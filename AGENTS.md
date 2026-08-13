@@ -1,13 +1,13 @@
-# Agent Instructions
+# 에이전트 지침
 
-## Vendored repositories
+## 벤더링된 저장소
 
-`repos/` contains third-party source vendored for agent reference.
+`repos/`에는 에이전트가 참조할 수 있도록 포함한 서드 파티 소스가 있습니다.
 
-- Treat it as read-only reference material, not application code.
-- Do not import from or edit files under `repos/`.
-- When working with an associated dependency, prefer its vendored implementation and tests over web search or generated API guesses.
+- 애플리케이션 코드가 아닌 읽기 전용 참조 자료로 취급합니다.
+- `repos/` 아래 파일을 수정하거나 여기서 import하지 않습니다.
+- 관련 의존성을 작업할 때는 웹 검색이나 추측한 API보다 벤더링된 구현과 테스트를 우선합니다.
 
 ## Effect
 
-When writing or reviewing code that imports `effect`, inspect the relevant implementation and tests under `repos/effect/packages/effect/` first. The subtree is pinned to the same version as the `effect` dependency; keep both versions aligned when updating.
+`effect`를 import하는 코드를 작성하거나 검토할 때는 먼저 `repos/effect/packages/effect/`의 관련 구현과 테스트를 확인합니다. 이 subtree는 `effect` 의존성과 같은 버전으로 고정되어 있으므로, 업데이트할 때 두 버전을 항상 일치시킵니다.

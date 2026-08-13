@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@toss/tds-mobile";
 // create-ait-app:sample-imports:start
 import { InAppAdsPage } from "./pages/InAppAdsPage";
 // create-ait-app:sample-imports:end
@@ -16,7 +17,9 @@ function App() {
       <p>원하는 기능을 샌드박스 앱이나 토스 앱에서 확인해 보세요.</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {/* create-ait-app:sample-buttons:start */}
-        <button type="button" onClick={() => setPage("iaa")}>인앱 광고 테스트하기</button>
+        <Button display="block" type="button" onClick={() => setPage("iaa")}>
+          인앱 광고 테스트하기
+        </Button>
         {/* create-ait-app:sample-buttons:end */}
       </div>
     </main>
