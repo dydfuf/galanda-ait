@@ -44,3 +44,14 @@ npm run deploy
 ```
 
 플랫폼 설정은 `apps-in-toss.config.ts`에서 관리해요.
+
+## Effect with AI agents
+
+`repos/effect` vendors the source matching the installed `effect` package so coding agents can follow real Effect patterns. Application code imports from `effect`, never from `repos/effect`.
+
+To upgrade both together:
+
+```bash
+npm install effect@<version> --save-exact
+git subtree pull --prefix=repos/effect https://github.com/Effect-TS/effect.git effect@<version> --squash
+```
