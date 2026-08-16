@@ -1,39 +1,178 @@
+import { css } from "@emotion/react";
 import { useInAppAds } from "../hooks/useInAppAds";
-import "./InAppAdsPage.css";
+import { useAppNavigation } from "../hooks/useAppNavigation.ts";
 
 // TODO: 서비스를 출시하기 전에 앱인토스 콘솔에서 발급한 광고 그룹 ID로 변경해 주세요.
 const TEST_INTERSTITIAL_ID = "ait-ad-test-interstitial-id";
 const TEST_REWARDED_ID = "ait-ad-test-rewarded-id";
 
 interface InAppAdsPageProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
+const pageContainerStyle = css`
+  padding: max(16px, env(safe-area-inset-top, 16px)) 20px calc(40px + env(safe-area-inset-bottom, 0px));
+`;
+
+const backRowStyle = css`
+  margin-bottom: 12px;
+`;
+
+const backButtonStyle = css`
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--adaptiveGrey800, #333d4b);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+
+  &:active {
+    opacity: 0.7;
+    background-color: var(--adaptiveGrey100, #f2f4f6);
+  }
+`;
+
+const headerStyle = css`
+  margin-bottom: 24px;
+`;
+
+const titleStyle = css`
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: var(--adaptiveGrey900, #191f28);
+`;
+
+const subtitleStyle = css`
+  font-size: 13px;
+  color: var(--adaptiveGrey500, #8b95a1);
+  margin: 0;
+`;
+
+const sectionListStyle = css`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const sectionCardStyle = css`
+  background-color: var(--adaptiveBackground, #ffffff);
+  border-radius: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const sectionRowStyle = css`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+`;
+
+const sectionInfoStyle = css`
+  flex: 1;
+`;
+
+const sectionTitleStyle = css`
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--adaptiveGrey900, #191f28);
+  margin: 0 0 4px 0;
+`;
+
+const sectionDescStyle = css`
+  font-size: 13px;
+  color: var(--adaptiveGrey500, #8b95a1);
+  margin: 0;
+`;
+
+const actionButtonStyle = css`
+  padding: 8px 16px;
+  border-radius: 8px;
+  background-color: var(--adaptiveBlue50, #e8f3ff);
+  color: var(--adaptiveBlue600, #1b64da);
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background-color: #dbeafe;
+  }
+
+  &:active:not(:disabled) {
+    opacity: 0.8;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const rewardMessageStyle = css`
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--adaptiveBlue500, #3182f6);
+  margin: 4px 0 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--adaptiveGrey100, #f2f4f6);
+`;
+
 export function InAppAdsPage({ onBack }: InAppAdsPageProps) {
+  const { goBack } = useAppNavigation();
   const interstitial = useInAppAds(TEST_INTERSTITIAL_ID);
   const rewarded = useInAppAds(TEST_REWARDED_ID);
 
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      goBack();
+    }
+  };
+
   return (
-    <>
-      <div className="app-header">
-        <h1 className="page-title">인앱 광고</h1>
+    <div css={pageContainerStyle}>
+      <div css={backRowStyle}>
+        <button
+          type="button"
+          onClick={handleBack}
+          css={backButtonStyle}
+        >
+          ← 뒤로가기
+        </button>
+      </div>
+
+      <header css={headerStyle}>
+        <h1 css={titleStyle}>인앱 광고</h1>
         {!interstitial.isSupported && (
-          <p className="page-subtitle">
+          <p css={subtitleStyle}>
             이 환경에서는 인앱 광고를 사용할 수 없어요.
           </p>
         )}
-      </div>
+      </header>
 
-      <div className="iaa-section-list">
-        <div className="iaa-section">
-          <div className="iaa-section-row">
-            <div className="iaa-section-info">
-              <h2 className="iaa-section-title">전면형 광고</h2>
-              <p className="iaa-section-desc">화면 전체에 표시되는 광고</p>
+      <div css={sectionListStyle}>
+        <div css={sectionCardStyle}>
+          <div css={sectionRowStyle}>
+            <div css={sectionInfoStyle}>
+              <h2 css={sectionTitleStyle}>전면형 광고</h2>
+              <p css={sectionDescStyle}>화면 전체에 표시되는 광고</p>
             </div>
             <button
               type="button"
-              className="iaa-section-button"
+              css={actionButtonStyle}
               onClick={interstitial.showAd}
               disabled={!interstitial.isAdLoaded}
             >
@@ -42,15 +181,15 @@ export function InAppAdsPage({ onBack }: InAppAdsPageProps) {
           </div>
         </div>
 
-        <div className="iaa-section">
-          <div className="iaa-section-row">
-            <div className="iaa-section-info">
-              <h2 className="iaa-section-title">보상형 광고</h2>
-              <p className="iaa-section-desc">시청 완료 시 보상을 받는 광고</p>
+        <div css={sectionCardStyle}>
+          <div css={sectionRowStyle}>
+            <div css={sectionInfoStyle}>
+              <h2 css={sectionTitleStyle}>보상형 광고</h2>
+              <p css={sectionDescStyle}>시청 완료 시 보상을 받는 광고</p>
             </div>
             <button
               type="button"
-              className="iaa-section-button"
+              css={actionButtonStyle}
               onClick={rewarded.showAd}
               disabled={!rewarded.isAdLoaded}
             >
@@ -59,21 +198,13 @@ export function InAppAdsPage({ onBack }: InAppAdsPageProps) {
           </div>
 
           {rewarded.lastReward && (
-            <p className="iaa-reward-message">
+            <p css={rewardMessageStyle}>
               보상 획득: {rewarded.lastReward.unitType}{" "}
               {rewarded.lastReward.unitAmount}개
             </p>
           )}
         </div>
       </div>
-
-      <button
-        type="button"
-        className="text-button iaa-back-btn"
-        onClick={onBack}
-      >
-        ← 홈으로
-      </button>
-    </>
+    </div>
   );
 }

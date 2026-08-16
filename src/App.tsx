@@ -1,28 +1,15 @@
-import { useState } from "react";
-import { Button } from "@toss/tds-mobile";
-// create-ait-app:sample-imports:start
-import { InAppAdsPage } from "./pages/InAppAdsPage";
-// create-ait-app:sample-imports:end
+import { BrowserRouter } from "react-router-dom";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./app/query-client.ts";
+import { AppRouter } from "./app/router.tsx";
 
 function App() {
-  const [page, setPage] = useState<string | null>(null);
-
-  // create-ait-app:sample-routes:start
-  if (page === "iaa") return <InAppAdsPage onBack={() => setPage(null)} />;
-  // create-ait-app:sample-routes:end
-
   return (
-    <main>
-      <h1>Apps in Toss</h1>
-      <p>원하는 기능을 샌드박스 앱이나 토스 앱에서 확인해 보세요.</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {/* create-ait-app:sample-buttons:start */}
-        <Button display="block" type="button" onClick={() => setPage("iaa")}>
-          인앱 광고 테스트하기
-        </Button>
-        {/* create-ait-app:sample-buttons:end */}
-      </div>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppRouter />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
