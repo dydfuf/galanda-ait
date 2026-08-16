@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import type { TripId } from "../domain/ids.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import type { NotFoundError } from "../domain/errors.ts";
@@ -11,6 +11,14 @@ export const getTripRoom = (
     const repo = yield* TripRoomRepository;
     return yield* repo.getRoom(roomId);
   });
+
+export const findTripRoom = (
+  roomId: TripId
+): Effect.Effect<Option.Option<TripRoom>, never, TripRoomRepository> =>
+  getTripRoom(roomId).pipe(
+    Effect.map(Option.some),
+    Effect.catchTag("NotFoundError", () => Effect.succeed(Option.none()))
+  );
 
 export const getTripRooms = (): Effect.Effect<
   ReadonlyArray<TripRoom>,
