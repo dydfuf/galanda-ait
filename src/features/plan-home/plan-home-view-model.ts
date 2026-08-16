@@ -38,27 +38,92 @@ export const toTripRoomViewModel = (room: TripRoom): TripRoomViewModel => {
     decisionSubText = "마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.";
   }
 
+  const baseMembers = room.members.length > 0 ? room.members.length : 1;
+
   const plans: ReadonlyArray<PlanCardData> = room.plans.map((p, idx) => {
     const isPlanConfirmed = p.id === room.confirmedPlanId;
     const isBasic = idx === 0;
-
-    // 기본 시뮬레이션 데이터 (MVP / 스캐폴딩 presentation 매핑)
-    const nights = 3;
-    const days = 4;
-    const baseMembers = room.members.length > 0 ? room.members.length : 4;
-    const groupCost = 3200000 + idx * 240000;
-    const perPersonCost = Math.round(groupCost / baseMembers);
+    const authorName =
+      p.authorName ??
+      room.members.find((m) => m.id === p.authorId)?.name ??
+      (room.members[0]?.name ?? "작성자");
+    const headcount = p.baseHeadcount ?? baseMembers;
 
     const route =
-      p.places.length > 0
-        ? p.places.slice(0, 3).map((place, pIdx) => ({
-            city: place.name.split(" ")[0] || room.destination,
-            nights: pIdx === 0 ? 1 : 2,
-          }))
-        : [
-            { city: room.destination, nights: 2 },
-            { city: "인근 지역", nights: 1 },
-          ];
+      p.routes && p.routes.length > 0
+        ? p.routes.map((r) => ({ city: r.city, nights: r.nights }))
+        : p.places.length > 0
+          ? p.places.slice(0, 3).map((place, pIdx) => ({
+              city: place.name.split(" ")[0] || room.destination,
+              nights: pIdx === 0 ? 1 : 2,
+            }))
+          : [{ city: room.destination, nights: 1 }];
+
+    const nights = route.reduce((acc, curr) => acc + curr.nights, 0) || 1;
+    const days = nights + 1;
+
+    let minTotal = 0;
+    let maxTotal = 0;
+    let hasCost = false;
+
+    if (p.accommodations) {
+      for (const a of p.accommodations) {
+        if (a.priceRange && (a.priceRange.min > 0 || a.priceRange.max > 0)) {
+          minTotal += a.priceRange.min;
+          maxTotal += a.priceRange.max;
+          hasCost = true;
+        }
+      }
+    }
+    if (p.transports) {
+      for (const t of p.transports) {
+        if (t.priceRange && (t.priceRange.min > 0 || t.priceRange.max > 0)) {
+          minTotal += t.priceRange.min;
+          maxTotal += t.priceRange.max;
+          hasCost = true;
+        }
+      }
+    }
+
+    const groupCostText = hasCost
+      ? minTotal === maxTotal
+        ? `그룹 총액 약 ${Math.round(minTotal / 10000)}만원`
+        : `그룹 총액 약 ${Math.round(minTotal / 10000)}~${Math.round(maxTotal / 10000)}만원`
+      : "예상 경비 미정";
+
+    const perPersonCostText = hasCost
+      ? minTotal === maxTotal
+        ? `${headcount}명 기준 1인 ${Math.round(minTotal / headcount / 10000)}만원`
+        : `${headcount}명 기준 1인 ${Math.round(minTotal / headcount / 10000)}~${Math.round(maxTotal / headcount / 10000)}만원`
+      : "비용 미정";
+
+    // 예약 경고 상태 계산
+    let bookingAlert: string | undefined = undefined;
+    if (p.accommodations) {
+      const fullStay = p.accommodations.find((a) => a.bookingStatus === "FULL");
+      const checkStay = p.accommodations.find(
+        (a) => a.bookingStatus === "NEED_CHECK"
+      );
+      if (fullStay) {
+        bookingAlert = `${fullStay.city} 숙소 만실 확인 필요`;
+      } else if (checkStay) {
+        bookingAlert = `${checkStay.city} 숙소 잔여 객실 확인 필요`;
+      }
+    }
+
+    const likeCount = p.memberOpinions
+      ? p.memberOpinions.filter((m) => m.reaction === "LIKE").length
+      : p.voteCount;
+    const okayCount = p.memberOpinions
+      ? p.memberOpinions.filter((m) => m.reaction === "OKAY").length
+      : 0;
+    const hardCount = p.memberOpinions
+      ? p.memberOpinions.filter((m) => m.reaction === "HARD").length
+      : 0;
+
+    const myOpinion = p.memberOpinions?.find(
+      (m) => m.userId === "user-local-me" || m.userId === "user-local-host"
+    );
 
     return {
       id: p.id,
@@ -69,17 +134,17 @@ export const toTripRoomViewModel = (room: TripRoom): TripRoomViewModel => {
       nights,
       days,
       route,
-      differenceSummary: !isBasic ? "체류 배분 및 추천 코스 변경" : undefined,
-      groupCostText: `그룹 총액 약 ${(groupCost / 10000).toLocaleString()}만원`,
-      perPersonCostText: `${baseMembers}명 기준 1인 ${(perPersonCost / 10000).toLocaleString()}만원`,
-      bookingAlert: idx === 1 ? "숙소 1개 만실 여부 확인 필요" : undefined,
-      authorName: room.members[idx % room.members.length]?.name ?? "작성자",
+      differenceSummary: p.differenceSummary,
+      groupCostText,
+      perPersonCostText,
+      bookingAlert,
+      authorName,
       opinions: {
-        likeCount: Math.max(1, p.voteCount),
-        okayCount: 1,
-        hardCount: idx === 1 ? 1 : 0,
+        likeCount,
+        okayCount,
+        hardCount,
       },
-      myReaction: idx === 0 ? "LIKE" : undefined,
+      myReaction: myOpinion?.reaction,
       isConfirmed: isPlanConfirmed,
     };
   });

@@ -1,10 +1,19 @@
 import { Effect, Layer, Schema } from "effect";
-import { TripRoomRepository } from "../../core/ports/trip-room-repository.ts";
+import {
+  TripRoomRepository,
+  type CreateRoomParams,
+  type UpdateRoomParams,
+} from "../../core/ports/trip-room-repository.ts";
 import { TripRoomSchema } from "../../core/domain/room.ts";
 import { ConflictError, NotFoundError } from "../../core/domain/errors.ts";
 import { supabase } from "./supabase-client.ts";
 import type { PlanId, Revision, TripId } from "../../core/domain/ids.ts";
-import type { TripRoom } from "../../core/domain/room.ts";
+import type {
+  PlanMemberOpinion,
+  TripMember,
+  TripPlan,
+  TripRoom,
+} from "../../core/domain/room.ts";
 
 export const SupabaseTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
   getRooms: () =>
@@ -30,10 +39,89 @@ export const SupabaseTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository,
       catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
     }),
 
+  createRoom: (params: CreateRoomParams) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase
+          .from("trip_rooms")
+          .insert({
+            title: params.title.trim(),
+            destination: params.destination?.trim() || "여행지",
+            start_date: params.startDate,
+            end_date: params.endDate,
+            host_user: params.hostUser,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: "new" }),
+    }),
+
+  updateRoom: (
+    roomId: TripId,
+    params: UpdateRoomParams,
+    expectedRevision: Revision
+  ) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase.rpc("update_trip_room", {
+          room_id: roomId,
+          room_data: params,
+          expected_revision: expectedRevision,
+        });
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
+    }),
+
+  createPlan: (roomId: TripId, plan: TripPlan, expectedRevision: Revision) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase.rpc("create_trip_plan", {
+          room_id: roomId,
+          plan_data: plan,
+          expected_revision: expectedRevision,
+        });
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
+    }),
+
+  updatePlan: (roomId: TripId, plan: TripPlan, expectedRevision: Revision) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase.rpc("update_trip_plan", {
+          room_id: roomId,
+          plan_data: plan,
+          expected_revision: expectedRevision,
+        });
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
+    }),
+
+  deletePlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase.rpc("delete_trip_plan", {
+          room_id: roomId,
+          plan_id: planId,
+          expected_revision: expectedRevision,
+        });
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
+    }),
+
   confirmPlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
     Effect.tryPromise({
       try: async () => {
-        // 원자적 Database Function 호출 (revision 일치 시에만 업데이트)
         const { data, error } = await supabase.rpc("confirm_trip_plan", {
           room_id: roomId,
           plan_id: planId,
@@ -56,5 +144,38 @@ export const SupabaseTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository,
         e instanceof ConflictError
           ? e
           : new NotFoundError({ entity: "TripRoom", id: roomId }),
+    }),
+
+  setPlanOpinion: (
+    roomId: TripId,
+    planId: PlanId,
+    opinion: PlanMemberOpinion,
+    expectedRevision: Revision
+  ) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase.rpc("set_plan_opinion", {
+          room_id: roomId,
+          plan_id: planId,
+          opinion_data: opinion,
+          expected_revision: expectedRevision,
+        });
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
+    }),
+
+  joinRoom: (roomId: TripId, member: TripMember) =>
+    Effect.tryPromise({
+      try: async () => {
+        const { data, error } = await supabase.rpc("join_trip_room", {
+          room_id: roomId,
+          member_data: member,
+        });
+        if (error) throw error;
+        return Schema.decodeUnknownSync(TripRoomSchema)(data);
+      },
+      catch: () => new NotFoundError({ entity: "TripRoom", id: roomId }),
     }),
 });

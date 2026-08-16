@@ -4,8 +4,8 @@ import { UserIdSchema } from "../../core/domain/ids.ts";
 import type { UserSession } from "../../core/domain/room.ts";
 
 const DEFAULT_LOCAL_USER: UserSession = {
-  userId: UserIdSchema.make("user-local-host"),
-  name: "로컬 호스트",
+  userId: UserIdSchema.make("user-local-me"),
+  name: "나",
   isAuthenticated: true,
 };
 

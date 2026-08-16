@@ -1,113 +1,92 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { css } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
+import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { Result } from "effect";
-import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
-import { RouteRail } from "../common/RouteRail.tsx";
+import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
+import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
+import { BasicInfoSection } from "./components/BasicInfoSection.tsx";
+import { RouteCitySection } from "./components/RouteCitySection.tsx";
+import { AccommodationSection } from "./components/AccommodationSection.tsx";
+import { TransportSection } from "./components/TransportSection.tsx";
+import { CostSummarySection } from "./components/CostSummarySection.tsx";
+import { ValidationBanner } from "./components/ValidationBanner.tsx";
+import { useUpdatePlanMutation } from "./mutations.ts";
+import type { TripPlan } from "../../core/domain/room.ts";
 
-const loadingContainerStyle = css`
-  padding: 24px;
-  text-align: center;
+const pageContainerStyle = css`
+  padding: 16px 20px calc(48px + env(safe-area-inset-bottom, 0px));
+  max-width: 640px;
+  margin: 0 auto;
 `;
 
-const loadingTextStyle = css`
+const loadingContainerStyle = css`
+  padding: 40px 20px;
+  text-align: center;
   color: var(--adaptiveGrey600, #6b7684);
   font-size: 15px;
 `;
 
-const pageContainerStyle = css`
-  padding: 16px 20px calc(40px + env(safe-area-inset-bottom, 0px));
-`;
-
-const pageHeaderStyle = css`
-  margin-bottom: 20px;
-`;
-
-const pageTitleStyle = css`
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const pageSubtitleStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin: 0;
-`;
-
-const formCardStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background-color: var(--adaptiveBackground, #ffffff);
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-`;
-
-const fieldLabelStyle = css`
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--adaptiveGrey800, #333d4b);
-  margin-bottom: 8px;
-`;
-
-const inputStyle = css`
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  font-size: 15px;
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
-  transition: border-color 0.15s ease;
-
-  &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
-  }
-`;
-
-const submitWrapperStyle = css`
-  margin-top: 12px;
+const bottomCTAWrapperStyle = css`
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--adaptiveBackground, #ffffff) 20%);
+  padding: 16px 0 env(safe-area-inset-bottom, 0px);
+  margin-top: 16px;
 `;
 
 export function PlanEditPage() {
   const params = useParams();
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validated = decodeRouteParams(PlanParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
 
-  const { data: room, isLoading, isError } = useTripRoomDetailQuery(tripId);
+  const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
+  const updatePlanMutation = useUpdatePlanMutation();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const plan = room?.plans.find((p) => p.id === planId);
 
-  useEffect(() => {
-    if (plan) {
-      setTitle(plan.title);
-    }
-  }, [plan]);
+  const {
+    title,
+    setTitle,
+    proposalReason,
+    setProposalReason,
+    baseHeadcount,
+    setBaseHeadcount,
+    routes,
+    totalTripNights,
+    currentTotalNights,
+    handleAddCity,
+    handleUpdateCity,
+    handleRemoveCity,
+    accommodations,
+    handleAddAccommodation,
+    handleUpdateAccommodation,
+    handleRemoveAccommodation,
+    transports,
+    handleAddTransport,
+    handleUpdateTransport,
+    handleRemoveTransport,
+    costSummary,
+    validation,
+    lastSavedTime,
+    clearDraft,
+  } = usePlanEditorState(room, plan, undefined);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
   }
 
   if (isLoading) {
-    return (
-      <div css={loadingContainerStyle}>
-        <p css={loadingTextStyle}>데이터를 불러오는 중입니다...</p>
-      </div>
-    );
+    return <div css={loadingContainerStyle}>여행안 정보를 불러오는 중입니다...</div>;
   }
 
   if (isError || !room || !plan) {
@@ -119,58 +98,92 @@ export function PlanEditPage() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
-    // 스캐폴딩: 수정 완료 후 상세 페이지로 이동 (문서 10절)
-    setTimeout(() => {
+    try {
+      const updatedPlan: TripPlan = {
+        ...plan,
+        title: title.trim(),
+        proposalReason: proposalReason.trim() || undefined,
+        baseHeadcount,
+        routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
+        accommodations: [...accommodations],
+        transports: [...transports],
+      };
+
+      await updatePlanMutation.mutateAsync({
+        roomId: tripId,
+        plan: updatedPlan,
+        expectedRevision: room.revision,
+      });
+
+      clearDraft();
+      navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
+    } catch {
       setIsSubmitting(false);
-      navigate(`/trips/${tripId}/plans/${planId}`, { replace: true });
-    }, 500);
+    }
   };
 
   return (
     <div css={pageContainerStyle}>
-      <header css={pageHeaderStyle}>
-        <h1 css={pageTitleStyle}>
-          여행안 수정하기
-        </h1>
-        <p css={pageSubtitleStyle}>
-          내가 제안한 여행안의 내용을 변경합니다.
-        </p>
-      </header>
+      <PlanEditorHeader
+        isEditMode={true}
+        isCloneMode={false}
+        lastSavedTime={lastSavedTime}
+        onClearDraft={clearDraft}
+      />
 
-      <form onSubmit={handleSubmit} css={formCardStyle}>
-        <div>
-          <label css={fieldLabelStyle}>
-            여행안 제목 *
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            css={inputStyle}
-            required
+      <form onSubmit={handleSubmit}>
+        <BasicInfoSection
+          title={title}
+          onTitleChange={setTitle}
+          proposalReason={proposalReason}
+          onProposalReasonChange={setProposalReason}
+          baseHeadcount={baseHeadcount}
+          onBaseHeadcountChange={setBaseHeadcount}
+        />
+
+        <RouteCitySection
+          routes={routes}
+          totalTripNights={totalTripNights}
+          currentTotalNights={currentTotalNights}
+          onAddCity={handleAddCity}
+          onUpdateCity={handleUpdateCity}
+          onRemoveCity={handleRemoveCity}
+        />
+
+        <AccommodationSection
+          accommodations={accommodations}
+          routes={routes}
+          onAdd={handleAddAccommodation}
+          onUpdate={handleUpdateAccommodation}
+          onRemove={handleRemoveAccommodation}
+        />
+
+        <TransportSection
+          transports={transports}
+          onAdd={handleAddTransport}
+          onUpdate={handleUpdateTransport}
+          onRemove={handleRemoveTransport}
+        />
+
+        <CostSummarySection costSummary={costSummary} />
+
+        <div css={bottomCTAWrapperStyle}>
+          <ValidationBanner
+            firstError={validation.firstError}
+            errorCount={validation.errorCount}
           />
-        </div>
-
-        <div>
-          <label css={fieldLabelStyle}>
-            경로 코스
-          </label>
-          <RouteRail route={plan.route} differenceSummary={plan.differenceSummary} />
-        </div>
-
-        <div css={submitWrapperStyle}>
           <Button
             display="block"
             size="large"
             type="submit"
-            disabled={isSubmitting || !title.trim()}
+            disabled={!validation.isValid || isSubmitting}
           >
-            {isSubmitting ? "저장 중..." : "수정 완료"}
+            {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
           </Button>
         </div>
       </form>

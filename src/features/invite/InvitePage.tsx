@@ -5,6 +5,12 @@ import { decodeRouteParams, InviteParamsSchema } from "../../app/routes/route-pa
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { Result } from "effect";
 import { useState } from "react";
+import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import { appRuntime } from "../../app/runtime.ts";
+import { joinTripRoomUseCase } from "../../core/usecases/join-room.ts";
+import { TripIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
+import { useQueryClient } from "@tanstack/react-query";
+import { tripRoomKeys } from "../plan-home/queries.ts";
 
 const pageContainerStyle = css`
   padding: max(24px, env(safe-area-inset-top, 24px)) 20px calc(32px + env(safe-area-inset-bottom, 0px));
@@ -94,9 +100,13 @@ const backHomeLinkStyle = css`
 export function InvitePage() {
   const params = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isAccepting, setIsAccepting] = useState(false);
 
   const validated = decodeRouteParams(InviteParamsSchema, params);
+  const inviteToken = Result.isSuccess(validated) ? validated.success.inviteToken : "";
+  const { data: room, isLoading, isError } = useTripRoomRawQuery(inviteToken);
+
   if (Result.isFailure(validated)) {
     return (
       <RouteErrorFallback
@@ -106,16 +116,59 @@ export function InvitePage() {
     );
   }
 
-  const { inviteToken } = validated.success;
 
-  const handleAccept = () => {
+  const handleAccept = async () => {
+    if (!room) return;
     setIsAccepting(true);
-    setTimeout(() => {
+    try {
+      await appRuntime.runPromise(
+        joinTripRoomUseCase({
+          roomId: TripIdSchema.make(room.id),
+          member: {
+            id: UserIdSchema.make(`user-${Date.now()}`),
+            name: "새 참여자",
+            role: "MEMBER",
+          },
+        })
+      );
+      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
+      navigate(`/trips/${room.id}/plans`, { replace: true });
+    } catch {
       setIsAccepting(false);
-      // Mock: 참여 완료 후 해당 여행방으로 이동
-      navigate("/trips/room-1", { replace: true });
-    }, 600);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div css={pageContainerStyle}>
+        <p style={{ color: "var(--adaptiveGrey500, #8b95a1)" }}>초대장 정보를 확인하는 중...</p>
+      </div>
+    );
+  }
+
+  if (isError || !room) {
+    return (
+      <div css={pageContainerStyle}>
+        <div css={cardStyle}>
+          <span css={iconStyle}>⚠️</span>
+          <h1 css={titleStyle}>여행방을 찾을 수 없어요</h1>
+          <p css={descriptionStyle}>
+            초대 링크의 여행방이 이미 삭제되었거나 존재하지 않습니다.
+          </p>
+          <Button
+            display="block"
+            size="medium"
+            type="button"
+            onClick={() => navigate("/trips", { replace: true })}
+          >
+            내 여행 목록으로 가기
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const hostName = room.members[0]?.name ?? "호스트";
 
   return (
     <div css={pageContainerStyle}>
@@ -127,21 +180,21 @@ export function InvitePage() {
           여행에 초대받았어요!
         </h1>
         <p css={descriptionStyle}>
-          <strong>민수</strong>님이 <strong>2026 제주 힐링 여행</strong>에<br />
+          <strong>{hostName}</strong>님이 <strong>{room.title}</strong>에<br />
           함께하자고 초대장을 보냈습니다.
         </p>
 
         <div css={summaryBoxStyle}>
           <div css={summaryRowStyle}>
-            <span css={summaryLabelStyle}>목적지: </span>제주도
+            <span css={summaryLabelStyle}>목적지: </span>{room.destination}
           </div>
           <div css={summaryRowStyle}>
-            <span css={summaryLabelStyle}>일정: </span>2026.09.12 ~ 09.15
+            <span css={summaryLabelStyle}>일정: </span>{room.startDate} ~ {room.endDate}
           </div>
           <div>
-            <span css={summaryLabelStyle}>초대 코드: </span>
+            <span css={summaryLabelStyle}>참여 인원: </span>
             <code css={codeStyle}>
-              {inviteToken}
+              {room.members.length}명 참여 중
             </code>
           </div>
         </div>

@@ -3,6 +3,7 @@ import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
 import type { TimelineItem } from "./components/DetailTimeline.tsx";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
 import type { PlanCardData } from "../plan-home/components/PlanCard.tsx";
+import { calculatePlanCost, formatCostRangeText } from "../../core/calculations/plan-cost.ts";
 
 export interface PlanMemberOpinionViewModel {
   readonly userId: string;
@@ -54,110 +55,132 @@ export const toPlanDetailViewModel = (room: TripRoom): PlanDetailViewModel => {
     decisionSubText = "마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.";
   }
 
-  const baseMembers = room.members.length > 0 ? room.members.length : 4;
+  const baseMembers = room.members.length > 0 ? room.members.length : 1;
 
   const plans: ReadonlyArray<DetailedPlanViewModel> = room.plans.map((p, idx) => {
     const isPlanConfirmed = p.id === room.confirmedPlanId;
     const isBasic = idx === 0;
-    const author = room.members[idx % room.members.length] ?? { name: "호스트" };
-
-    const nights = 3;
-    const days = 4;
-    const groupCost = 3200000 + idx * 240000;
-    const perPersonCost = Math.round(groupCost / baseMembers);
+    const authorName =
+      p.authorName ??
+      room.members.find((m) => m.id === p.authorId)?.name ??
+      (room.members[0]?.name ?? "작성자");
+    const headcount = p.baseHeadcount ?? baseMembers;
 
     const route =
-      p.places.length > 0
-        ? p.places.slice(0, 3).map((place, pIdx) => ({
-            city: place.name.split(" ")[0] || room.destination,
-            nights: pIdx === 0 ? 1 : 2,
-          }))
-        : [
-            { city: room.destination, nights: 2 },
-            { city: "인근 지역", nights: 1 },
-          ];
+      p.routes && p.routes.length > 0
+        ? p.routes.map((r) => ({ city: r.city, nights: r.nights }))
+        : p.places.length > 0
+          ? p.places.slice(0, 3).map((place, pIdx) => ({
+              city: place.name.split(" ")[0] || room.destination,
+              nights: pIdx === 0 ? 1 : 2,
+            }))
+          : [{ city: room.destination, nights: 1 }];
+
+    const nights = route.reduce((acc, curr) => acc + curr.nights, 0) || 1;
+    const days = nights + 1;
+
+    // 비용 계산
+    const costSummary = calculatePlanCost(p.accommodations, p.transports, headcount);
+    const groupCostText = costSummary.hasCost
+      ? `그룹 총액 ${formatCostRangeText(costSummary.minTotal, costSummary.maxTotal)}`
+      : "예상 경비 미정";
+    const perPersonCostText = costSummary.hasCost
+      ? `${headcount}명 기준 1인 ${formatCostRangeText(costSummary.minPerPerson, costSummary.maxPerPerson)}`
+      : "비용 미정";
 
     // 예약 위험 요약 (PL-02 2번 섹션)
-    const bookingRisks: ReadonlyArray<BookingRiskItem> =
-      idx === 1
-        ? [
-            {
-              level: "WARNING",
-              message: "서귀포 숙소 잔여 객실 확인이 필요해요",
-              snapshotInfo: `${author.name} · 3일 전 확인 스냅샷`,
+    const bookingRisks: BookingRiskItem[] = [];
+    if (p.accommodations) {
+      for (const acc of p.accommodations) {
+        if (acc.bookingStatus === "NEED_CHECK") {
+          bookingRisks.push({
+            level: "WARNING",
+            message: `${acc.city} 숙소(${acc.hotelName}) 잔여 객실 확인이 필요해요`,
+            snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
+          });
+        } else if (acc.bookingStatus === "FULL") {
+          bookingRisks.push({
+            level: "DANGER",
+            message: `${acc.city} 숙소(${acc.hotelName})가 현재 만실 상태예요`,
+            snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
+          });
+        }
+      }
+    }
+
+    // 타임라인 아이템 (체류 + 이동 구간)
+    const timelineItems: TimelineItem[] = [];
+    if (p.accommodations && p.accommodations.length > 0) {
+      for (let i = 0; i < p.accommodations.length; i++) {
+        const acc = p.accommodations[i];
+        const stayStatus =
+          acc.bookingStatus === "NOT_CHECKED" || acc.isSearching
+            ? "SEARCHING"
+            : acc.bookingStatus;
+
+        timelineItems.push({
+          type: "STAY",
+          stay: {
+            id: acc.id,
+            city: acc.city,
+            period: acc.period,
+            nights: acc.nights,
+            hotelName: acc.hotelName,
+            priceText: acc.priceRange
+              ? `그룹 총액 ${formatCostRangeText(acc.priceRange.min, acc.priceRange.max)} (${headcount}명 기준)`
+              : "가격 미정",
+            bookingStatus: stayStatus,
+            confirmedInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근 확인"}`,
+            bookingUrl: acc.bookingUrl,
+          },
+        });
+
+        if (p.transports && p.transports[i]) {
+          const trans = p.transports[i];
+          const transStatus =
+            trans.bookingStatus === "FULL" || trans.bookingStatus === "NOT_CHECKED"
+              ? "SEARCHING"
+              : trans.bookingStatus;
+
+          timelineItems.push({
+            type: "TRANSPORT",
+            transport: {
+              id: trans.id,
+              fromCity: trans.fromCity,
+              toCity: trans.toCity,
+              mode: trans.mode,
+              hasTransfer: trans.hasTransfer,
+              durationText: trans.durationText,
+              priceText: trans.priceRange
+                ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
+                : "가격 미정",
+              bookingStatus: transStatus,
+              confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
+              bookingUrl: trans.bookingUrl,
             },
-          ]
+          });
+        }
+      }
+    }
+
+    // 구성원 의견 목록
+    const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> =
+      p.memberOpinions && p.memberOpinions.length > 0
+        ? p.memberOpinions.map((mo) => ({
+            userId: mo.userId,
+            userName: mo.userName,
+            reaction: mo.reaction,
+            reason: mo.reason,
+          }))
         : [];
-
-    // 타임라인 아이템 (체류 + 이동 구간 - PL-02 3번 섹션)
-    const timelineItems: ReadonlyArray<TimelineItem> = [
-      {
-        type: "STAY",
-        stay: {
-          id: `stay-${p.id}-1`,
-          city: route[0]?.city ?? room.destination,
-          period: "4월 10일~11일",
-          nights: route[0]?.nights ?? 1,
-          hotelName: idx === 0 ? "그랜드 조선 호텔" : "해비치 리조트 & 호텔",
-          priceText: `그룹 총액 ${(1200000 + idx * 100000).toLocaleString()}원 (${baseMembers}명 기준)`,
-          bookingStatus: "AVAILABLE",
-          confirmedInfo: `${author.name} · 어제 확인`,
-          bookingUrl: "https://toss.im",
-        },
-      },
-      {
-        type: "TRANSPORT",
-        transport: {
-          id: `transport-${p.id}-1`,
-          fromCity: route[0]?.city ?? room.destination,
-          toCity: route[1]?.city ?? "서귀포",
-          mode: "렌터카 카니발",
-          hasTransfer: false,
-          durationText: "약 50분",
-          priceText: "그룹 총액 약 240,000원",
-          bookingStatus: "AVAILABLE",
-          confirmedInfo: "김호스트 · 2일 전 확인",
-        },
-      },
-      {
-        type: "STAY",
-        stay: {
-          id: `stay-${p.id}-2`,
-          city: route[1]?.city ?? "서귀포",
-          period: "4월 11일~13일",
-          nights: route[1]?.nights ?? 2,
-          hotelName: idx === 0 ? "파르나스 호텔 제주" : "신라호텔 제주",
-          priceText: `그룹 총액 ${(1800000 + idx * 140000).toLocaleString()}원 (${baseMembers}명 기준)`,
-          bookingStatus: idx === 1 ? "NEED_CHECK" : "AVAILABLE",
-          confirmedInfo: `${author.name} · 3일 전 확인`,
-          bookingUrl: "https://toss.im",
-        },
-      },
-    ];
-
-    // 구성원 의견 목록 (PL-02 5번 섹션)
-    const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> = [
-      {
-        userId: "user-host",
-        userName: room.members[0]?.name ?? "김호스트",
-        reaction: "LIKE",
-      },
-      {
-        userId: "user-member-1",
-        userName: room.members[1]?.name ?? "이친구",
-        reaction: idx === 1 ? "HARD" : "OKAY",
-        reason: idx === 1 ? "숙소 이동이 많아 피로할 것 같아요." : undefined,
-      },
-      {
-        userId: "user-member-2",
-        userName: room.members[2]?.name ?? "박여행",
-        reaction: "LIKE",
-      },
-    ];
 
     const likeCount = memberOpinions.filter((m) => m.reaction === "LIKE").length;
     const okayCount = memberOpinions.filter((m) => m.reaction === "OKAY").length;
     const hardCount = memberOpinions.filter((m) => m.reaction === "HARD").length;
+
+    const myOpinion = memberOpinions.find(
+      (m) => m.userId === "user-local-me" || m.userId === "user-local-host"
+    );
 
     return {
       id: p.id,
@@ -168,21 +191,18 @@ export const toPlanDetailViewModel = (room: TripRoom): PlanDetailViewModel => {
       nights,
       days,
       route,
-      differenceSummary: !isBasic ? "서귀포 체류 중심 코스 및 숙소 변경" : undefined,
-      groupCostText: `그룹 총액 약 ${(groupCost / 10000).toLocaleString()}만원`,
-      perPersonCostText: `${baseMembers}명 기준 1인 ${(perPersonCost / 10000).toLocaleString()}만원`,
-      bookingAlert: idx === 1 ? "서귀포 숙소 잔여 객실 확인 필요" : undefined,
-      authorName: author.name,
-      proposalReason:
-        idx === 0
-          ? "첫날은 가볍게 오션뷰 카페를 즐기고 둘째 날부터 서귀포 힐링 코스로 이동하는 기본 일정입니다."
-          : "호텔 수영장과 서귀포 휴양림 중심의 여유로운 호캉스 코스입니다.",
+      differenceSummary: p.differenceSummary,
+      groupCostText,
+      perPersonCostText,
+      bookingAlert: bookingRisks[0]?.message,
+      authorName,
+      proposalReason: p.proposalReason ?? "",
       opinions: {
         likeCount,
         okayCount,
         hardCount,
       },
-      myReaction: idx === 0 ? "LIKE" : undefined,
+      myReaction: myOpinion?.reaction,
       isConfirmed: isPlanConfirmed,
       bookingRisks,
       timelineItems,

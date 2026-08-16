@@ -3,7 +3,9 @@ import { css } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomDetailQuery } from "./queries.ts";
+import { useSubmitOpinionMutation } from "./mutations.ts";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
+
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { Result } from "effect";
 import { RouteRail } from "../common/RouteRail.tsx";
@@ -268,10 +270,9 @@ export function PlanDetailPage() {
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
 
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
+  const submitOpinionMutation = useSubmitOpinionMutation();
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
-  const [currentReaction, setCurrentReaction] = useState<ReactionType | undefined>(undefined);
-  const [currentReason, setCurrentReason] = useState<string>("");
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -310,10 +311,16 @@ export function PlanDetailPage() {
   const isRoomConfirmed = Boolean(room.confirmedPlanId);
 
   const handleOpinionSubmit = (reaction: ReactionType, reason?: string) => {
-    setCurrentReaction(reaction);
-    setCurrentReason(reason ?? "");
+    submitOpinionMutation.mutate({
+      roomId: room.id,
+      planId: plan.id,
+      reaction,
+      reason,
+      expectedRevision: room.revision,
+    });
     setIsBottomSheetOpen(false);
   };
+
 
   return (
     <div css={pageContainerStyle}>
@@ -327,9 +334,28 @@ export function PlanDetailPage() {
             <span css={authorTextStyle}>{plan.authorName} 제안</span>
           </div>
 
-          <span css={periodTextStyle}>
-            {plan.period}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span css={periodTextStyle}>
+              {plan.period}
+            </span>
+            {!isConfirmed && !isRoomConfirmed && (
+              <button
+                type="button"
+                onClick={() => navigate(`/trips/${tripId}/plans/${plan.id}/edit`)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--adaptiveBlue600, #1b64da)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                }}
+              >
+                수정
+              </button>
+            )}
+          </div>
         </div>
 
         <h1 css={planTitleStyle}>
@@ -383,7 +409,7 @@ export function PlanDetailPage() {
         <section css={forkSectionStyle}>
           <button
             type="button"
-            onClick={() => navigate(`/trips/${tripId}/plans/new`)}
+            onClick={() => navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)}
             css={forkButtonStyle}
           >
             📋 이 여행안을 복제해 다른 구성으로 제안하기
@@ -445,9 +471,10 @@ export function PlanDetailPage() {
             display="block"
             size="large"
             type="button"
+            disabled={submitOpinionMutation.isPending}
             onClick={() => setIsBottomSheetOpen(true)}
           >
-            {currentReaction ? "내 의견 바꾸기" : "의견 남기기"}
+            {plan.myReaction ? "내 의견 바꾸기" : "의견 남기기"}
           </Button>
         )}
       </div>
@@ -456,10 +483,15 @@ export function PlanDetailPage() {
       <OpinionBottomSheet
         isOpen={isBottomSheetOpen}
         onClose={() => setIsBottomSheetOpen(false)}
-        initialReaction={currentReaction || (plan.myReaction as ReactionType)}
-        initialReason={currentReason}
+        initialReaction={plan.myReaction as ReactionType | undefined}
+        initialReason={
+          plan.memberOpinions.find(
+            (m) => m.userId === "user-local-me" || m.userId === "user-local-host"
+          )?.reason || ""
+        }
         onSubmit={handleOpinionSubmit}
       />
     </div>
   );
 }
+

@@ -1,260 +1,224 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { Result } from "effect";
+import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
+import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
+import { DiffBanner } from "./components/DiffBanner.tsx";
+import { BasicInfoSection } from "./components/BasicInfoSection.tsx";
+import { RouteCitySection } from "./components/RouteCitySection.tsx";
+import { AccommodationSection } from "./components/AccommodationSection.tsx";
+import { TransportSection } from "./components/TransportSection.tsx";
+import { CostSummarySection } from "./components/CostSummarySection.tsx";
+import { ValidationBanner } from "./components/ValidationBanner.tsx";
+import { useCreatePlanMutation } from "./mutations.ts";
+import { PlanIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
+import type { TripPlan } from "../../core/domain/room.ts";
 
 const pageContainerStyle = css`
-  padding: 16px 20px calc(40px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px calc(48px + env(safe-area-inset-bottom, 0px));
+  max-width: 640px;
+  margin: 0 auto;
 `;
 
-const pageHeaderStyle = css`
-  margin-bottom: 20px;
-`;
-
-const pageTitleStyle = css`
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const pageSubtitleStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin: 0;
-`;
-
-const formCardStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background-color: var(--adaptiveBackground, #ffffff);
-  padding: 20px;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-`;
-
-const fieldLabelStyle = css`
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--adaptiveGrey800, #333d4b);
-  margin-bottom: 8px;
-`;
-
-const inputStyle = css`
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+const loadingContainerStyle = css`
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--adaptiveGrey600, #6b7684);
   font-size: 15px;
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
-  transition: border-color 0.15s ease;
-
-  &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
-  }
 `;
 
-const inputSmallStyle = css`
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
-  transition: border-color 0.15s ease;
-
-  &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
-  }
-`;
-
-const cityListStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const cityRowStyle = css`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const cityIndexStyle = css`
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--adaptiveGrey500, #8b95a1);
-  width: 20px;
-`;
-
-const cityInputStyle = css`
-  flex: 1;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
-  transition: border-color 0.15s ease;
-
-  &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
-  }
-`;
-
-const addCityButtonStyle = css`
-  padding: 10px 12px;
-  border: 1px dashed var(--adaptiveGrey300, #d1d6db);
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border-radius: 8px;
-  color: var(--adaptiveBlue500, #3182f6);
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  margin-top: 4px;
-  transition: background-color 0.15s ease, transform 0.12s ease;
-
-  &:hover {
-    background-color: var(--adaptiveGrey100, #f2f4f6);
-  }
-
-  &:active {
-    transform: scale(0.99);
-  }
-`;
-
-const submitWrapperStyle = css`
-  margin-top: 8px;
+const bottomCTAWrapperStyle = css`
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--adaptiveBackground, #ffffff) 20%);
+  padding: 16px 0 env(safe-area-inset-bottom, 0px);
+  margin-top: 16px;
 `;
 
 export function PlanCreatePage() {
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const [title, setTitle] = useState("");
-  const [reason, setReason] = useState("");
-  const [cities, setCities] = useState<string[]>(["제주시", "서귀포시"]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const cloneFromPlanId = searchParams.get("cloneFrom");
 
   const validated = decodeRouteParams(TripParamsSchema, params);
+  const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
+
+  const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
+  const createPlanMutation = useCreatePlanMutation();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 복제 원본 플랜 찾기
+  const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
+
+  const {
+    title,
+    setTitle,
+    proposalReason,
+    setProposalReason,
+    baseHeadcount,
+    setBaseHeadcount,
+    routes,
+    totalTripNights,
+    currentTotalNights,
+    handleAddCity,
+    handleUpdateCity,
+    handleRemoveCity,
+    accommodations,
+    handleAddAccommodation,
+    handleUpdateAccommodation,
+    handleRemoveAccommodation,
+    transports,
+    handleAddTransport,
+    handleUpdateTransport,
+    handleRemoveTransport,
+    costSummary,
+    diffFromOriginal,
+    validation,
+    lastSavedTime,
+    clearDraft,
+  } = usePlanEditorState(room, undefined, cloneFromPlan);
+
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
   }
 
-  const { tripId } = validated.success;
+  if (isLoading) {
+    return <div css={loadingContainerStyle}>여행방 정보를 불러오는 중입니다...</div>;
+  }
 
-  const handleAddCity = () => {
-    setCities([...cities, ""]);
-  };
+  if (isError || !room) {
+    return (
+      <RouteErrorFallback
+        title="여행방을 찾을 수 없습니다"
+        message="요청하신 정보가 없거나 삭제되었습니다."
+      />
+    );
+  }
 
-  const handleCityChange = (index: number, val: string) => {
-    const next = [...cities];
-    next[index] = val;
-    setCities(next);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
-    // 스캐폴딩: 생성 시뮬레이션 후 생성된 여행안 상세 페이지로 이동
-    setTimeout(() => {
+    try {
+      const hostUser = room.members[0];
+      const authorId = hostUser?.id || UserIdSchema.make("user-local-me");
+      const authorName = hostUser?.name || "나";
+      const newPlanId = PlanIdSchema.make(`plan-${Date.now()}`);
+
+      const newPlan: TripPlan = {
+
+        id: newPlanId,
+        title: title.trim(),
+        status: "DRAFT",
+        proposalReason: proposalReason.trim() || undefined,
+        authorId,
+        authorName,
+        baseHeadcount,
+        routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
+        accommodations: [...accommodations],
+        transports: [...transports],
+        places: [],
+        clonedFromPlanId: cloneFromPlan ? cloneFromPlan.id : undefined,
+        differenceSummary: diffFromOriginal?.hasChanges ? diffFromOriginal.summaryText : undefined,
+        memberOpinions: [
+          {
+            userId: authorId,
+            userName: authorName,
+            reaction: "LIKE",
+          },
+        ],
+        voteCount: 1,
+      };
+
+
+      await createPlanMutation.mutateAsync({
+        roomId: tripId,
+        plan: newPlan,
+        expectedRevision: room.revision,
+      });
+
+      clearDraft();
+      navigate(`/trips/${tripId}/plans/${newPlan.id}`, { replace: true });
+    } catch {
       setIsSubmitting(false);
-      navigate(`/trips/${tripId}/plans`, { replace: true });
-    }, 500);
+    }
   };
 
   return (
     <div css={pageContainerStyle}>
-      <header css={pageHeaderStyle}>
-        <h1 css={pageTitleStyle}>
-          새 여행안 제안하기
-        </h1>
-        <p css={pageSubtitleStyle}>
-          코스와 방문 도시를 제안하고 친구들과 함께 비교해보세요.
-        </p>
-      </header>
+      <PlanEditorHeader
+        isEditMode={false}
+        isCloneMode={Boolean(cloneFromPlan)}
+        lastSavedTime={lastSavedTime}
+        onClearDraft={clearDraft}
+      />
 
-      <form onSubmit={handleSubmit} css={formCardStyle}>
-        <div>
-          <label css={fieldLabelStyle}>
-            여행안 제목 *
-          </label>
-          <input
-            type="text"
-            placeholder="예: 힐링 카페 & 호캉스 코스"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            css={inputStyle}
-            required
+      {cloneFromPlan && diffFromOriginal && (
+        <DiffBanner diff={diffFromOriginal} originalTitle={cloneFromPlan.title} />
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <BasicInfoSection
+          title={title}
+          onTitleChange={setTitle}
+          proposalReason={proposalReason}
+          onProposalReasonChange={setProposalReason}
+          baseHeadcount={baseHeadcount}
+          onBaseHeadcountChange={setBaseHeadcount}
+        />
+
+        <RouteCitySection
+          routes={routes}
+          totalTripNights={totalTripNights}
+          currentTotalNights={currentTotalNights}
+          differenceSummary={diffFromOriginal?.summaryText}
+          onAddCity={handleAddCity}
+          onUpdateCity={handleUpdateCity}
+          onRemoveCity={handleRemoveCity}
+        />
+
+        <AccommodationSection
+          accommodations={accommodations}
+          routes={routes}
+          onAdd={handleAddAccommodation}
+          onUpdate={handleUpdateAccommodation}
+          onRemove={handleRemoveAccommodation}
+        />
+
+        <TransportSection
+          transports={transports}
+          onAdd={handleAddTransport}
+          onUpdate={handleUpdateTransport}
+          onRemove={handleRemoveTransport}
+        />
+
+        <CostSummarySection costSummary={costSummary} />
+
+        <div css={bottomCTAWrapperStyle}>
+          <ValidationBanner
+            firstError={validation.firstError}
+            errorCount={validation.errorCount}
           />
-        </div>
-
-        <div>
-          <label css={fieldLabelStyle}>
-            제안 이유 (한 줄 요약)
-          </label>
-          <input
-            type="text"
-            placeholder="예: 이동 시간을 줄이고 여유롭게 호캉스를 즐기는 안입니다."
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            css={inputSmallStyle}
-          />
-        </div>
-
-        <div>
-          <label css={fieldLabelStyle}>
-            경유 도시 순서
-          </label>
-          <div css={cityListStyle}>
-            {cities.map((city, idx) => (
-              <div key={idx} css={cityRowStyle}>
-                <span css={cityIndexStyle}>
-                  {idx + 1}.
-                </span>
-                <input
-                  type="text"
-                  placeholder={`도시 ${idx + 1} 이름`}
-                  value={city}
-                  onChange={(e) => handleCityChange(idx, e.target.value)}
-                  css={cityInputStyle}
-                />
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={handleAddCity}
-              css={addCityButtonStyle}
-            >
-              + 도시 추가
-            </button>
-          </div>
-        </div>
-
-        <div css={submitWrapperStyle}>
           <Button
             display="block"
             size="large"
             type="submit"
-            disabled={isSubmitting || !title.trim()}
+            disabled={!validation.isValid || isSubmitting}
           >
-            {isSubmitting ? "작성 중..." : "여행안 제안 등록"}
+            {isSubmitting
+              ? "등록 중..."
+              : cloneFromPlan
+              ? "대안 여행안 제안하기"
+              : "여행안 제안 등록"}
           </Button>
         </div>
       </form>

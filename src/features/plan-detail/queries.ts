@@ -18,3 +18,13 @@ export const useTripRoomDetailQuery = (roomId: string) =>
     select: (room): PlanDetailViewModel => toPlanDetailViewModel(room),
     enabled: Boolean(roomId),
   });
+
+export const useTripRoomRawQuery = (roomId: string) =>
+  useQuery({
+    queryKey: tripRoomKeys.detail(roomId),
+    queryFn: ({ signal }) =>
+      appRuntime.runPromise(getTripRoom(TripIdSchema.make(roomId)), {
+        signal,
+      }),
+    enabled: Boolean(roomId),
+  });
