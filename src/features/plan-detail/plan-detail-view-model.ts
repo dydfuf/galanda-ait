@@ -16,6 +16,8 @@ export interface PlanMemberOpinionViewModel {
 
 export interface DetailedPlanViewModel extends PlanCardData {
   readonly authorId?: string;
+  /** 세션 사용자가 남긴 "어려워요" 사유 등 본인 의견 내용 (비로그인 시 undefined) */
+  readonly myOpinionReason?: string;
   readonly isAuthor: boolean;
   readonly canManage: boolean;
   readonly proposalReason: string;
@@ -189,9 +191,11 @@ export const toPlanDetailViewModel = (
     const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
     const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
 
-    const myOpinion = memberOpinions.find((m) =>
-      currentUserId ? m.userId === currentUserId : m.userId === "user-local-me"
-    );
+    // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
+    // (하드코딩된 로컬 사용자 폴백은 남의 의견을 내 것으로 표시하므로 사용하지 않는다)
+    const myOpinion = currentUserId
+      ? memberOpinions.find((m) => m.userId === currentUserId)
+      : undefined;
 
     return {
       id: p.id,
@@ -217,6 +221,7 @@ export const toPlanDetailViewModel = (
         hardCount,
       },
       myReaction: myOpinion?.reaction,
+      myOpinionReason: myOpinion?.reason,
       isConfirmed: isPlanConfirmed,
       bookingRisks,
       timelineItems,

@@ -49,13 +49,20 @@ const messageStyle = css`
   line-height: 1.5;
 `;
 
+const DEFAULT_TITLE = "접근할 수 없는 페이지입니다";
+const DEFAULT_MESSAGE = "요청하신 경로가 올바르지 않거나 변경되었습니다.";
+
 export function RouteErrorFallback({
-  title = "접근할 수 없는 페이지입니다",
-  message = "요청하신 경로가 올바르지 않거나 변경되었습니다.",
+  title,
+  message,
   actionText = "여행 목록으로 이동",
   onAction,
 }: RouteErrorFallbackProps) {
   const navigate = useNavigate();
+
+  // 빈 문자열이 전달돼도 안내 문구가 사라지지 않도록 기본값으로 대체한다
+  const resolvedTitle = title?.trim() ? title : DEFAULT_TITLE;
+  const resolvedMessage = message?.trim() ? message : DEFAULT_MESSAGE;
 
   const handleAction = () => {
     if (onAction) {
@@ -71,10 +78,10 @@ export function RouteErrorFallback({
         !
       </div>
       <h2 css={titleStyle}>
-        {title}
+        {resolvedTitle}
       </h2>
       <p css={messageStyle}>
-        {message}
+        {resolvedMessage}
       </p>
       <Button size="medium" type="button" onClick={handleAction}>
         {actionText}

@@ -6,6 +6,7 @@ import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
+import { toUserMessage } from "../common/error-message.ts";
 import { canManagePlan } from "../../core/domain/auth-guards.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
@@ -50,7 +51,12 @@ export function PlanEditPage(): JSX.Element {
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
 
-  const { data: session, isLoading: isSessionLoading } = useSessionQuery();
+  const {
+    data: session,
+    isLoading: isSessionLoading,
+    isError: isSessionError,
+    error: sessionError,
+  } = useSessionQuery();
   const { data: room, isLoading: isRoomLoading, isError } = useTripRoomRawQuery(tripId);
   const updatePlanMutation = useUpdatePlanMutation();
   const deletePlanMutation = useDeletePlanMutation();
@@ -116,7 +122,19 @@ export function PlanEditPage(): JSX.Element {
     );
   }
 
-  // 2. 작성자 소유권 또는 방장 관리 권한 확인 (UnauthorizedError 대응)
+  // 2. 세션 조회 실패는 권한 없음이 아니라 일시적 장애로 안내한다
+  if (isSessionError) {
+    return (
+      <RouteErrorFallback
+        title="로그인 정보를 확인할 수 없습니다"
+        message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
+        actionText="여행안 상세로 돌아가기"
+        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+      />
+    );
+  }
+
+  // 3. 작성자 소유권 또는 방장 관리 권한 확인 (UnauthorizedError 대응)
   const canManage = canManagePlan(room, plan, session?.userId);
   if (!session || !canManage) {
     return (
@@ -129,7 +147,7 @@ export function PlanEditPage(): JSX.Element {
     );
   }
 
-  // 3. 확정 여부 확인
+  // 4. 확정 여부 확인
   const isConfirmed = plan.id === room.confirmedPlanId || plan.status === "CONFIRMED";
   if (isConfirmed) {
     return (
@@ -168,13 +186,7 @@ export function PlanEditPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
     } catch (err: unknown) {
       setIsSubmitting(false);
-      const reason =
-        err && typeof err === "object" && "reason" in err
-          ? String((err as { reason: string }).reason)
-          : err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "여행안 수정에 실패했습니다.";
-      alert(reason);
+      alert(toUserMessage(err, "여행안 수정에 실패했습니다."));
     }
   };
 
@@ -191,11 +203,7 @@ export function PlanEditPage(): JSX.Element {
       clearDraft();
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
-      const reason =
-        err && typeof err === "object" && "reason" in err
-          ? String((err as { reason: string }).reason)
-          : "여행안 삭제에 실패했습니다.";
-      alert(reason);
+      alert(toUserMessage(err, "여행안 삭제에 실패했습니다."));
     }
   };
 

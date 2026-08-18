@@ -5,23 +5,26 @@ import {
   requirePlanInRoom,
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
-import type { PlanId, Revision, TripId, UserId } from "../domain/ids.ts";
+import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import type { PlanMemberOpinion, TripRoom } from "../domain/room.ts";
 import {
   ValidationError,
   type ConflictError,
   type NotFoundError,
+  type SessionUnavailableError,
   type UnauthorizedError,
 } from "../domain/errors.ts";
 
+/**
+ * 의견 제출 입력
+ * - 작성자 신원은 세션에서만 결정되므로 호출자가 userId/userName을 넘길 수 없다
+ */
 export interface SubmitPlanOpinionInput {
   readonly roomId: TripId;
   readonly planId: PlanId;
   readonly opinion: {
     readonly reaction: "LIKE" | "OKAY" | "HARD";
     readonly reason?: string;
-    readonly userId?: UserId;
-    readonly userName?: string;
   };
   readonly expectedRevision: Revision;
 }
@@ -30,21 +33,25 @@ export const submitPlanOpinionUseCase = (
   input: SubmitPlanOpinionInput
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | ValidationError | UnauthorizedError,
+  | NotFoundError
+  | ConflictError
+  | ValidationError
+  | UnauthorizedError
+  | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
-    // 1. 의견 입력값 유효성 검증
+    // 1. 인증 세션 확인 (세션 사용자 단일 주체 강제)
+    const session = yield* requireAuthSession(
+      "의견을 등록하려면 로그인이 필요합니다."
+    );
+
+    // 2. 의견 입력값 유효성 검증
     if (!["LIKE", "OKAY", "HARD"].includes(input.opinion?.reaction)) {
       return yield* Effect.fail(
         new ValidationError({ message: "올바른 반응(리액션)을 선택해주세요." })
       );
     }
-
-    // 2. 인증 세션 확인 (세션 사용자 단일 주체 강제)
-    const session = yield* requireAuthSession(
-      "의견을 등록하려면 로그인이 필요합니다."
-    );
 
     const repo = yield* TripRoomRepository;
 

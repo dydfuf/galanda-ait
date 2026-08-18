@@ -11,6 +11,7 @@ import {
   ValidationError,
   type ConflictError,
   type NotFoundError,
+  type SessionUnavailableError,
   type UnauthorizedError,
 } from "../domain/errors.ts";
 
@@ -24,21 +25,26 @@ export const updateTripRoomUseCase = (
   input: UpdateRoomInput
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | ValidationError | UnauthorizedError,
+  | NotFoundError
+  | ConflictError
+  | ValidationError
+  | UnauthorizedError
+  | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
-    // 1. 수정 제목 유효성 검증
+    // 1. 인증 세션 확인 (입력 검증보다 먼저 수행)
+    const session = yield* requireAuthSession(
+      "방 정보를 수정하려면 로그인이 필요합니다."
+    );
+
+    // 2. 수정 제목 유효성 검증
     if (input.params.title !== undefined && !input.params.title.trim()) {
       return yield* Effect.fail(
         new ValidationError({ message: "여행 제목은 빈 값일 수 없습니다." })
       );
     }
 
-    // 2. 인증 세션 및 방 조회
-    const session = yield* requireAuthSession(
-      "방 정보를 수정하려면 로그인이 필요합니다."
-    );
     const repo = yield* TripRoomRepository;
     const currentRoom = yield* repo.getRoom(input.roomId);
 

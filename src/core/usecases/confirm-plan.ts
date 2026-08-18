@@ -9,6 +9,7 @@ import {
 import type {
   ConflictError,
   NotFoundError,
+  SessionUnavailableError,
   UnauthorizedError,
 } from "../domain/errors.ts";
 import type { TripRoom } from "../domain/room.ts";
@@ -19,7 +20,7 @@ export const confirmTripPlan = (
   expectedRevision: Revision
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | UnauthorizedError,
+  NotFoundError | ConflictError | UnauthorizedError | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {

@@ -5,12 +5,22 @@ import type { TripMember, TripPlan, TripRoom, UserSession } from "../../domain/r
 import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession } from "../../ports/session.ts";
 import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams } from "../../ports/trip-room-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
-import { createTripRoomUseCase } from "../create-room.ts";
-import { joinTripRoomUseCase } from "../join-room.ts";
+import { createTripRoomUseCase, type CreateRoomInput } from "../create-room.ts";
+import { joinTripRoomUseCase, type JoinRoomInput } from "../join-room.ts";
 import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../save-plan.ts";
-import { submitPlanOpinionUseCase } from "../submit-opinion.ts";
+import {
+  submitPlanOpinionUseCase,
+  type SubmitPlanOpinionInput,
+} from "../submit-opinion.ts";
 import { confirmTripPlan } from "../confirm-plan.ts";
-import { NotFoundError, ConflictError, UnauthorizedError } from "../../domain/errors.ts";
+import { updateTripRoomUseCase } from "../update-room.ts";
+import {
+  NotFoundError,
+  ConflictError,
+  SessionUnavailableError,
+  UnauthorizedError,
+  ValidationError,
+} from "../../domain/errors.ts";
 
 /**
  * 테스트용 인메모리 TripRoomRepository 구현체 생성 헬퍼
@@ -34,11 +44,6 @@ const createInMemoryRepositoryLayer = (
     createRoom: (
       params: CreateRoomParams
     ): Effect.Effect<TripRoom, never> => {
-      const hostUser: TripMember = params.hostUser ?? {
-        id: UserIdSchema.make("default-host"),
-        name: "호스트",
-        role: "HOST",
-      };
       const newRoom: TripRoom = {
         id: TripIdSchema.make(`room-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`),
         title: params.title,
@@ -46,7 +51,7 @@ const createInMemoryRepositoryLayer = (
         startDate: params.startDate ?? "2026-09-01",
         endDate: params.endDate ?? "2026-09-05",
         revision: RevisionSchema.make(1),
-        members: [hostUser],
+        members: [params.hostUser],
         plans: [],
         confirmedPlanId: undefined,
       };
@@ -283,6 +288,20 @@ const createTestSessionLayer = (
 ): Layer.Layer<SessionService> =>
   Layer.succeed(SessionService, makeLocalSessionService(session));
 
+/**
+ * 세션 저장소·인증 서버 장애를 재현하는 SessionService 구현
+ * - 비로그인(UnauthorizedError)이 아니라 SessionUnavailableError로 실패한다
+ */
+const createUnavailableSessionLayer = (
+  reason = "세션 저장소에 접근할 수 없습니다."
+): Layer.Layer<SessionService> =>
+  Layer.succeed(SessionService, {
+    getCurrentSession: (): Effect.Effect<UserSession, SessionUnavailableError> =>
+      Effect.fail(new SessionUnavailableError({ reason })),
+    getCurrentUser: (): Effect.Effect<UserSession, SessionUnavailableError> =>
+      Effect.fail(new SessionUnavailableError({ reason })),
+  });
+
 describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => {
   const aliceUser: UserSession = {
     userId: UserIdSchema.make("user-alice"),
@@ -365,15 +384,20 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
         createTestSessionLayer(aliceUser)
       );
 
-      // 클라이언트가 임의의 user-bob을 hostUser로 주입 시도
-      const program = createTripRoomUseCase({
+      // 타입에서는 hostUser를 받지 않지만(컴파일 타임 차단),
+      // 런타임에서 주입되더라도 무시되는지 확인한다 (다층 방어)
+      const spoofedInput = {
         title: "스위스 패키지",
         hostUser: {
           id: UserIdSchema.make("user-bob"),
           name: "가짜 밥",
           role: "HOST",
         },
-      } as any).pipe(Effect.provide(testEnv));
+      } as unknown as CreateRoomInput;
+
+      const program = createTripRoomUseCase(spoofedInput).pipe(
+        Effect.provide(testEnv)
+      );
 
       const room = await Effect.runPromise(program);
       // 세션 사용자(user-alice)가 호스트로 강제되어야 함
@@ -424,14 +448,20 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
         createTestSessionLayer(strangerUser)
       );
 
-      const program = joinTripRoomUseCase({
+      // 타입에서는 member를 받지 않지만(컴파일 타임 차단),
+      // 런타임에서 주입되더라도 무시되는지 확인한다 (다층 방어)
+      const spoofedInput = {
         roomId: sampleRoom.id,
         member: {
           id: UserIdSchema.make("user-spoofed"),
           name: "가짜 사용자",
           role: "HOST",
         },
-      }).pipe(Effect.provide(testEnv));
+      } as unknown as JoinRoomInput;
+
+      const program = joinTripRoomUseCase(spoofedInput).pipe(
+        Effect.provide(testEnv)
+      );
 
       const room = await Effect.runPromise(program);
       expect(room.members.some((m) => m.id === "user-spoofed")).toBe(false);
@@ -1109,7 +1139,9 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
         createTestSessionLayer(bobUser)
       );
 
-      const program = submitPlanOpinionUseCase({
+      // 타입에서는 userId/userName을 받지 않지만(컴파일 타임 차단),
+      // 런타임에서 주입되더라도 무시되는지 확인한다 (다층 방어)
+      const spoofedInput = {
         roomId: sampleRoom.id,
         planId: PlanIdSchema.make("plan-1"),
         opinion: {
@@ -1119,7 +1151,11 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
           userName: "앨리스",
         },
         expectedRevision: sampleRoom.revision,
-      }).pipe(Effect.provide(testEnv));
+      } as unknown as SubmitPlanOpinionInput;
+
+      const program = submitPlanOpinionUseCase(spoofedInput).pipe(
+        Effect.provide(testEnv)
+      );
 
       const room = await Effect.runPromise(program);
       const plan = room.plans.find((p) => p.id === "plan-1");
@@ -1213,6 +1249,256 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       const unauthLayer = createTestSessionLayer(unauthenticatedSession);
       const result = await Effect.runPromise(getOptionalSession.pipe(Effect.provide(unauthLayer)));
       expect(Option.isNone(result)).toBe(true);
+    });
+  });
+  describe("8. 세션 조회 실패(SessionUnavailableError)와 비로그인 구분 (RAON-149)", () => {
+    it("getOptionalSession은 세션 조회 실패를 None으로 삼키지 않고 전파한다", async () => {
+      const program = getOptionalSession.pipe(
+        Effect.provide(createUnavailableSessionLayer())
+      );
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("session lookup failure should not be swallowed");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(SessionUnavailableError);
+        expect(err).not.toBeInstanceOf(UnauthorizedError);
+      }
+    });
+
+    it("requireAuthSession은 세션 조회 실패를 UnauthorizedError로 바꾸지 않고 사유를 보존한다", async () => {
+      const program = requireAuthSession("여행안을 작성하려면 로그인이 필요합니다.").pipe(
+        Effect.provide(createUnavailableSessionLayer("네트워크에 연결할 수 없습니다."))
+      );
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(SessionUnavailableError);
+        expect((err as SessionUnavailableError).reason).toBe(
+          "네트워크에 연결할 수 없습니다."
+        );
+      }
+    });
+
+    it("세션 조회에 실패하면 쓰기 작업이 SessionUnavailableError로 실패하고 저장소가 변경되지 않는다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createUnavailableSessionLayer()
+      );
+
+      const program = createPlanUseCase({
+        roomId: sampleRoom.id,
+        plan: {
+          id: PlanIdSchema.make("plan-new"),
+          title: "세션 장애 중 작성 시도",
+          status: "DRAFT",
+          places: [],
+          voteCount: 0,
+        },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(SessionUnavailableError);
+      }
+
+      const room = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(sampleRoom.id)),
+          Effect.provide(testEnv)
+        )
+      );
+      expect(room.plans).toHaveLength(1);
+    });
+
+    it("비로그인은 여전히 None으로 매핑되어 조회 실패와 구분된다", async () => {
+      const result = await Effect.runPromise(
+        getOptionalSession.pipe(
+          Effect.provide(createTestSessionLayer(unauthenticatedSession))
+        )
+      );
+      expect(Option.isNone(result)).toBe(true);
+    });
+  });
+
+  describe("9. 인증이 입력 검증보다 먼저 수행된다 (RAON-149)", () => {
+    it("비로그인 상태에서 제목이 비어 있어도 ValidationError가 아닌 UnauthorizedError로 실패한다 (방 생성)", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer(),
+        createTestSessionLayer(unauthenticatedSession)
+      );
+
+      const program = createTripRoomUseCase({ title: "   " }).pipe(
+        Effect.provide(testEnv)
+      );
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).not.toBeInstanceOf(ValidationError);
+      }
+    });
+
+    it("로그인 상태에서 제목이 비어 있으면 ValidationError로 실패한다 (대조군)", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer(),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const program = createTripRoomUseCase({ title: "   " }).pipe(
+        Effect.provide(testEnv)
+      );
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(ValidationError);
+      }
+    });
+
+    it("비로그인 상태에서 여행안 제목이 비어 있어도 UnauthorizedError로 실패한다 (여행안 작성)", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(unauthenticatedSession)
+      );
+
+      const program = createPlanUseCase({
+        roomId: sampleRoom.id,
+        plan: {
+          id: PlanIdSchema.make("plan-empty"),
+          title: "  ",
+          status: "DRAFT",
+          places: [],
+          voteCount: 0,
+        },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).not.toBeInstanceOf(ValidationError);
+      }
+    });
+
+    it("비로그인 상태에서 인원수가 잘못되어 있어도 UnauthorizedError로 실패한다 (여행안 수정)", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(unauthenticatedSession)
+      );
+
+      const program = updatePlanUseCase({
+        roomId: sampleRoom.id,
+        plan: { ...sampleRoom.plans[0], baseHeadcount: 0 },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).not.toBeInstanceOf(ValidationError);
+      }
+    });
+
+    it("비로그인 상태에서 리액션 값이 잘못되어 있어도 UnauthorizedError로 실패한다 (의견 등록)", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(unauthenticatedSession)
+      );
+
+      const program = submitPlanOpinionUseCase({
+        roomId: sampleRoom.id,
+        planId: PlanIdSchema.make("plan-1"),
+        opinion: { reaction: "INVALID" as "LIKE" },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).not.toBeInstanceOf(ValidationError);
+      }
+    });
+
+    it("비로그인 상태에서 방 제목이 비어 있어도 UnauthorizedError로 실패한다 (방 정보 수정)", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(unauthenticatedSession)
+      );
+
+      const program = updateTripRoomUseCase({
+        roomId: sampleRoom.id,
+        params: { title: "   " },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).not.toBeInstanceOf(ValidationError);
+      }
+    });
+  });
+
+  describe("10. updateTripRoomUseCase 권한 검증", () => {
+    it("방장(HOST)은 방 정보를 수정할 수 있다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const program = updateTripRoomUseCase({
+        roomId: sampleRoom.id,
+        params: { title: "제주도 미식 여행" },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      const room = await Effect.runPromise(program);
+      expect(room.title).toBe("제주도 미식 여행");
+    });
+
+    it("일반 멤버(MEMBER)는 방 정보를 수정할 수 없다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const program = updateTripRoomUseCase({
+        roomId: sampleRoom.id,
+        params: { title: "밥이 바꾼 제목" },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("member should not be allowed to update room");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      const room = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(sampleRoom.id)),
+          Effect.provide(testEnv)
+        )
+      );
+      expect(room.title).toBe("제주도 힐링 여행");
     });
   });
 });

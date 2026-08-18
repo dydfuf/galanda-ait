@@ -1,30 +1,53 @@
 import { Effect, Layer } from "effect";
-import { SessionService } from "../../core/ports/session.ts";
+import { SessionService, type SessionLookupError } from "../../core/ports/session.ts";
 import { UserIdSchema } from "../../core/domain/ids.ts";
-import { UnauthorizedError } from "../../core/domain/errors.ts";
+import {
+  SessionUnavailableError,
+  UnauthorizedError,
+} from "../../core/domain/errors.ts";
 import { supabase } from "./supabase-client.ts";
 import type { UserSession } from "../../core/domain/room.ts";
 
-const fetchSupabaseUser = (): Effect.Effect<UserSession, UnauthorizedError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session?.user) {
-        throw new Error(error?.message ?? "로그인이 필요합니다.");
-      }
-      return {
-        userId: UserIdSchema.make(data.session.user.id),
-        name:
-          data.session.user.user_metadata?.name ??
-          data.session.user.email ??
-          "사용자",
-        isAuthenticated: true,
-      };
-    },
-    catch: (e) =>
-      new UnauthorizedError({
-        reason: e instanceof Error ? e.message : "로그인이 필요합니다.",
-      }),
+/**
+ * Supabase 세션 조회
+ * - 세션이 없으면 UnauthorizedError (비로그인)
+ * - 조회 자체가 실패하면 SessionUnavailableError (네트워크·인증 서버 장애)
+ */
+const fetchSupabaseUser = (): Effect.Effect<UserSession, SessionLookupError> =>
+  Effect.gen(function* () {
+    const result = yield* Effect.tryPromise({
+      try: () => supabase.auth.getSession(),
+      catch: (e: unknown) =>
+        new SessionUnavailableError({
+          reason:
+            e instanceof Error
+              ? `로그인 정보를 확인하지 못했습니다: ${e.message}`
+              : "로그인 정보를 확인하지 못했습니다.",
+        }),
+    });
+
+    if (result.error) {
+      return yield* Effect.fail(
+        new SessionUnavailableError({
+          reason: `로그인 정보를 확인하지 못했습니다: ${result.error.message}`,
+        })
+      );
+    }
+
+    const user = result.data.session?.user;
+    if (!user) {
+      return yield* Effect.fail(
+        new UnauthorizedError({ reason: "로그인이 필요합니다." })
+      );
+    }
+
+    const session: UserSession = {
+      userId: UserIdSchema.make(user.id),
+      name: user.user_metadata?.name ?? user.email ?? "사용자",
+      isAuthenticated: true,
+    };
+
+    return session;
   });
 
 export const SupabaseSessionLayer = Layer.succeed(SessionService, {

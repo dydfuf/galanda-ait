@@ -8,7 +8,8 @@ export interface CreateRoomParams {
   readonly destination?: string;
   readonly startDate?: string;
   readonly endDate?: string;
-  readonly hostUser?: TripMember;
+  /** 방장으로 등록할 사용자. Use Case가 세션에서 결정해 반드시 채워준다 */
+  readonly hostUser: TripMember;
 }
 
 export interface UpdateRoomParams {

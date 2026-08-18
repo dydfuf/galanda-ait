@@ -3,6 +3,8 @@ import { css } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
 import { useNavigate } from "react-router-dom";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
+import { toUserMessage } from "../common/error-message.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
 import type { TripRoomViewModel } from "../plan-home/plan-home-view-model.ts";
 
 const pageContainerStyle = css`
@@ -215,6 +217,7 @@ const fixedCtaContainerStyle = css`
 export function TripListPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"ONGOING" | "PAST">("ONGOING");
+  const { isError: isSessionError, error: sessionError } = useSessionQuery();
   const { data: rooms, isLoading, isError, error } = useTripRoomsQuery();
 
   const getNextAction = (room: TripRoomViewModel) => {
@@ -297,10 +300,19 @@ export function TripListPage() {
         </div>
       )}
 
+      {isSessionError && (
+        <div css={errorContainerStyle}>
+          <p css={errorTextStyle}>
+            로그인 정보를 확인할 수 없습니다:{" "}
+            {toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
+          </p>
+        </div>
+      )}
+
       {isError && (
         <div css={errorContainerStyle}>
           <p css={errorTextStyle}>
-            오류가 발생했습니다: {error instanceof Error ? error.message : "알 수 없는 오류"}
+            오류가 발생했습니다: {toUserMessage(error, "알 수 없는 오류")}
           </p>
         </div>
       )}
