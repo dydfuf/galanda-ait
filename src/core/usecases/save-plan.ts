@@ -141,11 +141,21 @@ export const updatePlanUseCase = (
       "여행안 작성자 또는 방장만 여행안을 수정할 수 있습니다."
     );
 
+    // 작성자 정보 보존 및 기존에 authorId가 누락된 경우 보정(backfill)
+    const authorMember = existingPlan.authorName
+      ? room.members.find((m) => m.name === existingPlan.authorName)
+      : undefined;
+
+    const resolvedAuthorId =
+      existingPlan.authorId ?? authorMember?.id ?? session.userId;
+    const resolvedAuthorName =
+      existingPlan.authorName ?? authorMember?.name ?? session.name;
+
     let finalPlan: TripPlan = {
       ...input.plan,
       title: input.plan.title.trim(),
-      authorId: existingPlan.authorId,
-      authorName: existingPlan.authorName,
+      authorId: resolvedAuthorId,
+      authorName: resolvedAuthorName,
     };
 
     // 5. 복제된 여행안인 경우, 변경사항 재계산하여 동기화

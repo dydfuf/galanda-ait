@@ -687,6 +687,107 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       expect(finalRoom.plans.some((p) => p.id === "plan-bob")).toBe(false);
     });
 
+    it("authorId가 누락된 레거시 여행안도 authorName이 일치하는 멤버(MEMBER)가 수정 및 삭제할 수 있고 authorId가 보정된다", async () => {
+      const roomWithLegacyPlan: TripRoom = {
+        ...sampleRoom,
+        plans: [
+          ...sampleRoom.plans,
+          {
+            id: PlanIdSchema.make("plan-legacy-bob"),
+            title: "밥의 구버전 제안",
+            status: "DRAFT",
+            authorId: undefined, // 레거시 데이터로 authorId 누락
+            authorName: "밥",
+            places: [],
+            voteCount: 0,
+          },
+        ],
+      };
+
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithLegacyPlan]),
+        createTestSessionLayer(bobUser)
+      );
+
+      // 밥(MEMBER)이 자신의 이름으로 된 레거시 여행안 수정
+      const updateTarget: TripPlan = {
+        ...roomWithLegacyPlan.plans[1],
+        title: "밥이 수정한 구버전 제안",
+      };
+
+      const updateProgram = updatePlanUseCase({
+        roomId: roomWithLegacyPlan.id,
+        plan: updateTarget,
+        expectedRevision: roomWithLegacyPlan.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      const updatedRoom = await Effect.runPromise(updateProgram);
+      const updatedPlan = updatedRoom.plans.find((p) => p.id === "plan-legacy-bob");
+      expect(updatedPlan?.title).toBe("밥이 수정한 구버전 제안");
+      expect(updatedPlan?.authorId).toBe("user-bob"); // authorId가 성공적으로 보정됨
+      expect(updatedPlan?.authorName).toBe("밥");
+
+      // 밥이 자신의 레거시 여행안 삭제
+      const deleteProgram = deletePlanUseCase({
+        roomId: updatedRoom.id,
+        planId: PlanIdSchema.make("plan-legacy-bob"),
+        expectedRevision: updatedRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      const finalRoom = await Effect.runPromise(deleteProgram);
+      expect(finalRoom.plans.some((p) => p.id === "plan-legacy-bob")).toBe(false);
+    });
+
+    it("authorId가 누락된 레거시 여행안이라도 타 멤버(MEMBER)의 수정 및 삭제는 거절된다", async () => {
+      const roomWithLegacyPlan: TripRoom = {
+        ...sampleRoom,
+        members: [...sampleRoom.members, { id: UserIdSchema.make("user-stranger"), name: "이방인", role: "MEMBER" }],
+        plans: [
+          ...sampleRoom.plans,
+          {
+            id: PlanIdSchema.make("plan-legacy-bob"),
+            title: "밥의 구버전 제안",
+            status: "DRAFT",
+            authorId: undefined,
+            authorName: "밥",
+            places: [],
+            voteCount: 0,
+          },
+        ],
+      };
+
+      const strangerEnv = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithLegacyPlan]),
+        createTestSessionLayer(strangerUser)
+      );
+
+      const updateProgram = updatePlanUseCase({
+        roomId: roomWithLegacyPlan.id,
+        plan: { ...roomWithLegacyPlan.plans[1], title: "이방인의 수정 시도" },
+        expectedRevision: roomWithLegacyPlan.revision,
+      }).pipe(Effect.provide(strangerEnv));
+
+      try {
+        await Effect.runPromise(updateProgram);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      const deleteProgram = deletePlanUseCase({
+        roomId: roomWithLegacyPlan.id,
+        planId: PlanIdSchema.make("plan-legacy-bob"),
+        expectedRevision: roomWithLegacyPlan.revision,
+      }).pipe(Effect.provide(strangerEnv));
+
+      try {
+        await Effect.runPromise(deleteProgram);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+    });
+
     it("비로그인 상태에서 여행안 수정 및 삭제는 실패한다", async () => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),

@@ -190,6 +190,8 @@ export const requirePlanInRoom = (
 
 /**
  * 여행안 작성자 또는 방장 권한을 요구하는 가드 (소유권 기반 ABAC)
+ * - authorId가 존재하면 userId와 직접 비교
+ * - legacy/이전 데이터로 인해 authorId가 누락된 경우 authorName과 사용자의 이름을 매칭하여 소유권 인정
  */
 export const requirePlanAuthorOrHost = (
   room: TripRoom,
@@ -199,7 +201,10 @@ export const requirePlanAuthorOrHost = (
 ): Effect.Effect<RoomActor, UnauthorizedError> =>
   Effect.gen(function* () {
     const actor = getRoomActor(room, userId);
-    const isAuthor = plan.authorId === userId;
+    const isAuthor =
+      plan.authorId !== undefined
+        ? plan.authorId === userId
+        : Boolean(plan.authorName && actor.member?.name === plan.authorName);
 
     if (!isAuthor && !actor.isHost) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));
