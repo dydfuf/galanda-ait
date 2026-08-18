@@ -3,6 +3,7 @@ import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { SessionService, requireAuthSession } from "../ports/session.ts";
 import { calculatePlanDifference } from "../calculations/plan-diff.ts";
 import {
+  requirePlanAuthorOrHost,
   requirePlanInRoom,
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
@@ -132,6 +133,14 @@ export const updatePlanUseCase = (
       "여행방 참여자만 여행안을 수정할 수 있습니다."
     );
 
+    // 5. ABAC: 여행안 작성자 또는 방장 권한 검증 (소유권 검증)
+    yield* requirePlanAuthorOrHost(
+      room,
+      existingPlan,
+      session.userId,
+      "여행안 작성자 또는 방장만 여행안을 수정할 수 있습니다."
+    );
+
     let finalPlan: TripPlan = {
       ...input.plan,
       title: input.plan.title.trim(),
@@ -181,7 +190,7 @@ export const deletePlanUseCase = (
 
     const repo = yield* TripRoomRepository;
     const room = yield* repo.getRoom(input.roomId);
-    yield* requirePlanInRoom(room, input.planId);
+    const plan = yield* requirePlanInRoom(room, input.planId);
 
     // 2. RBAC: 세션 사용자의 'plan:delete' 권한 검증
     yield* requireRoomPermission(
@@ -189,6 +198,14 @@ export const deletePlanUseCase = (
       session.userId,
       "plan:delete",
       "여행방 참여자만 여행안을 삭제할 수 있습니다."
+    );
+
+    // 3. ABAC: 여행안 작성자 또는 방장 권한 검증 (소유권 검증)
+    yield* requirePlanAuthorOrHost(
+      room,
+      plan,
+      session.userId,
+      "여행안 작성자 또는 방장만 여행안을 삭제할 수 있습니다."
     );
 
     return yield* repo.deletePlan(

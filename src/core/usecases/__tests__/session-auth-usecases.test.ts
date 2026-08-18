@@ -384,7 +384,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
   });
 
   describe("2. joinTripRoomUseCase", () => {
-    it("인증된 세션 사용자의 신원으로 방에 참여한다", async () => {
+    it("인증된 세션 사용자의 신원(userId 및 name)으로 방에 참여한다", async () => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(strangerUser)
@@ -395,10 +395,13 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       }).pipe(Effect.provide(testEnv));
 
       const room = await Effect.runPromise(program);
-      expect(room.members.some((m) => m.id === "user-stranger" && m.role === "MEMBER")).toBe(true);
+      const joined = room.members.find((m) => m.id === "user-stranger");
+      expect(joined).toBeDefined();
+      expect(joined?.name).toBe("이방인");
+      expect(joined?.role).toBe("MEMBER");
     });
 
-    it("요청에 다른 userId가 포함되어 있어도 세션 사용자의 userId로 참여한다", async () => {
+    it("요청에 다른 userId나 name이 포함되어 있어도 세션 사용자의 정보로 참여한다 (가장 방지)", async () => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(strangerUser)
@@ -414,8 +417,11 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       }).pipe(Effect.provide(testEnv));
 
       const room = await Effect.runPromise(program);
-      expect(room.members.some((m) => m.id === "user-stranger")).toBe(true);
       expect(room.members.some((m) => m.id === "user-spoofed")).toBe(false);
+      const joined = room.members.find((m) => m.id === "user-stranger");
+      expect(joined).toBeDefined();
+      expect(joined?.name).toBe("이방인"); // 가짜 사용자가 아닌 세션의 name('이방인')이어야 함
+      expect(joined?.role).toBe("MEMBER");
     });
 
     it("비로그인 상태에서는 방 참여가 UnauthorizedError로 실패한다", async () => {
@@ -548,10 +554,26 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
   });
 
   describe("4. updatePlanUseCase & deletePlanUseCase", () => {
-    it("여행안 수정 시 기존 작성자 정보를 보존하며 세션 사용자의 권한으로 수행된다", async () => {
+    const roomWithBobPlan: TripRoom = {
+      ...sampleRoom,
+      plans: [
+        ...sampleRoom.plans,
+        {
+          id: PlanIdSchema.make("plan-bob"),
+          title: "밥의 제안",
+          status: "DRAFT",
+          authorId: UserIdSchema.make("user-bob"),
+          authorName: "밥",
+          places: [],
+          voteCount: 0,
+        },
+      ],
+    };
+
+    it("작성자가 자신의 여행안 수정 시 기존 작성자 정보를 보존하며 정상 수정된다", async () => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
-        createTestSessionLayer(bobUser)
+        createTestSessionLayer(aliceUser)
       );
 
       const updateTarget: TripPlan = {
@@ -570,6 +592,99 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       const plan = room.plans.find((p) => p.id === "plan-1");
       expect(plan?.title).toBe("수정된 기본 1안");
       expect(plan?.authorId).toBe("user-alice"); // 원래 작성자 유지
+    });
+
+    it("작성자나 방장이 아닌 일반 멤버(MEMBER)가 다른 사람의 여행안 수정을 시도하면 UnauthorizedError로 실패한다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const updateTarget: TripPlan = {
+        ...sampleRoom.plans[0],
+        title: "밥이 앨리스의 여행안 수정 시도",
+      };
+
+      const program = updatePlanUseCase({
+        roomId: sampleRoom.id,
+        plan: updateTarget,
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+    });
+
+    it("작성자나 방장이 아닌 일반 멤버(MEMBER)가 다른 사람의 여행안 삭제를 시도하면 UnauthorizedError로 실패한다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const program = deletePlanUseCase({
+        roomId: sampleRoom.id,
+        planId: sampleRoom.plans[0].id,
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+    });
+
+    it("방장(HOST)은 다른 멤버가 작성한 여행안도 수정 및 삭제할 수 있다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithBobPlan]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const updateTarget: TripPlan = {
+        ...roomWithBobPlan.plans[1],
+        title: "방장이 수정한 밥의 제안",
+      };
+
+      const updateProgram = updatePlanUseCase({
+        roomId: roomWithBobPlan.id,
+        plan: updateTarget,
+        expectedRevision: roomWithBobPlan.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      const updatedRoom = await Effect.runPromise(updateProgram);
+      const updatedPlan = updatedRoom.plans.find((p) => p.id === "plan-bob");
+      expect(updatedPlan?.title).toBe("방장이 수정한 밥의 제안");
+      expect(updatedPlan?.authorId).toBe("user-bob");
+
+      const deleteProgram = deletePlanUseCase({
+        roomId: updatedRoom.id,
+        planId: PlanIdSchema.make("plan-bob"),
+        expectedRevision: updatedRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      const finalRoom = await Effect.runPromise(deleteProgram);
+      expect(finalRoom.plans.some((p) => p.id === "plan-bob")).toBe(false);
+    });
+
+    it("작성자(MEMBER)는 자신이 작성한 여행안을 정상적으로 삭제할 수 있다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithBobPlan]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const deleteProgram = deletePlanUseCase({
+        roomId: roomWithBobPlan.id,
+        planId: PlanIdSchema.make("plan-bob"),
+        expectedRevision: roomWithBobPlan.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      const finalRoom = await Effect.runPromise(deleteProgram);
+      expect(finalRoom.plans.some((p) => p.id === "plan-bob")).toBe(false);
     });
 
     it("비로그인 상태에서 여행안 수정 및 삭제는 실패한다", async () => {

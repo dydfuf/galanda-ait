@@ -28,9 +28,6 @@ export const joinTripRoomUseCase = (
       "방에 참여하려면 로그인이 필요합니다."
     );
 
-    const memberName =
-      input.member?.name?.trim() || session.name || "참여자";
-
     const repo = yield* TripRoomRepository;
 
     // 2. 방 존재 여부 및 기존 참여 여부 확인 (멱등성 보장)
@@ -43,7 +40,7 @@ export const joinTripRoomUseCase = (
     // 3. 참여 등록 실행 (세션 사용자의 userId 및 name 바인딩)
     const member: TripMember = {
       id: session.userId,
-      name: memberName,
+      name: session.name,
       role: "MEMBER",
     };
 
