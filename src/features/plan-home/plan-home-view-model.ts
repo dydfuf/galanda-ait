@@ -5,6 +5,8 @@ export interface TripRoomViewModel {
   readonly id: string;
   readonly title: string;
   readonly destination: string;
+  readonly startDate?: string;
+  readonly endDate?: string;
   readonly period: string;
   readonly memberCount: number;
   readonly memberNames: string;
@@ -153,6 +155,8 @@ export const toTripRoomViewModel = (room: TripRoom): TripRoomViewModel => {
     id: room.id,
     title: room.title,
     destination: room.destination,
+    startDate: room.startDate,
+    endDate: room.endDate,
     period: `${room.startDate} ~ ${room.endDate}`,
     memberCount: room.members.length,
     memberNames: room.members.map((m) => m.name).join(", "),

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { css } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
@@ -8,31 +9,12 @@ import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
 
-const centerNoticeContainerStyle = css`
-  padding: 40px 20px;
-  text-align: center;
-`;
-
-const loadingTextStyle = css`
-  color: var(--adaptiveGrey500, #8b95a1);
-  font-size: 15px;
-`;
-
-const noticeTitleStyle = css`
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const noticeDescStyle = css`
-  font-size: 14px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin: 0 0 24px 0;
-`;
-
 const pageContainerStyle = css`
-  padding: 16px 20px calc(40px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px calc(108px + env(safe-area-inset-bottom, 0px));
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100vh;
+  box-sizing: border-box;
 `;
 
 const pageHeaderStyle = css`
@@ -40,132 +22,164 @@ const pageHeaderStyle = css`
 `;
 
 const pageTitleStyle = css`
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  margin: 0 0 4px 0;
+  margin: 0 0 6px 0;
   color: var(--adaptiveGrey900, #191f28);
+  letter-spacing: -0.4px;
 `;
 
 const pageSubtitleStyle = css`
   font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--adaptiveGrey600, #6b7684);
   margin: 0;
 `;
 
-const compareStackStyle = css`
+// PL-04 시안 1 핵심: 상단 핵심 차이 요약 배너
+const summaryBannerStyle = css`
+  background-color: var(--adaptiveBlue50, #e8f3ff);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 24px;
+  border: 1px solid #d0e4ff;
+`;
+
+const summaryBannerTitleStyle = css`
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--adaptiveBlue700, #1b64da);
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const summaryBannerListStyle = css`
+  margin: 0;
+  padding: 0 0 0 18px;
+  font-size: 13px;
+  color: var(--adaptiveGrey800, #333d4b);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 4px;
+  line-height: 1.4;
 `;
 
-const compareCardStyle = css`
+// 비교 항목 카드 스타일
+const compareSectionCardStyle = css`
   background-color: var(--adaptiveBackground, #ffffff);
   border-radius: 16px;
-  padding: 18px 20px;
+  padding: 20px;
   border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  margin-bottom: 18px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 `;
 
-const cardHeaderStyle = css`
+const sectionHeaderStyle = css`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--adaptiveGrey100, #f2f4f6);
 `;
 
-const tagLabelStyle = (isLeft: boolean) => css`
+const sectionTitleStyle = css`
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--adaptiveGrey900, #191f28);
+  margin: 0;
+`;
+
+const twoColumnsGridStyle = css`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+`;
+
+const planColumnBoxStyle = (isSelected: boolean) => css`
+  padding: 12px 14px;
+  border-radius: 12px;
+  background-color: ${isSelected ? "var(--adaptiveBlue50, #e8f3ff)" : "var(--adaptiveGrey50, #f9fafb)"};
+  border: 1.5px solid ${isSelected ? "var(--adaptiveBlue500, #3182f6)" : "var(--adaptiveGrey200, #e5e8eb)"};
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+`;
+
+const planBadgeRowStyle = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const planBadgeStyle = (isLeft: boolean) => css`
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 7px;
-  border-radius: 6px;
-  background-color: ${isLeft ? "var(--adaptiveBlue50, #e8f3ff)" : "var(--adaptiveGrey100, #f2f4f6)"};
-  color: ${isLeft ? "var(--adaptiveBlue600, #1b64da)" : "var(--adaptiveGrey700, #4e5968)"};
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: ${isLeft ? "var(--adaptiveBlue600, #1b64da)" : "var(--adaptiveGrey700, #4e5968)"};
+  color: #ffffff;
 `;
 
-const authorTextStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
-`;
-
-const cardTitleStyle = css`
-  font-size: 17px;
+const planTitleTextStyle = css`
+  font-size: 14px;
   font-weight: 700;
   color: var(--adaptiveGrey900, #191f28);
-  margin: 0 0 8px 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
-const railWrapperStyle = css`
-  margin-bottom: 12px;
-`;
-
-const costBoxStyle = css`
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border-radius: 10px;
-  padding: 10px 12px;
-  display: flex;
-  justify-content: space-between;
+const valueTextStyle = css`
   font-size: 13px;
-  margin-bottom: 12px;
+  color: var(--adaptiveGrey800, #333d4b);
+  margin: 0;
+  line-height: 1.4;
 `;
 
-const costLabelStyle = css`
-  color: var(--adaptiveGrey700, #4e5968);
-`;
-
-const costValueStyle = css`
+const costHighlightStyle = css`
+  font-size: 15px;
   font-weight: 700;
   color: var(--adaptiveGrey900, #191f28);
 `;
 
-const cardFooterStyle = css`
-  display: flex;
-  justify-content: space-between;
+const alertBadgeStyle = (isWarning: boolean) => css`
+  display: inline-flex;
   align-items: center;
+  gap: 4px;
   font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background-color: ${isWarning ? "var(--adaptiveYellow50, #fff8e1)" : "var(--adaptiveGreen50, #f0fbf4)"};
+  color: ${isWarning ? "var(--adaptiveYellow700, #b78103)" : "var(--adaptiveGreen700, #15803d)"};
 `;
 
-const opinionGroupStyle = css`
+const opinionCountsRowStyle = css`
   display: flex;
-  gap: 8px;
-`;
-
-const likeCountStyle = css`
-  color: var(--adaptiveGreen600, #15803d);
-  font-weight: 600;
-`;
-
-const okayCountStyle = css`
-  color: var(--adaptiveBlue600, #1b64da);
-  font-weight: 600;
-`;
-
-const hardCountStyle = css`
-  color: var(--adaptiveRed600, #e0383e);
-  font-weight: 600;
-`;
-
-const vsWrapperStyle = css`
-  text-align: center;
-  position: relative;
-`;
-
-const vsHrStyle = css`
-  border: none;
-  border-top: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  margin: 10px 0;
-`;
-
-const vsBadgeStyle = css`
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--adaptiveGrey100, #f2f4f6);
-  padding: 2px 10px;
-  border-radius: 10px;
+  gap: 6px;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--adaptiveGrey500, #8b95a1);
+  font-weight: 600;
+`;
+
+const fixedCtaContainerStyle = css`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 640px;
+  margin: 0 auto;
+  background-color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  box-sizing: border-box;
 `;
 
 export function PlanComparePage() {
@@ -187,14 +201,16 @@ export function PlanComparePage() {
   const { data: room, isLoading, isError } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
 
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
   }
 
   if (isLoading) {
     return (
-      <div css={centerNoticeContainerStyle}>
-        <p css={loadingTextStyle}>비교 정보를 불러오는 중...</p>
+      <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--adaptiveGrey500, #8b95a1)" }}>
+        비교 정보를 불러오는 중...
       </div>
     );
   }
@@ -208,21 +224,14 @@ export function PlanComparePage() {
     );
   }
 
-  // 쿼리가 없거나 유효하지 않거나, left와 right가 같은 경우
   if (Result.isFailure(queryValidated) || leftParam === rightParam) {
     return (
-      <div css={centerNoticeContainerStyle}>
-        <h2 css={noticeTitleStyle}>
-          비교할 두 여행안을 선택해주세요
-        </h2>
-        <p css={noticeDescStyle}>
+      <div style={{ padding: "40px 20px", textAlign: "center" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px 0" }}>비교할 두 여행안을 선택해주세요</h2>
+        <p style={{ fontSize: 14, color: "var(--adaptiveGrey500, #8b95a1)", margin: "0 0 24px 0" }}>
           비교하려는 서로 다른 두 여행안이 지정되지 않았습니다.
         </p>
-        <Button
-          size="medium"
-          type="button"
-          onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
-        >
+        <Button size="medium" type="button" onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}>
           계획 홈으로 돌아가기
         </Button>
       </div>
@@ -235,18 +244,12 @@ export function PlanComparePage() {
 
   if (!leftPlan || !rightPlan) {
     return (
-      <div css={centerNoticeContainerStyle}>
-        <h2 css={noticeTitleStyle}>
-          여행안을 찾을 수 없습니다
-        </h2>
-        <p css={noticeDescStyle}>
+      <div style={{ padding: "40px 20px", textAlign: "center" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px 0" }}>여행안을 찾을 수 없습니다</h2>
+        <p style={{ fontSize: 14, color: "var(--adaptiveGrey500, #8b95a1)", margin: "0 0 24px 0" }}>
           비교 대상 중 일부 여행안이 존재하지 않거나 삭제되었습니다.
         </p>
-        <Button
-          size="medium"
-          type="button"
-          onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
-        >
+        <Button size="medium" type="button" onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}>
           계획 홈으로 이동
         </Button>
       </div>
@@ -254,14 +257,17 @@ export function PlanComparePage() {
   }
 
   const isRoomConfirmed = Boolean(room.confirmedPlanId);
+  const currentSelectedId = selectedPlanId || leftPlan.id;
+  const selectedPlan = currentSelectedId === leftPlan.id ? leftPlan : rightPlan;
 
-  const handleConfirm = (planId: string) => {
-    if (!window.confirm("이 여행안으로 일정을 최종 확정하시겠습니까?")) return;
+  const handleConfirm = () => {
+    if (!selectedPlan) return;
+    if (!window.confirm(`'${selectedPlan.title}'으로 최종 일정을 확정하시겠습니까?`)) return;
 
     confirmPlanMutation.mutate(
       {
         roomId: room.id,
-        planId,
+        planId: selectedPlan.id,
         revision: room.revision,
       },
       {
@@ -272,115 +278,218 @@ export function PlanComparePage() {
     );
   };
 
+  // 핵심 차이점 분석 문구 생성 (시안 1 명세)
+  const generateDifferences = () => {
+    const diffs: string[] = [];
+    if (leftPlan.period !== rightPlan.period || leftPlan.nights !== rightPlan.nights) {
+      diffs.push(`기간 차이: ${leftPlan.title} (${leftPlan.period}) vs ${rightPlan.title} (${rightPlan.period})`);
+    }
+    if (rightPlan.differenceSummary) {
+      diffs.push(rightPlan.differenceSummary);
+    }
+    if (leftPlan.groupCostText !== rightPlan.groupCostText) {
+      diffs.push(`예상 경비: ${leftPlan.groupCostText} vs ${rightPlan.groupCostText}`);
+    }
+    if (leftPlan.bookingRisks.length > 0 || rightPlan.bookingRisks.length > 0) {
+      const leftRisk = leftPlan.bookingRisks.length > 0 ? `${leftPlan.planTagLabel} 점검 필요` : "위험 없음";
+      const rightRisk = rightPlan.bookingRisks.length > 0 ? `${rightPlan.planTagLabel} 점검 필요` : "위험 없음";
+      diffs.push(`예약 상태: ${leftPlan.planTagLabel}(${leftRisk}) vs ${rightPlan.planTagLabel}(${rightRisk})`);
+    }
+    return diffs.length > 0 ? diffs : ["두 여행안의 세부 조건이 유사합니다."];
+  };
+
+  const differences = generateDifferences();
+
   return (
     <div css={pageContainerStyle}>
-      {/* 상단 안내 */}
       <div css={pageHeaderStyle}>
-        <h1 css={pageTitleStyle}>
-          여행안 비교하기
-        </h1>
-        <p css={pageSubtitleStyle}>
-          두 여행안의 코스, 예상 경비, 구성원 의견 차이를 비교하세요.
-        </p>
+        <h1 css={pageTitleStyle}>여행안 비교</h1>
+        <p css={pageSubtitleStyle}>두 여행안의 핵심 차이를 비교하고 확정할 안을 선택하세요.</p>
       </div>
 
-      {/* 두 여행안 카드 비교 */}
-      <div css={compareStackStyle}>
-        {/* 좌측 여행안 카드 */}
-        <div css={compareCardStyle}>
-          <div css={cardHeaderStyle}>
-            <span css={tagLabelStyle(true)}>
-              {leftPlan.planTagLabel}
-            </span>
-            <span css={authorTextStyle}>{leftPlan.authorName} 제안</span>
+      {/* 1. 상단 핵심 차이 요약 배너 (PL-04 시안 1) */}
+      <div css={summaryBannerStyle}>
+        <h3 css={summaryBannerTitleStyle}>
+          <span>💡</span>
+          <span>핵심 차이점 요약</span>
+        </h3>
+        <ul css={summaryBannerListStyle}>
+          {differences.map((diff, i) => (
+            <li key={i}>{diff}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* 비교 대조 항목 1: 여행안 선택 및 기본 정보 */}
+      <section css={compareSectionCardStyle}>
+        <div css={sectionHeaderStyle}>
+          <h3 css={sectionTitleStyle}>1. 비교 대상 선택</h3>
+          <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>카드를 눌러 확정할 안을 고르세요</span>
+        </div>
+
+        <div css={twoColumnsGridStyle}>
+          <div
+            css={planColumnBoxStyle(currentSelectedId === leftPlan.id)}
+            onClick={() => setSelectedPlanId(leftPlan.id)}
+          >
+            <div css={planBadgeRowStyle}>
+              <span css={planBadgeStyle(true)}>{leftPlan.planTagLabel}</span>
+              {currentSelectedId === leftPlan.id && (
+                <span style={{ fontSize: 11, color: "var(--adaptiveBlue600, #1b64da)", fontWeight: 700 }}>✓ 선택됨</span>
+              )}
+            </div>
+            <h4 css={planTitleTextStyle}>{leftPlan.title}</h4>
+            <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>{leftPlan.authorName} 제안</span>
           </div>
 
-          <h3 css={cardTitleStyle}>
-            {leftPlan.title}
-          </h3>
+          <div
+            css={planColumnBoxStyle(currentSelectedId === rightPlan.id)}
+            onClick={() => setSelectedPlanId(rightPlan.id)}
+          >
+            <div css={planBadgeRowStyle}>
+              <span css={planBadgeStyle(false)}>{rightPlan.planTagLabel}</span>
+              {currentSelectedId === rightPlan.id && (
+                <span style={{ fontSize: 11, color: "var(--adaptiveBlue600, #1b64da)", fontWeight: 700 }}>✓ 선택됨</span>
+              )}
+            </div>
+            <h4 css={planTitleTextStyle}>{rightPlan.title}</h4>
+            <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>{rightPlan.authorName} 제안</span>
+          </div>
+        </div>
+      </section>
 
-          <div css={railWrapperStyle}>
+      {/* 비교 대조 항목 2: 날짜 및 도시 체류 (PL-04 시안 1) */}
+      <section css={compareSectionCardStyle}>
+        <div css={sectionHeaderStyle}>
+          <h3 css={sectionTitleStyle}>2. 날짜 및 체류 도시</h3>
+        </div>
+
+        <div css={twoColumnsGridStyle}>
+          <div>
+            <p css={valueTextStyle} style={{ fontWeight: 600, marginBottom: 6 }}>
+              {leftPlan.period} ({leftPlan.nights}박 {leftPlan.days}일)
+            </p>
             <RouteRail route={leftPlan.route} />
           </div>
 
-          <div css={costBoxStyle}>
-            <span css={costLabelStyle}>예상 총액</span>
-            <span css={costValueStyle}>{leftPlan.groupCostText}</span>
-          </div>
-
-          <div css={cardFooterStyle}>
-            <div css={opinionGroupStyle}>
-              <span css={likeCountStyle}>👍 {leftPlan.opinions.likeCount}</span>
-              <span css={okayCountStyle}>🙂 {leftPlan.opinions.okayCount}</span>
-              {leftPlan.opinions.hardCount > 0 && (
-                <span css={hardCountStyle}>😢 {leftPlan.opinions.hardCount}</span>
-              )}
-            </div>
-
-            {!isRoomConfirmed && (
-              <Button
-                size="small"
-                type="button"
-                disabled={confirmPlanMutation.isPending}
-                onClick={() => handleConfirm(leftPlan.id)}
-              >
-                이 안으로 확정
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* VS 구분자 */}
-        <div css={vsWrapperStyle}>
-          <hr css={vsHrStyle} />
-          <span css={vsBadgeStyle}>
-            VS
-          </span>
-        </div>
-
-        {/* 우측 여행안 카드 */}
-        <div css={compareCardStyle}>
-          <div css={cardHeaderStyle}>
-            <span css={tagLabelStyle(false)}>
-              {rightPlan.planTagLabel}
-            </span>
-            <span css={authorTextStyle}>{rightPlan.authorName} 제안</span>
-          </div>
-
-          <h3 css={cardTitleStyle}>
-            {rightPlan.title}
-          </h3>
-
-          <div css={railWrapperStyle}>
+          <div>
+            <p css={valueTextStyle} style={{ fontWeight: 600, marginBottom: 6 }}>
+              {rightPlan.period} ({rightPlan.nights}박 {rightPlan.days}일)
+            </p>
             <RouteRail route={rightPlan.route} differenceSummary={rightPlan.differenceSummary} />
           </div>
+        </div>
+      </section>
 
-          <div css={costBoxStyle}>
-            <span css={costLabelStyle}>예상 총액</span>
-            <span css={costValueStyle}>{rightPlan.groupCostText}</span>
+      {/* 비교 대조 항목 3: 예약 및 일정 점검 (PL-04 시안 1) */}
+      <section css={compareSectionCardStyle}>
+        <div css={sectionHeaderStyle}>
+          <h3 css={sectionTitleStyle}>3. 예약 및 일정 점검</h3>
+        </div>
+
+        <div css={twoColumnsGridStyle}>
+          <div>
+            {leftPlan.bookingRisks.length > 0 ? (
+              <span css={alertBadgeStyle(true)}>
+                ⚠️ {leftPlan.bookingRisks.length}건 확인 필요
+              </span>
+            ) : (
+              <span css={alertBadgeStyle(false)}>
+                ✓ 예약 위험 없음
+              </span>
+            )}
           </div>
 
-          <div css={cardFooterStyle}>
-            <div css={opinionGroupStyle}>
-              <span css={likeCountStyle}>👍 {rightPlan.opinions.likeCount}</span>
-              <span css={okayCountStyle}>🙂 {rightPlan.opinions.okayCount}</span>
-              {rightPlan.opinions.hardCount > 0 && (
-                <span css={hardCountStyle}>😢 {rightPlan.opinions.hardCount}</span>
-              )}
-            </div>
-
-            {!isRoomConfirmed && (
-              <Button
-                size="small"
-                type="button"
-                disabled={confirmPlanMutation.isPending}
-                onClick={() => handleConfirm(rightPlan.id)}
-              >
-                이 안으로 확정
-              </Button>
+          <div>
+            {rightPlan.bookingRisks.length > 0 ? (
+              <span css={alertBadgeStyle(true)}>
+                ⚠️ {rightPlan.bookingRisks.length}건 확인 필요
+              </span>
+            ) : (
+              <span css={alertBadgeStyle(false)}>
+                ✓ 예약 위험 없음
+              </span>
             )}
           </div>
         </div>
+      </section>
+
+      {/* 비교 대조 항목 4: 예상 경비 (PL-04 시안 1) */}
+      <section css={compareSectionCardStyle}>
+        <div css={sectionHeaderStyle}>
+          <h3 css={sectionTitleStyle}>4. 예상 경비</h3>
+        </div>
+
+        <div css={twoColumnsGridStyle}>
+          <div>
+            <span css={costHighlightStyle}>{leftPlan.groupCostText}</span>
+            <p css={valueTextStyle} style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)", marginTop: 2 }}>
+              {leftPlan.perPersonCostText}
+            </p>
+          </div>
+
+          <div>
+            <span css={costHighlightStyle}>{rightPlan.groupCostText}</span>
+            <p css={valueTextStyle} style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)", marginTop: 2 }}>
+              {rightPlan.perPersonCostText}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 비교 대조 항목 5: 구성원 의견 (PL-04 시안 1) */}
+      <section css={compareSectionCardStyle}>
+        <div css={sectionHeaderStyle}>
+          <h3 css={sectionTitleStyle}>5. 구성원 의견</h3>
+        </div>
+
+        <div css={twoColumnsGridStyle}>
+          <div>
+            <div css={opinionCountsRowStyle}>
+              <span style={{ color: "var(--adaptiveGreen600, #15803d)" }}>👍 {leftPlan.opinions.likeCount}</span>
+              <span style={{ color: "var(--adaptiveBlue600, #1b64da)" }}>🙂 {leftPlan.opinions.okayCount}</span>
+              {leftPlan.opinions.hardCount > 0 && (
+                <span style={{ color: "var(--adaptiveRed600, #e0383e)" }}>😢 {leftPlan.opinions.hardCount}</span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div css={opinionCountsRowStyle}>
+              <span style={{ color: "var(--adaptiveGreen600, #15803d)" }}>👍 {rightPlan.opinions.likeCount}</span>
+              <span style={{ color: "var(--adaptiveBlue600, #1b64da)" }}>🙂 {rightPlan.opinions.okayCount}</span>
+              {rightPlan.opinions.hardCount > 0 && (
+                <span style={{ color: "var(--adaptiveRed600, #e0383e)" }}>😢 {rightPlan.opinions.hardCount}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PL-04 시안 1 하단 고정 확정 CTA */}
+      <div css={fixedCtaContainerStyle}>
+        {isRoomConfirmed ? (
+          <Button
+            display="block"
+            size="large"
+            type="button"
+            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+          >
+            확정 일정 보기
+          </Button>
+        ) : (
+          <Button
+            display="block"
+            size="large"
+            type="button"
+            disabled={confirmPlanMutation.isPending}
+            onClick={handleConfirm}
+          >
+            {confirmPlanMutation.isPending
+              ? "일정 확정 중..."
+              : `선택한 [${selectedPlan?.planTagLabel}]으로 일정 확정하기`}
+          </Button>
+        )}
       </div>
     </div>
   );
