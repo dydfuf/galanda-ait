@@ -85,11 +85,6 @@ const listSubtitleStyle = css`
   margin: 0;
 `;
 
-const actionGroupStyle = css`
-  display: flex;
-  gap: 6px;
-`;
-
 const emptyCardStyle = css`
   background-color: var(--adaptiveBackground, #ffffff);
   border-radius: 16px;
@@ -195,7 +190,7 @@ export function PlanHomePage() {
         isConfirmed={isConfirmed}
       />
 
-      {/* 여행안 목록 헤더 및 보조 버튼 */}
+      {/* 여행안 목록 헤더 */}
       <div css={listHeaderRowStyle}>
         <div>
           <h2 css={listTitleStyle}>
@@ -204,16 +199,6 @@ export function PlanHomePage() {
           <p css={listSubtitleStyle}>
             카드를 눌러 상세 일정과 숙소·교통을 확인하세요.
           </p>
-        </div>
-
-        <div css={actionGroupStyle}>
-          <Button
-            size="small"
-            type="button"
-            onClick={() => navigate(`/trips/${tripId}/plans/new`)}
-          >
-            + 새 제안
-          </Button>
         </div>
       </div>
 
