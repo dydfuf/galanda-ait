@@ -1,4 +1,6 @@
 import type { TripRoom } from "../../core/domain/room.ts";
+import type { UserId } from "../../core/domain/ids.ts";
+import { isPlanAuthor } from "../../core/domain/auth-guards.ts";
 import type { PlanCardData } from "./components/PlanCard.tsx";
 
 export interface TripRoomViewModel {
@@ -18,7 +20,10 @@ export interface TripRoomViewModel {
   readonly plans: ReadonlyArray<PlanCardData>;
 }
 
-export const toTripRoomViewModel = (room: TripRoom): TripRoomViewModel => {
+export const toTripRoomViewModel = (
+  room: TripRoom,
+  currentUserId?: UserId | string
+): TripRoomViewModel => {
   const confirmed = room.plans.find((p) => p.id === room.confirmedPlanId);
   const isConfirmed = Boolean(room.confirmedPlanId);
 
@@ -123,8 +128,10 @@ export const toTripRoomViewModel = (room: TripRoom): TripRoomViewModel => {
       ? p.memberOpinions.filter((m) => m.reaction === "HARD").length
       : 0;
 
-    const myOpinion = p.memberOpinions?.find(
-      (m) => m.userId === "user-local-me" || m.userId === "user-local-host"
+    const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
+
+    const myOpinion = p.memberOpinions?.find((m) =>
+      currentUserId ? m.userId === currentUserId : m.userId === "user-local-me"
     );
 
     return {
@@ -140,7 +147,9 @@ export const toTripRoomViewModel = (room: TripRoom): TripRoomViewModel => {
       groupCostText,
       perPersonCostText,
       bookingAlert,
+      authorId: p.authorId,
       authorName,
+      isAuthor,
       opinions: {
         likeCount,
         okayCount,

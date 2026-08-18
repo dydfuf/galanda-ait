@@ -189,32 +189,69 @@ export const requirePlanInRoom = (
 };
 
 /**
- * 여행안 작성자 또는 방장 권한을 요구하는 가드 (소유권 기반 ABAC)
- * - authorId가 존재하면 userId와 직접 비교
- * - legacy/이전 데이터로 인해 authorId가 누락된 경우:
- *   authorName과 일치하는 방 참여자가 유일(단 1명)할 때만 해당 참여자를 작성자로 인정
- *   동명이인이 존재하거나 일치하는 멤버가 없으면 일반 멤버는 소유권을 주장할 수 없으며 방장만 수정/삭제 가능
+ * 특정 사용자가 여행안의 작성자인지 확인하는 순수 도메인 함수
+ * - authorId가 존재하면 userId와 직접 일치 여부 확인
+ * - legacy 데이터로 authorId가 누락된 경우:
+ *   authorName과 일치하는 방 참여자가 유일(단 1명)할 때만 해당 참여자를 작성자로 판별
+ *   동명이인이 존재하거나 일치하는 멤버가 없으면 작성자로 인정하지 않음
+ */
+export const isPlanAuthor = (
+  room: TripRoom,
+  plan: TripPlan,
+  userId?: UserId
+): boolean => {
+  if (!userId) {
+    return false;
+  }
+
+  if (plan.authorId !== undefined) {
+    return plan.authorId === userId;
+  }
+
+  if (plan.authorName) {
+    const matchingMembers = room.members.filter(
+      (m) => m.name === plan.authorName
+    );
+    if (matchingMembers.length === 1 && matchingMembers[0].id === userId) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
+ * 여행안 작성자 소유권 권한을 요구하는 도메인 가드 (ABAC)
+ * - 작성자 본인만 통과하며, 비작성자(방장 포함)는 UnauthorizedError로 거절됨
+ */
+export const requirePlanAuthor = (
+  room: TripRoom,
+  plan: TripPlan,
+  userId: UserId,
+  reason = "여행안 작성자만 수정하거나 삭제할 수 있습니다."
+): Effect.Effect<RoomActor, UnauthorizedError> =>
+  Effect.gen(function* () {
+    const actor = getRoomActor(room, userId);
+
+    if (!isPlanAuthor(room, plan, userId)) {
+      return yield* Effect.fail(new UnauthorizedError({ reason }));
+    }
+
+    return actor;
+  });
+
+/**
+ * 여행안 작성자 또는 방장 권한을 요구하는 가드 (하위 호환성 유지용)
  */
 export const requirePlanAuthorOrHost = (
   room: TripRoom,
   plan: TripPlan,
   userId: UserId,
-  reason = "여행안 작성자 또는 방장만 수정/삭제할 수 있습니다."
+  reason = "여행안 작성자 또는 방장만 수행할 수 있습니다."
 ): Effect.Effect<RoomActor, UnauthorizedError> =>
   Effect.gen(function* () {
     const actor = getRoomActor(room, userId);
-    let isAuthor = false;
-
-    if (plan.authorId !== undefined) {
-      isAuthor = plan.authorId === userId;
-    } else if (plan.authorName) {
-      const matchingMembers = room.members.filter(
-        (m) => m.name === plan.authorName
-      );
-      if (matchingMembers.length === 1 && matchingMembers[0].id === userId) {
-        isAuthor = true;
-      }
-    }
+    const isAuthor = isPlanAuthor(room, plan, userId);
 
     if (!isAuthor && !actor.isHost) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));

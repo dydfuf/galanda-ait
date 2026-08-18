@@ -20,7 +20,9 @@ export interface PlanCardData {
   readonly groupCostText: string;
   readonly perPersonCostText: string;
   readonly bookingAlert?: string;
+  readonly authorId?: string;
   readonly authorName: string;
+  readonly isAuthor?: boolean;
   readonly opinions: PlanCardOpinionCounts;
   readonly myReaction?: "LIKE" | "OKAY" | "HARD";
   readonly isConfirmed: boolean;

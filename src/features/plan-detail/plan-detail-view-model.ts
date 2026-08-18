@@ -1,4 +1,6 @@
 import type { TripRoom } from "../../core/domain/room.ts";
+import type { UserId } from "../../core/domain/ids.ts";
+import { isPlanAuthor } from "../../core/domain/auth-guards.ts";
 import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
 import type { TimelineItem } from "./components/DetailTimeline.tsx";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
@@ -13,6 +15,8 @@ export interface PlanMemberOpinionViewModel {
 }
 
 export interface DetailedPlanViewModel extends PlanCardData {
+  readonly authorId?: string;
+  readonly isAuthor: boolean;
   readonly proposalReason: string;
   readonly bookingRisks: ReadonlyArray<BookingRiskItem>;
   readonly timelineItems: ReadonlyArray<TimelineItem>;
@@ -34,7 +38,10 @@ export interface PlanDetailViewModel {
   readonly plans: ReadonlyArray<DetailedPlanViewModel>;
 }
 
-export const toPlanDetailViewModel = (room: TripRoom): PlanDetailViewModel => {
+export const toPlanDetailViewModel = (
+  room: TripRoom,
+  currentUserId?: UserId | string
+): PlanDetailViewModel => {
   const confirmed = room.plans.find((p) => p.id === room.confirmedPlanId);
   const isConfirmed = Boolean(room.confirmedPlanId);
 
@@ -178,8 +185,10 @@ export const toPlanDetailViewModel = (room: TripRoom): PlanDetailViewModel => {
     const okayCount = memberOpinions.filter((m) => m.reaction === "OKAY").length;
     const hardCount = memberOpinions.filter((m) => m.reaction === "HARD").length;
 
-    const myOpinion = memberOpinions.find(
-      (m) => m.userId === "user-local-me" || m.userId === "user-local-host"
+    const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
+
+    const myOpinion = memberOpinions.find((m) =>
+      currentUserId ? m.userId === currentUserId : m.userId === "user-local-me"
     );
 
     return {
@@ -195,7 +204,9 @@ export const toPlanDetailViewModel = (room: TripRoom): PlanDetailViewModel => {
       groupCostText,
       perPersonCostText,
       bookingAlert: bookingRisks[0]?.message,
+      authorId: p.authorId,
       authorName,
+      isAuthor,
       proposalReason: p.proposalReason ?? "",
       opinions: {
         likeCount,

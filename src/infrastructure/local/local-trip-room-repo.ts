@@ -23,11 +23,11 @@ const STORAGE_KEY = "galanda_rooms_v1";
 
 const loadFromStorage = (): ReadonlyArray<unknown> => {
   if (typeof window === "undefined" || !window.localStorage) return [];
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return [];
-  }
   try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -37,7 +37,11 @@ const loadFromStorage = (): ReadonlyArray<unknown> => {
 
 const saveToStorage = (rooms: ReadonlyArray<TripRoom>): void => {
   if (typeof window !== "undefined" && window.localStorage) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
+    } catch {
+      // ignore storage error
+    }
   }
 };
 

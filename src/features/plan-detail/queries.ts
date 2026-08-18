@@ -8,16 +8,22 @@ import {
 } from "./plan-detail-view-model.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
 
-export const useTripRoomDetailQuery = (roomId: string) =>
-  useQuery({
+import { useSessionQuery } from "../../hooks/useSession.ts";
+
+export const useTripRoomDetailQuery = (roomId: string) => {
+  const { data: session } = useSessionQuery();
+
+  return useQuery({
     queryKey: tripRoomKeys.detail(roomId),
     queryFn: ({ signal }) =>
       appRuntime.runPromise(getTripRoom(TripIdSchema.make(roomId)), {
         signal,
       }),
-    select: (room): PlanDetailViewModel => toPlanDetailViewModel(room),
+    select: (room): PlanDetailViewModel =>
+      toPlanDetailViewModel(room, session?.userId),
     enabled: Boolean(roomId),
   });
+};
 
 export const useTripRoomRawQuery = (roomId: string) =>
   useQuery({

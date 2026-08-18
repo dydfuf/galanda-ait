@@ -6,17 +6,22 @@ import {
   type TripRoomViewModel,
 } from "./plan-home-view-model.ts";
 
+import { useSessionQuery } from "../../hooks/useSession.ts";
+
 export const tripRoomKeys = {
   all: ["trip-rooms"] as const,
   list: () => [...tripRoomKeys.all, "list"] as const,
   detail: (id: string) => [...tripRoomKeys.all, "detail", id] as const,
 };
 
-export const useTripRoomsQuery = () =>
-  useQuery({
+export const useTripRoomsQuery = () => {
+  const { data: session } = useSessionQuery();
+
+  return useQuery({
     queryKey: tripRoomKeys.list(),
     queryFn: ({ signal }) =>
       appRuntime.runPromise(getTripRooms(), { signal }),
     select: (rooms): ReadonlyArray<TripRoomViewModel> =>
-      rooms.map(toTripRoomViewModel),
+      rooms.map((r) => toTripRoomViewModel(r, session?.userId)),
   });
+};
