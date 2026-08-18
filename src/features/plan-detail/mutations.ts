@@ -5,7 +5,6 @@ import {
   TripIdSchema,
   PlanIdSchema,
   RevisionSchema,
-  UserIdSchema,
 } from "../../core/domain/ids.ts";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
 import { tripRoomKeys } from "../plan-home/queries.ts";
@@ -16,8 +15,6 @@ export interface SubmitOpinionVariables {
   readonly reaction: ReactionType;
   readonly reason?: string;
   readonly expectedRevision: number;
-  readonly userId?: string;
-  readonly userName?: string;
 }
 
 export const useSubmitOpinionMutation = () => {
@@ -30,16 +27,12 @@ export const useSubmitOpinionMutation = () => {
       reaction,
       reason,
       expectedRevision,
-      userId = "user-local-me",
-      userName = "나",
     }: SubmitOpinionVariables) =>
       appRuntime.runPromise(
         submitPlanOpinionUseCase({
           roomId: TripIdSchema.make(roomId),
           planId: PlanIdSchema.make(planId),
           opinion: {
-            userId: UserIdSchema.make(userId),
-            userName,
             reaction,
             reason: reason?.trim() ? reason.trim() : undefined,
           },

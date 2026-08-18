@@ -1,11 +1,14 @@
-import { Effect, Option, Result, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import {
   TripRoomRepository,
   type CreateRoomParams,
 } from "../ports/trip-room-repository.ts";
-import { SessionService, getOptionalSession } from "../ports/session.ts";
-import { TripMemberSchema } from "../domain/room.ts";
-import { ValidationError, type NotFoundError } from "../domain/errors.ts";
+import { SessionService, requireAuthSession } from "../ports/session.ts";
+import {
+  ValidationError,
+  UnauthorizedError,
+  type NotFoundError,
+} from "../domain/errors.ts";
 import type { TripMember, TripRoom } from "../domain/room.ts";
 
 export const CreateRoomInputSchema = Schema.Struct({
@@ -13,7 +16,6 @@ export const CreateRoomInputSchema = Schema.Struct({
   destination: Schema.optional(Schema.String),
   startDate: Schema.optional(Schema.String),
   endDate: Schema.optional(Schema.String),
-  hostUser: Schema.optional(TripMemberSchema),
 });
 
 export type CreateRoomInput = CreateRoomParams;
@@ -22,7 +24,7 @@ export const createTripRoomUseCase = (
   input: CreateRoomInput
 ): Effect.Effect<
   TripRoom,
-  ValidationError | NotFoundError,
+  ValidationError | NotFoundError | UnauthorizedError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
@@ -55,18 +57,16 @@ export const createTripRoomUseCase = (
       );
     }
 
-    // 3. 호스트 사용자 정보 자동 바인딩 (추상화된 세션 헬퍼 활용)
-    let hostUser: TripMember | undefined = validated.hostUser;
-    if (!hostUser) {
-      const sessionOpt = yield* getOptionalSession;
-      if (Option.isSome(sessionOpt)) {
-        hostUser = {
-          id: sessionOpt.value.userId,
-          name: sessionOpt.value.name,
-          role: "HOST",
-        };
-      }
-    }
+    // 3. 인증 세션 확인 및 호스트 사용자 바인딩 (세션 사용자 단일 주체 강제)
+    const session = yield* requireAuthSession(
+      "방을 생성하려면 로그인이 필요합니다."
+    );
+
+    const hostUser: TripMember = {
+      id: session.userId,
+      name: session.name,
+      role: "HOST",
+    };
 
     // 4. 저장소 생성 요청
     const repo = yield* TripRoomRepository;
