@@ -12,9 +12,13 @@ export const DEFAULT_LOCAL_USER: UserSession = {
 
 export const makeLocalSessionService = (
   session: UserSession = DEFAULT_LOCAL_USER
-) => ({
-  getCurrentSession: () => Effect.succeed(session),
-  getCurrentUser: () =>
+): {
+  readonly getCurrentSession: () => Effect.Effect<UserSession, never>;
+  readonly getCurrentUser: () => Effect.Effect<UserSession, UnauthorizedError>;
+} => ({
+  getCurrentSession: (): Effect.Effect<UserSession, never> =>
+    Effect.succeed(session),
+  getCurrentUser: (): Effect.Effect<UserSession, UnauthorizedError> =>
     session.isAuthenticated
       ? Effect.succeed(session)
       : Effect.fail(new UnauthorizedError({ reason: "로그인이 필요합니다." })),
@@ -22,6 +26,8 @@ export const makeLocalSessionService = (
 
 export const createLocalSessionLayer = (
   session: UserSession = DEFAULT_LOCAL_USER
-) => Layer.succeed(SessionService, makeLocalSessionService(session));
+): Layer.Layer<SessionService> =>
+  Layer.succeed(SessionService, makeLocalSessionService(session));
 
-export const LocalSessionLayer = createLocalSessionLayer();
+export const LocalSessionLayer: Layer.Layer<SessionService> = createLocalSessionLayer();
+

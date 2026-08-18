@@ -5,6 +5,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
+import { useSessionQuery } from "../../hooks/useSession.ts";
+import { canManagePlan } from "../../core/domain/auth-guards.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
@@ -14,7 +16,7 @@ import { AccommodationSection } from "./components/AccommodationSection.tsx";
 import { TransportSection } from "./components/TransportSection.tsx";
 import { CostSummarySection } from "./components/CostSummarySection.tsx";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
-import { useUpdatePlanMutation } from "./mutations.ts";
+import { useUpdatePlanMutation, useDeletePlanMutation } from "./mutations.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
 
 const pageContainerStyle = css`
@@ -40,7 +42,7 @@ const bottomCTAWrapperStyle = css`
   margin-top: 16px;
 `;
 
-export function PlanEditPage() {
+export function PlanEditPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
 
@@ -48,8 +50,10 @@ export function PlanEditPage() {
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
 
-  const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
+  const { data: session, isLoading: isSessionLoading } = useSessionQuery();
+  const { data: room, isLoading: isRoomLoading, isError } = useTripRoomRawQuery(tripId);
   const updatePlanMutation = useUpdatePlanMutation();
+  const deletePlanMutation = useDeletePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const plan = room?.plans.find((p) => p.id === planId);
@@ -85,20 +89,60 @@ export function PlanEditPage() {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
   }
 
-  if (isLoading) {
+  if (isRoomLoading || isSessionLoading) {
     return <div css={loadingContainerStyle}>여행안 정보를 불러오는 중입니다...</div>;
   }
 
-  if (isError || !room || !plan) {
+  if (isError || !room) {
     return (
       <RouteErrorFallback
-        title="수정할 여행안을 찾을 수 없습니다"
-        message="요청하신 정보가 없거나 삭제되었습니다."
+        title="여행 정보를 찾을 수 없습니다"
+        message="요청하신 여행 정보가 없거나 삭제되었습니다."
+        actionText="여행 목록으로 이동"
+        onAction={() => navigate("/trips", { replace: true })}
       />
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // 1. 여행안 존재 여부 확인 (NotFoundError 대응)
+  if (!plan) {
+    return (
+      <RouteErrorFallback
+        title="수정할 여행안을 찾을 수 없습니다"
+        message="요청하신 여행안이 존재하지 않거나 이미 삭제되었습니다."
+        actionText="계획 목록으로 돌아가기"
+        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+      />
+    );
+  }
+
+  // 2. 작성자 소유권 또는 방장 관리 권한 확인 (UnauthorizedError 대응)
+  const canManage = canManagePlan(room, plan, session?.userId);
+  if (!session || !canManage) {
+    return (
+      <RouteErrorFallback
+        title="수정 권한이 없습니다"
+        message="여행안 작성자만 해당 여행안을 수정하거나 삭제할 수 있습니다."
+        actionText="여행안 상세로 돌아가기"
+        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+      />
+    );
+  }
+
+  // 3. 확정 여부 확인
+  const isConfirmed = plan.id === room.confirmedPlanId || plan.status === "CONFIRMED";
+  if (isConfirmed) {
+    return (
+      <RouteErrorFallback
+        title="확정된 여행안은 수정할 수 없습니다"
+        message="이미 확정된 여행안은 세부 일정을 변경할 수 없습니다."
+        actionText="여행안 상세로 돌아가기"
+        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+      />
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!validation.isValid || isSubmitting) return;
 
@@ -122,8 +166,36 @@ export function PlanEditPage() {
 
       clearDraft();
       navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
-    } catch {
+    } catch (err: unknown) {
       setIsSubmitting(false);
+      const reason =
+        err && typeof err === "object" && "reason" in err
+          ? String((err as { reason: string }).reason)
+          : err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "여행안 수정에 실패했습니다.";
+      alert(reason);
+    }
+  };
+
+  const handleDelete = async (): Promise<void> => {
+    if (!window.confirm(`'${plan.title}' 여행안을 삭제하시겠습니까?`)) {
+      return;
+    }
+    try {
+      await deletePlanMutation.mutateAsync({
+        roomId: tripId,
+        planId: plan.id,
+        expectedRevision: room.revision,
+      });
+      clearDraft();
+      navigate(`/trips/${tripId}/plans`, { replace: true });
+    } catch (err: unknown) {
+      const reason =
+        err && typeof err === "object" && "reason" in err
+          ? String((err as { reason: string }).reason)
+          : "여행안 삭제에 실패했습니다.";
+      alert(reason);
     }
   };
 
@@ -177,14 +249,28 @@ export function PlanEditPage() {
             firstError={validation.firstError}
             errorCount={validation.errorCount}
           />
-          <Button
-            display="block"
-            size="large"
-            type="submit"
-            disabled={!validation.isValid || isSubmitting}
-          >
-            {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
-          </Button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Button
+              display="block"
+              size="large"
+              type="button"
+              color="danger"
+              style={{ flex: 1 }}
+              onClick={handleDelete}
+              disabled={isSubmitting}
+            >
+              삭제하기
+            </Button>
+            <Button
+              display="block"
+              size="large"
+              type="submit"
+              style={{ flex: 2 }}
+              disabled={!validation.isValid || isSubmitting}
+            >
+              {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
+            </Button>
+          </div>
         </div>
       </form>
     </div>

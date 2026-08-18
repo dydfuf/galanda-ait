@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { appRuntime } from "../../app/runtime.ts";
 import { confirmTripPlan } from "../../core/usecases/confirm-plan.ts";
 import {
@@ -6,6 +6,7 @@ import {
   PlanIdSchema,
   RevisionSchema,
 } from "../../core/domain/ids.ts";
+import type { TripRoom } from "../../core/domain/room.ts";
 import { tripRoomKeys } from "./queries.ts";
 
 export interface ConfirmPlanVariables {
@@ -14,11 +15,16 @@ export interface ConfirmPlanVariables {
   readonly revision: number;
 }
 
-export const useConfirmPlanMutation = () => {
+export const useConfirmPlanMutation = (): UseMutationResult<
+  TripRoom,
+  Error,
+  ConfirmPlanVariables,
+  unknown
+> => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ roomId, planId, revision }: ConfirmPlanVariables) =>
+    mutationFn: ({ roomId, planId, revision }: ConfirmPlanVariables): Promise<TripRoom> =>
       appRuntime.runPromise(
         confirmTripPlan(
           TripIdSchema.make(roomId),
@@ -26,8 +32,9 @@ export const useConfirmPlanMutation = () => {
           RevisionSchema.make(revision)
         )
       ),
-    onSuccess: () => {
+    onSuccess: (): void => {
       queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
     },
   });
 };
+

@@ -3,7 +3,7 @@ import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { SessionService, requireAuthSession } from "../ports/session.ts";
 import { calculatePlanDifference } from "../calculations/plan-diff.ts";
 import {
-  requirePlanAuthorOrHost,
+  requirePlanAuthor,
   requirePlanInRoom,
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
@@ -133,12 +133,12 @@ export const updatePlanUseCase = (
       "여행방 참여자만 여행안을 수정할 수 있습니다."
     );
 
-    // 5. ABAC: 여행안 작성자 또는 방장 권한 검증 (소유권 검증)
-    yield* requirePlanAuthorOrHost(
+    // 5. ABAC: 여행안 작성자 소유권 권한 검증
+    yield* requirePlanAuthor(
       room,
       existingPlan,
       session.userId,
-      "여행안 작성자 또는 방장만 여행안을 수정할 수 있습니다."
+      "여행안 작성자만 여행안을 수정할 수 있습니다."
     );
 
     // 작성자 정보 보존 및 기존에 authorId가 누락된 경우 유일 매칭 시 보정(backfill)
@@ -212,12 +212,12 @@ export const deletePlanUseCase = (
       "여행방 참여자만 여행안을 삭제할 수 있습니다."
     );
 
-    // 3. ABAC: 여행안 작성자 또는 방장 권한 검증 (소유권 검증)
-    yield* requirePlanAuthorOrHost(
+    // 3. ABAC: 여행안 작성자 소유권 권한 검증
+    yield* requirePlanAuthor(
       room,
       plan,
       session.userId,
-      "여행안 작성자 또는 방장만 여행안을 삭제할 수 있습니다."
+      "여행안 작성자만 여행안을 삭제할 수 있습니다."
     );
 
     return yield* repo.deletePlan(

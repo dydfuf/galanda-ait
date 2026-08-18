@@ -42,7 +42,7 @@ const bottomCTAWrapperStyle = css`
   margin-top: 16px;
 `;
 
-export function PlanCreatePage() {
+export function PlanCreatePage(): JSX.Element {
   const params = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -103,7 +103,7 @@ export function PlanCreatePage() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!validation.isValid || isSubmitting) return;
 

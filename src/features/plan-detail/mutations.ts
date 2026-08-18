@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { appRuntime } from "../../app/runtime.ts";
 import { submitPlanOpinionUseCase } from "../../core/usecases/submit-opinion.ts";
 import {
@@ -7,6 +7,7 @@ import {
   RevisionSchema,
 } from "../../core/domain/ids.ts";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
+import type { TripRoom } from "../../core/domain/room.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
 
 export interface SubmitOpinionVariables {
@@ -17,7 +18,12 @@ export interface SubmitOpinionVariables {
   readonly expectedRevision: number;
 }
 
-export const useSubmitOpinionMutation = () => {
+export const useSubmitOpinionMutation = (): UseMutationResult<
+  TripRoom,
+  Error,
+  SubmitOpinionVariables,
+  unknown
+> => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -27,7 +33,7 @@ export const useSubmitOpinionMutation = () => {
       reaction,
       reason,
       expectedRevision,
-    }: SubmitOpinionVariables) =>
+    }: SubmitOpinionVariables): Promise<TripRoom> =>
       appRuntime.runPromise(
         submitPlanOpinionUseCase({
           roomId: TripIdSchema.make(roomId),
@@ -39,8 +45,9 @@ export const useSubmitOpinionMutation = () => {
           expectedRevision: RevisionSchema.make(expectedRevision),
         })
       ),
-    onSuccess: () => {
+    onSuccess: (): void => {
       queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
     },
   });
 };
+

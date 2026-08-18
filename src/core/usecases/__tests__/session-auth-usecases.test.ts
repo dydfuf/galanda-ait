@@ -15,19 +15,25 @@ import { NotFoundError, ConflictError, UnauthorizedError } from "../../domain/er
 /**
  * 테스트용 인메모리 TripRoomRepository 구현체 생성 헬퍼
  */
-const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
+const createInMemoryRepositoryLayer = (
+  initialRooms: TripRoom[] = []
+): Layer.Layer<TripRoomRepository> => {
   let rooms: TripRoom[] = [...initialRooms];
 
   const repoImpl = {
-    getRoom: (roomId: typeof TripIdSchema.Type) => {
+    getRoom: (
+      roomId: typeof TripIdSchema.Type
+    ): Effect.Effect<TripRoom, NotFoundError> => {
       const room = rooms.find((r) => r.id === roomId);
       if (!room) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       }
       return Effect.succeed(room);
     },
-    getRooms: () => Effect.succeed(rooms),
-    createRoom: (params: CreateRoomParams) => {
+    getRooms: (): Effect.Effect<ReadonlyArray<TripRoom>, never> => Effect.succeed(rooms),
+    createRoom: (
+      params: CreateRoomParams
+    ): Effect.Effect<TripRoom, never> => {
       const hostUser: TripMember = params.hostUser ?? {
         id: UserIdSchema.make("default-host"),
         name: "호스트",
@@ -51,7 +57,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       params: UpdateRoomParams,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -81,7 +87,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       plan: TripPlan,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -108,7 +114,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       plan: TripPlan,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -140,7 +146,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       planId: typeof PlanIdSchema.Type,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -168,7 +174,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       planId: typeof PlanIdSchema.Type,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -200,7 +206,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       planId: typeof PlanIdSchema.Type,
       opinion: typeof import("../../domain/room.ts").PlanMemberOpinionSchema.Type,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -249,7 +255,10 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
       return Effect.succeed(updated);
     },
-    joinRoom: (roomId: typeof TripIdSchema.Type, member: TripMember) => {
+    joinRoom: (
+      roomId: typeof TripIdSchema.Type,
+      member: TripMember
+    ): Effect.Effect<TripRoom, NotFoundError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -269,7 +278,9 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
   return Layer.succeed(TripRoomRepository, repoImpl);
 };
 
-const createTestSessionLayer = (session: UserSession) =>
+const createTestSessionLayer = (
+  session: UserSession
+): Layer.Layer<SessionService> =>
   Layer.succeed(SessionService, makeLocalSessionService(session));
 
 describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => {
@@ -645,7 +656,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       }
     });
 
-    it("방장(HOST)은 다른 멤버가 작성한 여행안도 수정 및 삭제할 수 있다", async () => {
+    it("방장(HOST)이라도 타 멤버(MEMBER)가 작성한 여행안 수정을 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([roomWithBobPlan]),
         createTestSessionLayer(aliceUser)
@@ -653,7 +664,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
 
       const updateTarget: TripPlan = {
         ...roomWithBobPlan.plans[1],
-        title: "방장이 수정한 밥의 제안",
+        title: "방장이 타인의 여행안 수정 시도",
       };
 
       const updateProgram = updatePlanUseCase({
@@ -662,19 +673,121 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
         expectedRevision: roomWithBobPlan.revision,
       }).pipe(Effect.provide(testEnv));
 
+      try {
+        await Effect.runPromise(updateProgram);
+        expect.unreachable("host should not be allowed to update other member's plan");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      // 원본 데이터가 손상되지 않고 보존되었는지 검증
+      const getProgram = TripRoomRepository.pipe(
+        Effect.flatMap((repo) => repo.getRoom(roomWithBobPlan.id)),
+        Effect.provide(testEnv)
+      );
+      const room = await Effect.runPromise(getProgram);
+      const bobPlan = room.plans.find((p) => p.id === "plan-bob");
+      expect(bobPlan?.title).toBe("밥의 제안");
+      expect(bobPlan?.authorId).toBe("user-bob");
+    });
+
+    it("방장(HOST)이라도 타 멤버(MEMBER)가 작성한 여행안 삭제를 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithBobPlan]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const deleteProgram = deletePlanUseCase({
+        roomId: roomWithBobPlan.id,
+        planId: PlanIdSchema.make("plan-bob"),
+        expectedRevision: roomWithBobPlan.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(deleteProgram);
+        expect.unreachable("host should not be allowed to delete other member's plan");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      // 원본 데이터가 삭제되지 않고 보존되었는지 검증
+      const getProgram = TripRoomRepository.pipe(
+        Effect.flatMap((repo) => repo.getRoom(roomWithBobPlan.id)),
+        Effect.provide(testEnv)
+      );
+      const room = await Effect.runPromise(getProgram);
+      expect(room.plans.some((p) => p.id === "plan-bob")).toBe(true);
+    });
+
+    it("작성자(HOST)는 자신이 작성한 여행안을 정상적으로 수정 및 삭제할 수 있다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const updateTarget: TripPlan = {
+        ...sampleRoom.plans[0],
+        title: "방장이 자신이 작성한 여행안 수정",
+      };
+
+      const updateProgram = updatePlanUseCase({
+        roomId: sampleRoom.id,
+        plan: updateTarget,
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
       const updatedRoom = await Effect.runPromise(updateProgram);
-      const updatedPlan = updatedRoom.plans.find((p) => p.id === "plan-bob");
-      expect(updatedPlan?.title).toBe("방장이 수정한 밥의 제안");
-      expect(updatedPlan?.authorId).toBe("user-bob");
+      const updatedPlan = updatedRoom.plans.find((p) => p.id === "plan-1");
+      expect(updatedPlan?.title).toBe("방장이 자신이 작성한 여행안 수정");
+      expect(updatedPlan?.authorId).toBe("user-alice");
 
       const deleteProgram = deletePlanUseCase({
         roomId: updatedRoom.id,
-        planId: PlanIdSchema.make("plan-bob"),
+        planId: PlanIdSchema.make("plan-1"),
         expectedRevision: updatedRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
       const finalRoom = await Effect.runPromise(deleteProgram);
-      expect(finalRoom.plans.some((p) => p.id === "plan-bob")).toBe(false);
+      expect(finalRoom.plans.some((p) => p.id === "plan-1")).toBe(false);
+    });
+
+    it("존재하지 않는 여행안을 수정 또는 삭제하려고 하면 NotFoundError로 실패한다", async () => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const nonExistentPlan: TripPlan = {
+        ...sampleRoom.plans[0],
+        id: PlanIdSchema.make("plan-does-not-exist"),
+        title: "존재하지 않는 플랜",
+      };
+
+      const updateProgram = updatePlanUseCase({
+        roomId: sampleRoom.id,
+        plan: nonExistentPlan,
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(updateProgram);
+        expect.unreachable("should fail with NotFoundError");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(NotFoundError);
+      }
+
+      const deleteProgram = deletePlanUseCase({
+        roomId: sampleRoom.id,
+        planId: PlanIdSchema.make("plan-does-not-exist"),
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(deleteProgram);
+        expect.unreachable("should fail with NotFoundError");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(NotFoundError);
+      }
     });
 
     it("작성자(MEMBER)는 자신이 작성한 여행안을 정상적으로 삭제할 수 있다", async () => {
@@ -881,7 +994,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       }
     });
 
-    it("동명이인이 존재하는 레거시 여행안을 방장이 수정할 때 임의의 동명이인 ID로 잘못 고정되지 않고 authorId undefined가 유지된다", async () => {
+    it("동명이인이 존재하는 레거시 여행안을 방장이 수정/삭제할 수 있어 영구 잠금을 방지하며 임의의 동명이인 ID로 잘못 고정되지 않고 authorId undefined가 유지된다", async () => {
       const roomWithDuplicateNames: TripRoom = {
         ...sampleRoom,
         members: [
@@ -907,6 +1020,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
         createTestSessionLayer(aliceUser)
       );
 
+      // 1. 방장의 수정 허용 및 authorId 미오염 검증
       const updateProgram = updatePlanUseCase({
         roomId: roomWithDuplicateNames.id,
         plan: { ...roomWithDuplicateNames.plans[1], title: "방장이 수정한 모호한 여행안" },
@@ -914,10 +1028,20 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       }).pipe(Effect.provide(hostEnv));
 
       const updatedRoom = await Effect.runPromise(updateProgram);
-      const plan = updatedRoom.plans.find((p) => p.id === "plan-legacy-bob");
-      expect(plan?.title).toBe("방장이 수정한 모호한 여행안");
-      expect(plan?.authorId).toBeUndefined(); // 임의의 멤버나 방장으로 변조되지 않음
-      expect(plan?.authorName).toBe("밥");
+      const updatedPlan = updatedRoom.plans.find((p) => p.id === "plan-legacy-bob");
+      expect(updatedPlan?.title).toBe("방장이 수정한 모호한 여행안");
+      expect(updatedPlan?.authorId).toBeUndefined(); // 임의의 멤버나 방장으로 잘못 변조되지 않음
+      expect(updatedPlan?.authorName).toBe("밥");
+
+      // 2. 방장의 삭제 허용 검증
+      const deleteProgram = deletePlanUseCase({
+        roomId: updatedRoom.id,
+        planId: PlanIdSchema.make("plan-legacy-bob"),
+        expectedRevision: updatedRoom.revision,
+      }).pipe(Effect.provide(hostEnv));
+
+      const finalRoom = await Effect.runPromise(deleteProgram);
+      expect(finalRoom.plans.some((p) => p.id === "plan-legacy-bob")).toBe(false);
     });
 
     it("비로그인 상태에서 여행안 수정 및 삭제는 실패한다", async () => {

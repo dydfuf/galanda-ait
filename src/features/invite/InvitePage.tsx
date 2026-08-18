@@ -97,7 +97,7 @@ const backHomeLinkStyle = css`
   }
 `;
 
-export function InvitePage() {
+export function InvitePage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -117,7 +117,7 @@ export function InvitePage() {
   }
 
 
-  const handleAccept = async () => {
+  const handleAccept = async (): Promise<void> => {
     if (!room) return;
     setIsAccepting(true);
     try {

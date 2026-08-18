@@ -25,7 +25,7 @@ export class TripRoomRepository extends Context.Service<
     readonly getRooms: () => Effect.Effect<ReadonlyArray<TripRoom>>;
     readonly createRoom: (
       params: CreateRoomParams
-    ) => Effect.Effect<TripRoom, NotFoundError>;
+    ) => Effect.Effect<TripRoom, ConflictError>;
     readonly updateRoom: (
       roomId: TripId,
       params: UpdateRoomParams,

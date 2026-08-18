@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { css } from "@emotion/react";
+import { css, type SerializedStyles } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomDetailQuery } from "./queries.ts";
 import { useSubmitOpinionMutation } from "./mutations.ts";
+import { useDeletePlanMutation } from "../plan-editor/mutations.ts";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -27,7 +28,7 @@ const pageContainerStyle = css`
   padding: 16px 20px calc(108px + env(safe-area-inset-bottom, 0px));
 `;
 
-const summaryCardStyle = (isConfirmed: boolean) => css`
+const summaryCardStyle = (isConfirmed: boolean): SerializedStyles => css`
   background-color: var(--adaptiveBackground, #ffffff);
   border-radius: 16px;
   padding: 20px;
@@ -51,7 +52,7 @@ const tagGroupStyle = css`
   align-items: center;
 `;
 
-const tagBadgeStyle = (isConfirmed: boolean) => css`
+const tagBadgeStyle = (isConfirmed: boolean): SerializedStyles => css`
   font-size: 11px;
   font-weight: 700;
   padding: 3px 7px;
@@ -261,7 +262,7 @@ const fixedCtaContainerStyle = css`
   box-sizing: border-box;
 `;
 
-export function PlanDetailPage() {
+export function PlanDetailPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
 
@@ -271,6 +272,7 @@ export function PlanDetailPage() {
 
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
+  const deletePlanMutation = useDeletePlanMutation();
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
 
@@ -310,7 +312,7 @@ export function PlanDetailPage() {
   const isConfirmed = plan.id === room.confirmedPlanId;
   const isRoomConfirmed = Boolean(room.confirmedPlanId);
 
-  const handleOpinionSubmit = (reaction: ReactionType, reason?: string) => {
+  const handleOpinionSubmit = (reaction: ReactionType, reason?: string): void => {
     submitOpinionMutation.mutate({
       roomId: room.id,
       planId: plan.id,
@@ -321,6 +323,27 @@ export function PlanDetailPage() {
     setIsBottomSheetOpen(false);
   };
 
+  const handleDeletePlan = async (): Promise<void> => {
+    if (!window.confirm(`'${plan.title}' 여행안을 삭제하시겠습니까?`)) {
+      return;
+    }
+    try {
+      await deletePlanMutation.mutateAsync({
+        roomId: room.id,
+        planId: plan.id,
+        expectedRevision: room.revision,
+      });
+      navigate(`/trips/${tripId}/plans`, { replace: true });
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "reason" in err
+          ? String((err as { reason: string }).reason)
+          : err && typeof err === "object" && "message" in err
+          ? String((err as { message: string }).message)
+          : "여행안 삭제에 실패했습니다.";
+      alert(message);
+    }
+  };
 
   return (
     <div css={pageContainerStyle}>
@@ -338,22 +361,39 @@ export function PlanDetailPage() {
             <span css={periodTextStyle}>
               {plan.period}
             </span>
-            {!isConfirmed && !isRoomConfirmed && (
-              <button
-                type="button"
-                onClick={() => navigate(`/trips/${tripId}/plans/${plan.id}/edit`)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--adaptiveBlue600, #1b64da)",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  padding: "2px 4px",
-                }}
-              >
-                수정
-              </button>
+            {!isConfirmed && !isRoomConfirmed && plan.canManage && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/trips/${tripId}/plans/${plan.id}/edit`)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--adaptiveBlue600, #1b64da)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "2px 4px",
+                  }}
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeletePlan}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--adaptiveRed500, #f04452)",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    padding: "2px 4px",
+                  }}
+                >
+                  삭제
+                </button>
+              </div>
             )}
           </div>
         </div>
