@@ -994,7 +994,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       }
     });
 
-    it("동명이인이 존재하는 레거시 여행안을 방장이 수정/삭제 시도해도 UnauthorizedError로 거부되고 원본이 보존된다", async () => {
+    it("동명이인이 존재하는 레거시 여행안을 방장이 수정/삭제할 수 있어 영구 잠금을 방지하며 임의의 동명이인 ID로 잘못 고정되지 않고 authorId undefined가 유지된다", async () => {
       const roomWithDuplicateNames: TripRoom = {
         ...sampleRoom,
         members: [
@@ -1020,42 +1020,28 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
         createTestSessionLayer(aliceUser)
       );
 
+      // 1. 방장의 수정 허용 및 authorId 미오염 검증
       const updateProgram = updatePlanUseCase({
         roomId: roomWithDuplicateNames.id,
         plan: { ...roomWithDuplicateNames.plans[1], title: "방장이 수정한 모호한 여행안" },
         expectedRevision: roomWithDuplicateNames.revision,
       }).pipe(Effect.provide(hostEnv));
 
-      try {
-        await Effect.runPromise(updateProgram);
-        expect.unreachable("host should not be able to modify other member's ambiguous plan");
-      } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
-      }
+      const updatedRoom = await Effect.runPromise(updateProgram);
+      const updatedPlan = updatedRoom.plans.find((p) => p.id === "plan-legacy-bob");
+      expect(updatedPlan?.title).toBe("방장이 수정한 모호한 여행안");
+      expect(updatedPlan?.authorId).toBeUndefined(); // 임의의 멤버나 방장으로 잘못 변조되지 않음
+      expect(updatedPlan?.authorName).toBe("밥");
 
+      // 2. 방장의 삭제 허용 검증
       const deleteProgram = deletePlanUseCase({
-        roomId: roomWithDuplicateNames.id,
+        roomId: updatedRoom.id,
         planId: PlanIdSchema.make("plan-legacy-bob"),
-        expectedRevision: roomWithDuplicateNames.revision,
+        expectedRevision: updatedRoom.revision,
       }).pipe(Effect.provide(hostEnv));
 
-      try {
-        await Effect.runPromise(deleteProgram);
-        expect.unreachable("host should not be able to delete other member's ambiguous plan");
-      } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
-      }
-
-      // 원본 보존 검증
-      const getProgram = TripRoomRepository.pipe(
-        Effect.flatMap((repo) => repo.getRoom(roomWithDuplicateNames.id)),
-        Effect.provide(hostEnv)
-      );
-      const room = await Effect.runPromise(getProgram);
-      const plan = room.plans.find((p) => p.id === "plan-legacy-bob");
-      expect(plan?.title).toBe("밥의 구버전 제안");
-      expect(plan?.authorId).toBeUndefined();
-      expect(plan?.authorName).toBe("밥");
+      const finalRoom = await Effect.runPromise(deleteProgram);
+      expect(finalRoom.plans.some((p) => p.id === "plan-legacy-bob")).toBe(false);
     });
 
     it("비로그인 상태에서 여행안 수정 및 삭제는 실패한다", async () => {

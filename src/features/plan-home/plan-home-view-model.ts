@@ -1,6 +1,6 @@
 import type { TripRoom } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
-import { isPlanAuthor } from "../../core/domain/auth-guards.ts";
+import { isPlanAuthor, canManagePlan } from "../../core/domain/auth-guards.ts";
 import type { PlanCardData } from "./components/PlanCard.tsx";
 
 export interface TripRoomViewModel {
@@ -129,6 +129,7 @@ export const toTripRoomViewModel = (
       : 0;
 
     const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
+    const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
 
     const myOpinion = p.memberOpinions?.find((m) =>
       currentUserId ? m.userId === currentUserId : m.userId === "user-local-me"
@@ -150,6 +151,7 @@ export const toTripRoomViewModel = (
       authorId: p.authorId,
       authorName,
       isAuthor,
+      canManage,
       opinions: {
         likeCount,
         okayCount,

@@ -14,7 +14,12 @@ import { SessionService } from "../../ports/session.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../save-plan.ts";
 import { createTripRoomUseCase } from "../create-room.ts";
-import { isPlanAuthor, requirePlanAuthor } from "../../domain/auth-guards.ts";
+import {
+  isPlanAuthor,
+  requirePlanAuthor,
+  hasResolvablePlanAuthor,
+  canManagePlan,
+} from "../../domain/auth-guards.ts";
 import { NotFoundError, UnauthorizedError, ConflictError } from "../../domain/errors.ts";
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
@@ -243,6 +248,57 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(isPlanAuthor(roomWithDuplicates, legacyPlan, authorUser.id)).toBe(false);
       expect(isPlanAuthor(roomWithDuplicates, legacyPlan, UserIdSchema.make("user-author-2"))).toBe(false);
     });
+
+    it("작성자를 식별할 수 없는 레거시 여행안(authorName 미기재, 불일치, 동명이인)의 경우 방장에게만 canManagePlan/requirePlanAuthor가 허용되어 영구 잠금을 방지한다", async () => {
+      const roomWithDuplicates: TripRoom = {
+        ...sampleRoom,
+        members: [
+          ...sampleRoom.members,
+          { id: UserIdSchema.make("user-author-2"), name: "작성자", role: "MEMBER" },
+        ],
+      };
+      const ambiguousPlan: TripPlan = {
+        id: PlanIdSchema.make("plan-legacy-ambiguous"),
+        title: "동명이인 레거시 플랜",
+        status: "DRAFT",
+        authorName: "작성자",
+        places: [],
+        voteCount: 0,
+      };
+      const orphanPlan: TripPlan = {
+        id: PlanIdSchema.make("plan-legacy-orphan"),
+        title: "작성자 정보 없는 레거시 플랜",
+        status: "DRAFT",
+        places: [],
+        voteCount: 0,
+      };
+
+      expect(hasResolvablePlanAuthor(roomWithDuplicates, ambiguousPlan)).toBe(false);
+      expect(hasResolvablePlanAuthor(sampleRoom, orphanPlan)).toBe(false);
+
+      // 일반 멤버(작성자 포함 동명이인)에게는 canManagePlan이 false
+      expect(canManagePlan(roomWithDuplicates, ambiguousPlan, authorUser.id)).toBe(false);
+      expect(canManagePlan(sampleRoom, orphanPlan, authorUser.id)).toBe(false);
+
+      // 방장에게는 canManagePlan이 true
+      expect(canManagePlan(roomWithDuplicates, ambiguousPlan, hostUser.id)).toBe(true);
+      expect(canManagePlan(sampleRoom, orphanPlan, hostUser.id)).toBe(true);
+
+      // requirePlanAuthor 가드: 방장은 통과, 일반 멤버는 실패
+      const hostSuccess = await Effect.runPromise(
+        requirePlanAuthor(roomWithDuplicates, ambiguousPlan, hostUser.id)
+      );
+      expect(hostSuccess.isHost).toBe(true);
+
+      try {
+        await Effect.runPromise(
+          requirePlanAuthor(roomWithDuplicates, ambiguousPlan, authorUser.id)
+        );
+        expect.unreachable("member should fail on ambiguous legacy plan");
+      } catch (err) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+    });
   });
 
   describe("2. Use Case 기반 플랜 생성 시 작성자 지정", () => {
@@ -395,6 +451,36 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         expect(err).toBeInstanceOf(NotFoundError);
       }
     });
+
+    it("작성자를 식별할 수 없는 레거시 여행안을 방장이 수정할 수 있어 영구 잠금이 방지된다", async () => {
+      const orphanPlan: TripPlan = {
+        id: PlanIdSchema.make("plan-orphan"),
+        title: "작성자 정보가 유실된 플랜",
+        status: "DRAFT",
+        places: [],
+        voteCount: 0,
+      };
+      const roomWithOrphan: TripRoom = {
+        ...sampleRoom,
+        plans: [...sampleRoom.plans, orphanPlan],
+      };
+
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOrphan]),
+        createSessionLayer(hostSession)
+      );
+
+      const res = await Effect.runPromise(
+        updatePlanUseCase({
+          roomId: roomWithOrphan.id,
+          plan: { ...orphanPlan, title: "방장이 수정한 레거시 플랜" },
+          expectedRevision: roomWithOrphan.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === orphanPlan.id);
+      expect(target?.title).toBe("방장이 수정한 레거시 플랜");
+    });
   });
 
   describe("4. Use Case 기반 소유권 삭제 보호", () => {
@@ -512,6 +598,35 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       } catch (err) {
         expect(err).toBeInstanceOf(NotFoundError);
       }
+    });
+
+    it("작성자를 식별할 수 없는 레거시 여행안을 방장이 삭제할 수 있어 영구 잠금이 방지된다", async () => {
+      const orphanPlan: TripPlan = {
+        id: PlanIdSchema.make("plan-orphan"),
+        title: "작성자 정보가 유실된 플랜",
+        status: "DRAFT",
+        places: [],
+        voteCount: 0,
+      };
+      const roomWithOrphan: TripRoom = {
+        ...sampleRoom,
+        plans: [...sampleRoom.plans, orphanPlan],
+      };
+
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOrphan]),
+        createSessionLayer(hostSession)
+      );
+
+      const res = await Effect.runPromise(
+        deletePlanUseCase({
+          roomId: roomWithOrphan.id,
+          planId: orphanPlan.id,
+          expectedRevision: roomWithOrphan.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      expect(res.plans.some((p) => p.id === orphanPlan.id)).toBe(false);
     });
   });
 

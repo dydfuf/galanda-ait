@@ -6,7 +6,7 @@ import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
-import { isPlanAuthor } from "../../core/domain/auth-guards.ts";
+import { canManagePlan } from "../../core/domain/auth-guards.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
@@ -116,9 +116,9 @@ export function PlanEditPage(): JSX.Element {
     );
   }
 
-  // 2. 작성자 소유권 확인 (UnauthorizedError 대응)
-  const isAuthor = isPlanAuthor(room, plan, session?.userId);
-  if (!session || !isAuthor) {
+  // 2. 작성자 소유권 또는 방장 관리 권한 확인 (UnauthorizedError 대응)
+  const canManage = canManagePlan(room, plan, session?.userId);
+  if (!session || !canManage) {
     return (
       <RouteErrorFallback
         title="수정 권한이 없습니다"

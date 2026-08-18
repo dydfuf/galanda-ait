@@ -1,6 +1,6 @@
 import type { TripRoom } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
-import { isPlanAuthor } from "../../core/domain/auth-guards.ts";
+import { isPlanAuthor, canManagePlan } from "../../core/domain/auth-guards.ts";
 import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
 import type { TimelineItem } from "./components/DetailTimeline.tsx";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
@@ -17,6 +17,7 @@ export interface PlanMemberOpinionViewModel {
 export interface DetailedPlanViewModel extends PlanCardData {
   readonly authorId?: string;
   readonly isAuthor: boolean;
+  readonly canManage: boolean;
   readonly proposalReason: string;
   readonly bookingRisks: ReadonlyArray<BookingRiskItem>;
   readonly timelineItems: ReadonlyArray<TimelineItem>;
@@ -186,6 +187,7 @@ export const toPlanDetailViewModel = (
     const hardCount = memberOpinions.filter((m) => m.reaction === "HARD").length;
 
     const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
+    const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
 
     const myOpinion = memberOpinions.find((m) =>
       currentUserId ? m.userId === currentUserId : m.userId === "user-local-me"
@@ -207,6 +209,7 @@ export const toPlanDetailViewModel = (
       authorId: p.authorId,
       authorName,
       isAuthor,
+      canManage,
       proposalReason: p.proposalReason ?? "",
       opinions: {
         likeCount,

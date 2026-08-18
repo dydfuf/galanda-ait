@@ -361,7 +361,7 @@ export function PlanDetailPage(): JSX.Element {
             <span css={periodTextStyle}>
               {plan.period}
             </span>
-            {!isConfirmed && !isRoomConfirmed && plan.isAuthor && (
+            {!isConfirmed && !isRoomConfirmed && plan.canManage && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <button
                   type="button"

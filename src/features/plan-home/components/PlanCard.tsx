@@ -23,6 +23,7 @@ export interface PlanCardData {
   readonly authorId?: string;
   readonly authorName: string;
   readonly isAuthor?: boolean;
+  readonly canManage?: boolean;
   readonly opinions: PlanCardOpinionCounts;
   readonly myReaction?: "LIKE" | "OKAY" | "HARD";
   readonly isConfirmed: boolean;

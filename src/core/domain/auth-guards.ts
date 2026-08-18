@@ -221,8 +221,61 @@ export const isPlanAuthor = (
 };
 
 /**
+ * 여행안의 작성자가 특정(식별) 가능한지 확인하는 순수 도메인 함수
+ * - authorId가 명시되어 있거나
+ * - authorId가 없더라도 authorName과 일치하는 멤버가 방에 유일하게 1명 존재하는 경우 true
+ * - authorName이 없거나, 일치하는 멤버가 없거나, 동명이인이 2명 이상인 경우 false (레거시 미식별 상태)
+ */
+export const hasResolvablePlanAuthor = (
+  room: TripRoom,
+  plan: TripPlan
+): boolean => {
+  if (plan.authorId !== undefined) {
+    return true;
+  }
+
+  if (plan.authorName) {
+    const matchingMembers = room.members.filter(
+      (m) => m.name === plan.authorName
+    );
+    return matchingMembers.length === 1;
+  }
+
+  return false;
+};
+
+/**
+ * 특정 사용자가 해당 여행안을 관리(수정/삭제)할 수 있는지 확인하는 순수 도메인 함수
+ * 1. 여행안의 작성자 본인인 경우 -> true
+ * 2. 작성자가 식별되지 않는 레거시 여행안이면서, 사용자가 방장(HOST)인 경우 -> true (영구 잠금 방지 및 복구 권한)
+ * 3. 그 외 (타인의 여행안, 작성자 미식별 여행안에 대한 일반 멤버의 접근 등) -> false
+ */
+export const canManagePlan = (
+  room: TripRoom,
+  plan: TripPlan,
+  userId?: UserId
+): boolean => {
+  if (!userId) {
+    return false;
+  }
+
+  if (isPlanAuthor(room, plan, userId)) {
+    return true;
+  }
+
+  const actor = getRoomActor(room, userId);
+  if (actor.isHost && !hasResolvablePlanAuthor(room, plan)) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
  * 여행안 작성자 소유권 권한을 요구하는 도메인 가드 (ABAC)
- * - 작성자 본인만 통과하며, 비작성자(방장 포함)는 UnauthorizedError로 거절됨
+ * - 작성자 본인만 통과하며, 비작성자(방장 포함)는 거절됨
+ * - 단, 레거시 데이터로 인해 작성자를 식별할 수 없는 경우(authorId 누락 및 authorName 부재/불일치/동명이인)에 한하여
+ *   방이 영구 잠금 상태가 되는 것을 방지하기 위해 방장(HOST)에게 관리(수정/삭제) 권한 허용
  */
 export const requirePlanAuthor = (
   room: TripRoom,
@@ -233,7 +286,7 @@ export const requirePlanAuthor = (
   Effect.gen(function* () {
     const actor = getRoomActor(room, userId);
 
-    if (!isPlanAuthor(room, plan, userId)) {
+    if (!canManagePlan(room, plan, userId)) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));
     }
 

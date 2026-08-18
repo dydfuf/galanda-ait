@@ -7,7 +7,7 @@ import {
 import { TripRoomSchema } from "../../core/domain/room.ts";
 import { ConflictError, NotFoundError } from "../../core/domain/errors.ts";
 import { supabase } from "./supabase-client.ts";
-import type { PlanId, Revision, TripId } from "../../core/domain/ids.ts";
+import { RevisionSchema, type PlanId, type Revision, type TripId } from "../../core/domain/ids.ts";
 import type {
   PlanMemberOpinion,
   TripMember,
