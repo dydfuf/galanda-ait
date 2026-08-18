@@ -291,6 +291,12 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
     isAuthenticated: true,
   };
 
+  const bob2User: UserSession = {
+    userId: UserIdSchema.make("user-bob-2"),
+    name: "밥",
+    isAuthenticated: true,
+  };
+
   const unauthenticatedSession: UserSession = {
     userId: UserIdSchema.make("anonymous"),
     name: "게스트",
@@ -786,6 +792,132 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => 
       } catch (err: unknown) {
         expect(err).toBeInstanceOf(UnauthorizedError);
       }
+    });
+
+    it("authorId가 누락된 레거시 여행안의 authorName과 일치하는 참여자가 여러 명(동명이인)일 경우 일반 멤버의 수정/삭제는 거부된다", async () => {
+      const roomWithDuplicateNames: TripRoom = {
+        ...sampleRoom,
+        members: [
+          ...sampleRoom.members, // user-alice ("앨리스"), user-bob ("밥")
+          { id: UserIdSchema.make("user-bob-2"), name: "밥", role: "MEMBER" }, // 동명이인 밥 2
+        ],
+        plans: [
+          ...sampleRoom.plans,
+          {
+            id: PlanIdSchema.make("plan-legacy-bob"),
+            title: "밥의 구버전 제안",
+            status: "DRAFT",
+            authorId: undefined,
+            authorName: "밥",
+            places: [],
+            voteCount: 0,
+          },
+        ],
+      };
+
+      const bob1Env = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithDuplicateNames]),
+        createTestSessionLayer(bobUser)
+      );
+      const bob2Env = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithDuplicateNames]),
+        createTestSessionLayer(bob2User)
+      );
+
+      // 밥1의 수정 시도 -> 실패
+      try {
+        await Effect.runPromise(
+          updatePlanUseCase({
+            roomId: roomWithDuplicateNames.id,
+            plan: { ...roomWithDuplicateNames.plans[1], title: "밥1의 수정 시도" },
+            expectedRevision: roomWithDuplicateNames.revision,
+          }).pipe(Effect.provide(bob1Env))
+        );
+        expect.unreachable("bob1 update should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      // 밥2의 수정 시도 -> 실패
+      try {
+        await Effect.runPromise(
+          updatePlanUseCase({
+            roomId: roomWithDuplicateNames.id,
+            plan: { ...roomWithDuplicateNames.plans[1], title: "밥2의 수정 시도" },
+            expectedRevision: roomWithDuplicateNames.revision,
+          }).pipe(Effect.provide(bob2Env))
+        );
+        expect.unreachable("bob2 update should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      // 밥1의 삭제 시도 -> 실패
+      try {
+        await Effect.runPromise(
+          deletePlanUseCase({
+            roomId: roomWithDuplicateNames.id,
+            planId: PlanIdSchema.make("plan-legacy-bob"),
+            expectedRevision: roomWithDuplicateNames.revision,
+          }).pipe(Effect.provide(bob1Env))
+        );
+        expect.unreachable("bob1 delete should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      // 밥2의 삭제 시도 -> 실패
+      try {
+        await Effect.runPromise(
+          deletePlanUseCase({
+            roomId: roomWithDuplicateNames.id,
+            planId: PlanIdSchema.make("plan-legacy-bob"),
+            expectedRevision: roomWithDuplicateNames.revision,
+          }).pipe(Effect.provide(bob2Env))
+        );
+        expect.unreachable("bob2 delete should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+    });
+
+    it("동명이인이 존재하는 레거시 여행안을 방장이 수정할 때 임의의 동명이인 ID로 잘못 고정되지 않고 authorId undefined가 유지된다", async () => {
+      const roomWithDuplicateNames: TripRoom = {
+        ...sampleRoom,
+        members: [
+          ...sampleRoom.members,
+          { id: UserIdSchema.make("user-bob-2"), name: "밥", role: "MEMBER" },
+        ],
+        plans: [
+          ...sampleRoom.plans,
+          {
+            id: PlanIdSchema.make("plan-legacy-bob"),
+            title: "밥의 구버전 제안",
+            status: "DRAFT",
+            authorId: undefined,
+            authorName: "밥",
+            places: [],
+            voteCount: 0,
+          },
+        ],
+      };
+
+      const hostEnv = Layer.merge(
+        createInMemoryRepositoryLayer([roomWithDuplicateNames]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const updateProgram = updatePlanUseCase({
+        roomId: roomWithDuplicateNames.id,
+        plan: { ...roomWithDuplicateNames.plans[1], title: "방장이 수정한 모호한 여행안" },
+        expectedRevision: roomWithDuplicateNames.revision,
+      }).pipe(Effect.provide(hostEnv));
+
+      const updatedRoom = await Effect.runPromise(updateProgram);
+      const plan = updatedRoom.plans.find((p) => p.id === "plan-legacy-bob");
+      expect(plan?.title).toBe("방장이 수정한 모호한 여행안");
+      expect(plan?.authorId).toBeUndefined(); // 임의의 멤버나 방장으로 변조되지 않음
+      expect(plan?.authorName).toBe("밥");
     });
 
     it("비로그인 상태에서 여행안 수정 및 삭제는 실패한다", async () => {
