@@ -573,5 +573,37 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       expect(afterDelete.plans.some((p) => p.id === authorPlan.id)).toBe(false);
     });
+
+    it("localStorage 저장 실패 시(스토리지 차단/용량 초과 등) 성공으로 위장하지 않고 에러를 전파한다", async () => {
+      const localEnv = Layer.merge(
+        LocalTripRoomRepositoryLayer,
+        createLocalSessionLayer({
+          userId: authorUser.id,
+          name: authorUser.name,
+          isAuthenticated: true,
+        })
+      );
+
+      const storageKey = "galanda_rooms_v1";
+      globalThis.window.localStorage.setItem(storageKey, JSON.stringify([sampleRoom]));
+
+      // setItem이 에러(용량 초과/접근 제한)를 던지도록 모킹
+      globalThis.window.localStorage.setItem = () => {
+        throw new Error("QuotaExceededError: storage is full");
+      };
+
+      try {
+        await Effect.runPromise(
+          updatePlanUseCase({
+            roomId: sampleRoom.id,
+            plan: { ...authorPlan, title: "스토리지 오류 시도" },
+            expectedRevision: sampleRoom.revision,
+          }).pipe(Effect.provide(localEnv))
+        );
+        expect.unreachable("should fail when localStorage fails");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ConflictError);
+      }
+    });
   });
 });

@@ -35,15 +35,26 @@ const loadFromStorage = (): ReadonlyArray<unknown> => {
   }
 };
 
-const saveToStorage = (rooms: ReadonlyArray<TripRoom>): void => {
-  if (typeof window !== "undefined" && window.localStorage) {
-    try {
+const saveToStorage = (
+  rooms: ReadonlyArray<TripRoom>
+): Effect.Effect<void, ConflictError> =>
+  Effect.try({
+    try: () => {
+      if (typeof window === "undefined" || !window.localStorage) {
+        throw new Error("로컬 스토리지를 사용할 수 없는 환경입니다.");
+      }
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
-    } catch {
-      // ignore storage error
-    }
-  }
-};
+    },
+    catch: (error) =>
+      new ConflictError({
+        message:
+          error instanceof Error
+            ? `데이터 저장에 실패했습니다: ${error.message}`
+            : "로컬 저장소에 데이터를 저장하지 못했습니다.",
+        expectedRevision: RevisionSchema.make(0),
+        actualRevision: RevisionSchema.make(0),
+      }),
+  });
 
 const decodeRooms = (
   raw: unknown
@@ -105,7 +116,9 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
       };
 
       const nextRooms = [newRoom, ...rooms];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms).pipe(
+        Effect.mapError(() => new NotFoundError({ entity: "TripRoom", id: "storage" }))
+      );
 
       return newRoom;
     }),
@@ -153,7 +166,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
@@ -192,7 +205,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
@@ -243,7 +256,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
@@ -284,7 +297,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
@@ -334,7 +347,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
@@ -415,7 +428,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
@@ -448,7 +461,7 @@ export const LocalTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository, {
         updatedRoom,
         ...rooms.slice(index + 1),
       ];
-      saveToStorage(nextRooms);
+      yield* saveToStorage(nextRooms);
 
       return updatedRoom;
     }),
