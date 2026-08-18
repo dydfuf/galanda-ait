@@ -1,14 +1,27 @@
 import { Effect, Layer } from "effect";
 import { SessionService } from "../../core/ports/session.ts";
 import { UserIdSchema } from "../../core/domain/ids.ts";
+import { UnauthorizedError } from "../../core/domain/errors.ts";
 import type { UserSession } from "../../core/domain/room.ts";
 
-const DEFAULT_LOCAL_USER: UserSession = {
+export const DEFAULT_LOCAL_USER: UserSession = {
   userId: UserIdSchema.make("user-local-me"),
   name: "나",
   isAuthenticated: true,
 };
 
-export const LocalSessionLayer = Layer.succeed(SessionService, {
-  getCurrentSession: () => Effect.succeed(DEFAULT_LOCAL_USER),
+export const makeLocalSessionService = (
+  session: UserSession = DEFAULT_LOCAL_USER
+) => ({
+  getCurrentSession: () => Effect.succeed(session),
+  getCurrentUser: () =>
+    session.isAuthenticated
+      ? Effect.succeed(session)
+      : Effect.fail(new UnauthorizedError({ reason: "로그인이 필요합니다." })),
 });
+
+export const createLocalSessionLayer = (
+  session: UserSession = DEFAULT_LOCAL_USER
+) => Layer.succeed(SessionService, makeLocalSessionService(session));
+
+export const LocalSessionLayer = createLocalSessionLayer();

@@ -16,7 +16,7 @@ import { TransportSection } from "./components/TransportSection.tsx";
 import { CostSummarySection } from "./components/CostSummarySection.tsx";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
-import { PlanIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
+import { PlanIdSchema } from "../../core/domain/ids.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
 
 const pageContainerStyle = css`
@@ -109,19 +109,13 @@ export function PlanCreatePage() {
 
     setIsSubmitting(true);
     try {
-      const hostUser = room.members[0];
-      const authorId = hostUser?.id || UserIdSchema.make("user-local-me");
-      const authorName = hostUser?.name || "나";
       const newPlanId = PlanIdSchema.make(`plan-${Date.now()}`);
 
       const newPlan: TripPlan = {
-
         id: newPlanId,
         title: title.trim(),
         status: "DRAFT",
         proposalReason: proposalReason.trim() || undefined,
-        authorId,
-        authorName,
         baseHeadcount,
         routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
         accommodations: [...accommodations],
@@ -129,16 +123,8 @@ export function PlanCreatePage() {
         places: [],
         clonedFromPlanId: cloneFromPlan ? cloneFromPlan.id : undefined,
         differenceSummary: diffFromOriginal?.hasChanges ? diffFromOriginal.summaryText : undefined,
-        memberOpinions: [
-          {
-            userId: authorId,
-            userName: authorName,
-            reaction: "LIKE",
-          },
-        ],
-        voteCount: 1,
+        voteCount: 0,
       };
-
 
       await createPlanMutation.mutateAsync({
         roomId: tripId,

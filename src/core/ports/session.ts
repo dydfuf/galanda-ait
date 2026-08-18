@@ -9,6 +9,10 @@ export class SessionService extends Context.Service<
       UserSession,
       UnauthorizedError
     >;
+    readonly getCurrentUser: () => Effect.Effect<
+      UserSession,
+      UnauthorizedError
+    >;
   }
 >()("galanda/ports/SessionService") { }
 
@@ -21,7 +25,7 @@ export const requireAuthSession = (
 ): Effect.Effect<UserSession, UnauthorizedError, SessionService> =>
   Effect.gen(function* () {
     const sessionService = yield* SessionService;
-    const session = yield* sessionService.getCurrentSession().pipe(
+    const session = yield* sessionService.getCurrentUser().pipe(
       Effect.catch(() =>
         Effect.fail(new UnauthorizedError({ reason }))
       )
@@ -33,6 +37,14 @@ export const requireAuthSession = (
 
     return session;
   });
+
+/**
+ * 현재 인증된 사용자를 조회하는 Effect
+ */
+export const getCurrentUser = (
+  reason = "로그인이 필요합니다."
+): Effect.Effect<UserSession, UnauthorizedError, SessionService> =>
+  requireAuthSession(reason);
 
 /**
  * 현재 세션을 Option 형태로 안전하게 획득하는 Effect (실패 시 None)

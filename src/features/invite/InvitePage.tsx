@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { appRuntime } from "../../app/runtime.ts";
 import { joinTripRoomUseCase } from "../../core/usecases/join-room.ts";
-import { TripIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
+import { TripIdSchema } from "../../core/domain/ids.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { tripRoomKeys } from "../plan-home/queries.ts";
 
@@ -124,11 +124,6 @@ export function InvitePage() {
       await appRuntime.runPromise(
         joinTripRoomUseCase({
           roomId: TripIdSchema.make(room.id),
-          member: {
-            id: UserIdSchema.make(`user-${Date.now()}`),
-            name: "새 참여자",
-            role: "MEMBER",
-          },
         })
       );
       queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
