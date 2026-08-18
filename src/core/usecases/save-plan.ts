@@ -3,6 +3,7 @@ import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { SessionService, requireAuthSession } from "../ports/session.ts";
 import { calculatePlanDifference } from "../calculations/plan-diff.ts";
 import {
+  requireMutablePlan,
   requirePlanAuthor,
   requirePlanInRoom,
   requireRoomPermission,
@@ -150,6 +151,13 @@ export const updatePlanUseCase = (
       "여행안 작성자만 여행안을 수정할 수 있습니다."
     );
 
+    // 6. 확정본 불변성 검증: 방 전체가 공유하는 공개본은 작성자도 수정할 수 없다
+    yield* requireMutablePlan(
+      room,
+      existingPlan,
+      "확정된 여행안은 수정할 수 없습니다."
+    );
+
     // 작성자 정보 보존 및 기존에 authorId가 누락된 경우 유일 매칭 시 보정(backfill)
     const matchingMembers = existingPlan.authorName
       ? room.members.filter((m) => m.name === existingPlan.authorName)
@@ -162,14 +170,24 @@ export const updatePlanUseCase = (
     const resolvedAuthorName =
       existingPlan.authorName ?? uniqueAuthorMember?.name;
 
+    // 7. 서버가 소유하는 필드는 입력값을 신뢰하지 않고 기존 여행안에서 이어받는다
+    //    - status: 확정 Use Case만 변경할 수 있다
+    //    - memberOpinions/voteCount: 의견 제출 Use Case만 변경할 수 있다 (타인의 의견·투표 보호)
+    //    - clonedFromPlanId: 생성 시점에 정해지는 복제 계보이므로 수정 대상이 아니다
+    //    입력에서 받는 값은 작성자가 편집하는 내용(제목, 제안 이유, 인원, 경로, 숙소, 교통, 장소)뿐이다
     let finalPlan: TripPlan = {
       ...input.plan,
+      id: existingPlan.id,
       title: input.plan.title.trim(),
+      status: existingPlan.status,
       authorId: resolvedAuthorId,
       authorName: resolvedAuthorName,
+      clonedFromPlanId: existingPlan.clonedFromPlanId,
+      memberOpinions: existingPlan.memberOpinions,
+      voteCount: existingPlan.voteCount,
     };
 
-    // 5. 복제된 여행안인 경우, 변경사항 재계산하여 동기화
+    // 8. 복제된 여행안인 경우, 변경사항 재계산하여 동기화
     if (finalPlan.clonedFromPlanId) {
       const originalPlan = room.plans.find(
         (p) => p.id === finalPlan.clonedFromPlanId
@@ -231,6 +249,13 @@ export const deletePlanUseCase = (
       plan,
       session.userId,
       "여행안 작성자만 여행안을 삭제할 수 있습니다."
+    );
+
+    // 4. 확정본 불변성 검증: 확정된 여행안을 지우면 방의 공개된 결정이 사라지므로 거부한다
+    yield* requireMutablePlan(
+      room,
+      plan,
+      "확정된 여행안은 삭제할 수 없습니다."
     );
 
     return yield* repo.deletePlan(

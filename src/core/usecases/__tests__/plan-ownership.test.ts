@@ -16,6 +16,8 @@ import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../save
 import { createTripRoomUseCase } from "../create-room.ts";
 import {
   isPlanAuthor,
+  isPlanConfirmed,
+  requireMutablePlan,
   requirePlanAuthor,
   hasResolvablePlanAuthor,
   canManagePlan,
@@ -771,6 +773,387 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         expect(err).toBeInstanceOf(ConflictError);
         expect((err as ConflictError).message).toContain("QuotaExceededError: storage is full");
       }
+    });
+  });
+
+  describe("6. RAON-150: 서버 소유 필드 보호 및 확정본 불변성", () => {
+    const opinionsPlan: TripPlan = {
+      id: PlanIdSchema.make("plan-with-opinions"),
+      title: "의견이 모인 여행안",
+      status: "VOTING",
+      authorId: authorUser.id,
+      authorName: authorUser.name,
+      places: [],
+      voteCount: 2,
+      memberOpinions: [
+        { userId: hostUser.id, userName: hostUser.name, reaction: "LIKE" },
+        {
+          userId: strangerUser.id,
+          userName: strangerUser.name,
+          reaction: "LIKE",
+          reason: "이 안이 좋아요",
+        },
+      ],
+    };
+
+    const roomWithOpinions: TripRoom = {
+      ...sampleRoom,
+      plans: [hostPlan, opinionsPlan],
+    };
+
+    const confirmedPlan: TripPlan = {
+      ...opinionsPlan,
+      id: PlanIdSchema.make("plan-confirmed"),
+      title: "확정된 여행안",
+      status: "CONFIRMED",
+    };
+
+    const roomWithConfirmed: TripRoom = {
+      ...sampleRoom,
+      plans: [hostPlan, confirmedPlan],
+      confirmedPlanId: confirmedPlan.id,
+    };
+
+    const readRoom = (
+      env: Layer.Layer<TripRoomRepository | SessionService>,
+      roomId: TripId
+    ): Promise<TripRoom> =>
+      Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((r) => r.getRoom(roomId)),
+          Effect.provide(env)
+        )
+      );
+
+    it("작성자의 수정 요청이라도 타인의 의견과 투표수를 덮어쓸 수 없다", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOpinions]),
+        createSessionLayer(authorSession)
+      );
+
+      const res = await Effect.runPromise(
+        updatePlanUseCase({
+          roomId: roomWithOpinions.id,
+          plan: {
+            ...opinionsPlan,
+            title: "작성자가 수정한 제목",
+            memberOpinions: [],
+            voteCount: 99,
+          },
+          expectedRevision: roomWithOpinions.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === opinionsPlan.id);
+      expect(target?.title).toBe("작성자가 수정한 제목");
+      expect(target?.memberOpinions).toEqual(opinionsPlan.memberOpinions);
+      expect(target?.voteCount).toBe(2);
+    });
+
+    it("작성자의 수정 요청으로 status를 확정으로 위조할 수 없다", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOpinions]),
+        createSessionLayer(authorSession)
+      );
+
+      const res = await Effect.runPromise(
+        updatePlanUseCase({
+          roomId: roomWithOpinions.id,
+          plan: { ...opinionsPlan, status: "CONFIRMED" },
+          expectedRevision: roomWithOpinions.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === opinionsPlan.id);
+      expect(target?.status).toBe("VOTING");
+      expect(res.confirmedPlanId).toBeUndefined();
+    });
+
+    it("작성자의 수정 요청으로 복제 계보(clonedFromPlanId)를 바꿀 수 없다", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOpinions]),
+        createSessionLayer(authorSession)
+      );
+
+      const res = await Effect.runPromise(
+        updatePlanUseCase({
+          roomId: roomWithOpinions.id,
+          plan: { ...opinionsPlan, clonedFromPlanId: hostPlan.id },
+          expectedRevision: roomWithOpinions.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === opinionsPlan.id);
+      expect(target?.clonedFromPlanId).toBeUndefined();
+    });
+
+    it("작성자가 편집하는 내용은 그대로 반영된다 (과보호 회귀 방지 대조군)", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOpinions]),
+        createSessionLayer(authorSession)
+      );
+
+      const res = await Effect.runPromise(
+        updatePlanUseCase({
+          roomId: roomWithOpinions.id,
+          plan: {
+            ...opinionsPlan,
+            title: "  공백이 정리된 제목  ",
+            proposalReason: "숙소를 바꿨어요",
+            baseHeadcount: 5,
+            routes: [{ city: "서귀포", nights: 3 }],
+          },
+          expectedRevision: roomWithOpinions.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === opinionsPlan.id);
+      expect(target?.title).toBe("공백이 정리된 제목");
+      expect(target?.proposalReason).toBe("숙소를 바꿨어요");
+      expect(target?.baseHeadcount).toBe(5);
+      expect(target?.routes).toEqual([{ city: "서귀포", nights: 3 }]);
+    });
+
+    it("확정된 여행안은 작성자도 수정할 수 없고 원본이 보존된다", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithConfirmed]),
+        createSessionLayer(authorSession)
+      );
+
+      try {
+        await Effect.runPromise(
+          updatePlanUseCase({
+            roomId: roomWithConfirmed.id,
+            plan: { ...confirmedPlan, title: "확정본을 바꾸려는 제목" },
+            expectedRevision: roomWithConfirmed.revision,
+          }).pipe(Effect.provide(env))
+        );
+        expect.unreachable("should fail");
+      } catch (err) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect((err as UnauthorizedError).reason).toContain(
+          "확정된 여행안은 수정할 수 없습니다."
+        );
+      }
+
+      const check = await readRoom(env, roomWithConfirmed.id);
+      const plan = check.plans.find((p) => p.id === confirmedPlan.id);
+      expect(plan?.title).toBe("확정된 여행안");
+      expect(check.revision).toBe(1);
+    });
+
+    it("확정된 여행안은 작성자도 삭제할 수 없고 방의 확정 상태가 보존된다", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithConfirmed]),
+        createSessionLayer(authorSession)
+      );
+
+      try {
+        await Effect.runPromise(
+          deletePlanUseCase({
+            roomId: roomWithConfirmed.id,
+            planId: confirmedPlan.id,
+            expectedRevision: roomWithConfirmed.revision,
+          }).pipe(Effect.provide(env))
+        );
+        expect.unreachable("should fail");
+      } catch (err) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect((err as UnauthorizedError).reason).toContain(
+          "확정된 여행안은 삭제할 수 없습니다."
+        );
+      }
+
+      const check = await readRoom(env, roomWithConfirmed.id);
+      expect(check.plans.some((p) => p.id === confirmedPlan.id)).toBe(true);
+      expect(check.confirmedPlanId).toBe(confirmedPlan.id);
+      expect(check.revision).toBe(1);
+    });
+
+    it("status가 확정이 아니어도 방의 confirmedPlanId가 가리키는 여행안은 변경할 수 없다", async () => {
+      // 확정 신호가 어긋난 레거시 데이터 (room.confirmedPlanId만 확정을 가리키는 경우)
+      const staleStatusPlan: TripPlan = { ...opinionsPlan, status: "VOTING" };
+      const roomWithStaleStatus: TripRoom = {
+        ...sampleRoom,
+        plans: [hostPlan, staleStatusPlan],
+        confirmedPlanId: staleStatusPlan.id,
+      };
+
+      expect(isPlanConfirmed(roomWithStaleStatus, staleStatusPlan)).toBe(true);
+      expect(isPlanConfirmed(roomWithOpinions, opinionsPlan)).toBe(false);
+
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithStaleStatus]),
+        createSessionLayer(authorSession)
+      );
+
+      for (const program of [
+        updatePlanUseCase({
+          roomId: roomWithStaleStatus.id,
+          plan: { ...staleStatusPlan, title: "확정본을 바꾸려는 제목" },
+          expectedRevision: roomWithStaleStatus.revision,
+        }),
+        deletePlanUseCase({
+          roomId: roomWithStaleStatus.id,
+          planId: staleStatusPlan.id,
+          expectedRevision: roomWithStaleStatus.revision,
+        }),
+      ]) {
+        try {
+          await Effect.runPromise(program.pipe(Effect.provide(env)));
+          expect.unreachable("should fail");
+        } catch (err) {
+          expect(err).toBeInstanceOf(UnauthorizedError);
+        }
+      }
+
+      const check = await readRoom(env, roomWithStaleStatus.id);
+      expect(check.plans.find((p) => p.id === staleStatusPlan.id)?.title).toBe(
+        "의견이 모인 여행안"
+      );
+      expect(check.revision).toBe(1);
+    });
+
+    it("requireMutablePlan 가드는 미확정 여행안만 통과시킨다", async () => {
+      await Effect.runPromise(requireMutablePlan(roomWithOpinions, opinionsPlan));
+
+      try {
+        await Effect.runPromise(
+          requireMutablePlan(roomWithConfirmed, confirmedPlan)
+        );
+        expect.unreachable("should fail");
+      } catch (err) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+    });
+
+    it("미확정 여행안의 정상 수정·삭제 경로는 유지된다 (회귀 방지 대조군)", async () => {
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithOpinions]),
+        createSessionLayer(authorSession)
+      );
+
+      const updated = await Effect.runPromise(
+        updatePlanUseCase({
+          roomId: roomWithOpinions.id,
+          plan: { ...opinionsPlan, title: "미확정 여행안 수정" },
+          expectedRevision: roomWithOpinions.revision,
+        }).pipe(Effect.provide(env))
+      );
+      expect(
+        updated.plans.find((p) => p.id === opinionsPlan.id)?.title
+      ).toBe("미확정 여행안 수정");
+
+      const afterDelete = await Effect.runPromise(
+        deletePlanUseCase({
+          roomId: roomWithOpinions.id,
+          planId: opinionsPlan.id,
+          expectedRevision: updated.revision,
+        }).pipe(Effect.provide(env))
+      );
+      expect(afterDelete.plans.some((p) => p.id === opinionsPlan.id)).toBe(false);
+    });
+
+    describe("Local 어댑터 동일성", () => {
+      beforeEach(() => {
+        const storage: Record<string, string> = {};
+        (globalThis as unknown as { window: { localStorage: Storage } }).window = {
+          localStorage: {
+            getItem: (key: string) => storage[key] ?? null,
+            setItem: (key: string, val: string) => {
+              storage[key] = val;
+            },
+            removeItem: (key: string) => {
+              delete storage[key];
+            },
+            clear: () => {
+              for (const k of Object.keys(storage)) delete storage[k];
+            },
+            key: (_idx: number) => null,
+            length: 0,
+          },
+        };
+      });
+
+      it("Local 어댑터에서도 확정본 수정·삭제가 거부되고 저장소 내용이 그대로 유지된다", async () => {
+        const localEnv = Layer.merge(
+          LocalTripRoomRepositoryLayer,
+          createLocalSessionLayer({
+            userId: authorUser.id,
+            name: authorUser.name,
+            isAuthenticated: true,
+          })
+        );
+
+        const storageKey = "galanda_rooms_v1";
+        const initialSnapshot = JSON.stringify([roomWithConfirmed]);
+        globalThis.window.localStorage.setItem(storageKey, initialSnapshot);
+
+        try {
+          await Effect.runPromise(
+            updatePlanUseCase({
+              roomId: roomWithConfirmed.id,
+              plan: { ...confirmedPlan, title: "로컬에서 확정본 수정 시도" },
+              expectedRevision: roomWithConfirmed.revision,
+            }).pipe(Effect.provide(localEnv))
+          );
+          expect.unreachable("should fail");
+        } catch (err) {
+          expect(err).toBeInstanceOf(UnauthorizedError);
+        }
+
+        try {
+          await Effect.runPromise(
+            deletePlanUseCase({
+              roomId: roomWithConfirmed.id,
+              planId: confirmedPlan.id,
+              expectedRevision: roomWithConfirmed.revision,
+            }).pipe(Effect.provide(localEnv))
+          );
+          expect.unreachable("should fail");
+        } catch (err) {
+          expect(err).toBeInstanceOf(UnauthorizedError);
+        }
+
+        expect(globalThis.window.localStorage.getItem(storageKey)).toBe(
+          initialSnapshot
+        );
+      });
+
+      it("Local 어댑터에서도 수정 요청이 타인의 의견과 투표수를 덮어쓸 수 없다", async () => {
+        const localEnv = Layer.merge(
+          LocalTripRoomRepositoryLayer,
+          createLocalSessionLayer({
+            userId: authorUser.id,
+            name: authorUser.name,
+            isAuthenticated: true,
+          })
+        );
+
+        const storageKey = "galanda_rooms_v1";
+        globalThis.window.localStorage.setItem(
+          storageKey,
+          JSON.stringify([roomWithOpinions])
+        );
+
+        const res = await Effect.runPromise(
+          updatePlanUseCase({
+            roomId: roomWithOpinions.id,
+            plan: {
+              ...opinionsPlan,
+              title: "로컬에서 의견을 지우려는 수정",
+              memberOpinions: [],
+              voteCount: 0,
+            },
+            expectedRevision: roomWithOpinions.revision,
+          }).pipe(Effect.provide(localEnv))
+        );
+
+        const target = res.plans.find((p) => p.id === opinionsPlan.id);
+        expect(target?.title).toBe("로컬에서 의견을 지우려는 수정");
+        expect(target?.memberOpinions).toEqual(opinionsPlan.memberOpinions);
+        expect(target?.voteCount).toBe(2);
+      });
     });
   });
 });
