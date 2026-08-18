@@ -1,10 +1,19 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { Effect, Layer } from "effect";
-import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../domain/ids.ts";
+import {
+  PlanIdSchema,
+  RevisionSchema,
+  TripIdSchema,
+  UserIdSchema,
+  type PlanId,
+  type Revision,
+  type TripId,
+} from "../../domain/ids.ts";
 import type { TripMember, TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
 import { SessionService } from "../../ports/session.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../save-plan.ts";
+import { createTripRoomUseCase } from "../create-room.ts";
 import { isPlanAuthor, requirePlanAuthor } from "../../domain/auth-guards.ts";
 import { NotFoundError, UnauthorizedError, ConflictError } from "../../domain/errors.ts";
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
@@ -13,21 +22,27 @@ import { createLocalSessionLayer } from "../../../infrastructure/local/local-ses
 /**
  * 인메모리 테스트 레포지토리
  */
-const createInMemoryRepo = (initialRooms: TripRoom[]) => {
+const createInMemoryRepo = (
+  initialRooms: TripRoom[]
+): Layer.Layer<TripRoomRepository> => {
   let rooms = [...initialRooms];
 
   return Layer.succeed(TripRoomRepository, {
-    getRoom: (roomId) => {
+    getRoom: (roomId: TripId): Effect.Effect<TripRoom, NotFoundError> => {
       const found = rooms.find((r) => r.id === roomId);
       if (!found) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       }
       return Effect.succeed(found);
     },
-    getRooms: () => Effect.succeed(rooms),
-    createRoom: () => Effect.die("not implemented in test"),
-    updateRoom: () => Effect.die("not implemented in test"),
-    createPlan: (roomId, plan, expectedRevision) => {
+    getRooms: (): Effect.Effect<ReadonlyArray<TripRoom>, never> => Effect.succeed(rooms),
+    createRoom: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented in test"),
+    updateRoom: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented in test"),
+    createPlan: (
+      roomId: TripId,
+      plan: TripPlan,
+      expectedRevision: Revision
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const idx = rooms.findIndex((r) => r.id === roomId);
       if (idx === -1) return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       if (rooms[idx].revision !== expectedRevision) {
@@ -41,7 +56,11 @@ const createInMemoryRepo = (initialRooms: TripRoom[]) => {
       rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
       return Effect.succeed(updated);
     },
-    updatePlan: (roomId, plan, expectedRevision) => {
+    updatePlan: (
+      roomId: TripId,
+      plan: TripPlan,
+      expectedRevision: Revision
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const idx = rooms.findIndex((r) => r.id === roomId);
       if (idx === -1) return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       if (rooms[idx].revision !== expectedRevision) {
@@ -58,7 +77,11 @@ const createInMemoryRepo = (initialRooms: TripRoom[]) => {
       rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
       return Effect.succeed(updated);
     },
-    deletePlan: (roomId, planId, expectedRevision) => {
+    deletePlan: (
+      roomId: TripId,
+      planId: PlanId,
+      expectedRevision: Revision
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const idx = rooms.findIndex((r) => r.id === roomId);
       if (idx === -1) return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       if (rooms[idx].revision !== expectedRevision) {
@@ -73,16 +96,17 @@ const createInMemoryRepo = (initialRooms: TripRoom[]) => {
       rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
       return Effect.succeed(updated);
     },
-    confirmPlan: () => Effect.die("not implemented"),
-    setPlanOpinion: () => Effect.die("not implemented"),
-    joinRoom: () => Effect.die("not implemented"),
+    confirmPlan: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented"),
+    setPlanOpinion: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented"),
+    joinRoom: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented"),
   });
 };
 
-const createSessionLayer = (session: UserSession) =>
+const createSessionLayer = (session: UserSession): Layer.Layer<SessionService> =>
   Layer.succeed(SessionService, {
-    getCurrentSession: () => Effect.succeed(session),
-    getCurrentUser: () =>
+    getCurrentSession: (): Effect.Effect<UserSession, never> =>
+      Effect.succeed(session),
+    getCurrentUser: (): Effect.Effect<UserSession, UnauthorizedError> =>
       session.isAuthenticated
         ? Effect.succeed(session)
         : Effect.fail(new UnauthorizedError({ reason: "로그인이 필요합니다." })),
@@ -603,6 +627,34 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         expect.unreachable("should fail when localStorage fails");
       } catch (err) {
         expect(err).toBeInstanceOf(ConflictError);
+      }
+    });
+
+    it("방 생성 시 localStorage 저장 실패 시 NotFoundError(id: storage)가 아닌 ConflictError를 전파한다", async () => {
+      const localEnv = Layer.merge(
+        LocalTripRoomRepositoryLayer,
+        createLocalSessionLayer({
+          userId: hostUser.id,
+          name: hostUser.name,
+          isAuthenticated: true,
+        })
+      );
+
+      // setItem이 에러(용량 초과/접근 제한)를 던지도록 모킹
+      globalThis.window.localStorage.setItem = () => {
+        throw new Error("QuotaExceededError: storage is full");
+      };
+
+      try {
+        await Effect.runPromise(
+          createTripRoomUseCase({
+            title: "신규 방 생성 시도",
+          }).pipe(Effect.provide(localEnv))
+        );
+        expect.unreachable("should fail when localStorage fails on room creation");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ConflictError);
+        expect((err as ConflictError).message).toContain("QuotaExceededError: storage is full");
       }
     });
   });

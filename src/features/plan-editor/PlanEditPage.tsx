@@ -42,7 +42,7 @@ const bottomCTAWrapperStyle = css`
   margin-top: 16px;
 `;
 
-export function PlanEditPage() {
+export function PlanEditPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
 
@@ -142,7 +142,7 @@ export function PlanEditPage() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!validation.isValid || isSubmitting) return;
 
@@ -178,7 +178,7 @@ export function PlanEditPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     if (!window.confirm(`'${plan.title}' 여행안을 삭제하시겠습니까?`)) {
       return;
     }

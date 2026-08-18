@@ -56,7 +56,15 @@ export const SupabaseTripRoomRepositoryLayer = Layer.succeed(TripRoomRepository,
         if (error) throw error;
         return Schema.decodeUnknownSync(TripRoomSchema)(data);
       },
-      catch: () => new NotFoundError({ entity: "TripRoom", id: "new" }),
+      catch: (error) =>
+        new ConflictError({
+          message:
+            error instanceof Error
+              ? `데이터 저장에 실패했습니다: ${error.message}`
+              : "저장소에 데이터를 저장하지 못했습니다.",
+          expectedRevision: RevisionSchema.make(0),
+          actualRevision: RevisionSchema.make(0),
+        }),
     }),
 
   updateRoom: (

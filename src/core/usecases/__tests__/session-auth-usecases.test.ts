@@ -15,19 +15,25 @@ import { NotFoundError, ConflictError, UnauthorizedError } from "../../domain/er
 /**
  * 테스트용 인메모리 TripRoomRepository 구현체 생성 헬퍼
  */
-const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
+const createInMemoryRepositoryLayer = (
+  initialRooms: TripRoom[] = []
+): Layer.Layer<TripRoomRepository> => {
   let rooms: TripRoom[] = [...initialRooms];
 
   const repoImpl = {
-    getRoom: (roomId: typeof TripIdSchema.Type) => {
+    getRoom: (
+      roomId: typeof TripIdSchema.Type
+    ): Effect.Effect<TripRoom, NotFoundError> => {
       const room = rooms.find((r) => r.id === roomId);
       if (!room) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       }
       return Effect.succeed(room);
     },
-    getRooms: () => Effect.succeed(rooms),
-    createRoom: (params: CreateRoomParams) => {
+    getRooms: (): Effect.Effect<ReadonlyArray<TripRoom>, never> => Effect.succeed(rooms),
+    createRoom: (
+      params: CreateRoomParams
+    ): Effect.Effect<TripRoom, never> => {
       const hostUser: TripMember = params.hostUser ?? {
         id: UserIdSchema.make("default-host"),
         name: "호스트",
@@ -51,7 +57,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       params: UpdateRoomParams,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -81,7 +87,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       plan: TripPlan,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -108,7 +114,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       plan: TripPlan,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -140,7 +146,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       planId: typeof PlanIdSchema.Type,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -168,7 +174,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       roomId: typeof TripIdSchema.Type,
       planId: typeof PlanIdSchema.Type,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -200,7 +206,7 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       planId: typeof PlanIdSchema.Type,
       opinion: typeof import("../../domain/room.ts").PlanMemberOpinionSchema.Type,
       expectedRevision: typeof RevisionSchema.Type
-    ) => {
+    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -249,7 +255,10 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
       rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
       return Effect.succeed(updated);
     },
-    joinRoom: (roomId: typeof TripIdSchema.Type, member: TripMember) => {
+    joinRoom: (
+      roomId: typeof TripIdSchema.Type,
+      member: TripMember
+    ): Effect.Effect<TripRoom, NotFoundError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -269,7 +278,9 @@ const createInMemoryRepositoryLayer = (initialRooms: TripRoom[] = []) => {
   return Layer.succeed(TripRoomRepository, repoImpl);
 };
 
-const createTestSessionLayer = (session: UserSession) =>
+const createTestSessionLayer = (
+  session: UserSession
+): Layer.Layer<SessionService> =>
   Layer.succeed(SessionService, makeLocalSessionService(session));
 
 describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", () => {

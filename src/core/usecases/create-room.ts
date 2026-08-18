@@ -7,7 +7,7 @@ import { SessionService, requireAuthSession } from "../ports/session.ts";
 import {
   ValidationError,
   UnauthorizedError,
-  type NotFoundError,
+  type ConflictError,
 } from "../domain/errors.ts";
 import type { TripMember, TripRoom } from "../domain/room.ts";
 
@@ -24,7 +24,7 @@ export const createTripRoomUseCase = (
   input: CreateRoomInput
 ): Effect.Effect<
   TripRoom,
-  ValidationError | NotFoundError | UnauthorizedError,
+  ValidationError | ConflictError | UnauthorizedError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
