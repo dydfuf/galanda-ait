@@ -332,6 +332,12 @@ export function PlanDetailPage(): JSX.Element {
     reaction: ReactionType,
     reason?: string
   ): Promise<void> => {
+    // 저장 중 재제출을 막는다. 두 요청이 같은 expectedRevision을 쓰기 때문에
+    // 먼저 도착한 요청이 성공하면 뒤이은 요청은 ConflictError로 실패한다
+    if (submitOpinionMutation.isPending) {
+      return;
+    }
+
     try {
       await submitOpinionMutation.mutateAsync({
         roomId: room.id,
@@ -542,6 +548,7 @@ export function PlanDetailPage(): JSX.Element {
         onClose={() => setIsBottomSheetOpen(false)}
         initialReaction={plan.myReaction as ReactionType | undefined}
         initialReason={plan.myOpinionReason ?? ""}
+        isSubmitting={submitOpinionMutation.isPending}
         onSubmit={handleOpinionSubmit}
       />
     </div>
