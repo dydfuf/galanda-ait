@@ -131,9 +131,10 @@ export const toTripRoomViewModel = (
     const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
     const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
 
-    const myOpinion = p.memberOpinions?.find((m) =>
-      currentUserId ? m.userId === currentUserId : m.userId === "user-local-me"
-    );
+    // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
+    const myOpinion = currentUserId
+      ? p.memberOpinions?.find((m) => m.userId === currentUserId)
+      : undefined;
 
     return {
       id: p.id,

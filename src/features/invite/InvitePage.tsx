@@ -11,6 +11,7 @@ import { joinTripRoomUseCase } from "../../core/usecases/join-room.ts";
 import { TripIdSchema } from "../../core/domain/ids.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { tripRoomKeys } from "../plan-home/queries.ts";
+import { toUserMessage } from "../common/error-message.ts";
 
 const pageContainerStyle = css`
   padding: max(24px, env(safe-area-inset-top, 24px)) 20px calc(32px + env(safe-area-inset-bottom, 0px));
@@ -83,6 +84,13 @@ const codeStyle = css`
   font-weight: 600;
 `;
 
+const errorMessageStyle = css`
+  font-size: 13px;
+  color: var(--adaptiveRed600, #e0383e);
+  margin: 12px 0 0 0;
+  line-height: 1.5;
+`;
+
 const backHomeLinkStyle = css`
   margin-top: 16px;
   background: none;
@@ -102,6 +110,7 @@ export function InvitePage(): JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isAccepting, setIsAccepting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const validated = decodeRouteParams(InviteParamsSchema, params);
   const inviteToken = Result.isSuccess(validated) ? validated.success.inviteToken : "";
@@ -120,6 +129,7 @@ export function InvitePage(): JSX.Element {
   const handleAccept = async (): Promise<void> => {
     if (!room) return;
     setIsAccepting(true);
+    setErrorMsg(null);
     try {
       await appRuntime.runPromise(
         joinTripRoomUseCase({
@@ -128,8 +138,10 @@ export function InvitePage(): JSX.Element {
       );
       queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
       navigate(`/trips/${room.id}/plans`, { replace: true });
-    } catch {
+    } catch (err: unknown) {
+      // 비로그인·세션 조회 실패 등 참여 실패 사유를 화면에 그대로 전달한다
       setIsAccepting(false);
+      setErrorMsg(toUserMessage(err, "여행방에 참여하지 못했어요. 다시 시도해주세요."));
     }
   };
 
@@ -203,6 +215,12 @@ export function InvitePage(): JSX.Element {
         >
           {isAccepting ? "참여하는 중..." : "초대 수락하고 참여하기"}
         </Button>
+
+        {errorMsg && (
+          <p css={errorMessageStyle} role="alert">
+            {errorMsg}
+          </p>
+        )}
       </div>
 
       <button

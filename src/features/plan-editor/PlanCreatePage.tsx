@@ -18,6 +18,7 @@ import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
 import { PlanIdSchema } from "../../core/domain/ids.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
+import { toUserMessage } from "../common/error-message.ts";
 
 const pageContainerStyle = css`
   padding: 16px 20px calc(48px + env(safe-area-inset-bottom, 0px));
@@ -30,6 +31,14 @@ const loadingContainerStyle = css`
   text-align: center;
   color: var(--adaptiveGrey600, #6b7684);
   font-size: 15px;
+`;
+
+const errorMessageStyle = css`
+  font-size: 13px;
+  color: var(--adaptiveRed600, #e0383e);
+  margin: 0 0 12px 0;
+  text-align: center;
+  line-height: 1.5;
 `;
 
 const bottomCTAWrapperStyle = css`
@@ -54,6 +63,7 @@ export function PlanCreatePage(): JSX.Element {
   const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
   const createPlanMutation = useCreatePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // 복제 원본 플랜 찾기
   const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
@@ -108,6 +118,7 @@ export function PlanCreatePage(): JSX.Element {
     if (!validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
+    setErrorMsg(null);
     try {
       const newPlanId = PlanIdSchema.make(`plan-${Date.now()}`);
 
@@ -134,8 +145,10 @@ export function PlanCreatePage(): JSX.Element {
 
       clearDraft();
       navigate(`/trips/${tripId}/plans/${newPlan.id}`, { replace: true });
-    } catch {
+    } catch (err: unknown) {
+      // 비로그인·권한 부족 등 작성 실패 사유를 화면에 그대로 전달한다
       setIsSubmitting(false);
+      setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
     }
   };
 
@@ -194,6 +207,11 @@ export function PlanCreatePage(): JSX.Element {
             firstError={validation.firstError}
             errorCount={validation.errorCount}
           />
+          {errorMsg && (
+            <p css={errorMessageStyle} role="alert">
+              {errorMsg}
+            </p>
+          )}
           <Button
             display="block"
             size="large"

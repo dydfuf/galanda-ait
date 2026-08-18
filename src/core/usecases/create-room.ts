@@ -1,13 +1,11 @@
 import { Effect, Result, Schema } from "effect";
-import {
-  TripRoomRepository,
-  type CreateRoomParams,
-} from "../ports/trip-room-repository.ts";
+import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { SessionService, requireAuthSession } from "../ports/session.ts";
 import {
   ValidationError,
-  UnauthorizedError,
   type ConflictError,
+  type SessionUnavailableError,
+  type UnauthorizedError,
 } from "../domain/errors.ts";
 import type { TripMember, TripRoom } from "../domain/room.ts";
 
@@ -18,17 +16,32 @@ export const CreateRoomInputSchema = Schema.Struct({
   endDate: Schema.optional(Schema.String),
 });
 
-export type CreateRoomInput = CreateRoomParams;
+/**
+ * 방 생성 입력
+ * - 호스트(actor)는 세션에서만 결정되므로 호출자가 사용자 신원을 넘길 수 없다
+ */
+export interface CreateRoomInput {
+  readonly title: string;
+  readonly destination?: string;
+  readonly startDate?: string;
+  readonly endDate?: string;
+}
 
 export const createTripRoomUseCase = (
   input: CreateRoomInput
 ): Effect.Effect<
   TripRoom,
-  ValidationError | ConflictError | UnauthorizedError,
+  ValidationError | ConflictError | UnauthorizedError | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
-    // 1. 입력 스키마 검증
+    // 1. 인증 세션 확인 및 호스트 사용자 바인딩 (세션 사용자 단일 주체 강제)
+    //    입력 검증보다 먼저 수행해 비로그인 사용자가 ValidationError를 먼저 받지 않도록 한다
+    const session = yield* requireAuthSession(
+      "방을 생성하려면 로그인이 필요합니다."
+    );
+
+    // 2. 입력 스키마 검증
     const decodeResult = Schema.decodeUnknownResult(CreateRoomInputSchema)({
       ...input,
       title: input.title?.trim(),
@@ -44,7 +57,7 @@ export const createTripRoomUseCase = (
 
     const validated = decodeResult.success;
 
-    // 2. 날짜 정합성 검증
+    // 3. 날짜 정합성 검증
     if (
       validated.startDate &&
       validated.endDate &&
@@ -56,11 +69,6 @@ export const createTripRoomUseCase = (
         })
       );
     }
-
-    // 3. 인증 세션 확인 및 호스트 사용자 바인딩 (세션 사용자 단일 주체 강제)
-    const session = yield* requireAuthSession(
-      "방을 생성하려면 로그인이 필요합니다."
-    );
 
     const hostUser: TripMember = {
       id: session.userId,

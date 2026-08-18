@@ -5,11 +5,7 @@ import {
   type UpdateRoomParams,
 } from "../../core/ports/trip-room-repository.ts";
 import { TripRoomSchema } from "../../core/domain/room.ts";
-import {
-  TripIdSchema,
-  RevisionSchema,
-  UserIdSchema,
-} from "../../core/domain/ids.ts";
+import { TripIdSchema, RevisionSchema } from "../../core/domain/ids.ts";
 import { ConflictError, NotFoundError } from "../../core/domain/errors.ts";
 import type {
   PlanMemberOpinion,
@@ -100,12 +96,6 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         const defaultStartDate = now.toISOString().split("T")[0];
         const defaultEndDate = threeDaysLater.toISOString().split("T")[0];
 
-        const hostUser: TripMember = params.hostUser ?? {
-          id: UserIdSchema.make("user-local-me"),
-          name: "나",
-          role: "HOST",
-        };
-
         const newRoom: TripRoom = {
           id: TripIdSchema.make(`room-${Date.now()}`),
           title: params.title.trim(),
@@ -113,7 +103,7 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
           startDate: params.startDate || defaultStartDate,
           endDate: params.endDate || defaultEndDate,
           revision: RevisionSchema.make(1),
-          members: [hostUser],
+          members: [params.hostUser],
           plans: [],
           confirmedPlanId: undefined,
         };

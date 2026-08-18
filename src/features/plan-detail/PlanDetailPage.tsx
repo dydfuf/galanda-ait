@@ -8,6 +8,8 @@ import { useDeletePlanMutation } from "../plan-editor/mutations.ts";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
+import { toUserMessage } from "../common/error-message.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { BookingRiskSummary } from "./components/BookingRiskSummary.tsx";
@@ -270,6 +272,10 @@ export function PlanDetailPage(): JSX.Element {
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
 
+  const {
+    isError: isSessionError,
+    error: sessionError,
+  } = useSessionQuery();
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
   const deletePlanMutation = useDeletePlanMutation();
@@ -288,11 +294,21 @@ export function PlanDetailPage(): JSX.Element {
     );
   }
 
+  // 세션 조회 실패는 비로그인과 구분해 명시적으로 안내한다
+  if (isSessionError) {
+    return (
+      <RouteErrorFallback
+        title="로그인 정보를 확인할 수 없습니다"
+        message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
+      />
+    );
+  }
+
   if (isError || !room) {
     return (
       <RouteErrorFallback
         title="여행 정보를 찾을 수 없습니다"
-        message={error instanceof Error ? error.message : "요청한 정보를 찾을 수 없습니다."}
+        message={toUserMessage(error, "요청한 정보를 찾을 수 없습니다.")}
       />
     );
   }
@@ -312,15 +328,28 @@ export function PlanDetailPage(): JSX.Element {
   const isConfirmed = plan.id === room.confirmedPlanId;
   const isRoomConfirmed = Boolean(room.confirmedPlanId);
 
-  const handleOpinionSubmit = (reaction: ReactionType, reason?: string): void => {
-    submitOpinionMutation.mutate({
-      roomId: room.id,
-      planId: plan.id,
-      reaction,
-      reason,
-      expectedRevision: room.revision,
-    });
-    setIsBottomSheetOpen(false);
+  const handleOpinionSubmit = async (
+    reaction: ReactionType,
+    reason?: string
+  ): Promise<void> => {
+    // 저장 중 재제출을 막는다. 두 요청이 같은 expectedRevision을 쓰기 때문에
+    // 먼저 도착한 요청이 성공하면 뒤이은 요청은 ConflictError로 실패한다
+    if (submitOpinionMutation.isPending) {
+      return;
+    }
+
+    try {
+      await submitOpinionMutation.mutateAsync({
+        roomId: room.id,
+        planId: plan.id,
+        reaction,
+        reason,
+        expectedRevision: room.revision,
+      });
+      setIsBottomSheetOpen(false);
+    } catch (err: unknown) {
+      alert(toUserMessage(err, "의견을 등록하지 못했습니다."));
+    }
   };
 
   const handleDeletePlan = async (): Promise<void> => {
@@ -335,13 +364,7 @@ export function PlanDetailPage(): JSX.Element {
       });
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
-      const message =
-        err && typeof err === "object" && "reason" in err
-          ? String((err as { reason: string }).reason)
-          : err && typeof err === "object" && "message" in err
-          ? String((err as { message: string }).message)
-          : "여행안 삭제에 실패했습니다.";
-      alert(message);
+      alert(toUserMessage(err, "여행안 삭제에 실패했습니다."));
     }
   };
 
@@ -524,11 +547,8 @@ export function PlanDetailPage(): JSX.Element {
         isOpen={isBottomSheetOpen}
         onClose={() => setIsBottomSheetOpen(false)}
         initialReaction={plan.myReaction as ReactionType | undefined}
-        initialReason={
-          plan.memberOpinions.find(
-            (m) => m.userId === "user-local-me" || m.userId === "user-local-host"
-          )?.reason || ""
-        }
+        initialReason={plan.myOpinionReason ?? ""}
+        isSubmitting={submitOpinionMutation.isPending}
         onSubmit={handleOpinionSubmit}
       />
     </div>

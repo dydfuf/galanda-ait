@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
+import { toUserMessage } from "../common/error-message.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { DecisionStatusBanner } from "../common/DecisionStatusBanner.tsx";
 import { PlanCard } from "./components/PlanCard.tsx";
@@ -137,6 +139,7 @@ export function PlanHomePage() {
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
+  const { isError: isSessionError, error: sessionError } = useSessionQuery();
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
 
   if (Result.isFailure(validated)) {
@@ -151,11 +154,21 @@ export function PlanHomePage() {
     );
   }
 
+  // 세션 조회 실패는 비로그인과 구분해 명시적으로 안내한다
+  if (isSessionError) {
+    return (
+      <RouteErrorFallback
+        title="로그인 정보를 확인할 수 없습니다"
+        message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
+      />
+    );
+  }
+
   if (isError || !room) {
     return (
       <RouteErrorFallback
         title="여행 정보를 찾을 수 없습니다"
-        message={error instanceof Error ? error.message : "요청한 여행 정보를 불러올 수 없습니다."}
+        message={toUserMessage(error, "요청한 여행 정보를 불러올 수 없습니다.")}
       />
     );
   }

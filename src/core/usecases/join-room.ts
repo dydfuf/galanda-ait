@@ -6,20 +6,28 @@ import type { TripMember, TripRoom } from "../domain/room.ts";
 import type {
   ConflictError,
   NotFoundError,
+  SessionUnavailableError,
   UnauthorizedError,
   ValidationError,
 } from "../domain/errors.ts";
 
+/**
+ * 방 참여 입력
+ * - 참여자 신원은 세션에서만 결정되므로 호출자가 member 정보를 넘길 수 없다
+ */
 export interface JoinRoomInput {
   readonly roomId: TripId;
-  readonly member?: Partial<TripMember>;
 }
 
 export const joinTripRoomUseCase = (
   input: JoinRoomInput
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | ValidationError | UnauthorizedError,
+  | NotFoundError
+  | ConflictError
+  | ValidationError
+  | UnauthorizedError
+  | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {

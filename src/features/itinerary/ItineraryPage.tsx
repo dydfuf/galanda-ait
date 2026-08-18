@@ -3,6 +3,7 @@ import { Button } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
+import { toUserMessage } from "../common/error-message.ts";
 import { Result } from "effect";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
@@ -263,7 +264,7 @@ export function ItineraryPage() {
     return (
       <RouteErrorFallback
         title="일정 정보를 찾을 수 없습니다"
-        message={error instanceof Error ? error.message : "요청한 정보를 찾을 수 없습니다."}
+        message={toUserMessage(error, "요청한 정보를 찾을 수 없습니다.")}
       />
     );
   }

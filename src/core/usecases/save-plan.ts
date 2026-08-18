@@ -13,6 +13,7 @@ import {
   ValidationError,
   type ConflictError,
   type NotFoundError,
+  type SessionUnavailableError,
   type UnauthorizedError,
 } from "../domain/errors.ts";
 
@@ -26,28 +27,32 @@ export const createPlanUseCase = (
   input: CreatePlanInput
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | ValidationError | UnauthorizedError,
+  | NotFoundError
+  | ConflictError
+  | ValidationError
+  | UnauthorizedError
+  | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
-    // 1. 여행안 제목 유효성 검증
+    // 1. 인증 세션 확인 (단일 권한 주체, 입력 검증보다 먼저 수행)
+    const session = yield* requireAuthSession(
+      "여행안을 작성하려면 로그인이 필요합니다."
+    );
+
+    // 2. 여행안 제목 유효성 검증
     if (!input.plan.title?.trim()) {
       return yield* Effect.fail(
         new ValidationError({ message: "여행안 제목을 입력해주세요." })
       );
     }
 
-    // 2. 인원수 유효성 검증
+    // 3. 인원수 유효성 검증
     if (input.plan.baseHeadcount !== undefined && input.plan.baseHeadcount < 1) {
       return yield* Effect.fail(
         new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
       );
     }
-
-    // 3. 인증 세션 확인 (단일 권한 주체)
-    const session = yield* requireAuthSession(
-      "여행안을 작성하려면 로그인이 필요합니다."
-    );
 
     const repo = yield* TripRoomRepository;
     const room = yield* repo.getRoom(input.roomId);
@@ -98,28 +103,32 @@ export const updatePlanUseCase = (
   input: UpdatePlanInput
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | ValidationError | UnauthorizedError,
+  | NotFoundError
+  | ConflictError
+  | ValidationError
+  | UnauthorizedError
+  | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
-    // 1. 여행안 제목 유효성 검증
+    // 1. 인증 세션 확인 (입력 검증보다 먼저 수행)
+    const session = yield* requireAuthSession(
+      "여행안을 수정하려면 로그인이 필요합니다."
+    );
+
+    // 2. 여행안 제목 유효성 검증
     if (!input.plan.title?.trim()) {
       return yield* Effect.fail(
         new ValidationError({ message: "여행안 제목을 입력해주세요." })
       );
     }
 
-    // 2. 인원수 유효성 검증
+    // 3. 인원수 유효성 검증
     if (input.plan.baseHeadcount !== undefined && input.plan.baseHeadcount < 1) {
       return yield* Effect.fail(
         new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
       );
     }
-
-    // 3. 인증 세션 확인
-    const session = yield* requireAuthSession(
-      "여행안을 수정하려면 로그인이 필요합니다."
-    );
 
     const repo = yield* TripRoomRepository;
     const room = yield* repo.getRoom(input.roomId);
@@ -191,7 +200,11 @@ export const deletePlanUseCase = (
   input: DeletePlanInput
 ): Effect.Effect<
   TripRoom,
-  NotFoundError | ConflictError | ValidationError | UnauthorizedError,
+  | NotFoundError
+  | ConflictError
+  | ValidationError
+  | UnauthorizedError
+  | SessionUnavailableError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
