@@ -40,15 +40,15 @@ const room: TripRoom = {
   confirmedPlanId: undefined,
 };
 
-describe("toTripRoomViewModel 세션 신원 처리 (RAON-149)", () => {
-  it("세션 사용자의 의견만 '내 반응'으로 표시한다", () => {
+describe("toTripRoomViewModel 세션 신원 처리 (RAON-149)", (): void => {
+  it("세션 사용자의 의견만 '내 반응'으로 표시한다", (): void => {
     const vm = toTripRoomViewModel(room, UserIdSchema.make("user-local-me"));
 
     expect(vm.plans[0].myReaction).toBe("LIKE");
     expect(vm.plans[0].canManage).toBe(true);
   });
 
-  it("세션 사용자가 없으면 '내 반응'과 관리 권한이 모두 비어 있다 (user-local-me 폴백 금지)", () => {
+  it("세션 사용자가 없으면 '내 반응'과 관리 권한이 모두 비어 있다 (user-local-me 폴백 금지)", (): void => {
     const vm = toTripRoomViewModel(room, undefined);
 
     expect(vm.plans[0].myReaction).toBeUndefined();
@@ -56,7 +56,7 @@ describe("toTripRoomViewModel 세션 신원 처리 (RAON-149)", () => {
     expect(vm.plans[0].canManage).toBe(false);
   });
 
-  it("다른 사용자의 의견은 내 반응으로 잡히지 않는다", () => {
+  it("다른 사용자의 의견은 내 반응으로 잡히지 않는다", (): void => {
     const vm = toTripRoomViewModel(room, UserIdSchema.make("user-bob"));
 
     expect(vm.plans[0].myReaction).toBeUndefined();

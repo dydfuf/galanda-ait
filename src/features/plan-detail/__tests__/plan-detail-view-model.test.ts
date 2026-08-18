@@ -50,8 +50,8 @@ const room: TripRoom = {
   confirmedPlanId: undefined,
 };
 
-describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", () => {
-  it("세션 사용자의 의견만 '내 의견'으로 표시한다", () => {
+describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
+  it("세션 사용자의 의견만 '내 의견'으로 표시한다", (): void => {
     const vm = toPlanDetailViewModel(room, UserIdSchema.make("user-bob"));
     const plan = vm.plans[0];
 
@@ -59,7 +59,7 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", () => {
     expect(plan.myOpinionReason).toBe("이동이 너무 많아요");
   });
 
-  it("세션 사용자가 없으면 '내 의견'이 존재하지 않는다 (user-local-me 폴백 금지)", () => {
+  it("세션 사용자가 없으면 '내 의견'이 존재하지 않는다 (user-local-me 폴백 금지)", (): void => {
     const vm = toPlanDetailViewModel(room, undefined);
     const plan = vm.plans[0];
 
@@ -67,7 +67,7 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", () => {
     expect(plan.myOpinionReason).toBeUndefined();
   });
 
-  it("세션 사용자가 없으면 여행안 관리 권한도 부여되지 않는다", () => {
+  it("세션 사용자가 없으면 여행안 관리 권한도 부여되지 않는다", (): void => {
     const vm = toPlanDetailViewModel(room, undefined);
     const plan = vm.plans[0];
 
@@ -75,7 +75,7 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", () => {
     expect(plan.canManage).toBe(false);
   });
 
-  it("의견을 남기지 않은 사용자에게는 다른 사람의 사유가 노출되지 않는다", () => {
+  it("의견을 남기지 않은 사용자에게는 다른 사람의 사유가 노출되지 않는다", (): void => {
     const vm = toPlanDetailViewModel(room, UserIdSchema.make("user-stranger"));
     const plan = vm.plans[0];
 
