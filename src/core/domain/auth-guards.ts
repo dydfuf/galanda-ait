@@ -294,6 +294,28 @@ export const requirePlanAuthor = (
   });
 
 /**
+ * 여행안이 방의 확정본인지 확인하는 순수 도메인 함수
+ * - 방의 confirmedPlanId 또는 플랜 자체의 status 중 하나라도 확정을 가리키면 확정본으로 본다
+ *   (두 신호가 어긋난 레거시 데이터에서도 확정본을 보호하기 위함)
+ */
+export const isPlanConfirmed = (room: TripRoom, plan: TripPlan): boolean =>
+  room.confirmedPlanId === plan.id || plan.status === "CONFIRMED";
+
+/**
+ * 확정된 여행안의 변경(수정/삭제)을 거부하는 도메인 가드
+ * - 확정본은 방 전체가 공유하는 공개본이므로 작성자에게도 변경을 허용하지 않는다
+ * - 지금까지 수정 화면 진입 차단과 상세 화면 CTA 숨김으로 UI에만 있던 규칙을 도메인 경계로 승격한 것
+ */
+export const requireMutablePlan = (
+  room: TripRoom,
+  plan: TripPlan,
+  reason = "확정된 여행안은 변경할 수 없습니다."
+): Effect.Effect<void, UnauthorizedError> =>
+  isPlanConfirmed(room, plan)
+    ? Effect.fail(new UnauthorizedError({ reason }))
+    : Effect.void;
+
+/**
  * 여행안 작성자 또는 방장 권한을 요구하는 가드 (하위 호환성 유지용)
  */
 export const requirePlanAuthorOrHost = (
