@@ -57,6 +57,12 @@ const REACTION_OPTIONS = [
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * 시트를 닫은 뒤 원래 버튼으로 포커스를 되돌릴 때, 재시도를 포기하는 시간이에요.
+ * 저장 중에는 시트를 연 버튼이 잠시 `disabled`가 되어 `focus()`가 무시되기 때문에 기다려요.
+ */
+const FOCUS_RESTORE_TIMEOUT_MS = 2000;
+
 const backdropContainerStyle = css`
   position: fixed;
   inset: 0;
@@ -222,6 +228,7 @@ export function OpinionBottomSheet({
   const [reason, setReason] = useState<string>(initialReason);
   const sheetRef = useRef<HTMLDivElement>(null);
   const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+  const restoreFrameRef = useRef<number | null>(null);
 
   // 시트를 열 때마다 현재 저장된 의견을 기준으로 다시 시작해요.
   useEffect(() => {
@@ -239,9 +246,38 @@ export function OpinionBottomSheet({
     firstFocusable?.focus();
 
     return () => {
-      lastFocusedElementRef.current?.focus();
+      const trigger = lastFocusedElementRef.current;
+      if (trigger == null) return;
+
+      // 의견을 저장하면 시트가 닫히는 동시에 시트를 연 CTA가 저장 중 상태로 잠깐 비활성화돼요.
+      // 이때 focus()는 무시되므로, 버튼이 다시 활성화될 때까지 짧게 재시도해요.
+      // 그 사이 사용자가 다른 요소로 이동했다면 포커스를 빼앗지 않고 멈춰요.
+      const deadline = performance.now() + FOCUS_RESTORE_TIMEOUT_MS;
+
+      const restoreFocus = () => {
+        const active = document.activeElement;
+        const focusIsUnset = active == null || active === document.body;
+        if (!trigger.isConnected || !focusIsUnset) return;
+
+        trigger.focus();
+        if (document.activeElement === trigger || performance.now() > deadline) return;
+
+        restoreFrameRef.current = requestAnimationFrame(restoreFocus);
+      };
+
+      restoreFocus();
     };
   }, [isOpen]);
+
+  // 포커스 복귀 재시도가 남아 있는 채로 언마운트되지 않게 정리해요.
+  useEffect(
+    () => () => {
+      if (restoreFrameRef.current != null) {
+        cancelAnimationFrame(restoreFrameRef.current);
+      }
+    },
+    []
+  );
 
   // Escape로 닫고, Tab 포커스가 시트 밖으로 빠져나가지 않게 순환시켜요.
   useEffect(() => {
