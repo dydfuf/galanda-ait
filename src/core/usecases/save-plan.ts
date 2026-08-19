@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import { SessionService, requireAuthSession } from "../ports/session.ts";
+import { requireAuthSession } from "../ports/session.ts";
 import { calculatePlanDifference } from "../calculations/plan-diff.ts";
 import {
   requireMutablePlan,
@@ -9,15 +9,8 @@ import {
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
-import type { TripPlan, TripRoom } from "../domain/room.ts";
-import {
-  ValidationError,
-  type ConflictError,
-  type NotFoundError,
-  type RepositoryError,
-  type SessionUnavailableError,
-  type UnauthorizedError,
-} from "../domain/errors.ts";
+import type { TripPlan } from "../domain/room.ts";
+import { ValidationError } from "../domain/errors.ts";
 
 export interface CreatePlanInput {
   readonly roomId: TripId;
@@ -25,19 +18,8 @@ export interface CreatePlanInput {
   readonly expectedRevision: Revision;
 }
 
-export const createPlanUseCase = (
-  input: CreatePlanInput
-): Effect.Effect<
-  TripRoom,
-  | NotFoundError
-  | ConflictError
-  | ValidationError
-  | UnauthorizedError
-  | SessionUnavailableError
-  | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const createPlan = Effect.fn("createPlan")(
+  function* (input: CreatePlanInput) {
     // 1. 인증 세션 확인 (단일 권한 주체, 입력 검증보다 먼저 수행)
     const session = yield* requireAuthSession(
       "여행안을 작성하려면 로그인이 필요합니다."
@@ -94,7 +76,8 @@ export const createPlanUseCase = (
       finalPlan,
       input.expectedRevision
     );
-  });
+  }
+);
 
 export interface UpdatePlanInput {
   readonly roomId: TripId;
@@ -102,19 +85,8 @@ export interface UpdatePlanInput {
   readonly expectedRevision: Revision;
 }
 
-export const updatePlanUseCase = (
-  input: UpdatePlanInput
-): Effect.Effect<
-  TripRoom,
-  | NotFoundError
-  | ConflictError
-  | ValidationError
-  | UnauthorizedError
-  | SessionUnavailableError
-  | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const updatePlan = Effect.fn("updatePlan")(
+  function* (input: UpdatePlanInput) {
     // 1. 인증 세션 확인 (입력 검증보다 먼저 수행)
     const session = yield* requireAuthSession(
       "여행안을 수정하려면 로그인이 필요합니다."
@@ -209,7 +181,8 @@ export const updatePlanUseCase = (
       finalPlan,
       input.expectedRevision
     );
-  });
+  }
+);
 
 export interface DeletePlanInput {
   readonly roomId: TripId;
@@ -217,19 +190,8 @@ export interface DeletePlanInput {
   readonly expectedRevision: Revision;
 }
 
-export const deletePlanUseCase = (
-  input: DeletePlanInput
-): Effect.Effect<
-  TripRoom,
-  | NotFoundError
-  | ConflictError
-  | ValidationError
-  | UnauthorizedError
-  | SessionUnavailableError
-  | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const deletePlan = Effect.fn("deletePlan")(
+  function* (input: DeletePlanInput) {
     // 1. 인증 세션 확인
     const session = yield* requireAuthSession(
       "여행안을 삭제하려면 로그인이 필요합니다."
@@ -267,4 +229,5 @@ export const deletePlanUseCase = (
       input.planId,
       input.expectedRevision
     );
-  });
+  }
+);

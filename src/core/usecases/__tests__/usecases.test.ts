@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Effect, Exit, Layer, Option } from "effect";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import { findTripRoom, getTripRooms } from "../get-room.ts";
-import { createTripRoomUseCase } from "../create-room.ts";
+import { createTripRoom } from "../create-room.ts";
 import { LocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
 import {
   NotFoundError,
@@ -68,7 +68,7 @@ describe("UseCases Error Propagation", () => {
     }
   });
 
-  it("createTripRoomUseCase()는 스키마 유효성 실패 시 ValidationError, 저장소 실패 시 RepositoryError를 전파한다", async () => {
+  it("createTripRoom()는 스키마 유효성 실패 시 ValidationError, 저장소 실패 시 RepositoryError를 전파한다", async () => {
     const FailingRepoLayer = Layer.succeed(TripRoomRepository, {
       createRoom: () =>
         Effect.fail(
@@ -82,7 +82,7 @@ describe("UseCases Error Propagation", () => {
     const CombinedLayer = Layer.merge(FailingRepoLayer, LocalSessionLayer);
 
     // 1. 유효성 검증 실패
-    const invalidProgram = createTripRoomUseCase({ title: "   " }).pipe(
+    const invalidProgram = createTripRoom({ title: "   " }).pipe(
       Effect.provide(CombinedLayer)
     );
     const invalidExit = await Effect.runPromiseExit(invalidProgram);
@@ -92,7 +92,7 @@ describe("UseCases Error Propagation", () => {
     }
 
     // 2. 유효성 성공 후 저장소 오류 전파
-    const validProgram = createTripRoomUseCase({
+    const validProgram = createTripRoom({
       title: "제주 여행",
     }).pipe(Effect.provide(CombinedLayer));
     const validExit = await Effect.runPromiseExit(validProgram);

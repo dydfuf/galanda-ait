@@ -1,31 +1,20 @@
 import { Effect, Option } from "effect";
 import type { TripId } from "../domain/ids.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import type { NotFoundError, RepositoryError } from "../domain/errors.ts";
-import type { TripRoom } from "../domain/room.ts";
 
-export const getTripRoom = (
-  roomId: TripId
-): Effect.Effect<TripRoom, NotFoundError | RepositoryError, TripRoomRepository> =>
-  Effect.gen(function* () {
-    const repo = yield* TripRoomRepository;
-    return yield* repo.getRoom(roomId);
-  });
+export const getTripRoom = Effect.fn("getTripRoom")(function* (roomId: TripId) {
+  const repo = yield* TripRoomRepository;
+  return yield* repo.getRoom(roomId);
+});
 
-export const findTripRoom = (
-  roomId: TripId
-): Effect.Effect<Option.Option<TripRoom>, RepositoryError, TripRoomRepository> =>
-  getTripRoom(roomId).pipe(
+export const findTripRoom = Effect.fn("findTripRoom")(function* (roomId: TripId) {
+  return yield* getTripRoom(roomId).pipe(
     Effect.map(Option.some),
     Effect.catchTag("NotFoundError", () => Effect.succeed(Option.none()))
   );
+});
 
-export const getTripRooms = (): Effect.Effect<
-  ReadonlyArray<TripRoom>,
-  RepositoryError,
-  TripRoomRepository
-> =>
-  Effect.gen(function* () {
-    const repo = yield* TripRoomRepository;
-    return yield* repo.getRooms();
-  });
+export const getTripRooms = Effect.fn("getTripRooms")(function* () {
+  const repo = yield* TripRoomRepository;
+  return yield* repo.getRooms();
+});

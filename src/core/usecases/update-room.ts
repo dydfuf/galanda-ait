@@ -3,18 +3,10 @@ import {
   TripRoomRepository,
   type UpdateRoomParams,
 } from "../ports/trip-room-repository.ts";
-import { SessionService, requireAuthSession } from "../ports/session.ts";
+import { requireAuthSession } from "../ports/session.ts";
 import { requireRoomPermission } from "../domain/auth-guards.ts";
 import type { Revision, TripId } from "../domain/ids.ts";
-import type { TripRoom } from "../domain/room.ts";
-import {
-  ValidationError,
-  type ConflictError,
-  type NotFoundError,
-  type RepositoryError,
-  type SessionUnavailableError,
-  type UnauthorizedError,
-} from "../domain/errors.ts";
+import { ValidationError } from "../domain/errors.ts";
 
 export interface UpdateRoomInput {
   readonly roomId: TripId;
@@ -22,19 +14,8 @@ export interface UpdateRoomInput {
   readonly expectedRevision: Revision;
 }
 
-export const updateTripRoomUseCase = (
-  input: UpdateRoomInput
-): Effect.Effect<
-  TripRoom,
-  | NotFoundError
-  | ConflictError
-  | ValidationError
-  | UnauthorizedError
-  | SessionUnavailableError
-  | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const updateTripRoom = Effect.fn("updateTripRoom")(
+  function* (input: UpdateRoomInput) {
     // 1. 인증 세션 확인 (입력 검증보다 먼저 수행)
     const session = yield* requireAuthSession(
       "방 정보를 수정하려면 로그인이 필요합니다."
@@ -92,4 +73,5 @@ export const updateTripRoomUseCase = (
       sanitizedParams,
       input.expectedRevision
     );
-  });
+  }
+);

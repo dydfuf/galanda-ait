@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { appRuntime } from "../../app/runtime.ts";
-import { submitPlanOpinionUseCase } from "../../core/usecases/submit-opinion.ts";
+import { submitOpinion } from "../../core/usecases/submit-opinion.ts";
 import {
   TripIdSchema,
   PlanIdSchema,
@@ -35,7 +35,7 @@ export const useSubmitOpinionMutation = (): UseMutationResult<
       expectedRevision,
     }: SubmitOpinionVariables): Promise<TripRoom> =>
       appRuntime.runPromise(
-        submitPlanOpinionUseCase({
+        submitOpinion({
           roomId: TripIdSchema.make(roomId),
           planId: PlanIdSchema.make(planId),
           opinion: {

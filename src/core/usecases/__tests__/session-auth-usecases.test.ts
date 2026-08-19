@@ -5,15 +5,15 @@ import type { TripMember, TripPlan, TripRoom, UserSession } from "../../domain/r
 import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession } from "../../ports/session.ts";
 import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams } from "../../ports/trip-room-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
-import { createTripRoomUseCase, type CreateRoomInput } from "../create-room.ts";
-import { joinTripRoomUseCase, type JoinRoomInput } from "../join-room.ts";
-import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../save-plan.ts";
+import { createTripRoom, type CreateRoomInput } from "../create-room.ts";
+import { joinTripRoom, type JoinRoomInput } from "../join-room.ts";
+import { createPlan, updatePlan, deletePlan } from "../save-plan.ts";
 import {
-  submitPlanOpinionUseCase,
+  submitOpinion,
   type SubmitPlanOpinionInput,
 } from "../submit-opinion.ts";
 import { confirmTripPlan } from "../confirm-plan.ts";
-import { updateTripRoomUseCase } from "../update-room.ts";
+import { updateTripRoom } from "../update-room.ts";
 import {
   NotFoundError,
   ConflictError,
@@ -358,14 +358,14 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     confirmedPlanId: undefined,
   };
 
-  describe("1. createTripRoomUseCase", (): void => {
+  describe("1. createTripRoom", (): void => {
     it("인증된 세션 사용자를 호스트(HOST)로 설정하여 방을 생성한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer(),
         createTestSessionLayer(aliceUser)
       );
 
-      const program = createTripRoomUseCase({
+      const program = createTripRoom({
         title: "도쿄 맛집 탐방",
         destination: "도쿄",
       }).pipe(Effect.provide(testEnv));
@@ -395,7 +395,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         },
       } as unknown as CreateRoomInput;
 
-      const program = createTripRoomUseCase(spoofedInput).pipe(
+      const program = createTripRoom(spoofedInput).pipe(
         Effect.provide(testEnv)
       );
 
@@ -411,7 +411,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = createTripRoomUseCase({
+      const program = createTripRoom({
         title: "비로그인 방 생성 시도",
       }).pipe(Effect.provide(testEnv));
 
@@ -424,14 +424,14 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     });
   });
 
-  describe("2. joinTripRoomUseCase", (): void => {
+  describe("2. joinTripRoom", (): void => {
     it("인증된 세션 사용자의 신원(userId 및 name)으로 방에 참여한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(strangerUser)
       );
 
-      const program = joinTripRoomUseCase({
+      const program = joinTripRoom({
         roomId: sampleRoom.id,
       }).pipe(Effect.provide(testEnv));
 
@@ -459,7 +459,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         },
       } as unknown as JoinRoomInput;
 
-      const program = joinTripRoomUseCase(spoofedInput).pipe(
+      const program = joinTripRoom(spoofedInput).pipe(
         Effect.provide(testEnv)
       );
 
@@ -477,7 +477,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = joinTripRoomUseCase({
+      const program = joinTripRoom({
         roomId: sampleRoom.id,
       }).pipe(Effect.provide(testEnv));
 
@@ -490,7 +490,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     });
   });
 
-  describe("3. createPlanUseCase", (): void => {
+  describe("3. createPlan", (): void => {
     it("방 참여자가 여행안 생성 시 세션 사용자가 authorId로 설정된다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
@@ -505,7 +505,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         voteCount: 0,
       };
 
-      const program = createPlanUseCase({
+      const program = createPlan({
         roomId: sampleRoom.id,
         plan: newPlan,
         expectedRevision: sampleRoom.revision,
@@ -533,7 +533,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         voteCount: 0,
       };
 
-      const program = createPlanUseCase({
+      const program = createPlan({
         roomId: sampleRoom.id,
         plan: spoofedPlan,
         expectedRevision: sampleRoom.revision,
@@ -559,7 +559,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         voteCount: 0,
       };
 
-      const program = createPlanUseCase({
+      const program = createPlan({
         roomId: sampleRoom.id,
         plan: newPlan,
         expectedRevision: sampleRoom.revision,
@@ -579,7 +579,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = createPlanUseCase({
+      const program = createPlan({
         roomId: sampleRoom.id,
         plan: {
           id: PlanIdSchema.make("plan-5"),
@@ -600,7 +600,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     });
   });
 
-  describe("4. updatePlanUseCase & deletePlanUseCase", (): void => {
+  describe("4. updatePlan & deletePlan", (): void => {
     const roomWithBobPlan: TripRoom = {
       ...sampleRoom,
       plans: [
@@ -629,7 +629,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         authorId: UserIdSchema.make("user-hacker"), // 작성자 변조 시도
       };
 
-      const program = updatePlanUseCase({
+      const program = updatePlan({
         roomId: sampleRoom.id,
         plan: updateTarget,
         expectedRevision: sampleRoom.revision,
@@ -652,7 +652,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         title: "밥이 앨리스의 여행안 수정 시도",
       };
 
-      const program = updatePlanUseCase({
+      const program = updatePlan({
         roomId: sampleRoom.id,
         plan: updateTarget,
         expectedRevision: sampleRoom.revision,
@@ -672,7 +672,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(bobUser)
       );
 
-      const program = deletePlanUseCase({
+      const program = deletePlan({
         roomId: sampleRoom.id,
         planId: sampleRoom.plans[0].id,
         expectedRevision: sampleRoom.revision,
@@ -697,7 +697,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         title: "방장이 타인의 여행안 수정 시도",
       };
 
-      const updateProgram = updatePlanUseCase({
+      const updateProgram = updatePlan({
         roomId: roomWithBobPlan.id,
         plan: updateTarget,
         expectedRevision: roomWithBobPlan.revision,
@@ -727,7 +727,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(aliceUser)
       );
 
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: roomWithBobPlan.id,
         planId: PlanIdSchema.make("plan-bob"),
         expectedRevision: roomWithBobPlan.revision,
@@ -760,7 +760,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         title: "방장이 자신이 작성한 여행안 수정",
       };
 
-      const updateProgram = updatePlanUseCase({
+      const updateProgram = updatePlan({
         roomId: sampleRoom.id,
         plan: updateTarget,
         expectedRevision: sampleRoom.revision,
@@ -771,7 +771,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(updatedPlan?.title).toBe("방장이 자신이 작성한 여행안 수정");
       expect(updatedPlan?.authorId).toBe("user-alice");
 
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: updatedRoom.id,
         planId: PlanIdSchema.make("plan-1"),
         expectedRevision: updatedRoom.revision,
@@ -793,7 +793,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         title: "존재하지 않는 플랜",
       };
 
-      const updateProgram = updatePlanUseCase({
+      const updateProgram = updatePlan({
         roomId: sampleRoom.id,
         plan: nonExistentPlan,
         expectedRevision: sampleRoom.revision,
@@ -806,7 +806,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         expect(err).toBeInstanceOf(NotFoundError);
       }
 
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: sampleRoom.id,
         planId: PlanIdSchema.make("plan-does-not-exist"),
         expectedRevision: sampleRoom.revision,
@@ -826,7 +826,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(bobUser)
       );
 
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: roomWithBobPlan.id,
         planId: PlanIdSchema.make("plan-bob"),
         expectedRevision: roomWithBobPlan.revision,
@@ -864,7 +864,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         title: "밥이 수정한 구버전 제안",
       };
 
-      const updateProgram = updatePlanUseCase({
+      const updateProgram = updatePlan({
         roomId: roomWithLegacyPlan.id,
         plan: updateTarget,
         expectedRevision: roomWithLegacyPlan.revision,
@@ -877,7 +877,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(updatedPlan?.authorName).toBe("밥");
 
       // 밥이 자신의 레거시 여행안 삭제
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: updatedRoom.id,
         planId: PlanIdSchema.make("plan-legacy-bob"),
         expectedRevision: updatedRoom.revision,
@@ -910,7 +910,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(strangerUser)
       );
 
-      const updateProgram = updatePlanUseCase({
+      const updateProgram = updatePlan({
         roomId: roomWithLegacyPlan.id,
         plan: { ...roomWithLegacyPlan.plans[1], title: "이방인의 수정 시도" },
         expectedRevision: roomWithLegacyPlan.revision,
@@ -923,7 +923,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         expect(err).toBeInstanceOf(UnauthorizedError);
       }
 
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: roomWithLegacyPlan.id,
         planId: PlanIdSchema.make("plan-legacy-bob"),
         expectedRevision: roomWithLegacyPlan.revision,
@@ -970,7 +970,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       // 밥1의 수정 시도 -> 실패
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: roomWithDuplicateNames.id,
             plan: { ...roomWithDuplicateNames.plans[1], title: "밥1의 수정 시도" },
             expectedRevision: roomWithDuplicateNames.revision,
@@ -984,7 +984,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       // 밥2의 수정 시도 -> 실패
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: roomWithDuplicateNames.id,
             plan: { ...roomWithDuplicateNames.plans[1], title: "밥2의 수정 시도" },
             expectedRevision: roomWithDuplicateNames.revision,
@@ -998,7 +998,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       // 밥1의 삭제 시도 -> 실패
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: roomWithDuplicateNames.id,
             planId: PlanIdSchema.make("plan-legacy-bob"),
             expectedRevision: roomWithDuplicateNames.revision,
@@ -1012,7 +1012,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       // 밥2의 삭제 시도 -> 실패
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: roomWithDuplicateNames.id,
             planId: PlanIdSchema.make("plan-legacy-bob"),
             expectedRevision: roomWithDuplicateNames.revision,
@@ -1051,7 +1051,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       );
 
       // 1. 방장의 수정 허용 및 authorId 미오염 검증
-      const updateProgram = updatePlanUseCase({
+      const updateProgram = updatePlan({
         roomId: roomWithDuplicateNames.id,
         plan: { ...roomWithDuplicateNames.plans[1], title: "방장이 수정한 모호한 여행안" },
         expectedRevision: roomWithDuplicateNames.revision,
@@ -1064,7 +1064,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(updatedPlan?.authorName).toBe("밥");
 
       // 2. 방장의 삭제 허용 검증
-      const deleteProgram = deletePlanUseCase({
+      const deleteProgram = deletePlan({
         roomId: updatedRoom.id,
         planId: PlanIdSchema.make("plan-legacy-bob"),
         expectedRevision: updatedRoom.revision,
@@ -1080,7 +1080,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const updateProg = updatePlanUseCase({
+      const updateProg = updatePlan({
         roomId: sampleRoom.id,
         plan: sampleRoom.plans[0],
         expectedRevision: sampleRoom.revision,
@@ -1093,7 +1093,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         expect(err).toBeInstanceOf(UnauthorizedError);
       }
 
-      const deleteProg = deletePlanUseCase({
+      const deleteProg = deletePlan({
         roomId: sampleRoom.id,
         planId: sampleRoom.plans[0].id,
         expectedRevision: sampleRoom.revision,
@@ -1108,14 +1108,14 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     });
   });
 
-  describe("5. submitPlanOpinionUseCase", (): void => {
+  describe("5. submitOpinion", (): void => {
     it("세션 사용자의 정보로 의견과 투표를 등록한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(bobUser)
       );
 
-      const program = submitPlanOpinionUseCase({
+      const program = submitOpinion({
         roomId: sampleRoom.id,
         planId: PlanIdSchema.make("plan-1"),
         opinion: {
@@ -1153,7 +1153,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         expectedRevision: sampleRoom.revision,
       } as unknown as SubmitPlanOpinionInput;
 
-      const program = submitPlanOpinionUseCase(spoofedInput).pipe(
+      const program = submitOpinion(spoofedInput).pipe(
         Effect.provide(testEnv)
       );
 
@@ -1169,7 +1169,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = submitPlanOpinionUseCase({
+      const program = submitOpinion({
         roomId: sampleRoom.id,
         planId: PlanIdSchema.make("plan-1"),
         opinion: {
@@ -1288,7 +1288,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createUnavailableSessionLayer()
       );
 
-      const program = createPlanUseCase({
+      const program = createPlan({
         roomId: sampleRoom.id,
         plan: {
           id: PlanIdSchema.make("plan-new"),
@@ -1333,7 +1333,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = createTripRoomUseCase({ title: "   " }).pipe(
+      const program = createTripRoom({ title: "   " }).pipe(
         Effect.provide(testEnv)
       );
 
@@ -1352,7 +1352,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(aliceUser)
       );
 
-      const program = createTripRoomUseCase({ title: "   " }).pipe(
+      const program = createTripRoom({ title: "   " }).pipe(
         Effect.provide(testEnv)
       );
 
@@ -1370,7 +1370,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = createPlanUseCase({
+      const program = createPlan({
         roomId: sampleRoom.id,
         plan: {
           id: PlanIdSchema.make("plan-empty"),
@@ -1397,7 +1397,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = updatePlanUseCase({
+      const program = updatePlan({
         roomId: sampleRoom.id,
         plan: { ...sampleRoom.plans[0], baseHeadcount: 0 },
         expectedRevision: sampleRoom.revision,
@@ -1418,7 +1418,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = submitPlanOpinionUseCase({
+      const program = submitOpinion({
         roomId: sampleRoom.id,
         planId: PlanIdSchema.make("plan-1"),
         opinion: { reaction: "INVALID" as "LIKE" },
@@ -1440,7 +1440,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(unauthenticatedSession)
       );
 
-      const program = updateTripRoomUseCase({
+      const program = updateTripRoom({
         roomId: sampleRoom.id,
         params: { title: "   " },
         expectedRevision: sampleRoom.revision,
@@ -1456,14 +1456,14 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     });
   });
 
-  describe("10. updateTripRoomUseCase 권한 검증", (): void => {
+  describe("10. updateTripRoom 권한 검증", (): void => {
     it("방장(HOST)은 방 정보를 수정할 수 있다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(aliceUser)
       );
 
-      const program = updateTripRoomUseCase({
+      const program = updateTripRoom({
         roomId: sampleRoom.id,
         params: { title: "제주도 미식 여행" },
         expectedRevision: sampleRoom.revision,
@@ -1479,7 +1479,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(bobUser)
       );
 
-      const program = updateTripRoomUseCase({
+      const program = updateTripRoom({
         roomId: sampleRoom.id,
         params: { title: "밥이 바꾼 제목" },
         expectedRevision: sampleRoom.revision,

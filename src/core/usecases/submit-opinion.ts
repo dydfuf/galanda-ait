@@ -1,20 +1,13 @@
 import { Effect } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import { SessionService, requireAuthSession } from "../ports/session.ts";
+import { requireAuthSession } from "../ports/session.ts";
 import {
   requirePlanInRoom,
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
-import type { PlanMemberOpinion, TripRoom } from "../domain/room.ts";
-import {
-  ValidationError,
-  type ConflictError,
-  type NotFoundError,
-  type RepositoryError,
-  type SessionUnavailableError,
-  type UnauthorizedError,
-} from "../domain/errors.ts";
+import type { PlanMemberOpinion } from "../domain/room.ts";
+import { ValidationError } from "../domain/errors.ts";
 
 /**
  * 의견 제출 입력
@@ -30,19 +23,8 @@ export interface SubmitPlanOpinionInput {
   readonly expectedRevision: Revision;
 }
 
-export const submitPlanOpinionUseCase = (
-  input: SubmitPlanOpinionInput
-): Effect.Effect<
-  TripRoom,
-  | NotFoundError
-  | ConflictError
-  | ValidationError
-  | UnauthorizedError
-  | SessionUnavailableError
-  | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const submitOpinion = Effect.fn("submitOpinion")(
+  function* (input: SubmitPlanOpinionInput) {
     // 1. 인증 세션 확인 (세션 사용자 단일 주체 강제)
     const session = yield* requireAuthSession(
       "의견을 등록하려면 로그인이 필요합니다."
@@ -85,4 +67,5 @@ export const submitPlanOpinionUseCase = (
       sanitizedOpinion,
       input.expectedRevision
     );
-  });
+  }
+);

@@ -189,8 +189,8 @@ location.href = "/trips";
 
 ### 자동화 우선 후보
 
-- `createTripRoomUseCase`: 제목·날짜 검증, 한 번만 생성
-- `createPlanUseCase` / `updatePlanUseCase`: 제목·기준 인원·공개 조건·가격 범위·draft와 공개본 분리
+- `createTripRoom`: 제목·날짜 검증, 한 번만 생성
+- `createPlan` / `updatePlan`: 제목·기준 인원·공개 조건·가격 범위·draft와 공개본 분리
 - `calculatePlanDifference`: 복제안의 날짜·도시·예약·비용 차이
 - `getRoomActor`와 권한 guard: `H/M/G`별 action 허용 여부
 - repository: revision 충돌, 확정의 멱등성, 의견 upsert, 중복 참여 방지

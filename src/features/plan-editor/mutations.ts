@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { appRuntime } from "../../app/runtime.ts";
-import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../../core/usecases/save-plan.ts";
+import { createPlan, updatePlan, deletePlan } from "../../core/usecases/save-plan.ts";
 import { TripIdSchema, PlanIdSchema, RevisionSchema } from "../../core/domain/ids.ts";
 import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
@@ -22,7 +22,7 @@ export const useCreatePlanMutation = (): UseMutationResult<
   return useMutation({
     mutationFn: ({ roomId, plan, expectedRevision }: CreatePlanVariables): Promise<TripRoom> =>
       appRuntime.runPromise(
-        createPlanUseCase({
+        createPlan({
           roomId: TripIdSchema.make(roomId),
           plan,
           expectedRevision: RevisionSchema.make(expectedRevision),
@@ -51,7 +51,7 @@ export const useUpdatePlanMutation = (): UseMutationResult<
   return useMutation({
     mutationFn: ({ roomId, plan, expectedRevision }: UpdatePlanVariables): Promise<TripRoom> =>
       appRuntime.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: TripIdSchema.make(roomId),
           plan,
           expectedRevision: RevisionSchema.make(expectedRevision),
@@ -80,7 +80,7 @@ export const useDeletePlanMutation = (): UseMutationResult<
   return useMutation({
     mutationFn: ({ roomId, planId, expectedRevision }: DeletePlanVariables): Promise<TripRoom> =>
       appRuntime.runPromise(
-        deletePlanUseCase({
+        deletePlan({
           roomId: TripIdSchema.make(roomId),
           planId: PlanIdSchema.make(planId),
           expectedRevision: RevisionSchema.make(expectedRevision),
