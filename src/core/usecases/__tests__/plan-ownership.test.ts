@@ -22,9 +22,16 @@ import {
   hasResolvablePlanAuthor,
   canManagePlan,
 } from "../../domain/auth-guards.ts";
-import { NotFoundError, UnauthorizedError, ConflictError, RepositoryError } from "../../domain/errors.ts";
+import {
+  NotFoundError,
+  UnauthorizedError,
+  ConflictError,
+  RepositoryError,
+} from "../../domain/errors.ts";
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
+import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
+import { IdGenerator } from "../../ports/id-generator.ts";
 
 /**
  * 인메모리 테스트 레포지토리
@@ -109,15 +116,20 @@ const createInMemoryRepo = (
   });
 };
 
-const createSessionLayer = (session: UserSession): Layer.Layer<SessionService> =>
-  Layer.succeed(SessionService, {
-    getCurrentSession: (): Effect.Effect<UserSession, never> =>
-      Effect.succeed(session),
-    getCurrentUser: (): Effect.Effect<UserSession, UnauthorizedError> =>
-      session.isAuthenticated
-        ? Effect.succeed(session)
-        : Effect.fail(new UnauthorizedError({ reason: "로그인이 필요합니다." })),
-  });
+const createSessionLayer = (
+  session: UserSession
+): Layer.Layer<SessionService | IdGenerator> =>
+  Layer.merge(
+    Layer.succeed(SessionService, {
+      getCurrentSession: (): Effect.Effect<UserSession, never> =>
+        Effect.succeed(session),
+      getCurrentUser: (): Effect.Effect<UserSession, UnauthorizedError> =>
+        session.isAuthenticated
+          ? Effect.succeed(session)
+          : Effect.fail(new UnauthorizedError({ reason: "로그인이 필요합니다." })),
+    }),
+    IdGeneratorLive
+  );
 
 describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () => {
   const hostUser: TripMember = {
@@ -749,12 +761,15 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
     it("방 생성 시 localStorage 저장 실패 시 NotFoundError(id: storage)가 아닌 RepositoryError를 전파한다", async () => {
       const localEnv = Layer.merge(
-        LocalTripRoomRepositoryLayer,
-        createLocalSessionLayer({
-          userId: hostUser.id,
-          name: hostUser.name,
-          isAuthenticated: true,
-        })
+        Layer.merge(
+          LocalTripRoomRepositoryLayer,
+          createLocalSessionLayer({
+            userId: hostUser.id,
+            name: hostUser.name,
+            isAuthenticated: true,
+          })
+        ),
+        IdGeneratorLive
       );
 
       // setItem이 에러(용량 초과/접근 제한)를 던지도록 모킹

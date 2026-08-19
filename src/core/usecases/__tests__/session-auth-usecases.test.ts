@@ -21,6 +21,8 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "../../domain/errors.ts";
+import { IdGenerator } from "../../ports/id-generator.ts";
+import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
 
 /**
  * 테스트용 인메모리 TripRoomRepository 구현체 생성 헬퍼
@@ -45,7 +47,7 @@ const createInMemoryRepositoryLayer = (
       params: CreateRoomParams
     ): Effect.Effect<TripRoom, never> => {
       const newRoom: TripRoom = {
-        id: TripIdSchema.make(`room-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`),
+        id: params.id,
         title: params.title,
         destination: params.destination ?? "목적지",
         startDate: params.startDate ?? "2026-09-01",
@@ -285,8 +287,11 @@ const createInMemoryRepositoryLayer = (
 
 const createTestSessionLayer = (
   session: UserSession
-): Layer.Layer<SessionService> =>
-  Layer.succeed(SessionService, makeLocalSessionService(session));
+): Layer.Layer<SessionService | IdGenerator> =>
+  Layer.merge(
+    Layer.succeed(SessionService, makeLocalSessionService(session)),
+    IdGeneratorLive
+  );
 
 /**
  * 세션 저장소·인증 서버 장애를 재현하는 SessionService 구현
@@ -294,13 +299,16 @@ const createTestSessionLayer = (
  */
 const createUnavailableSessionLayer = (
   reason = "세션 저장소에 접근할 수 없습니다."
-): Layer.Layer<SessionService> =>
-  Layer.succeed(SessionService, {
-    getCurrentSession: (): Effect.Effect<UserSession, SessionUnavailableError> =>
-      Effect.fail(new SessionUnavailableError({ reason })),
-    getCurrentUser: (): Effect.Effect<UserSession, SessionUnavailableError> =>
-      Effect.fail(new SessionUnavailableError({ reason })),
-  });
+): Layer.Layer<SessionService | IdGenerator> =>
+  Layer.merge(
+    Layer.succeed(SessionService, {
+      getCurrentSession: (): Effect.Effect<UserSession, SessionUnavailableError> =>
+        Effect.fail(new SessionUnavailableError({ reason })),
+      getCurrentUser: (): Effect.Effect<UserSession, SessionUnavailableError> =>
+        Effect.fail(new SessionUnavailableError({ reason })),
+    }),
+    IdGeneratorLive
+  );
 
 describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): void => {
   const aliceUser: UserSession = {

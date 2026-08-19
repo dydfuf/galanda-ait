@@ -4,6 +4,7 @@ import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import { findTripRoom, getTripRooms } from "../get-room.ts";
 import { createTripRoom } from "../create-room.ts";
 import { LocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
+import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
 import {
   NotFoundError,
   RepositoryError,
@@ -79,7 +80,10 @@ describe("UseCases Error Propagation", () => {
         ),
     } as any);
 
-    const CombinedLayer = Layer.merge(FailingRepoLayer, LocalSessionLayer);
+    const CombinedLayer = Layer.merge(
+      Layer.merge(FailingRepoLayer, LocalSessionLayer),
+      IdGeneratorLive
+    );
 
     // 1. 유효성 검증 실패
     const invalidProgram = createTripRoom({ title: "   " }).pipe(

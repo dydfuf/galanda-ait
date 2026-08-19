@@ -1,13 +1,13 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { appRuntime } from "../../app/runtime.ts";
 import { createPlan, updatePlan, deletePlan } from "../../core/usecases/save-plan.ts";
-import { TripIdSchema, PlanIdSchema, RevisionSchema } from "../../core/domain/ids.ts";
+import { TripIdSchema, PlanIdSchema, RevisionSchema, type PlanId } from "../../core/domain/ids.ts";
 import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
 
 export interface CreatePlanVariables {
   readonly roomId: string;
-  readonly plan: TripPlan;
+  readonly plan: Omit<TripPlan, "id"> & { readonly id?: PlanId };
   readonly expectedRevision: number;
 }
 

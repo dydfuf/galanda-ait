@@ -12,7 +12,7 @@ import {
 } from "../supabase/supabase-client.ts";
 import { SupabaseSessionLayer } from "../supabase/supabase-session.ts";
 import { SupabaseTripRoomRepositoryLayer } from "../supabase/supabase-trip-room-repo.ts";
-import { LocalProfile } from "../../app/app-layer.ts";
+import { AppLayer, LocalProfile } from "../../app/app-layer.ts";
 import {
   InvalidDataBackendError,
   SupabaseConfigurationError,
@@ -125,7 +125,7 @@ describe("Infrastructure Layer Wiring & Config", () => {
       await Effect.runPromise(program.pipe(Effect.provide(LocalProfile)));
     });
 
-    it("allows running usecases with LocalProfile", async () => {
+    it("allows running usecases with AppLayer", async () => {
       const program = createTripRoom({
         title: "제주도 여행",
         destination: "제주",
@@ -134,7 +134,7 @@ describe("Infrastructure Layer Wiring & Config", () => {
       });
 
       const room = await Effect.runPromise(
-        program.pipe(Effect.provide(LocalProfile))
+        program.pipe(Effect.provide(AppLayer))
       );
 
       expect(room.title).toBe("제주도 여행");

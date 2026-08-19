@@ -240,6 +240,7 @@ export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
               const res = await client
                 .from("trip_rooms")
                 .insert({
+                  id: params.id,
                   title: params.title.trim(),
                   destination: params.destination?.trim() || "여행지",
                   start_date: params.startDate,

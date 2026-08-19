@@ -8,6 +8,7 @@ import {
   getDataBackend,
   SupabaseConfigViteLayer,
 } from "../infrastructure/config/app-config.ts";
+import { IdGeneratorLive } from "../infrastructure/id-generator.ts";
 
 export const LocalProfile = Layer.merge(
   LocalSessionLayer,
@@ -29,4 +30,7 @@ export const SupabaseProfile = SupabaseServices.pipe(
 
 const backend = getDataBackend();
 
-export const AppLayer = backend === "supabase" ? SupabaseProfile : LocalProfile;
+const BackendProfile = backend === "supabase" ? SupabaseProfile : LocalProfile;
+
+export const AppLayer = Layer.merge(BackendProfile, IdGeneratorLive);
+
