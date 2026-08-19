@@ -1,11 +1,31 @@
-import { createClient } from "@supabase/supabase-js";
+import { Context, Effect, Layer } from "effect";
+import {
+  createClient,
+  type SupabaseClient as SupabaseJsClient,
+} from "@supabase/supabase-js";
+import { SupabaseConfig } from "../config/app-config.ts";
 
-const supabaseUrl =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL) ||
-  "https://placeholder.supabase.co";
+export type { SupabaseJsClient };
 
-const supabaseAnonKey =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
-  "placeholder-anon-key";
+export class SupabaseClient extends Context.Service<
+  SupabaseClient,
+  {
+    readonly client: SupabaseJsClient;
+  }
+>()("galanda/SupabaseClient") {}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const makeSupabaseClient: Effect.Effect<
+  { readonly client: SupabaseJsClient },
+  never,
+  SupabaseConfig
+> = Effect.gen(function* () {
+  const config = yield* SupabaseConfig;
+  const client = createClient(config.url, config.anonKey);
+  return { client };
+});
+
+export const SupabaseClientLayer: Layer.Layer<
+  SupabaseClient,
+  never,
+  SupabaseConfig
+> = Layer.effect(SupabaseClient, makeSupabaseClient);

@@ -1,11 +1,14 @@
 import { Effect, Layer } from "effect";
-import { SessionService, type SessionLookupError } from "../../core/ports/session.ts";
+import {
+  SessionService,
+  type SessionLookupError,
+} from "../../core/ports/session.ts";
 import { UserIdSchema } from "../../core/domain/ids.ts";
 import {
   SessionUnavailableError,
   UnauthorizedError,
 } from "../../core/domain/errors.ts";
-import { supabase } from "./supabase-client.ts";
+import { SupabaseClient, type SupabaseJsClient } from "./supabase-client.ts";
 import type { UserSession } from "../../core/domain/room.ts";
 
 /**
@@ -13,10 +16,12 @@ import type { UserSession } from "../../core/domain/room.ts";
  * - 세션이 없으면 UnauthorizedError (비로그인)
  * - 조회 자체가 실패하면 SessionUnavailableError (네트워크·인증 서버 장애)
  */
-const fetchSupabaseUser = (): Effect.Effect<UserSession, SessionLookupError> =>
+export const fetchSupabaseUser = (
+  client: SupabaseJsClient
+): Effect.Effect<UserSession, SessionLookupError> =>
   Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
-      try: () => supabase.auth.getSession(),
+      try: () => client.auth.getSession(),
       catch: (e: unknown) =>
         new SessionUnavailableError({
           reason:
@@ -50,7 +55,18 @@ const fetchSupabaseUser = (): Effect.Effect<UserSession, SessionLookupError> =>
     return session;
   });
 
-export const SupabaseSessionLayer = Layer.succeed(SessionService, {
-  getCurrentSession: () => fetchSupabaseUser(),
-  getCurrentUser: () => fetchSupabaseUser(),
-});
+export const SupabaseSessionLayer: Layer.Layer<
+  SessionService,
+  never,
+  SupabaseClient
+> = Layer.effect(
+  SessionService,
+  Effect.gen(function* () {
+    const { client } = yield* SupabaseClient;
+
+    return {
+      getCurrentSession: () => fetchSupabaseUser(client),
+      getCurrentUser: () => fetchSupabaseUser(client),
+    };
+  })
+);
