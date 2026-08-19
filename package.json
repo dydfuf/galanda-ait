@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && ait build",
-    "lint": "oxlint",
+    "lint": "oxlint --disable-nested-config",
     "test": "vitest run",
     "preview": "vite preview",
     "deploy": "ait deploy"
