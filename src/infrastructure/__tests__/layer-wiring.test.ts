@@ -39,7 +39,7 @@ describe("Infrastructure Layer Wiring & Config", () => {
       expect(resolveDataBackend(undefined, "true")).toBe("supabase");
     });
 
-    it("defaults to 'local' when neither is set or VITE_USE_SUPABASE is 'false'", () => {
+    it("defaults to 'local' in dev/test when neither is set or VITE_USE_SUPABASE is 'false'", () => {
       expect(resolveDataBackend(undefined, "false")).toBe("local");
       expect(resolveDataBackend(undefined, undefined)).toBe("local");
       expect(resolveDataBackend("", "")).toBe("local");
@@ -48,6 +48,37 @@ describe("Infrastructure Layer Wiring & Config", () => {
     it("prioritizes VITE_DATA_BACKEND over VITE_USE_SUPABASE", () => {
       expect(resolveDataBackend("local", "true")).toBe("local");
       expect(resolveDataBackend("supabase", "false")).toBe("supabase");
+    });
+
+    it("selects 'supabase' when Supabase env variables are present even if VITE_DATA_BACKEND is missing", () => {
+      expect(
+        resolveDataBackend({
+          supabaseUrl: "https://example.supabase.co",
+        })
+      ).toBe("supabase");
+
+      expect(
+        resolveDataBackend({
+          supabaseAnonKey: "some-key",
+        })
+      ).toBe("supabase");
+    });
+
+    it("selects 'supabase' in production mode to avoid silent LocalProfile fallback", () => {
+      expect(
+        resolveDataBackend({
+          isProd: true,
+        })
+      ).toBe("supabase");
+    });
+
+    it("still allows explicit 'local' backend in production mode if explicitly requested", () => {
+      expect(
+        resolveDataBackend({
+          rawBackend: "local",
+          isProd: true,
+        })
+      ).toBe("local");
     });
   });
 
