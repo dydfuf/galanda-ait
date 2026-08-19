@@ -1,30 +1,18 @@
 import { Effect } from "effect";
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import { SessionService, requireAuthSession } from "../ports/session.ts";
+import { requireAuthSession } from "../ports/session.ts";
 import {
   requirePlanInRoom,
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
-import type {
-  ConflictError,
-  NotFoundError,
-  RepositoryError,
-  SessionUnavailableError,
-  UnauthorizedError,
-} from "../domain/errors.ts";
-import type { TripRoom } from "../domain/room.ts";
 
-export const confirmTripPlan = (
-  roomId: TripId,
-  planId: PlanId,
-  expectedRevision: Revision
-): Effect.Effect<
-  TripRoom,
-  NotFoundError | ConflictError | UnauthorizedError | SessionUnavailableError | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const confirmTripPlan = Effect.fn("confirmTripPlan")(
+  function* (
+    roomId: TripId,
+    planId: PlanId,
+    expectedRevision: Revision
+  ) {
     // 1. 인증된 세션 확인
     const session = yield* requireAuthSession(
       "여행안을 확정하려면 로그인이 필요합니다."
@@ -52,4 +40,5 @@ export const confirmTripPlan = (
 
     // 6. 확정 실행 (Revision 낙관적 락 보장)
     return yield* repo.confirmPlan(roomId, planId, expectedRevision);
-  });
+  }
+);

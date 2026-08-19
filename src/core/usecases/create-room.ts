@@ -1,14 +1,8 @@
 import { Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import { SessionService, requireAuthSession } from "../ports/session.ts";
-import {
-  ValidationError,
-  type ConflictError,
-  type RepositoryError,
-  type SessionUnavailableError,
-  type UnauthorizedError,
-} from "../domain/errors.ts";
-import type { TripMember, TripRoom } from "../domain/room.ts";
+import { requireAuthSession } from "../ports/session.ts";
+import { ValidationError } from "../domain/errors.ts";
+import type { TripMember } from "../domain/room.ts";
 
 export const CreateRoomInputSchema = Schema.Struct({
   title: Schema.NonEmptyString,
@@ -28,14 +22,8 @@ export interface CreateRoomInput {
   readonly endDate?: string;
 }
 
-export const createTripRoomUseCase = (
-  input: CreateRoomInput
-): Effect.Effect<
-  TripRoom,
-  ValidationError | ConflictError | UnauthorizedError | SessionUnavailableError | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const createTripRoom = Effect.fn("createTripRoom")(
+  function* (input: CreateRoomInput) {
     // 1. 인증 세션 확인 및 호스트 사용자 바인딩 (세션 사용자 단일 주체 강제)
     //    입력 검증보다 먼저 수행해 비로그인 사용자가 ValidationError를 먼저 받지 않도록 한다
     const session = yield* requireAuthSession(
@@ -86,4 +74,5 @@ export const createTripRoomUseCase = (
       endDate: validated.endDate,
       hostUser,
     });
-  });
+  }
+);

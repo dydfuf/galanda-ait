@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { appRuntime } from "../../app/runtime.ts";
-import { createTripRoomUseCase } from "../../core/usecases/create-room.ts";
+import { createTripRoom } from "../../core/usecases/create-room.ts";
 import type { TripRoom } from "../../core/domain/room.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
 
@@ -21,7 +21,7 @@ export const useCreateTripRoomMutation = (): UseMutationResult<
 
   return useMutation({
     mutationFn: (variables: CreateTripRoomVariables): Promise<TripRoom> =>
-      appRuntime.runPromise(createTripRoomUseCase(variables)),
+      appRuntime.runPromise(createTripRoom(variables)),
     onSuccess: (): void => {
       queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
     },

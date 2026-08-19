@@ -12,8 +12,8 @@ import {
 import type { TripMember, TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
 import { SessionService } from "../../ports/session.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
-import { createPlanUseCase, updatePlanUseCase, deletePlanUseCase } from "../save-plan.ts";
-import { createTripRoomUseCase } from "../create-room.ts";
+import { createPlan, updatePlan, deletePlan } from "../save-plan.ts";
+import { createTripRoom } from "../create-room.ts";
 import {
   isPlanAuthor,
   isPlanConfirmed,
@@ -304,7 +304,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
   });
 
   describe("2. Use Case 기반 플랜 생성 시 작성자 지정", () => {
-    it("createPlanUseCase는 세션 사용자를 작성자로 등록한다", async () => {
+    it("createPlan은 세션 사용자를 작성자로 등록한다", async () => {
       const env = Layer.merge(
         createInMemoryRepo([sampleRoom]),
         createSessionLayer(authorSession)
@@ -319,7 +319,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       };
 
       const res = await Effect.runPromise(
-        createPlanUseCase({
+        createPlan({
           roomId: sampleRoom.id,
           plan: newPlan,
           expectedRevision: sampleRoom.revision,
@@ -340,7 +340,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: sampleRoom.id,
           plan: { ...authorPlan, title: "작성자가 수정한 제목" },
           expectedRevision: sampleRoom.revision,
@@ -358,7 +358,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         createSessionLayer(hostSession)
       );
 
-      const program = updatePlanUseCase({
+      const program = updatePlan({
         roomId: sampleRoom.id,
         plan: { ...authorPlan, title: "방장이 변조하려는 제목" },
         expectedRevision: sampleRoom.revision,
@@ -389,7 +389,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         createSessionLayer(strangerSession)
       );
 
-      const program = updatePlanUseCase({
+      const program = updatePlan({
         roomId: sampleRoom.id,
         plan: { ...authorPlan, title: "타참여자가 변조하려는 제목" },
         expectedRevision: sampleRoom.revision,
@@ -422,7 +422,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: sampleRoom.id,
             plan: authorPlan,
             expectedRevision: sampleRoom.revision,
@@ -442,7 +442,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: sampleRoom.id,
             plan: { ...authorPlan, id: PlanIdSchema.make("non-existent-plan") },
             expectedRevision: sampleRoom.revision,
@@ -473,7 +473,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithOrphan.id,
           plan: { ...orphanPlan, title: "방장이 수정한 레거시 플랜" },
           expectedRevision: roomWithOrphan.revision,
@@ -493,7 +493,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        deletePlanUseCase({
+        deletePlan({
           roomId: sampleRoom.id,
           planId: authorPlan.id,
           expectedRevision: sampleRoom.revision,
@@ -512,7 +512,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: sampleRoom.id,
             planId: authorPlan.id,
             expectedRevision: sampleRoom.revision,
@@ -541,7 +541,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: sampleRoom.id,
             planId: authorPlan.id,
             expectedRevision: sampleRoom.revision,
@@ -570,7 +570,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: sampleRoom.id,
             planId: authorPlan.id,
             expectedRevision: sampleRoom.revision,
@@ -590,7 +590,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: sampleRoom.id,
             planId: PlanIdSchema.make("non-existent-plan"),
             expectedRevision: sampleRoom.revision,
@@ -621,7 +621,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        deletePlanUseCase({
+        deletePlan({
           roomId: roomWithOrphan.id,
           planId: orphanPlan.id,
           expectedRevision: roomWithOrphan.revision,
@@ -669,7 +669,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       // 2. 작성자가 수정 수행
       const updatedRoom = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: sampleRoom.id,
           plan: { ...authorPlan, title: "로컬에서 작성자가 수정한 제목" },
           expectedRevision: sampleRoom.revision,
@@ -692,7 +692,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: sampleRoom.id,
             plan: { ...authorPlan, title: "이방인이 로컬 수정 시도" },
             expectedRevision: updatedRoom.revision,
@@ -705,7 +705,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       // 4. 작성자가 삭제 수행
       const afterDelete = await Effect.runPromise(
-        deletePlanUseCase({
+        deletePlan({
           roomId: sampleRoom.id,
           planId: authorPlan.id,
           expectedRevision: updatedRoom.revision,
@@ -735,7 +735,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: sampleRoom.id,
             plan: { ...authorPlan, title: "스토리지 오류 시도" },
             expectedRevision: sampleRoom.revision,
@@ -764,7 +764,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          createTripRoomUseCase({
+          createTripRoom({
             title: "신규 방 생성 시도",
           }).pipe(Effect.provide(localEnv))
         );
@@ -832,7 +832,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithOpinions.id,
           plan: {
             ...opinionsPlan,
@@ -857,7 +857,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithOpinions.id,
           plan: { ...opinionsPlan, status: "CONFIRMED" },
           expectedRevision: roomWithOpinions.revision,
@@ -876,7 +876,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithOpinions.id,
           plan: { ...opinionsPlan, clonedFromPlanId: hostPlan.id },
           expectedRevision: roomWithOpinions.revision,
@@ -894,7 +894,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const res = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithOpinions.id,
           plan: {
             ...opinionsPlan,
@@ -922,7 +922,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: roomWithConfirmed.id,
             plan: { ...confirmedPlan, title: "확정본을 바꾸려는 제목" },
             expectedRevision: roomWithConfirmed.revision,
@@ -950,7 +950,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       try {
         await Effect.runPromise(
-          deletePlanUseCase({
+          deletePlan({
             roomId: roomWithConfirmed.id,
             planId: confirmedPlan.id,
             expectedRevision: roomWithConfirmed.revision,
@@ -988,12 +988,12 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       for (const program of [
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithStaleStatus.id,
           plan: { ...staleStatusPlan, title: "확정본을 바꾸려는 제목" },
           expectedRevision: roomWithStaleStatus.revision,
         }),
-        deletePlanUseCase({
+        deletePlan({
           roomId: roomWithStaleStatus.id,
           planId: staleStatusPlan.id,
           expectedRevision: roomWithStaleStatus.revision,
@@ -1034,7 +1034,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       );
 
       const updated = await Effect.runPromise(
-        updatePlanUseCase({
+        updatePlan({
           roomId: roomWithOpinions.id,
           plan: { ...opinionsPlan, title: "미확정 여행안 수정" },
           expectedRevision: roomWithOpinions.revision,
@@ -1045,7 +1045,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       ).toBe("미확정 여행안 수정");
 
       const afterDelete = await Effect.runPromise(
-        deletePlanUseCase({
+        deletePlan({
           roomId: roomWithOpinions.id,
           planId: opinionsPlan.id,
           expectedRevision: updated.revision,
@@ -1091,7 +1091,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
         try {
           await Effect.runPromise(
-            updatePlanUseCase({
+            updatePlan({
               roomId: roomWithConfirmed.id,
               plan: { ...confirmedPlan, title: "로컬에서 확정본 수정 시도" },
               expectedRevision: roomWithConfirmed.revision,
@@ -1104,7 +1104,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
         try {
           await Effect.runPromise(
-            deletePlanUseCase({
+            deletePlan({
               roomId: roomWithConfirmed.id,
               planId: confirmedPlan.id,
               expectedRevision: roomWithConfirmed.revision,
@@ -1137,7 +1137,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
 
         const res = await Effect.runPromise(
-          updatePlanUseCase({
+          updatePlan({
             roomId: roomWithOpinions.id,
             plan: {
               ...opinionsPlan,

@@ -1,16 +1,8 @@
 import { Effect } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import { SessionService, requireAuthSession } from "../ports/session.ts";
+import { requireAuthSession } from "../ports/session.ts";
 import type { TripId } from "../domain/ids.ts";
-import type { TripMember, TripRoom } from "../domain/room.ts";
-import type {
-  ConflictError,
-  NotFoundError,
-  RepositoryError,
-  SessionUnavailableError,
-  UnauthorizedError,
-  ValidationError,
-} from "../domain/errors.ts";
+import type { TripMember } from "../domain/room.ts";
 
 /**
  * 방 참여 입력
@@ -20,19 +12,8 @@ export interface JoinRoomInput {
   readonly roomId: TripId;
 }
 
-export const joinTripRoomUseCase = (
-  input: JoinRoomInput
-): Effect.Effect<
-  TripRoom,
-  | NotFoundError
-  | ConflictError
-  | ValidationError
-  | UnauthorizedError
-  | SessionUnavailableError
-  | RepositoryError,
-  TripRoomRepository | SessionService
-> =>
-  Effect.gen(function* () {
+export const joinTripRoom = Effect.fn("joinTripRoom")(
+  function* (input: JoinRoomInput) {
     // 1. 인증된 세션 확인 (세션 사용자 단일 주체 강제)
     const session = yield* requireAuthSession(
       "방에 참여하려면 로그인이 필요합니다."
@@ -55,4 +36,5 @@ export const joinTripRoomUseCase = (
     };
 
     return yield* repo.joinRoom(input.roomId, member);
-  });
+  }
+);

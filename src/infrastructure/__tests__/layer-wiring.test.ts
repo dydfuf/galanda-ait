@@ -17,7 +17,7 @@ import {
   InvalidDataBackendError,
   SupabaseConfigurationError,
 } from "../errors.ts";
-import { createTripRoomUseCase } from "../../core/usecases/create-room.ts";
+import { createTripRoom } from "../../core/usecases/create-room.ts";
 
 describe("Infrastructure Layer Wiring & Config", () => {
   describe("Backend Selection (resolveDataBackend)", () => {
@@ -126,7 +126,7 @@ describe("Infrastructure Layer Wiring & Config", () => {
     });
 
     it("allows running usecases with LocalProfile", async () => {
-      const program = createTripRoomUseCase({
+      const program = createTripRoom({
         title: "제주도 여행",
         destination: "제주",
         startDate: "2026-09-01",
