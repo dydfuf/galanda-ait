@@ -58,10 +58,40 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * 시트를 닫은 뒤 원래 버튼으로 포커스를 되돌릴 때, 재시도를 포기하는 시간이에요.
- * 저장 중에는 시트를 연 버튼이 잠시 `disabled`가 되어 `focus()`가 무시되기 때문에 기다려요.
+ * 시트를 닫은 뒤 원래 버튼으로 포커스를 되돌려요.
+ *
+ * 의견을 저장하면 시트가 닫히는 것과 동시에 시트를 연 CTA가 저장 중 상태로 비활성화돼서,
+ * 그 시점의 `focus()`는 무시돼요. 저장이 얼마나 걸릴지 알 수 없으므로 시간을 재며 재시도하는 대신,
+ * `disabled`가 풀리는 순간을 관찰해 그때 포커스를 되돌려요.
+ *
+ * 트리거가 사라졌거나 사용자가 이미 다른 요소로 이동했다면 포커스를 건드리지 않아요.
+ *
+ * @returns 관찰을 멈추는 함수
  */
-const FOCUS_RESTORE_TIMEOUT_MS = 2000;
+function restoreFocusWhenPossible(trigger: HTMLElement): () => void {
+  /** @returns 더 기다릴 필요가 없으면 `true` */
+  const tryFocus = (): boolean => {
+    const active = document.activeElement;
+    if (!trigger.isConnected) return true;
+    if (active != null && active !== document.body) return true;
+
+    trigger.focus();
+    return document.activeElement === trigger;
+  };
+
+  if (tryFocus()) {
+    return () => {};
+  }
+
+  const observer = new MutationObserver(() => {
+    if (tryFocus()) {
+      observer.disconnect();
+    }
+  });
+  observer.observe(trigger, { attributes: true, attributeFilter: ["disabled"] });
+
+  return () => observer.disconnect();
+}
 
 const backdropContainerStyle = css`
   position: fixed;
@@ -228,7 +258,7 @@ export function OpinionBottomSheet({
   const [reason, setReason] = useState<string>(initialReason);
   const sheetRef = useRef<HTMLDivElement>(null);
   const lastFocusedElementRef = useRef<HTMLElement | null>(null);
-  const restoreFrameRef = useRef<number | null>(null);
+  const stopFocusRestoreRef = useRef<(() => void) | null>(null);
 
   // 시트를 열 때마다 현재 저장된 의견을 기준으로 다시 시작해요.
   useEffect(() => {
@@ -241,6 +271,10 @@ export function OpinionBottomSheet({
   useEffect(() => {
     if (!isOpen) return;
 
+    // 이전에 닫으면서 시작한 포커스 복귀 관찰이 남아 있으면 정리해요.
+    stopFocusRestoreRef.current?.();
+    stopFocusRestoreRef.current = null;
+
     lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
     const firstFocusable = sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
     firstFocusable?.focus();
@@ -249,32 +283,14 @@ export function OpinionBottomSheet({
       const trigger = lastFocusedElementRef.current;
       if (trigger == null) return;
 
-      // 의견을 저장하면 시트가 닫히는 동시에 시트를 연 CTA가 저장 중 상태로 잠깐 비활성화돼요.
-      // 이때 focus()는 무시되므로, 버튼이 다시 활성화될 때까지 짧게 재시도해요.
-      // 그 사이 사용자가 다른 요소로 이동했다면 포커스를 빼앗지 않고 멈춰요.
-      const deadline = performance.now() + FOCUS_RESTORE_TIMEOUT_MS;
-
-      const restoreFocus = () => {
-        const active = document.activeElement;
-        const focusIsUnset = active == null || active === document.body;
-        if (!trigger.isConnected || !focusIsUnset) return;
-
-        trigger.focus();
-        if (document.activeElement === trigger || performance.now() > deadline) return;
-
-        restoreFrameRef.current = requestAnimationFrame(restoreFocus);
-      };
-
-      restoreFocus();
+      stopFocusRestoreRef.current = restoreFocusWhenPossible(trigger);
     };
   }, [isOpen]);
 
-  // 포커스 복귀 재시도가 남아 있는 채로 언마운트되지 않게 정리해요.
+  // 포커스 복귀 관찰이 남아 있는 채로 언마운트되지 않게 정리해요.
   useEffect(
     () => () => {
-      if (restoreFrameRef.current != null) {
-        cancelAnimationFrame(restoreFrameRef.current);
-      }
+      stopFocusRestoreRef.current?.();
     },
     []
   );
