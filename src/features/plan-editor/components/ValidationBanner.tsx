@@ -5,10 +5,10 @@ const bannerStyle = css`
   border: 1px solid var(--adaptiveRed200, #fecdd3);
   border-radius: 12px;
   padding: 12px 16px;
-  margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
+  text-align: left;
 `;
 
 const textStyle = css`
@@ -27,10 +27,11 @@ export function ValidationBanner({ firstError, errorCount }: ValidationBannerPro
   if (!firstError) return null;
 
   return (
-    <div css={bannerStyle}>
+    <span css={bannerStyle} role="alert">
       <span css={textStyle}>
-        ⚠️ {firstError} {errorCount > 1 && `(외 ${errorCount - 1}건)`}
+        <span aria-hidden="true">⚠️ </span>
+        {firstError} {errorCount > 1 && `(외 ${errorCount - 1}건)`}
       </span>
-    </div>
+    </span>
   );
 }

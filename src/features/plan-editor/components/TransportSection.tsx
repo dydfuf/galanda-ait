@@ -156,6 +156,7 @@ export function TransportSection({
                 <button
                   type="button"
                   css={removeBtnStyle}
+                  aria-label={`${idx + 1}번째 이동 구간 삭제`}
                   onClick={() => onRemove(trans.id)}
                 >
                   삭제
@@ -165,8 +166,11 @@ export function TransportSection({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <span css={fieldLabelStyle}>출발지</span>
+                <label css={fieldLabelStyle} htmlFor={`${trans.id}-from-city`}>
+                  출발지
+                </label>
                 <input
+                  id={`${trans.id}-from-city`}
                   type="text"
                   placeholder="예: 공항 / 제주시"
                   value={trans.fromCity}
@@ -175,8 +179,11 @@ export function TransportSection({
                 />
               </div>
               <div>
-                <span css={fieldLabelStyle}>도착지</span>
+                <label css={fieldLabelStyle} htmlFor={`${trans.id}-to-city`}>
+                  도착지
+                </label>
                 <input
+                  id={`${trans.id}-to-city`}
                   type="text"
                   placeholder="예: 서귀포시"
                   value={trans.toCity}
@@ -188,8 +195,11 @@ export function TransportSection({
 
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 8 }}>
               <div>
-                <span css={fieldLabelStyle}>교통수단</span>
+                <label css={fieldLabelStyle} htmlFor={`${trans.id}-mode`}>
+                  교통수단
+                </label>
                 <input
+                  id={`${trans.id}-mode`}
                   type="text"
                   placeholder="예: 렌터카 카니발 / KTX"
                   value={trans.mode}
@@ -198,8 +208,11 @@ export function TransportSection({
                 />
               </div>
               <div>
-                <span css={fieldLabelStyle}>예상 소요시간</span>
+                <label css={fieldLabelStyle} htmlFor={`${trans.id}-duration`}>
+                  예상 소요시간
+                </label>
                 <input
+                  id={`${trans.id}-duration`}
                   type="text"
                   placeholder="예: 약 50분"
                   value={trans.durationText}
@@ -220,8 +233,11 @@ export function TransportSection({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <span css={fieldLabelStyle}>예상 그룹 금액(원)</span>
+                <label css={fieldLabelStyle} htmlFor={`${trans.id}-price`}>
+                  예상 그룹 금액(원)
+                </label>
                 <input
+                  id={`${trans.id}-price`}
                   type="number"
                   placeholder="0"
                   step="10000"
@@ -234,8 +250,11 @@ export function TransportSection({
                 />
               </div>
               <div>
-                <span css={fieldLabelStyle}>예약 상태</span>
+                <label css={fieldLabelStyle} htmlFor={`${trans.id}-booking-status`}>
+                  예약 상태
+                </label>
                 <select
+                  id={`${trans.id}-booking-status`}
                   value={trans.bookingStatus}
                   onChange={(e) => onUpdate(trans.id, { bookingStatus: e.target.value as BookingStatus })}
                   css={selectStyle}

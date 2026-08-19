@@ -1,42 +1,29 @@
 import { useState, useRef, useEffect } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { FixedBottomCTA, TopNavigation, TopNavigationBackButton } from "@toss/tds-mobile";
 import { useNavigate } from "react-router-dom";
 import { useAppNavigation } from "../../hooks/useAppNavigation.ts";
 import { useCreateTripRoomMutation } from "./mutations.ts";
 import { toUserMessage } from "../common/error-message.ts";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
+
+const screenStyle = css`
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+`;
 
 const pageContainerStyle = css`
-  padding: max(16px, env(safe-area-inset-top, 16px)) 20px calc(48px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 20px 24px;
   max-width: 600px;
+  width: 100%;
   margin: 0 auto;
-  min-height: 100vh;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-`;
-
-const backRowStyle = css`
-  margin-bottom: 16px;
-`;
-
-const backButtonStyle = css`
-  background: none;
-  border: none;
-  padding: 6px 0;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--adaptiveGrey800, #333d4b);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 8px;
-  transition: opacity 0.15s ease;
-
-  &:active {
-    opacity: 0.7;
-  }
+  flex: 1;
 `;
 
 const pageHeaderStyle = css`
@@ -127,11 +114,6 @@ const errorMessageStyle = css`
   text-align: center;
 `;
 
-const bottomCTAWrapperStyle = css`
-  margin-top: auto;
-  padding-top: 24px;
-`;
-
 const MAX_TITLE_LENGTH = 30;
 
 export function TripCreatePage() {
@@ -151,8 +133,7 @@ export function TripCreatePage() {
   const isValid = trimmedTitle.length >= 1 && trimmedTitle.length <= MAX_TITLE_LENGTH;
   const isCloseToLimit = title.length >= 25;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!isValid || createRoomMutation.isPending) return;
 
     setErrorMsg(null);
@@ -169,65 +150,74 @@ export function TripCreatePage() {
   };
 
   return (
-    <div css={pageContainerStyle}>
-      <div css={backRowStyle}>
-        <button type="button" onClick={goBack} css={backButtonStyle}>
-          ← 뒤로가기
-        </button>
+    <div css={screenStyle}>
+      <TopNavigation leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />} />
+
+      <div css={pageContainerStyle}>
+        <header css={pageHeaderStyle}>
+          <h1 css={pageTitleStyle}>
+            어떤 여행을 계획하고 있나요?
+          </h1>
+          <p css={pageSubtitleStyle}>
+            먼저 여행 이름만 정해주세요. 날짜와 도시는 여행안을 만들며 함께 정할 수 있어요.
+          </p>
+        </header>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleSubmit();
+          }}
+          css={formStyle}
+        >
+          <div css={inputCardStyle}>
+            <label css={fieldLabelStyle} htmlFor="trip-title">
+              <span>여행 이름 *</span>
+              {isCloseToLimit && (
+                <span css={title.length > MAX_TITLE_LENGTH ? countWarningStyle : countStyle}>
+                  {title.length}/{MAX_TITLE_LENGTH}
+                </span>
+              )}
+            </label>
+
+            <input
+              id="trip-title"
+              ref={inputRef}
+              type="text"
+              placeholder="예: 일본 여행, 2026 제주 힐링"
+              value={title}
+              maxLength={MAX_TITLE_LENGTH}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (errorMsg) setErrorMsg(null);
+              }}
+              css={textInputStyle}
+              aria-describedby="trip-title-help"
+              required
+            />
+
+            <p css={helperTextStyle} id="trip-title-help">
+              <span aria-hidden="true">💡 </span>
+              여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.
+            </p>
+          </div>
+
+          {errorMsg && (
+            <p css={errorMessageStyle} role="alert">
+              {errorMsg}
+            </p>
+          )}
+        </form>
       </div>
 
-      <header css={pageHeaderStyle}>
-        <h1 css={pageTitleStyle}>
-          어떤 여행을 계획하고 있나요?
-        </h1>
-        <p css={pageSubtitleStyle}>
-          먼저 여행 이름만 정해주세요. 날짜와 도시는 여행안을 만들며 함께 정할 수 있어요.
-        </p>
-      </header>
-
-      <form onSubmit={handleSubmit} css={formStyle}>
-        <div css={inputCardStyle}>
-          <label css={fieldLabelStyle}>
-            <span>여행 이름 *</span>
-            {isCloseToLimit && (
-              <span css={title.length > MAX_TITLE_LENGTH ? countWarningStyle : countStyle}>
-                {title.length}/{MAX_TITLE_LENGTH}
-              </span>
-            )}
-          </label>
-
-          <input
-            ref={inputRef}
-            type="text"
-            placeholder="예: 일본 여행, 2026 제주 힐링"
-            value={title}
-            maxLength={MAX_TITLE_LENGTH}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              if (errorMsg) setErrorMsg(null);
-            }}
-            css={textInputStyle}
-            required
-          />
-
-          <p css={helperTextStyle}>
-            💡 여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.
-          </p>
-        </div>
-
-        {errorMsg && <p css={errorMessageStyle}>{errorMsg}</p>}
-
-        <div css={bottomCTAWrapperStyle}>
-          <Button
-            display="block"
-            size="large"
-            type="submit"
-            disabled={!isValid || createRoomMutation.isPending}
-          >
-            {createRoomMutation.isPending ? "여행방 만드는 중..." : "여행 만들기"}
-          </Button>
-        </div>
-      </form>
+      {/* 화면 하단 고정 CTA: 입력 중 키보드가 올라와도 가려지지 않아요. */}
+      <FixedBottomCTA
+        containerStyle={fixedCtaContainerStyle}
+        disabled={!isValid || createRoomMutation.isPending}
+        onClick={() => void handleSubmit()}
+      >
+        {createRoomMutation.isPending ? "여행방 만드는 중..." : "여행 만들기"}
+      </FixedBottomCTA>
     </div>
   );
 }

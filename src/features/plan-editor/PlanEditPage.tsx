@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { CTAButton, FixedBottomCTA } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
@@ -8,6 +8,7 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { toUserMessage } from "../common/error-message.ts";
 import { canManagePlan } from "../../core/domain/auth-guards.ts";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
@@ -21,9 +22,12 @@ import { useUpdatePlanMutation, useDeletePlanMutation } from "./mutations.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
 
 const pageContainerStyle = css`
-  padding: 16px 20px calc(48px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px 24px;
   max-width: 640px;
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
+  box-sizing: border-box;
 `;
 
 const loadingContainerStyle = css`
@@ -31,16 +35,6 @@ const loadingContainerStyle = css`
   text-align: center;
   color: var(--adaptiveGrey600, #6b7684);
   font-size: 15px;
-`;
-
-const bottomCTAWrapperStyle = css`
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--adaptiveBackground, #ffffff) 20%);
-  padding: 16px 0 env(safe-area-inset-bottom, 0px);
-  margin-top: 16px;
 `;
 
 export function PlanEditPage(): JSX.Element {
@@ -160,8 +154,7 @@ export function PlanEditPage(): JSX.Element {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault();
+  const handleSubmit = async (): Promise<void> => {
     if (!validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -216,7 +209,12 @@ export function PlanEditPage(): JSX.Element {
         onClearDraft={clearDraft}
       />
 
-      <form onSubmit={handleSubmit}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSubmit();
+        }}
+      >
         <BasicInfoSection
           title={title}
           onTitleChange={setTitle}
@@ -252,35 +250,38 @@ export function PlanEditPage(): JSX.Element {
 
         <CostSummarySection costSummary={costSummary} />
 
-        <div css={bottomCTAWrapperStyle}>
-          <ValidationBanner
-            firstError={validation.firstError}
-            errorCount={validation.errorCount}
-          />
-          <div style={{ display: "flex", gap: "8px" }}>
-            <Button
-              display="block"
-              size="large"
-              type="button"
-              color="danger"
-              style={{ flex: 1 }}
-              onClick={handleDelete}
-              disabled={isSubmitting}
-            >
-              삭제하기
-            </Button>
-            <Button
-              display="block"
-              size="large"
-              type="submit"
-              style={{ flex: 2 }}
-              disabled={!validation.isValid || isSubmitting}
-            >
-              {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
-            </Button>
-          </div>
-        </div>
       </form>
+
+      {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
+      <FixedBottomCTA.Double
+        containerStyle={fixedCtaContainerStyle}
+        topAccessory={
+          validation.firstError ? (
+            <ValidationBanner
+              firstError={validation.firstError}
+              errorCount={validation.errorCount}
+            />
+          ) : undefined
+        }
+        leftButton={
+          <CTAButton
+            color="danger"
+            variant="weak"
+            disabled={isSubmitting}
+            onClick={() => void handleDelete()}
+          >
+            삭제하기
+          </CTAButton>
+        }
+        rightButton={
+          <CTAButton
+            disabled={!validation.isValid || isSubmitting}
+            onClick={() => void handleSubmit()}
+          >
+            {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
+          </CTAButton>
+        }
+      />
     </div>
   );
 }
