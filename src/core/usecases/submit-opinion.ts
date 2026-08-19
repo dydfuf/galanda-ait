@@ -11,6 +11,7 @@ import {
   ValidationError,
   type ConflictError,
   type NotFoundError,
+  type RepositoryError,
   type SessionUnavailableError,
   type UnauthorizedError,
 } from "../domain/errors.ts";
@@ -37,7 +38,8 @@ export const submitPlanOpinionUseCase = (
   | ConflictError
   | ValidationError
   | UnauthorizedError
-  | SessionUnavailableError,
+  | SessionUnavailableError
+  | RepositoryError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {

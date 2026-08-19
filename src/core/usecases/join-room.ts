@@ -6,6 +6,7 @@ import type { TripMember, TripRoom } from "../domain/room.ts";
 import type {
   ConflictError,
   NotFoundError,
+  RepositoryError,
   SessionUnavailableError,
   UnauthorizedError,
   ValidationError,
@@ -27,7 +28,8 @@ export const joinTripRoomUseCase = (
   | ConflictError
   | ValidationError
   | UnauthorizedError
-  | SessionUnavailableError,
+  | SessionUnavailableError
+  | RepositoryError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {

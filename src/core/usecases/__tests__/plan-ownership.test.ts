@@ -22,7 +22,7 @@ import {
   hasResolvablePlanAuthor,
   canManagePlan,
 } from "../../domain/auth-guards.ts";
-import { NotFoundError, UnauthorizedError, ConflictError } from "../../domain/errors.ts";
+import { NotFoundError, UnauthorizedError, ConflictError, RepositoryError } from "../../domain/errors.ts";
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
 
@@ -743,11 +743,11 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail when localStorage fails");
       } catch (err) {
-        expect(err).toBeInstanceOf(ConflictError);
+        expect(err).toBeInstanceOf(RepositoryError);
       }
     });
 
-    it("방 생성 시 localStorage 저장 실패 시 NotFoundError(id: storage)가 아닌 ConflictError를 전파한다", async () => {
+    it("방 생성 시 localStorage 저장 실패 시 NotFoundError(id: storage)가 아닌 RepositoryError를 전파한다", async () => {
       const localEnv = Layer.merge(
         LocalTripRoomRepositoryLayer,
         createLocalSessionLayer({
@@ -770,8 +770,8 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail when localStorage fails on room creation");
       } catch (err) {
-        expect(err).toBeInstanceOf(ConflictError);
-        expect((err as ConflictError).message).toContain("QuotaExceededError: storage is full");
+        expect(err).toBeInstanceOf(RepositoryError);
+        expect((err as RepositoryError).message).toContain("QuotaExceededError: storage is full");
       }
     });
   });

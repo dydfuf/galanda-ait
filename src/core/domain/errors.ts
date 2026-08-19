@@ -31,7 +31,6 @@ export class ValidationError extends Schema.TaggedError<ValidationError>()(
   }
 ) {}
 
-
 /**
  * 세션 저장소·인증 서버에 접근하지 못해 현재 사용자를 판별할 수 없는 상태
  * - "로그인하지 않음"(UnauthorizedError)과 구분하기 위한 별도 오류
@@ -43,3 +42,12 @@ export class SessionUnavailableError extends Schema.TaggedError<SessionUnavailab
     reason: Schema.String,
   }
 ) {}
+
+export class RepositoryError extends Schema.TaggedError<RepositoryError>()(
+  "RepositoryError",
+  {
+    operation: Schema.String,
+    message: Schema.String,
+  }
+) {}
+

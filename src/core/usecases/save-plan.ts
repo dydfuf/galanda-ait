@@ -14,6 +14,7 @@ import {
   ValidationError,
   type ConflictError,
   type NotFoundError,
+  type RepositoryError,
   type SessionUnavailableError,
   type UnauthorizedError,
 } from "../domain/errors.ts";
@@ -32,7 +33,8 @@ export const createPlanUseCase = (
   | ConflictError
   | ValidationError
   | UnauthorizedError
-  | SessionUnavailableError,
+  | SessionUnavailableError
+  | RepositoryError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
@@ -108,7 +110,8 @@ export const updatePlanUseCase = (
   | ConflictError
   | ValidationError
   | UnauthorizedError
-  | SessionUnavailableError,
+  | SessionUnavailableError
+  | RepositoryError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
@@ -222,7 +225,8 @@ export const deletePlanUseCase = (
   | ConflictError
   | ValidationError
   | UnauthorizedError
-  | SessionUnavailableError,
+  | SessionUnavailableError
+  | RepositoryError,
   TripRoomRepository | SessionService
 > =>
   Effect.gen(function* () {
