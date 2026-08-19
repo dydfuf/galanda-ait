@@ -19,6 +19,29 @@ import type {
   TripRoom,
 } from "../../core/domain/room.ts";
 
+const fetchActualRevision = (
+  client: SupabaseJsClient,
+  roomId: TripId,
+  fallbackRevision: Revision
+): Effect.Effect<Revision> =>
+  Effect.promise(async () => {
+    try {
+      if (typeof client.from === "function") {
+        const res = await client
+          .from("trip_rooms")
+          .select("revision")
+          .eq("id", roomId)
+          .maybeSingle();
+        if (res.data && typeof res.data.revision === "number") {
+          return RevisionSchema.make(res.data.revision);
+        }
+      }
+    } catch {
+      // fallback if query fails
+    }
+    return fallbackRevision;
+  });
+
 const callRpcRoomMutation = (
   client: SupabaseJsClient,
   rpcName: string,
@@ -44,11 +67,17 @@ const callRpcRoomMutation = (
         result.error.code === "P0001" ||
         result.error.message.toLowerCase().includes("conflict")
       ) {
+        const actualRevision = yield* fetchActualRevision(
+          client,
+          roomId,
+          expectedRevision
+        );
+
         return yield* Effect.fail(
           new ConflictError({
             message: result.error.message,
             expectedRevision,
-            actualRevision: expectedRevision,
+            actualRevision,
           })
         );
       }
