@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { closeView } from "@apps-in-toss/web-framework";
+import { Screen } from "@apps-in-toss/web-framework";
 import { useCallback, useEffect } from "react";
 
 // 세션 내에서 라우트 이동이 있었는지 추적하기 위한 counter
@@ -20,7 +20,7 @@ export function useAppNavigation() {
     } else {
       // 직접 딥링크 진입 등으로 이전 라우트가 없는 경우 미니앱 닫기
       try {
-        closeView();
+        Screen.close();
       } catch {
         // 웹 브라우저 환경 등 fallback
         navigate("/trips", { replace: true });
