@@ -22,24 +22,53 @@ import type {
 const fetchActualRevision = (
   client: SupabaseJsClient,
   roomId: TripId,
-  fallbackRevision: Revision
-): Effect.Effect<Revision> =>
-  Effect.promise(async () => {
-    try {
-      if (typeof client.from === "function") {
+  rpcName: string
+): Effect.Effect<Revision, NotFoundError | RepositoryError> =>
+  Effect.gen(function* () {
+    const result = yield* Effect.tryPromise({
+      try: async () => {
         const res = await client
           .from("trip_rooms")
           .select("revision")
           .eq("id", roomId)
           .maybeSingle();
-        if (res.data && typeof res.data.revision === "number") {
-          return RevisionSchema.make(res.data.revision);
-        }
-      }
-    } catch {
-      // fallback if query fails
+        return res;
+      },
+      catch: (cause) =>
+        new RepositoryError({
+          operation: `${rpcName}.fetchActualRevision`,
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "최신 revision을 조회하지 못했습니다.",
+        }),
+    });
+
+    if (result.error) {
+      return yield* Effect.fail(
+        new RepositoryError({
+          operation: `${rpcName}.fetchActualRevision`,
+          message: result.error.message,
+        })
+      );
     }
-    return fallbackRevision;
+
+    if (!result.data) {
+      return yield* Effect.fail(
+        new NotFoundError({ entity: "TripRoom", id: roomId })
+      );
+    }
+
+    if (typeof result.data.revision !== "number") {
+      return yield* Effect.fail(
+        new RepositoryError({
+          operation: `${rpcName}.fetchActualRevision.decode`,
+          message: "저장된 revision 형식이 올바르지 않습니다.",
+        })
+      );
+    }
+
+    return RevisionSchema.make(result.data.revision);
   });
 
 const callRpcRoomMutation = (
@@ -70,7 +99,7 @@ const callRpcRoomMutation = (
         const actualRevision = yield* fetchActualRevision(
           client,
           roomId,
-          expectedRevision
+          rpcName
         );
 
         return yield* Effect.fail(

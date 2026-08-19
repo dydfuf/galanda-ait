@@ -171,6 +171,16 @@ describe("SupabaseTripRoomRepository", () => {
         data: null,
         error: { code: "P0001", message: "conflict revision mismatch" },
       }),
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { revision: 2 },
+              error: null,
+            }),
+          }),
+        }),
+      }),
     };
 
     const MockClientLayer = Layer.succeed(SupabaseClient, {
@@ -294,6 +304,141 @@ describe("SupabaseTripRoomRepository", () => {
       expect(err._tag).toBe("ConflictError");
       expect(err.expectedRevision).toBe(2);
       expect(err.actualRevision).toBe(5);
+    }
+  });
+
+  it("9. RPC 충돌 후 최신 revision 조회 실패 시 RepositoryError로 실패한다", async () => {
+    const mockClient = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "P0001", message: "conflict revision mismatch" },
+      }),
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: null,
+              error: { message: "Failed to fetch revision" },
+            }),
+          }),
+        }),
+      }),
+    };
+
+    const MockClientLayer = Layer.succeed(SupabaseClient, {
+      client: mockClient as any,
+    });
+
+    const program = Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      return yield* repo.updateRoom(
+        TripIdSchema.make("room-1"),
+        { title: "새 제목" },
+        RevisionSchema.make(1)
+      );
+    }).pipe(
+      Effect.provide(
+        SupabaseTripRoomRepositoryLayer.pipe(Layer.provide(MockClientLayer))
+      )
+    );
+
+    const exit = await Effect.runPromiseExit(program);
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const err = exit.cause;
+      expect(JSON.stringify(err)).toContain("RepositoryError");
+      expect(JSON.stringify(err)).not.toContain("ConflictError");
+    }
+  });
+
+  it("10. RPC 충돌 후 방이 DB에 존재하지 않으면 NotFoundError로 실패한다", async () => {
+    const mockClient = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "P0001", message: "conflict revision mismatch" },
+      }),
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: null,
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    };
+
+    const MockClientLayer = Layer.succeed(SupabaseClient, {
+      client: mockClient as any,
+    });
+
+    const program = Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      return yield* repo.updateRoom(
+        TripIdSchema.make("room-1"),
+        { title: "새 제목" },
+        RevisionSchema.make(1)
+      );
+    }).pipe(
+      Effect.provide(
+        SupabaseTripRoomRepositoryLayer.pipe(Layer.provide(MockClientLayer))
+      )
+    );
+
+    const exit = await Effect.runPromiseExit(program);
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const err = exit.cause;
+      expect(JSON.stringify(err)).toContain("NotFoundError");
+      expect(JSON.stringify(err)).not.toContain("ConflictError");
+    }
+  });
+
+  it("11. RPC 충돌 후 조회된 revision이 숫자가 아니면 RepositoryError로 실패한다", async () => {
+    const mockClient = {
+      rpc: vi.fn().mockResolvedValue({
+        data: null,
+        error: { code: "P0001", message: "conflict revision mismatch" },
+      }),
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { revision: "invalid-number" },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    };
+
+    const MockClientLayer = Layer.succeed(SupabaseClient, {
+      client: mockClient as any,
+    });
+
+    const program = Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      return yield* repo.updateRoom(
+        TripIdSchema.make("room-1"),
+        { title: "새 제목" },
+        RevisionSchema.make(1)
+      );
+    }).pipe(
+      Effect.provide(
+        SupabaseTripRoomRepositoryLayer.pipe(Layer.provide(MockClientLayer))
+      )
+    );
+
+    const exit = await Effect.runPromiseExit(program);
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (Exit.isFailure(exit)) {
+      const err = exit.cause;
+      expect(JSON.stringify(err)).toContain("RepositoryError");
+      expect(JSON.stringify(err)).not.toContain("ConflictError");
     }
   });
 });
