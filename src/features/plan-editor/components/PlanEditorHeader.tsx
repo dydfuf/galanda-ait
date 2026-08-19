@@ -4,6 +4,9 @@ const headerStyle = css`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 12px;
+  /* 좁은 화면에서 제목과 자동 저장 상태가 한 줄에 다 들어가지 않으면 줄바꿈해요. */
+  flex-wrap: wrap;
   margin-bottom: 20px;
 `;
 
@@ -11,6 +14,8 @@ const titleAreaStyle = css`
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1 1 200px;
+  min-width: 0;
 `;
 
 const titleStyle = css`
@@ -57,6 +62,7 @@ const actionAreaStyle = css`
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+  flex: 0 0 auto;
 `;
 
 interface PlanEditorHeaderProps {

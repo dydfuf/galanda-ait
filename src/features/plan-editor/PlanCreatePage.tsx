@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { FixedBottomCTA } from "@toss/tds-mobile";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
@@ -21,9 +22,12 @@ import type { TripPlan } from "../../core/domain/room.ts";
 import { toUserMessage } from "../common/error-message.ts";
 
 const pageContainerStyle = css`
-  padding: 16px 20px calc(48px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px 24px;
   max-width: 640px;
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
+  box-sizing: border-box;
 `;
 
 const loadingContainerStyle = css`
@@ -33,22 +37,14 @@ const loadingContainerStyle = css`
   font-size: 15px;
 `;
 
+/** 고정 CTA 위(topAccessory)에 놓이므로 문단이 아닌 인라인 요소로 렌더링해요. */
 const errorMessageStyle = css`
+  display: block;
   font-size: 13px;
   color: var(--adaptiveRed600, #e0383e);
-  margin: 0 0 12px 0;
+  margin: 8px 0 0 0;
   text-align: center;
   line-height: 1.5;
-`;
-
-const bottomCTAWrapperStyle = css`
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--adaptiveBackground, #ffffff) 20%);
-  padding: 16px 0 env(safe-area-inset-bottom, 0px);
-  margin-top: 16px;
 `;
 
 export function PlanCreatePage(): JSX.Element {
@@ -113,8 +109,7 @@ export function PlanCreatePage(): JSX.Element {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault();
+  const handleSubmit = async (): Promise<void> => {
     if (!validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -165,7 +160,12 @@ export function PlanCreatePage(): JSX.Element {
         <DiffBanner diff={diffFromOriginal} originalTitle={cloneFromPlan.title} />
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSubmit();
+        }}
+      >
         <BasicInfoSection
           title={title}
           onTitleChange={setTitle}
@@ -202,30 +202,37 @@ export function PlanCreatePage(): JSX.Element {
 
         <CostSummarySection costSummary={costSummary} />
 
-        <div css={bottomCTAWrapperStyle}>
-          <ValidationBanner
-            firstError={validation.firstError}
-            errorCount={validation.errorCount}
-          />
-          {errorMsg && (
-            <p css={errorMessageStyle} role="alert">
-              {errorMsg}
-            </p>
-          )}
-          <Button
-            display="block"
-            size="large"
-            type="submit"
-            disabled={!validation.isValid || isSubmitting}
-          >
-            {isSubmitting
-              ? "등록 중..."
-              : cloneFromPlan
-              ? "대안 여행안 제안하기"
-              : "여행안 제안 등록"}
-          </Button>
-        </div>
       </form>
+
+      {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
+      <FixedBottomCTA
+        containerStyle={fixedCtaContainerStyle}
+        topAccessory={
+          validation.firstError || errorMsg ? (
+            <>
+              {validation.firstError && (
+                <ValidationBanner
+                  firstError={validation.firstError}
+                  errorCount={validation.errorCount}
+                />
+              )}
+              {errorMsg && (
+                <span css={errorMessageStyle} role="alert">
+                  {errorMsg}
+                </span>
+              )}
+            </>
+          ) : undefined
+        }
+        disabled={!validation.isValid || isSubmitting}
+        onClick={() => void handleSubmit()}
+      >
+        {isSubmitting
+          ? "등록 중..."
+          : cloneFromPlan
+          ? "대안 여행안 제안하기"
+          : "여행안 제안 등록"}
+      </FixedBottomCTA>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { css } from "@emotion/react";
 import type { CityStay } from "../../../core/domain/room.ts";
 import { RouteRail } from "../../common/RouteRail.tsx";
+import { visuallyHiddenStyle } from "../../common/a11y.ts";
 
 const cardStyle = css`
   background-color: var(--adaptiveBackground, #ffffff);
@@ -93,6 +94,10 @@ const nightControlsStyle = css`
   display: flex;
   align-items: center;
   gap: 6px;
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
 `;
 
 const nightBtnStyle = css`
@@ -194,41 +199,49 @@ export function RouteCitySection({
       <div css={cityListStyle}>
         {routes.map((stay, idx) => (
           <div key={idx} css={cityRowStyle}>
-            <span css={cityIndexStyle}>{idx + 1}</span>
+            <span css={cityIndexStyle} aria-hidden="true">
+              {idx + 1}
+            </span>
             <input
               type="text"
+              aria-label={`도시 ${idx + 1} 이름`}
               placeholder={`도시 ${idx + 1} 이름`}
               value={stay.city}
               onChange={(e) => onUpdateCity(idx, { city: e.target.value })}
               css={cityInputStyle}
             />
-            <div css={nightControlsStyle}>
+            <fieldset css={nightControlsStyle}>
+              <legend css={visuallyHiddenStyle}>{`도시 ${idx + 1} 체류 박수`}</legend>
               <button
                 type="button"
                 css={nightBtnStyle}
+                aria-label={`도시 ${idx + 1} 체류 1박 줄이기`}
                 disabled={stay.nights <= 1}
                 onClick={() => onUpdateCity(idx, { nights: Math.max(1, stay.nights - 1) })}
               >
-                -
+                <span aria-hidden="true">-</span>
               </button>
-              <span css={nightValueStyle}>{stay.nights}박</span>
+              <span css={nightValueStyle} aria-live="polite">
+                {stay.nights}박
+              </span>
               <button
                 type="button"
                 css={nightBtnStyle}
+                aria-label={`도시 ${idx + 1} 체류 1박 늘리기`}
                 disabled={stay.nights >= 30}
                 onClick={() => onUpdateCity(idx, { nights: stay.nights + 1 })}
               >
-                +
+                <span aria-hidden="true">+</span>
               </button>
-            </div>
+            </fieldset>
             {routes.length > 1 && (
               <button
                 type="button"
                 onClick={() => onRemoveCity(idx)}
                 css={deleteCityBtnStyle}
-                title="도시 삭제"
+                aria-label={`도시 ${idx + 1} 삭제`}
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             )}
           </div>

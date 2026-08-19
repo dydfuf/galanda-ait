@@ -1,5 +1,6 @@
 import { css } from "@emotion/react";
-import { Outlet, useParams } from "react-router-dom";
+import { TopNavigation, TopNavigationBackButton } from "@toss/tds-mobile";
+import { Outlet, useParams, useLocation } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
 import { Result } from "effect";
@@ -19,43 +20,6 @@ const headerStyle = css`
   z-index: 20;
   background-color: var(--adaptiveBackground, #ffffff);
   border-bottom: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  padding: max(8px, env(safe-area-inset-top, 8px)) 16px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 52px;
-`;
-
-const backButtonStyle = css`
-  background: none;
-  border: none;
-  padding: 8px 6px;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--adaptiveGrey800, #333d4b);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 8px;
-  min-width: 60px;
-  transition: opacity 0.15s ease, background-color 0.15s ease;
-
-  &:active {
-    opacity: 0.7;
-    background-color: var(--adaptiveGrey100, #f2f4f6);
-  }
-`;
-
-const titleStyle = css`
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-  text-align: center;
-  flex: 1;
-`;
-
-const spacerStyle = css`
-  min-width: 60px;
 `;
 
 const mainStyle = css`
@@ -64,8 +28,23 @@ const mainStyle = css`
   flex-direction: column;
 `;
 
+/** 현재 경로에 맞는 상단 내비게이션 제목을 정해요. */
+function resolveTitle(pathname: string): string {
+  if (pathname.endsWith("/plans/new")) {
+    return "새 여행안";
+  }
+  if (pathname.endsWith("/plans/compare")) {
+    return "여행안 비교";
+  }
+  if (pathname.endsWith("/edit")) {
+    return "여행안 수정";
+  }
+  return "여행안 상세";
+}
+
 export function TripRoomChildLayout() {
   const params = useParams();
+  const location = useLocation();
   const { goBack } = useAppNavigation();
 
   const validated = decodeRouteParams(TripParamsSchema, params);
@@ -77,13 +56,13 @@ export function TripRoomChildLayout() {
 
   return (
     <div css={containerStyle}>
-      {/* 서브페이지 상단 헤더 */}
+      {/* 서브페이지 상단 내비게이션 (TDS TopNavigation) */}
       <header css={headerStyle}>
-        <button type="button" onClick={goBack} css={backButtonStyle}>
-          ← 뒤로
-        </button>
-        <span css={titleStyle}>여행 계획</span>
-        <div css={spacerStyle} />
+        <TopNavigation
+          background="transparent"
+          leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />}
+          content={resolveTitle(location.pathname)}
+        />
       </header>
 
       <main css={mainStyle}>

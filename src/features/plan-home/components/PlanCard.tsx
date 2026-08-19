@@ -1,4 +1,5 @@
 import { css } from "@emotion/react";
+import { Link } from "react-router-dom";
 import { RouteRail } from "../../common/RouteRail.tsx";
 
 export interface PlanCardOpinionCounts {
@@ -31,7 +32,8 @@ export interface PlanCardData {
 
 interface PlanCardProps {
   readonly plan: PlanCardData;
-  readonly onClick: () => void;
+  /** 카드 전체가 하나의 링크예요. 클릭 핸들러 대신 이동할 경로를 받아요. */
+  readonly to: string;
 }
 
 const cardStyle = (isConfirmed: boolean) => css`
@@ -40,11 +42,12 @@ const cardStyle = (isConfirmed: boolean) => css`
   padding: 18px 20px;
   border: ${isConfirmed ? "2px solid var(--adaptiveGreen500, #2da44e)" : "1px solid var(--adaptiveGrey200, #e5e8eb)"};
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  color: inherit;
+  text-decoration: none;
 
   &:active {
     transform: scale(0.985);
@@ -167,7 +170,7 @@ const myReactionLabelStyle = (hasReaction: boolean) => css`
   font-weight: ${hasReaction ? 600 : 400};
 `;
 
-export function PlanCard({ plan, onClick }: PlanCardProps) {
+export function PlanCard({ plan, to }: PlanCardProps) {
   const getBadgeColors = () => {
     if (plan.isConfirmed) {
       return { bg: "var(--adaptiveGreen50, #f0fbf4)", color: "var(--adaptiveGreen600, #15803d)", border: "#bbf7d0" };
@@ -195,8 +198,8 @@ export function PlanCard({ plan, onClick }: PlanCardProps) {
   };
 
   return (
-    <div
-      onClick={onClick}
+    <Link
+      to={to}
       css={cardStyle(plan.isConfirmed)}
     >
       {/* 1. 상단: 태그 & 제목 & 상세 바로가기 화살표 */}
@@ -214,7 +217,7 @@ export function PlanCard({ plan, onClick }: PlanCardProps) {
           </div>
 
           <span css={detailLinkStyle}>
-            상세보기 →
+            상세보기<span aria-hidden="true"> →</span>
           </span>
         </div>
 
@@ -244,7 +247,7 @@ export function PlanCard({ plan, onClick }: PlanCardProps) {
       {/* 4. 예약 상태 알림 (있는 경우) */}
       {plan.bookingAlert && (
         <div css={alertBoxStyle}>
-          <span>⚠️</span>
+          <span aria-hidden="true">⚠️</span>
           <span>{plan.bookingAlert}</span>
         </div>
       )}
@@ -265,6 +268,6 @@ export function PlanCard({ plan, onClick }: PlanCardProps) {
           {getMyReactionLabel()}
         </span>
       </div>
-    </div>
+    </Link>
   );
 }

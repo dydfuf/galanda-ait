@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { Button, FixedBottomCTA } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
@@ -9,6 +9,7 @@ import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { DecisionStatusBanner } from "../common/DecisionStatusBanner.tsx";
 import { PlanCard } from "./components/PlanCard.tsx";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 
 const loadingContainerStyle = css`
   padding: 40px 20px;
@@ -21,7 +22,7 @@ const loadingTextStyle = css`
 `;
 
 const pageContainerStyle = css`
-  padding: 16px 20px calc(96px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px 24px;
 `;
 
 const summaryCardStyle = css`
@@ -114,24 +115,6 @@ const planStackStyle = css`
   gap: 14px;
 `;
 
-const fixedCtaContainerStyle = css`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 480px;
-  margin: 0 auto;
-  background-color: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  display: flex;
-  gap: 10px;
-  box-sizing: border-box;
-`;
-
 export function PlanHomePage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -175,6 +158,22 @@ export function PlanHomePage() {
 
   const isConfirmed = Boolean(room.confirmedPlanId);
   const plans = room.plans;
+
+  const primaryCta = isConfirmed
+    ? {
+        label: "확정 일정 보기",
+        onClick: () => navigate(`/trips/${tripId}/itinerary`, { replace: true }),
+      }
+    : plans.length >= 2
+    ? {
+        label: `여행안 비교하기 (${plans.length}개)`,
+        onClick: () =>
+          navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`),
+      }
+    : {
+        label: plans.length === 1 ? "새 여행안 제안하기" : "첫 여행안 만들기",
+        onClick: () => navigate(`/trips/${tripId}/plans/new`),
+      };
 
   return (
     <div css={pageContainerStyle}>
@@ -234,54 +233,17 @@ export function PlanHomePage() {
             <PlanCard
               key={plan.id}
               plan={plan}
-              onClick={() => navigate(`/trips/${tripId}/plans/${plan.id}`)}
+              to={`/trips/${tripId}/plans/${plan.id}`}
             />
           ))}
         </div>
       )}
 
       {/* 하단 고정 핵심 행동 CTA (PL-01 5번 섹션) */}
-      <div css={fixedCtaContainerStyle}>
-        {isConfirmed ? (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
-          >
-            확정 일정 보기
-          </Button>
-        ) : plans.length >= 2 ? (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            onClick={() =>
-              navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`)
-            }
-          >
-            여행안 비교하기 ({plans.length}개)
-          </Button>
-        ) : plans.length === 1 ? (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            onClick={() => navigate(`/trips/${tripId}/plans/new`)}
-          >
-            새 여행안 제안하기
-          </Button>
-        ) : (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            onClick={() => navigate(`/trips/${tripId}/plans/new`)}
-          >
-            첫 여행안 만들기
-          </Button>
-        )}
-      </div>
+      <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={primaryCta.onClick}>
+        {primaryCta.label}
+      </FixedBottomCTA>
+
     </div>
   );
 }
