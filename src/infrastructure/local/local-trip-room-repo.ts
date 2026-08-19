@@ -94,6 +94,48 @@ const saveRooms = (
       }),
   });
 
+const mutateRoom = (
+  roomId: TripId,
+  expectedRevision: Revision | undefined,
+  operation: string,
+  updater: (room: TripRoom) => TripRoom | Effect.Effect<TripRoom, NotFoundError>
+): Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError> =>
+  Effect.gen(function* () {
+    const stored = yield* loadRooms(operation);
+    const rooms = yield* decodeRooms(stored, `${operation}.decode`);
+    const index = rooms.findIndex((r) => r.id === roomId);
+    if (index === -1) {
+      return yield* Effect.fail(
+        new NotFoundError({ entity: "TripRoom", id: roomId })
+      );
+    }
+
+    const room = rooms[index];
+    if (expectedRevision !== undefined && room.revision !== expectedRevision) {
+      return yield* Effect.fail(
+        new ConflictError({
+          message: "다른 사용자가 이미 방 정보를 수정했습니다.",
+          expectedRevision,
+          actualRevision: room.revision,
+        })
+      );
+    }
+
+    const updatedResult = updater(room);
+    const updatedRoom = Effect.isEffect(updatedResult)
+      ? yield* updatedResult
+      : updatedResult;
+
+    const nextRooms = [
+      ...rooms.slice(0, index),
+      updatedRoom,
+      ...rooms.slice(index + 1),
+    ];
+    yield* saveRooms(nextRooms, `${operation}.save`);
+
+    return updatedRoom;
+  });
+
 export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
   Layer.succeed(TripRoomRepository, {
     getRooms: () =>
@@ -148,228 +190,69 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
       params: UpdateRoomParams,
       expectedRevision: Revision
     ) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("updateRoom");
-        const rooms = yield* decodeRooms(stored, "updateRoom.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        if (room.revision !== expectedRevision) {
-          return yield* Effect.fail(
-            new ConflictError({
-              message: "다른 사용자가 이미 방 정보를 수정했습니다.",
-              expectedRevision,
-              actualRevision: room.revision,
-            })
-          );
-        }
-
-        const updatedRoom: TripRoom = {
-          ...room,
-          title: params.title !== undefined ? params.title.trim() : room.title,
-          destination:
-            params.destination !== undefined
-              ? params.destination.trim()
-              : room.destination,
-          startDate: params.startDate ?? room.startDate,
-          endDate: params.endDate ?? room.endDate,
-          revision: RevisionSchema.make(room.revision + 1),
-        };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "updateRoom.save");
-
-        return updatedRoom;
-      }),
+      mutateRoom(roomId, expectedRevision, "updateRoom", (room) => ({
+        ...room,
+        title: params.title !== undefined ? params.title.trim() : room.title,
+        destination:
+          params.destination !== undefined
+            ? params.destination.trim()
+            : room.destination,
+        startDate: params.startDate ?? room.startDate,
+        endDate: params.endDate ?? room.endDate,
+        revision: RevisionSchema.make(room.revision + 1),
+      })),
 
     createPlan: (roomId: TripId, plan: TripPlan, expectedRevision: Revision) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("createPlan");
-        const rooms = yield* decodeRooms(stored, "createPlan.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        if (room.revision !== expectedRevision) {
-          return yield* Effect.fail(
-            new ConflictError({
-              message: "다른 사용자가 이미 방 정보를 수정했습니다.",
-              expectedRevision,
-              actualRevision: room.revision,
-            })
-          );
-        }
-
-        const updatedPlans = [...room.plans, plan];
-        const updatedRoom: TripRoom = {
-          ...room,
-          revision: RevisionSchema.make(room.revision + 1),
-          plans: updatedPlans,
-        };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "createPlan.save");
-
-        return updatedRoom;
-      }),
+      mutateRoom(roomId, expectedRevision, "createPlan", (room) => ({
+        ...room,
+        revision: RevisionSchema.make(room.revision + 1),
+        plans: [...room.plans, plan],
+      })),
 
     updatePlan: (roomId: TripId, plan: TripPlan, expectedRevision: Revision) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("updatePlan");
-        const rooms = yield* decodeRooms(stored, "updatePlan.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        if (room.revision !== expectedRevision) {
-          return yield* Effect.fail(
-            new ConflictError({
-              message: "다른 사용자가 이미 방 정보를 수정했습니다.",
-              expectedRevision,
-              actualRevision: room.revision,
-            })
-          );
-        }
-
+      mutateRoom(roomId, expectedRevision, "updatePlan", (room) => {
         const planIndex = room.plans.findIndex((p) => p.id === plan.id);
         if (planIndex === -1) {
-          return yield* Effect.fail(
+          return Effect.fail(
             new NotFoundError({ entity: "TripPlan", id: plan.id })
           );
         }
-
-        const updatedPlans = [
-          ...room.plans.slice(0, planIndex),
-          plan,
-          ...room.plans.slice(planIndex + 1),
-        ];
-
-        const updatedRoom: TripRoom = {
+        return {
           ...room,
           revision: RevisionSchema.make(room.revision + 1),
-          plans: updatedPlans,
+          plans: [
+            ...room.plans.slice(0, planIndex),
+            plan,
+            ...room.plans.slice(planIndex + 1),
+          ],
         };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "updatePlan.save");
-
-        return updatedRoom;
       }),
 
     deletePlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("deletePlan");
-        const rooms = yield* decodeRooms(stored, "deletePlan.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        if (room.revision !== expectedRevision) {
-          return yield* Effect.fail(
-            new ConflictError({
-              message: "다른 사용자가 이미 방 정보를 수정했습니다.",
-              expectedRevision,
-              actualRevision: room.revision,
-            })
-          );
-        }
-
-        const updatedPlans = room.plans.filter((p) => p.id !== planId);
-        const updatedRoom: TripRoom = {
-          ...room,
-          revision: RevisionSchema.make(room.revision + 1),
-          plans: updatedPlans,
-          confirmedPlanId:
-            room.confirmedPlanId === planId ? undefined : room.confirmedPlanId,
-        };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "deletePlan.save");
-
-        return updatedRoom;
-      }),
+      mutateRoom(roomId, expectedRevision, "deletePlan", (room) => ({
+        ...room,
+        revision: RevisionSchema.make(room.revision + 1),
+        plans: room.plans.filter((p) => p.id !== planId),
+        confirmedPlanId:
+          room.confirmedPlanId === planId ? undefined : room.confirmedPlanId,
+      })),
 
     confirmPlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("confirmPlan");
-        const rooms = yield* decodeRooms(stored, "confirmPlan.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        if (room.revision !== expectedRevision) {
-          return yield* Effect.fail(
-            new ConflictError({
-              message: "다른 사용자가 이미 방 정보를 수정했습니다.",
-              expectedRevision,
-              actualRevision: room.revision,
-            })
-          );
-        }
-
+      mutateRoom(roomId, expectedRevision, "confirmPlan", (room) => {
         const targetPlan = room.plans.find((p) => p.id === planId);
         if (!targetPlan) {
-          return yield* Effect.fail(
+          return Effect.fail(
             new NotFoundError({ entity: "TripPlan", id: planId })
           );
         }
-
-        const updatedPlans = room.plans.map((p) =>
-          p.id === planId ? { ...p, status: "CONFIRMED" as const } : p
-        );
-
-        const updatedRoom: TripRoom = {
+        return {
           ...room,
           revision: RevisionSchema.make(room.revision + 1),
-          plans: updatedPlans,
+          plans: room.plans.map((p) =>
+            p.id === planId ? { ...p, status: "CONFIRMED" as const } : p
+          ),
           confirmedPlanId: planId,
         };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "confirmPlan.save");
-
-        return updatedRoom;
       }),
 
     setPlanOpinion: (
@@ -378,30 +261,10 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
       opinion: PlanMemberOpinion,
       expectedRevision: Revision
     ) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("setPlanOpinion");
-        const rooms = yield* decodeRooms(stored, "setPlanOpinion.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        if (room.revision !== expectedRevision) {
-          return yield* Effect.fail(
-            new ConflictError({
-              message: "다른 사용자가 이미 방 정보를 수정했습니다.",
-              expectedRevision,
-              actualRevision: room.revision,
-            })
-          );
-        }
-
+      mutateRoom(roomId, expectedRevision, "setPlanOpinion", (room) => {
         const planIndex = room.plans.findIndex((p) => p.id === planId);
         if (planIndex === -1) {
-          return yield* Effect.fail(
+          return Effect.fail(
             new NotFoundError({ entity: "TripPlan", id: planId })
           );
         }
@@ -412,16 +275,14 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
           (o) => o.userId === opinion.userId
         );
 
-        let nextOpinions: ReadonlyArray<PlanMemberOpinion>;
-        if (opinionIndex >= 0) {
-          nextOpinions = [
-            ...existingOpinions.slice(0, opinionIndex),
-            opinion,
-            ...existingOpinions.slice(opinionIndex + 1),
-          ];
-        } else {
-          nextOpinions = [...existingOpinions, opinion];
-        }
+        const nextOpinions =
+          opinionIndex >= 0
+            ? [
+                ...existingOpinions.slice(0, opinionIndex),
+                opinion,
+                ...existingOpinions.slice(opinionIndex + 1),
+              ]
+            : [...existingOpinions, opinion];
 
         const voteCount = nextOpinions.filter((o) => o.reaction === "LIKE").length;
 
@@ -431,26 +292,15 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
           voteCount,
         };
 
-        const updatedPlans = [
-          ...room.plans.slice(0, planIndex),
-          updatedPlan,
-          ...room.plans.slice(planIndex + 1),
-        ];
-
-        const updatedRoom: TripRoom = {
+        return {
           ...room,
           revision: RevisionSchema.make(room.revision + 1),
-          plans: updatedPlans,
+          plans: [
+            ...room.plans.slice(0, planIndex),
+            updatedPlan,
+            ...room.plans.slice(planIndex + 1),
+          ],
         };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "setPlanOpinion.save");
-
-        return updatedRoom;
       }),
 
     joinRoom: (roomId: TripId, member: TripMember) =>
@@ -486,4 +336,5 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         return updatedRoom;
       }),
   });
+
 

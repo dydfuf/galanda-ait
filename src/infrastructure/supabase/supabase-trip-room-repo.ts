@@ -10,13 +10,80 @@ import {
   NotFoundError,
   RepositoryError,
 } from "../../core/domain/errors.ts";
-import { SupabaseClient } from "./supabase-client.ts";
-import type { PlanId, Revision, TripId } from "../../core/domain/ids.ts";
+import { SupabaseClient, type SupabaseJsClient } from "./supabase-client.ts";
+import { RevisionSchema, type PlanId, type Revision, type TripId } from "../../core/domain/ids.ts";
 import type {
   PlanMemberOpinion,
   TripMember,
   TripPlan,
+  TripRoom,
 } from "../../core/domain/room.ts";
+
+const callRpcRoomMutation = (
+  client: SupabaseJsClient,
+  rpcName: string,
+  args: Record<string, unknown>,
+  roomId: TripId,
+  expectedRevision: Revision = RevisionSchema.make(0)
+): Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError> =>
+  Effect.gen(function* () {
+    const result = yield* Effect.tryPromise({
+      try: async () => client.rpc(rpcName, args),
+      catch: (cause) =>
+        new RepositoryError({
+          operation: rpcName,
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "저장소 통신에 실패했습니다.",
+        }),
+    });
+
+    if (result.error) {
+      if (
+        result.error.code === "P0001" ||
+        result.error.message.toLowerCase().includes("conflict")
+      ) {
+        return yield* Effect.fail(
+          new ConflictError({
+            message: result.error.message,
+            expectedRevision,
+            actualRevision: expectedRevision,
+          })
+        );
+      }
+      if (
+        result.error.code === "PGRST116" ||
+        result.error.message.toLowerCase().includes("not found")
+      ) {
+        return yield* Effect.fail(
+          new NotFoundError({ entity: "TripRoom", id: roomId })
+        );
+      }
+      return yield* Effect.fail(
+        new RepositoryError({
+          operation: rpcName,
+          message: result.error.message,
+        })
+      );
+    }
+
+    if (!result.data) {
+      return yield* Effect.fail(
+        new NotFoundError({ entity: "TripRoom", id: roomId })
+      );
+    }
+
+    return yield* Schema.decodeUnknownEffect(TripRoomSchema)(result.data).pipe(
+      Effect.mapError(
+        () =>
+          new RepositoryError({
+            operation: `${rpcName}.decode`,
+            message: "저장소 응답 데이터 형식이 올바르지 않습니다.",
+          })
+      )
+    );
+  });
 
 export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
   TripRoomRepository,
@@ -162,349 +229,69 @@ export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
         params: UpdateRoomParams,
         expectedRevision: Revision
       ) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("update_trip_room", {
-                room_id: roomId,
-                room_data: params,
-                expected_revision: expectedRevision,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "updateRoom",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "여행방을 수정하지 못했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision,
-                  actualRevision: expectedRevision,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "updateRoom",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "updateRoom.decode",
-                  message: "수정된 여행방 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "update_trip_room",
+          {
+            room_id: roomId,
+            room_data: params,
+            expected_revision: expectedRevision,
+          },
+          roomId,
+          expectedRevision
+        ),
 
       createPlan: (roomId: TripId, plan: TripPlan, expectedRevision: Revision) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("create_trip_plan", {
-                room_id: roomId,
-                plan_data: plan,
-                expected_revision: expectedRevision,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "createPlan",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "여행안을 생성하지 못했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision,
-                  actualRevision: expectedRevision,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "createPlan",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "createPlan.decode",
-                  message: "여행안 생성 후 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "create_trip_plan",
+          {
+            room_id: roomId,
+            plan_data: plan,
+            expected_revision: expectedRevision,
+          },
+          roomId,
+          expectedRevision
+        ),
 
       updatePlan: (roomId: TripId, plan: TripPlan, expectedRevision: Revision) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("update_trip_plan", {
-                room_id: roomId,
-                plan_data: plan,
-                expected_revision: expectedRevision,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "updatePlan",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "여행안을 수정하지 못했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision,
-                  actualRevision: expectedRevision,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "updatePlan",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "updatePlan.decode",
-                  message: "여행안 수정 후 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "update_trip_plan",
+          {
+            room_id: roomId,
+            plan_data: plan,
+            expected_revision: expectedRevision,
+          },
+          roomId,
+          expectedRevision
+        ),
 
       deletePlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("delete_trip_plan", {
-                room_id: roomId,
-                plan_id: planId,
-                expected_revision: expectedRevision,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "deletePlan",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "여행안을 삭제하지 못했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision,
-                  actualRevision: expectedRevision,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "deletePlan",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "deletePlan.decode",
-                  message: "여행안 삭제 후 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "delete_trip_plan",
+          {
+            room_id: roomId,
+            plan_id: planId,
+            expected_revision: expectedRevision,
+          },
+          roomId,
+          expectedRevision
+        ),
 
       confirmPlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("confirm_trip_plan", {
-                room_id: roomId,
-                plan_id: planId,
-                expected_revision: expectedRevision,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "confirmPlan",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "여행안을 확정하지 못했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision,
-                  actualRevision: expectedRevision,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "confirmPlan",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "confirmPlan.decode",
-                  message: "여행안 확정 후 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "confirm_trip_plan",
+          {
+            room_id: roomId,
+            plan_id: planId,
+            expected_revision: expectedRevision,
+          },
+          roomId,
+          expectedRevision
+        ),
 
       setPlanOpinion: (
         roomId: TripId,
@@ -512,143 +299,31 @@ export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
         opinion: PlanMemberOpinion,
         expectedRevision: Revision
       ) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("set_plan_opinion", {
-                room_id: roomId,
-                plan_id: planId,
-                opinion_data: opinion,
-                expected_revision: expectedRevision,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "setPlanOpinion",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "의견을 등록하지 못했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision,
-                  actualRevision: expectedRevision,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "setPlanOpinion",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "setPlanOpinion.decode",
-                  message: "의견 등록 후 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "set_plan_opinion",
+          {
+            room_id: roomId,
+            plan_id: planId,
+            opinion_data: opinion,
+            expected_revision: expectedRevision,
+          },
+          roomId,
+          expectedRevision
+        ),
 
       joinRoom: (roomId: TripId, member: TripMember) =>
-        Effect.gen(function* () {
-          const result = yield* Effect.tryPromise({
-            try: async () => {
-              const res = await client.rpc("join_trip_room", {
-                room_id: roomId,
-                member_data: member,
-              });
-              return res;
-            },
-            catch: (cause) =>
-              new RepositoryError({
-                operation: "joinRoom",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : "여행방 참여에 실패했습니다.",
-              }),
-          });
-
-          if (result.error) {
-            if (
-              result.error.code === "P0001" ||
-              result.error.message.toLowerCase().includes("conflict")
-            ) {
-              return yield* Effect.fail(
-                new ConflictError({
-                  message: result.error.message,
-                  expectedRevision: 0,
-                  actualRevision: 0,
-                })
-              );
-            }
-            if (
-              result.error.code === "PGRST116" ||
-              result.error.message.toLowerCase().includes("not found")
-            ) {
-              return yield* Effect.fail(
-                new NotFoundError({ entity: "TripRoom", id: roomId })
-              );
-            }
-            return yield* Effect.fail(
-              new RepositoryError({
-                operation: "joinRoom",
-                message: result.error.message,
-              })
-            );
-          }
-
-          if (!result.data) {
-            return yield* Effect.fail(
-              new NotFoundError({ entity: "TripRoom", id: roomId })
-            );
-          }
-
-          return yield* Schema.decodeUnknownEffect(TripRoomSchema)(
-            result.data
-          ).pipe(
-            Effect.mapError(
-              () =>
-                new RepositoryError({
-                  operation: "joinRoom.decode",
-                  message: "여행방 참여 후 데이터 형식이 올바르지 않습니다.",
-                })
-            )
-          );
-        }),
+        callRpcRoomMutation(
+          client,
+          "join_trip_room",
+          {
+            room_id: roomId,
+            member_data: member,
+          },
+          roomId
+        ),
     };
   })
 );
+
 

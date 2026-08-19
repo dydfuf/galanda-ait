@@ -1,7 +1,13 @@
-import { Context, Effect } from "effect";
+import { Context } from "effect";
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
-import type { PlanMemberOpinion, TripMember, TripPlan, TripRoom } from "../domain/room.ts";
-import type { ConflictError, NotFoundError, RepositoryError } from "../domain/errors.ts";
+import type {
+  PlanMemberOpinion,
+  TripMember,
+  TripPlan,
+  TripRoom,
+} from "../domain/room.ts";
+import type { ConflictError, NotFoundError } from "../domain/errors.ts";
+import type { RepositoryEffect } from "./repository.ts";
 
 export interface CreateRoomParams {
   readonly title: string;
@@ -24,49 +30,47 @@ export class TripRoomRepository extends Context.Service<
   {
     readonly getRoom: (
       roomId: TripId
-    ) => Effect.Effect<TripRoom, NotFoundError | RepositoryError>;
-    readonly getRooms: () => Effect.Effect<
-      ReadonlyArray<TripRoom>,
-      RepositoryError
-    >;
+    ) => RepositoryEffect<TripRoom, NotFoundError>;
+    readonly getRooms: () => RepositoryEffect<ReadonlyArray<TripRoom>>;
     readonly createRoom: (
       params: CreateRoomParams
-    ) => Effect.Effect<TripRoom, ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, ConflictError>;
     readonly updateRoom: (
       roomId: TripId,
       params: UpdateRoomParams,
       expectedRevision: Revision
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
     readonly createPlan: (
       roomId: TripId,
       plan: TripPlan,
       expectedRevision: Revision
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
     readonly updatePlan: (
       roomId: TripId,
       plan: TripPlan,
       expectedRevision: Revision
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
     readonly deletePlan: (
       roomId: TripId,
       planId: PlanId,
       expectedRevision: Revision
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
     readonly confirmPlan: (
       roomId: TripId,
       planId: PlanId,
       expectedRevision: Revision
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
     readonly setPlanOpinion: (
       roomId: TripId,
       planId: PlanId,
       opinion: PlanMemberOpinion,
       expectedRevision: Revision
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
     readonly joinRoom: (
       roomId: TripId,
       member: TripMember
-    ) => Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError>;
+    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
   }
 >()("galanda/ports/TripRoomRepository") {}
+
 
