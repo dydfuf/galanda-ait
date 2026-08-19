@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button, FixedBottomCTA } from "@toss/tds-mobile";
+import { BottomSheet, Button, FixedBottomCTA, useBottomSheet } from "@toss/tds-mobile";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema, CompareQuerySchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -10,6 +10,13 @@ import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { visuallyHiddenStyle } from "../common/a11y.ts";
+import { toUserMessage } from "../common/error-message.ts";
+import {
+  buildConfirmPlanSummary,
+  canSubmitConfirm,
+  getCompareConfirmState,
+} from "./plan-compare-view-model.ts";
+import { ConfirmPlanSummaryView } from "./components/ConfirmPlanSummaryView.tsx";
 
 const pageContainerStyle = css`
   padding: 16px 20px 24px;
@@ -192,6 +199,41 @@ const opinionCountsRowStyle = css`
   font-weight: 600;
 `;
 
+const sectionHintStyle = css`
+  font-size: 12px;
+  color: var(--adaptiveGrey500, #8b95a1);
+  text-align: right;
+`;
+
+const noticeBoxStyle = css`
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  background-color: var(--adaptiveGrey100, #f2f4f6);
+  color: var(--adaptiveGrey700, #4e5968);
+`;
+
+const confirmedNoticeStyle = css`
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  background-color: var(--adaptiveGreen50, #f0fbf4);
+  border: 1px solid #bbf7d0;
+  color: var(--adaptiveGreen700, #15803d);
+  font-weight: 600;
+`;
+
+/** 고정 CTA 위(topAccessory)에 놓이므로 문단이 아닌 인라인 요소로 렌더링해요. */
+const confirmErrorStyle = css`
+  display: block;
+  font-size: 13px;
+  color: var(--adaptiveRed600, #e0383e);
+  text-align: center;
+  line-height: 1.5;
+`;
+
 export function PlanComparePage() {
   const params = useParams();
   const [searchParams] = useSearchParams();
@@ -210,8 +252,10 @@ export function PlanComparePage() {
 
   const { data: room, isLoading, isError } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
+  const { openAsyncTwoButtonSheet } = useBottomSheet();
 
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -267,25 +311,46 @@ export function PlanComparePage() {
   }
 
   const isRoomConfirmed = Boolean(room.confirmedPlanId);
-  const currentSelectedId = selectedPlanId || leftPlan.id;
-  const selectedPlan = currentSelectedId === leftPlan.id ? leftPlan : rightPlan;
+  const confirmState = getCompareConfirmState({
+    isViewerHost: room.isViewerHost,
+    isRoomConfirmed,
+    confirmedPlanTitle: room.confirmedPlanTitle,
+  });
+  const isSelectionLocked = confirmState.kind === "LOCKED";
 
-  const handleConfirm = () => {
-    if (!selectedPlan) return;
-    if (!window.confirm(`'${selectedPlan.title}'으로 최종 일정을 확정하시겠습니까?`)) return;
+  // 확정된 방에서는 확정본을, 그 외에는 사용자가 고른 안을 기준으로 삼아요.
+  const confirmedInPair = [leftPlan, rightPlan].find((p) => p.id === room.confirmedPlanId);
+  const currentSelectedId = selectedPlanId ?? confirmedInPair?.id ?? leftPlan.id;
+  const selectedPlan = currentSelectedId === rightPlan.id ? rightPlan : leftPlan;
 
-    confirmPlanMutation.mutate(
-      {
-        roomId: room.id,
-        planId: selectedPlan.id,
-        revision: room.revision,
-      },
-      {
-        onSuccess: () => {
+  const handleConfirm = async (): Promise<void> => {
+    // 빠른 중복 탭으로 같은 revision을 쓰는 요청이 두 번 나가지 않게 막아요.
+    if (!canSubmitConfirm({ state: confirmState, isPending: confirmPlanMutation.isPending })) {
+      return;
+    }
+
+    await openAsyncTwoButtonSheet({
+      header: <BottomSheet.Header>이 여행안으로 확정할까요?</BottomSheet.Header>,
+      children: <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(selectedPlan)} />,
+      leftButton: "다시 보기",
+      rightButton: "확정하기",
+      onRightButtonClick: async (): Promise<void> => {
+        setConfirmError(null);
+        try {
+          await confirmPlanMutation.mutateAsync({
+            roomId: room.id,
+            planId: selectedPlan.id,
+            revision: room.revision,
+          });
           navigate(`/trips/${tripId}/itinerary`, { replace: true });
-        },
-      }
-    );
+        } catch (err: unknown) {
+          // 실패해도 비교 화면의 선택은 유지하고, 화면에서 바로 다시 시도할 수 있게 안내해요.
+          setConfirmError(
+            toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요.")
+          );
+        }
+      },
+    });
   };
 
   // 핵심 차이점 분석 문구 생성 (시안 1 명세)
@@ -314,7 +379,13 @@ export function PlanComparePage() {
     <div css={pageContainerStyle}>
       <div css={pageHeaderStyle}>
         <h1 css={pageTitleStyle}>여행안 비교</h1>
-        <p css={pageSubtitleStyle}>두 여행안의 핵심 차이를 비교하고 확정할 안을 선택하세요.</p>
+        <p css={pageSubtitleStyle}>
+          {confirmState.kind === "CONFIRMABLE"
+            ? "두 여행안의 핵심 차이를 비교하고 확정할 안을 선택하세요."
+            : confirmState.kind === "LOCKED"
+            ? "확정된 일정과 검토했던 여행안을 함께 확인할 수 있어요."
+            : "두 여행안의 핵심 차이를 확인하고 의견을 남겨보세요."}
+        </p>
       </div>
 
       {/* 1. 상단 핵심 차이 요약 배너 (PL-04 시안 1) */}
@@ -330,15 +401,42 @@ export function PlanComparePage() {
         </ul>
       </div>
 
+      {confirmState.kind === "LOCKED" && (
+        <p css={confirmedNoticeStyle}>
+          <span aria-hidden="true">✓ </span>
+          {confirmState.confirmedPlanTitle
+            ? `'${confirmState.confirmedPlanTitle}'(으)로 일정이 확정되었어요.`
+            : "이미 일정이 확정된 여행이에요."}
+        </p>
+      )}
+
+      {confirmState.kind === "VIEW_ONLY" && (
+        <p css={noticeBoxStyle}>
+          여행안 확정은 방장이 진행해요. 비교 결과를 보고 의견을 남겨주세요.
+        </p>
+      )}
+
       {/* 비교 대조 항목 1: 여행안 선택 및 기본 정보 */}
       <section css={compareSectionCardStyle}>
         <div css={sectionHeaderStyle}>
           <h3 css={sectionTitleStyle}>1. 비교 대상 선택</h3>
-          <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>카드를 눌러 확정할 안을 고르세요</span>
+          <span css={sectionHintStyle}>
+            {confirmState.kind === "CONFIRMABLE"
+              ? "카드를 눌러 확정할 안을 고르세요"
+              : confirmState.kind === "LOCKED"
+              ? "확정이 끝나 선택할 수 없어요"
+              : "방장이 확정할 안을 고를 수 있어요"}
+          </span>
         </div>
 
-        <fieldset css={planChoiceFieldsetStyle}>
-          <legend css={visuallyHiddenStyle}>확정할 여행안 선택</legend>
+        <fieldset css={planChoiceFieldsetStyle} disabled={isSelectionLocked}>
+          <legend css={visuallyHiddenStyle}>
+            {confirmState.kind === "CONFIRMABLE"
+              ? "확정할 여행안 선택"
+              : confirmState.kind === "LOCKED"
+              ? "확정된 여행안"
+              : "자세히 비교할 여행안 선택"}
+          </legend>
 
           <div css={twoColumnsGridStyle}>
             {[leftPlan, rightPlan].map((plan, index) => {
@@ -479,23 +577,32 @@ export function PlanComparePage() {
         </div>
       </section>
 
-      {/* PL-04 시안 1 하단 고정 확정 CTA */}
-      {isRoomConfirmed ? (
+      {/* PL-04 하단 고정 CTA: 확정 권한과 확정 여부에 따라 달라져요 */}
+      {confirmState.kind === "LOCKED" && (
         <FixedBottomCTA
           containerStyle={fixedCtaContainerStyle}
           onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
         >
           확정 일정 보기
         </FixedBottomCTA>
-      ) : (
+      )}
+
+      {confirmState.kind === "CONFIRMABLE" && (
         <FixedBottomCTA
           containerStyle={fixedCtaContainerStyle}
+          topAccessory={
+            confirmError ? (
+              <span css={confirmErrorStyle} role="alert">
+                {confirmError}
+              </span>
+            ) : undefined
+          }
           disabled={confirmPlanMutation.isPending}
-          onClick={handleConfirm}
+          onClick={() => void handleConfirm()}
         >
           {confirmPlanMutation.isPending
             ? "일정 확정 중..."
-            : `선택한 [${selectedPlan?.planTagLabel}]으로 일정 확정하기`}
+            : `선택한 [${selectedPlan.planTagLabel}]으로 일정 확정하기`}
         </FixedBottomCTA>
       )}
     </div>
