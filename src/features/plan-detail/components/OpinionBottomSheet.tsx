@@ -1,6 +1,12 @@
-import { useState } from "react";
+/*
+ * 네이티브 <dialog>는 바텀시트의 레이아웃/애니메이션과 맞지 않아,
+ * div + role="dialog" + aria-modal 조합에 포커스 트랩과 Escape 처리를 직접 붙였어요.
+ */
+/* oxlint-disable jsx-a11y/prefer-tag-over-role */
+import { useEffect, useRef, useState } from "react";
 import { css } from "@emotion/react";
 import { Button } from "@toss/tds-mobile";
+import { visuallyHiddenStyle } from "../../common/a11y.ts";
 
 export type ReactionType = "LIKE" | "OKAY" | "HARD";
 
@@ -12,6 +18,44 @@ interface OpinionBottomSheetProps {
   readonly onSubmit: (reaction: ReactionType, reason?: string) => void;
   readonly isSubmitting?: boolean;
 }
+
+const REACTION_OPTIONS = [
+  {
+    value: "LIKE",
+    emoji: "👍",
+    label: "좋아요",
+    borderColor: "var(--adaptiveGreen500, #2da44e)",
+    backgroundColor: "var(--adaptiveGreen50, #f0fbf4)",
+    labelColor: "var(--adaptiveGreen600, #15803d)",
+  },
+  {
+    value: "OKAY",
+    emoji: "🙂",
+    label: "괜찮아요",
+    borderColor: "var(--adaptiveBlue500, #3182f6)",
+    backgroundColor: "var(--adaptiveBlue50, #e8f3ff)",
+    labelColor: "var(--adaptiveBlue600, #1b64da)",
+  },
+  {
+    value: "HARD",
+    emoji: "😢",
+    label: "어려워요",
+    borderColor: "var(--adaptiveRed500, #f04452)",
+    backgroundColor: "var(--adaptiveRed50, #fdf2f3)",
+    labelColor: "var(--adaptiveRed600, #e0383e)",
+  },
+] as const satisfies ReadonlyArray<{
+  value: ReactionType;
+  emoji: string;
+  label: string;
+  borderColor: string;
+  backgroundColor: string;
+  labelColor: string;
+}>;
+
+/** 바텀시트 안에서 키보드 포커스를 순환시킬 때 대상으로 삼는 요소들이에요. */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const backdropContainerStyle = css`
   position: fixed;
@@ -86,13 +130,20 @@ const formStyle = css`
   gap: 20px;
 `;
 
+const reactionFieldsetStyle = css`
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+`;
+
 const reactionGridStyle = css`
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
 `;
 
-const reactionButtonStyle = (isSelected: boolean, selectedBorder: string, selectedBg: string) => css`
+const reactionOptionStyle = (isSelected: boolean, selectedBorder: string, selectedBg: string) => css`
   padding: 16px 8px;
   border-radius: 12px;
   border: ${isSelected ? `2px solid ${selectedBorder}` : "1px solid var(--adaptiveGrey200, #e5e8eb)"};
@@ -106,6 +157,12 @@ const reactionButtonStyle = (isSelected: boolean, selectedBorder: string, select
 
   &:active {
     transform: scale(0.96);
+  }
+
+  /* 라디오 입력을 화면에서 감췄기 때문에, 키보드 포커스를 라벨에 표시해요. */
+  &:has(:focus-visible) {
+    outline: 2px solid var(--adaptiveBlue500, #3182f6);
+    outline-offset: 2px;
   }
 `;
 
@@ -138,7 +195,6 @@ const reasonTextareaStyle = css`
   border: 1px solid var(--adaptiveGrey200, #e5e8eb);
   font-size: 14px;
   font-family: inherit;
-  outline: none;
   resize: none;
   box-sizing: border-box;
   background-color: var(--adaptiveBackground, #ffffff);
@@ -164,81 +220,137 @@ export function OpinionBottomSheet({
 }: OpinionBottomSheetProps) {
   const [reaction, setReaction] = useState<ReactionType | undefined>(initialReaction);
   const [reason, setReason] = useState<string>(initialReason);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  // 시트를 열 때마다 현재 저장된 의견을 기준으로 다시 시작해요.
+  useEffect(() => {
+    if (!isOpen) return;
+    setReaction(initialReaction);
+    setReason(initialReason);
+  }, [isOpen, initialReaction, initialReason]);
+
+  // 열릴 때 시트 안으로 포커스를 옮기고, 닫히면 원래 위치로 되돌려요.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    lastFocusedElementRef.current = document.activeElement as HTMLElement | null;
+    const firstFocusable = sheetRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+    firstFocusable?.focus();
+
+    return () => {
+      lastFocusedElementRef.current?.focus();
+    };
+  }, [isOpen]);
+
+  // Escape로 닫고, Tab 포커스가 시트 밖으로 빠져나가지 않게 순환시켜요.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusables = Array.from(
+        sheetRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
+      );
+      if (focusables.length === 0) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === first || !sheetRef.current?.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !sheetRef.current?.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!reaction) return;
-    if (reaction === "HARD" && !reason.trim()) {
-      alert("어려운 사유를 간략히 입력해주세요.");
-      return;
-    }
+    if (reaction === "HARD" && !reason.trim()) return;
     onSubmit(reaction, reaction === "HARD" ? reason.trim() : undefined);
   };
 
   const isFormValid = reaction && (reaction !== "HARD" || reason.trim().length > 0);
 
   return (
-    <div css={backdropContainerStyle} role="dialog" aria-modal="true" aria-labelledby="opinion-sheet-title">
-      {/* 백드롭 오버레이 */}
-      <div onClick={onClose} css={backdropOverlayStyle} />
+    <div
+      css={backdropContainerStyle}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="opinion-sheet-title"
+    >
+      {/* 백드롭 오버레이 (닫기는 아래 닫기 버튼과 Escape로도 가능해요) */}
+      <div onClick={onClose} css={backdropOverlayStyle} aria-hidden="true" />
 
       {/* 바텀시트 컨테이너 */}
-      <div css={sheetContainerStyle}>
+      <div css={sheetContainerStyle} ref={sheetRef}>
         <div css={sheetHeaderStyle}>
           <h3 id="opinion-sheet-title" css={sheetTitleStyle}>
             이 여행안은 어때요?
           </h3>
           <button type="button" onClick={onClose} css={closeButtonStyle} aria-label="닫기">
-            ✕
+            <span aria-hidden="true">✕</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} css={formStyle}>
-          {/* 반응 선택 버튼 3가지 */}
-          <div css={reactionGridStyle}>
-            <button
-              type="button"
-              onClick={() => setReaction("LIKE")}
-              css={reactionButtonStyle(reaction === "LIKE", "var(--adaptiveGreen500, #2da44e)", "var(--adaptiveGreen50, #f0fbf4)")}
-            >
-              <span css={reactionEmojiStyle}>👍</span>
-              <span css={reactionLabelStyle(reaction === "LIKE", "var(--adaptiveGreen600, #15803d)")}>
-                좋아요
-              </span>
-            </button>
+          {/* 반응 선택 (라디오 그룹) */}
+          <fieldset css={reactionFieldsetStyle}>
+            <legend css={visuallyHiddenStyle}>이 여행안에 대한 내 의견</legend>
 
-            <button
-              type="button"
-              onClick={() => setReaction("OKAY")}
-              css={reactionButtonStyle(reaction === "OKAY", "var(--adaptiveBlue500, #3182f6)", "var(--adaptiveBlue50, #e8f3ff)")}
-            >
-              <span css={reactionEmojiStyle}>🙂</span>
-              <span css={reactionLabelStyle(reaction === "OKAY", "var(--adaptiveBlue600, #1b64da)")}>
-                괜찮아요
-              </span>
-            </button>
+            <div css={reactionGridStyle}>
+              {REACTION_OPTIONS.map((option) => {
+                const isSelected = reaction === option.value;
 
-            <button
-              type="button"
-              onClick={() => setReaction("HARD")}
-              css={reactionButtonStyle(reaction === "HARD", "var(--adaptiveRed500, #f04452)", "var(--adaptiveRed50, #fdf2f3)")}
-            >
-              <span css={reactionEmojiStyle}>😢</span>
-              <span css={reactionLabelStyle(reaction === "HARD", "var(--adaptiveRed600, #e0383e)")}>
-                어려워요
-              </span>
-            </button>
-          </div>
+                return (
+                  <label
+                    key={option.value}
+                    css={reactionOptionStyle(isSelected, option.borderColor, option.backgroundColor)}
+                  >
+                    <input
+                      type="radio"
+                      name="opinion-reaction"
+                      value={option.value}
+                      checked={isSelected}
+                      onChange={() => setReaction(option.value)}
+                      css={visuallyHiddenStyle}
+                    />
+                    <span css={reactionEmojiStyle} aria-hidden="true">
+                      {option.emoji}
+                    </span>
+                    <span css={reactionLabelStyle(isSelected, option.labelColor)}>
+                      {option.label}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           {/* 어려워요 선택 시 사유 입력란 */}
           {reaction === "HARD" && (
             <div css={reasonContainerStyle}>
-              <label css={reasonLabelStyle}>
+              <label css={reasonLabelStyle} htmlFor="opinion-reason">
                 어려운 사유를 알려주세요 *
               </label>
               <textarea
+                id="opinion-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="예: 예산 초과, 숙소 위치, 이동 시간 등 (방장과 나에게만 공개돼요)"

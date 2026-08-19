@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { FixedBottomCTA } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomDetailQuery } from "./queries.ts";
 import { useSubmitOpinionMutation } from "./mutations.ts";
@@ -12,6 +12,7 @@ import { RouteRail } from "../common/RouteRail.tsx";
 import { BookingRiskSummary } from "./components/BookingRiskSummary.tsx";
 import { DetailTimeline } from "./components/DetailTimeline.tsx";
 import { OpinionBottomSheet, type ReactionType } from "./components/OpinionBottomSheet.tsx";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 
 const loadingContainerStyle = css`
   padding: 40px 20px;
@@ -24,7 +25,7 @@ const loadingTextStyle = css`
 `;
 
 const pageContainerStyle = css`
-  padding: 16px 20px calc(108px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px 24px;
 `;
 
 const summaryCardStyle = (isConfirmed: boolean) => css`
@@ -149,6 +150,27 @@ const snapshotCaptionStyle = css`
   color: var(--adaptiveGrey500, #8b95a1);
 `;
 
+const headerActionsStyle = css`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const editButtonStyle = css`
+  background: none;
+  border: none;
+  color: var(--adaptiveBlue600, #1b64da);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+
+  &:active {
+    background-color: var(--adaptiveBlue50, #e8f3ff);
+  }
+`;
+
 const forkSectionStyle = css`
   margin-bottom: 28px;
   text-align: center;
@@ -245,22 +267,6 @@ const opinionReasonStyle = css`
   margin: 4px 0 0 0;
 `;
 
-const fixedCtaContainerStyle = css`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 480px;
-  margin: 0 auto;
-  background-color: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  box-sizing: border-box;
-`;
-
 export function PlanDetailPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -334,7 +340,7 @@ export function PlanDetailPage() {
             <span css={authorTextStyle}>{plan.authorName} 제안</span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div css={headerActionsStyle}>
             <span css={periodTextStyle}>
               {plan.period}
             </span>
@@ -342,15 +348,7 @@ export function PlanDetailPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/trips/${tripId}/plans/${plan.id}/edit`)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--adaptiveBlue600, #1b64da)",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  padding: "2px 4px",
-                }}
+                css={editButtonStyle}
               >
                 수정
               </button>
@@ -364,7 +362,7 @@ export function PlanDetailPage() {
 
         {plan.proposalReason && (
           <p css={reasonQuoteStyle}>
-            💬 "{plan.proposalReason}"
+            <span aria-hidden="true">💬 </span>"{plan.proposalReason}"
           </p>
         )}
 
@@ -412,7 +410,7 @@ export function PlanDetailPage() {
             onClick={() => navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)}
             css={forkButtonStyle}
           >
-            📋 이 여행안을 복제해 다른 구성으로 제안하기
+            <span aria-hidden="true">📋 </span>이 여행안을 복제해 다른 구성으로 제안하기
           </button>
         </section>
       )}
@@ -456,28 +454,22 @@ export function PlanDetailPage() {
       </section>
 
       {/* 6. 하단 핵심 행동 CTA (PL-02 6번 섹션) */}
-      <div css={fixedCtaContainerStyle}>
-        {isConfirmed ? (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
-          >
-            확정 일정 보기
-          </Button>
-        ) : isRoomConfirmed ? null : (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            disabled={submitOpinionMutation.isPending}
-            onClick={() => setIsBottomSheetOpen(true)}
-          >
-            {plan.myReaction ? "내 의견 바꾸기" : "의견 남기기"}
-          </Button>
-        )}
-      </div>
+      {isConfirmed ? (
+        <FixedBottomCTA
+          containerStyle={fixedCtaContainerStyle}
+          onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+        >
+          확정 일정 보기
+        </FixedBottomCTA>
+      ) : isRoomConfirmed ? null : (
+        <FixedBottomCTA
+          containerStyle={fixedCtaContainerStyle}
+          disabled={submitOpinionMutation.isPending}
+          onClick={() => setIsBottomSheetOpen(true)}
+        >
+          {plan.myReaction ? "내 의견 바꾸기" : "의견 남기기"}
+        </FixedBottomCTA>
+      )}
 
       {/* 의견 작성 바텀시트 */}
       <OpinionBottomSheet

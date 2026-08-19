@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
-import { useNavigate } from "react-router-dom";
+import { Button, FixedBottomCTA, SegmentedControl } from "@toss/tds-mobile";
+import { Link, useNavigate } from "react-router-dom";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import type { TripRoomViewModel } from "../plan-home/plan-home-view-model.ts";
 
 const pageContainerStyle = css`
-  padding: max(16px, env(safe-area-inset-top, 16px)) 20px calc(96px + env(safe-area-inset-bottom, 0px));
+  padding: max(16px, env(safe-area-inset-top, 16px)) 20px 24px;
   max-width: 600px;
   margin: 0 auto;
   min-height: 100vh;
@@ -31,26 +32,8 @@ const pageSubtitleStyle = css`
   margin: 0;
 `;
 
-const tabSegmentContainerStyle = css`
-  display: flex;
-  background-color: var(--adaptiveGrey100, #f2f4f6);
-  border-radius: 10px;
-  padding: 3px;
+const filterContainerStyle = css`
   margin-bottom: 20px;
-`;
-
-const tabSegmentButtonStyle = (isActive: boolean) => css`
-  flex: 1;
-  padding: 8px 0;
-  font-size: 13px;
-  font-weight: ${isActive ? 700 : 500};
-  color: ${isActive ? "var(--adaptiveGrey900, #191f28)" : "var(--adaptiveGrey600, #6b7684)"};
-  background-color: ${isActive ? "var(--adaptiveBackground, #ffffff)" : "transparent"};
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: ${isActive ? "0 1px 3px rgba(0,0,0,0.08)" : "none"};
-  transition: all 0.15s ease;
 `;
 
 const loadingContainerStyle = css`
@@ -77,6 +60,9 @@ const listStackStyle = css`
   display: flex;
   flex-direction: column;
   gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 `;
 
 const emptyCardStyle = css`
@@ -110,11 +96,19 @@ const roomCardStyle = css`
   border-radius: 16px;
   padding: 18px 20px;
   border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
   display: flex;
   flex-direction: column;
   gap: 12px;
+`;
+
+/** 카드 본문 전체를 덮는 링크. 카드 안의 다른 링크와 중첩되지 않도록 형제로 배치해요. */
+const roomCardLinkStyle = css`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.12s ease;
 
   &:active {
     transform: scale(0.985);
@@ -165,7 +159,8 @@ const nextActionBoxStyle = css`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  cursor: pointer;
+  gap: 8px;
+  text-decoration: none;
   transition: background-color 0.12s ease;
 
   &:hover {
@@ -182,6 +177,7 @@ const nextActionLabelStyle = css`
 const nextActionArrowStyle = css`
   font-weight: 700;
   color: var(--adaptiveBlue600, #1b64da);
+  white-space: nowrap;
 `;
 
 const confirmedActionBoxStyle = css`
@@ -194,27 +190,20 @@ const confirmedActionBoxStyle = css`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  text-decoration: none;
 `;
 
-const fixedCtaContainerStyle = css`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 600px;
-  margin: 0 auto;
-  background-color: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  box-sizing: border-box;
+const confirmedActionArrowStyle = css`
+  font-weight: 700;
+  color: var(--adaptiveGreen700, #15803d);
 `;
+
+type TripListTab = "ONGOING" | "PAST";
 
 export function TripListPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<"ONGOING" | "PAST">("ONGOING");
+  const [activeTab, setActiveTab] = useState<TripListTab>("ONGOING");
   const { data: rooms, isLoading, isError, error } = useTripRoomsQuery();
 
   const getNextAction = (room: TripRoomViewModel) => {
@@ -273,22 +262,20 @@ export function TripListPage() {
         <p css={pageSubtitleStyle}>참여 중인 여행을 확인하고 새 여행을 시작하세요.</p>
       </header>
 
-      {/* 세그먼트 탭: 진행 중인 여행 / 지난 여행 */}
-      <div css={tabSegmentContainerStyle}>
-        <button
-          type="button"
-          onClick={() => setActiveTab("ONGOING")}
-          css={tabSegmentButtonStyle(activeTab === "ONGOING")}
+      {/* 세그먼트 필터: 진행 중인 여행 / 지난 여행 */}
+      <div css={filterContainerStyle}>
+        <SegmentedControl
+          aria-label="여행 목록 필터"
+          value={activeTab}
+          onChange={(value) => setActiveTab(value as TripListTab)}
         >
-          진행 중인 여행 ({ongoingRooms.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("PAST")}
-          css={tabSegmentButtonStyle(activeTab === "PAST")}
-        >
-          지난 여행 ({pastRooms.length})
-        </button>
+          <SegmentedControl.Item value="ONGOING">
+            진행 중인 여행 ({ongoingRooms.length})
+          </SegmentedControl.Item>
+          <SegmentedControl.Item value="PAST">
+            지난 여행 ({pastRooms.length})
+          </SegmentedControl.Item>
+        </SegmentedControl>
       </div>
 
       {isLoading && (
@@ -306,91 +293,76 @@ export function TripListPage() {
       )}
 
       {rooms && (
-        <div css={listStackStyle}>
-          {displayRooms.length === 0 ? (
-            <div css={emptyCardStyle}>
-              <div css={emptyIconStyle}>✈️</div>
-              <p css={emptyTitleStyle}>
-                {activeTab === "ONGOING" ? "진행 중인 여행이 없습니다" : "지난 여행 기록이 없습니다"}
-              </p>
-              <p css={emptyDescStyle}>
-                {activeTab === "ONGOING"
-                  ? "새로운 여행방을 만들고 친구들을 초대해보세요."
-                  : "다녀온 여행 기록이 이곳에 보관됩니다."}
-              </p>
-              {activeTab === "ONGOING" && (
-                <Button size="medium" type="button" onClick={() => navigate("/trips/new")}>
-                  새 여행 만들기
-                </Button>
-              )}
-            </div>
-          ) : (
-            displayRooms.map((room) => {
+        displayRooms.length === 0 ? (
+          <div css={emptyCardStyle}>
+            <div css={emptyIconStyle} aria-hidden="true">✈️</div>
+            <p css={emptyTitleStyle}>
+              {activeTab === "ONGOING" ? "진행 중인 여행이 없습니다" : "지난 여행 기록이 없습니다"}
+            </p>
+            <p css={emptyDescStyle}>
+              {activeTab === "ONGOING"
+                ? "새로운 여행방을 만들고 친구들을 초대해보세요."
+                : "다녀온 여행 기록이 이곳에 보관됩니다."}
+            </p>
+            {activeTab === "ONGOING" && (
+              <Button size="medium" type="button" onClick={() => navigate("/trips/new")}>
+                새 여행 만들기
+              </Button>
+            )}
+          </div>
+        ) : (
+          <ul css={listStackStyle}>
+            {displayRooms.map((room) => {
               const nextAction = getNextAction(room);
 
               return (
-                <div
-                  key={room.id}
-                  onClick={() => navigate(`/trips/${room.id}`)}
-                  css={roomCardStyle}
-                >
-                  <div css={roomHeaderStyle}>
-                    <span css={destinationBadgeStyle}>📍 {room.destination}</span>
-                    <span css={memberCountTextStyle}>참여 {room.memberCount}명</span>
-                  </div>
+                <li key={room.id} css={roomCardStyle}>
+                  <Link to={`/trips/${room.id}`} css={roomCardLinkStyle}>
+                    <div css={roomHeaderStyle}>
+                      <span css={destinationBadgeStyle}>
+                        <span aria-hidden="true">📍 </span>
+                        {room.destination}
+                      </span>
+                      <span css={memberCountTextStyle}>참여 {room.memberCount}명</span>
+                    </div>
 
-                  <div>
-                    <h2 css={roomTitleTextStyle}>{room.title}</h2>
-                    <p css={roomPeriodTextStyle}>
-                      {room.period} · {room.memberNames}
-                    </p>
-                  </div>
+                    <div>
+                      <h2 css={roomTitleTextStyle}>{room.title}</h2>
+                      <p css={roomPeriodTextStyle}>
+                        {room.period} · {room.memberNames}
+                      </p>
+                    </div>
+                  </Link>
 
                   {/* TR-01 시안 3 핵심: 옅은 파란 면의 행동 지점 */}
                   {nextAction.isConfirmed ? (
-                    <div
-                      css={confirmedActionBoxStyle}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(nextAction.path);
-                      }}
-                    >
+                    <Link to={nextAction.path} css={confirmedActionBoxStyle}>
                       <span css={nextActionLabelStyle}>{nextAction.text}</span>
-                      <span css={nextActionArrowStyle}>→</span>
-                    </div>
+                      <span css={confirmedActionArrowStyle} aria-hidden="true">→</span>
+                    </Link>
                   ) : (
-                    <div
-                      css={nextActionBoxStyle}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(nextAction.path);
-                      }}
-                    >
+                    <Link to={nextAction.path} css={nextActionBoxStyle}>
                       <span css={nextActionLabelStyle}>
-                        <span>💡</span>
+                        <span aria-hidden="true">💡</span>
                         <span>{nextAction.text}</span>
                       </span>
-                      <span css={nextActionArrowStyle}>{nextAction.actionText} →</span>
-                    </div>
+                      <span css={nextActionArrowStyle}>
+                        {nextAction.actionText}
+                        <span aria-hidden="true"> →</span>
+                      </span>
+                    </Link>
                   )}
-                </div>
+                </li>
               );
-            })
-          )}
-        </div>
+            })}
+          </ul>
+        )
       )}
 
       {/* TR-01 시안 3 고정 하단 CTA */}
-      <div css={fixedCtaContainerStyle}>
-        <Button
-          display="block"
-          size="large"
-          type="button"
-          onClick={() => navigate("/trips/new")}
-        >
-          새 여행 만들기
-        </Button>
-      </div>
+      <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={() => navigate("/trips/new")}>
+        새 여행 만들기
+      </FixedBottomCTA>
     </div>
   );
 }
