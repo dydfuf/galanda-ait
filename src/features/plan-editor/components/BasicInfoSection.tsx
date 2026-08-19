@@ -52,6 +52,10 @@ const headcountWrapperStyle = css`
   display: flex;
   align-items: center;
   gap: 12px;
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
 `;
 
 const headcountButtonStyle = css`
@@ -115,8 +119,11 @@ export function BasicInfoSection({
       <h2 css={sectionTitleStyle}>1. 기본 정보</h2>
 
       <div css={fieldStyle}>
-        <label css={labelStyle}>여행안 제목 *</label>
+        <label css={labelStyle} htmlFor="plan-title">
+          여행안 제목 *
+        </label>
         <input
+          id="plan-title"
           type="text"
           placeholder="예: 힐링 카페 & 호캉스 코스"
           value={title}
@@ -127,8 +134,11 @@ export function BasicInfoSection({
       </div>
 
       <div css={fieldStyle}>
-        <label css={labelStyle}>제안 이유 / 한 줄 요약 (선택)</label>
+        <label css={labelStyle} htmlFor="plan-proposal-reason">
+          제안 이유 / 한 줄 요약 (선택)
+        </label>
         <input
+          id="plan-proposal-reason"
           type="text"
           placeholder="예: 이동을 줄이고 서귀포 호텔에서 여유를 즐기는 안"
           value={proposalReason}
@@ -138,27 +148,31 @@ export function BasicInfoSection({
       </div>
 
       <div css={fieldStyle}>
-        <label css={labelStyle}>비용 기준 인원 *</label>
-        <div css={headcountWrapperStyle}>
+        <fieldset css={headcountWrapperStyle} aria-describedby="plan-headcount-hint">
+          <legend css={labelStyle}>비용 기준 인원 *</legend>
           <button
             type="button"
             css={headcountButtonStyle}
+            aria-label="비용 기준 인원 한 명 줄이기"
             disabled={baseHeadcount <= 1}
             onClick={() => onBaseHeadcountChange(Math.max(1, baseHeadcount - 1))}
           >
-            -
+            <span aria-hidden="true">-</span>
           </button>
-          <span css={headcountValueStyle}>{baseHeadcount}명</span>
+          <span css={headcountValueStyle} aria-live="polite">
+            {baseHeadcount}명
+          </span>
           <button
             type="button"
             css={headcountButtonStyle}
+            aria-label="비용 기준 인원 한 명 늘리기"
             disabled={baseHeadcount >= 20}
             onClick={() => onBaseHeadcountChange(baseHeadcount + 1)}
           >
-            +
+            <span aria-hidden="true">+</span>
           </button>
-        </div>
-        <span css={headcountHintStyle}>
+        </fieldset>
+        <span css={headcountHintStyle} id="plan-headcount-hint">
           이 인원을 기준으로 1인 예상 참고액이 자동 계산됩니다.
         </span>
       </div>

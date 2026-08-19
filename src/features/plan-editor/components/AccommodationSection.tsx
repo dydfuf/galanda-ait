@@ -165,6 +165,7 @@ export function AccommodationSection({
                 <button
                   type="button"
                   css={removeBtnStyle}
+                  aria-label={`${idx + 1}번째 숙소 구간 삭제`}
                   onClick={() => onRemove(acc.id)}
                 >
                   삭제
@@ -173,8 +174,11 @@ export function AccommodationSection({
             </div>
 
             <div>
-              <span css={fieldLabelStyle}>숙소명 / 호텔명</span>
+              <label css={fieldLabelStyle} htmlFor={`${acc.id}-hotel-name`}>
+                숙소명 / 호텔명
+              </label>
               <input
+                id={`${acc.id}-hotel-name`}
                 type="text"
                 placeholder="예: 그랜드 조선 호텔 제주"
                 value={acc.hotelName}
@@ -201,8 +205,11 @@ export function AccommodationSection({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <span css={fieldLabelStyle}>예상 최소 금액(원)</span>
+                <label css={fieldLabelStyle} htmlFor={`${acc.id}-price-min`}>
+                  예상 최소 금액(원)
+                </label>
                 <input
+                  id={`${acc.id}-price-min`}
                   type="number"
                   placeholder="0"
                   step="10000"
@@ -216,8 +223,11 @@ export function AccommodationSection({
                 />
               </div>
               <div>
-                <span css={fieldLabelStyle}>예상 최대 금액(원)</span>
+                <label css={fieldLabelStyle} htmlFor={`${acc.id}-price-max`}>
+                  예상 최대 금액(원)
+                </label>
                 <input
+                  id={`${acc.id}-price-max`}
                   type="number"
                   placeholder="0"
                   step="10000"
@@ -234,8 +244,11 @@ export function AccommodationSection({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <span css={fieldLabelStyle}>예약 상태</span>
+                <label css={fieldLabelStyle} htmlFor={`${acc.id}-booking-status`}>
+                  예약 상태
+                </label>
                 <select
+                  id={`${acc.id}-booking-status`}
                   value={acc.bookingStatus}
                   onChange={(e) => onUpdate(acc.id, { bookingStatus: e.target.value as BookingStatus })}
                   css={selectStyle}
@@ -249,8 +262,11 @@ export function AccommodationSection({
               </div>
 
               <div>
-                <span css={fieldLabelStyle}>예약 링크 (선택)</span>
+                <label css={fieldLabelStyle} htmlFor={`${acc.id}-booking-url`}>
+                  예약 링크 (선택)
+                </label>
                 <input
+                  id={`${acc.id}-booking-url`}
                   type="url"
                   placeholder="https://"
                   value={acc.bookingUrl || ""}

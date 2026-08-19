@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { Button, FixedBottomCTA } from "@toss/tds-mobile";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema, CompareQuerySchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -8,9 +8,11 @@ import { Result } from "effect";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
+import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
+import { visuallyHiddenStyle } from "../common/a11y.ts";
 
 const pageContainerStyle = css`
-  padding: 16px 20px calc(108px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 20px 24px;
   max-width: 640px;
   margin: 0 auto;
   min-height: 100vh;
@@ -97,6 +99,13 @@ const twoColumnsGridStyle = css`
   gap: 12px;
 `;
 
+const planChoiceFieldsetStyle = css`
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+`;
+
 const planColumnBoxStyle = (isSelected: boolean) => css`
   padding: 12px 14px;
   border-radius: 12px;
@@ -107,6 +116,23 @@ const planColumnBoxStyle = (isSelected: boolean) => css`
   gap: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
+
+  /* 라디오 입력은 화면에서 숨겼기 때문에, 키보드 포커스를 라벨에 표시해요. */
+  &:has(:focus-visible) {
+    outline: 2px solid var(--adaptiveBlue500, #3182f6);
+    outline-offset: 2px;
+  }
+`;
+
+const planChoiceMetaStyle = css`
+  font-size: 12px;
+  color: var(--adaptiveGrey500, #8b95a1);
+`;
+
+const planChoiceSelectedTextStyle = css`
+  font-size: 11px;
+  color: var(--adaptiveBlue600, #1b64da);
+  font-weight: 700;
 `;
 
 const planBadgeRowStyle = css`
@@ -164,22 +190,6 @@ const opinionCountsRowStyle = css`
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-`;
-
-const fixedCtaContainerStyle = css`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 640px;
-  margin: 0 auto;
-  background-color: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  padding: 12px 20px calc(14px + env(safe-area-inset-bottom, 0px));
-  z-index: 30;
-  box-sizing: border-box;
 `;
 
 export function PlanComparePage() {
@@ -310,7 +320,7 @@ export function PlanComparePage() {
       {/* 1. 상단 핵심 차이 요약 배너 (PL-04 시안 1) */}
       <div css={summaryBannerStyle}>
         <h3 css={summaryBannerTitleStyle}>
-          <span>💡</span>
+          <span aria-hidden="true">💡</span>
           <span>핵심 차이점 요약</span>
         </h3>
         <ul css={summaryBannerListStyle}>
@@ -327,35 +337,38 @@ export function PlanComparePage() {
           <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>카드를 눌러 확정할 안을 고르세요</span>
         </div>
 
-        <div css={twoColumnsGridStyle}>
-          <div
-            css={planColumnBoxStyle(currentSelectedId === leftPlan.id)}
-            onClick={() => setSelectedPlanId(leftPlan.id)}
-          >
-            <div css={planBadgeRowStyle}>
-              <span css={planBadgeStyle(true)}>{leftPlan.planTagLabel}</span>
-              {currentSelectedId === leftPlan.id && (
-                <span style={{ fontSize: 11, color: "var(--adaptiveBlue600, #1b64da)", fontWeight: 700 }}>✓ 선택됨</span>
-              )}
-            </div>
-            <h4 css={planTitleTextStyle}>{leftPlan.title}</h4>
-            <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>{leftPlan.authorName} 제안</span>
-          </div>
+        <fieldset css={planChoiceFieldsetStyle}>
+          <legend css={visuallyHiddenStyle}>확정할 여행안 선택</legend>
 
-          <div
-            css={planColumnBoxStyle(currentSelectedId === rightPlan.id)}
-            onClick={() => setSelectedPlanId(rightPlan.id)}
-          >
-            <div css={planBadgeRowStyle}>
-              <span css={planBadgeStyle(false)}>{rightPlan.planTagLabel}</span>
-              {currentSelectedId === rightPlan.id && (
-                <span style={{ fontSize: 11, color: "var(--adaptiveBlue600, #1b64da)", fontWeight: 700 }}>✓ 선택됨</span>
-              )}
-            </div>
-            <h4 css={planTitleTextStyle}>{rightPlan.title}</h4>
-            <span style={{ fontSize: 12, color: "var(--adaptiveGrey500, #8b95a1)" }}>{rightPlan.authorName} 제안</span>
+          <div css={twoColumnsGridStyle}>
+            {[leftPlan, rightPlan].map((plan, index) => {
+              const isSelected = currentSelectedId === plan.id;
+
+              return (
+                <label key={plan.id} css={planColumnBoxStyle(isSelected)}>
+                  <input
+                    type="radio"
+                    name="compare-selected-plan"
+                    value={plan.id}
+                    checked={isSelected}
+                    onChange={() => setSelectedPlanId(plan.id)}
+                    css={visuallyHiddenStyle}
+                  />
+                  <span css={planBadgeRowStyle}>
+                    <span css={planBadgeStyle(index === 0)}>{plan.planTagLabel}</span>
+                    {isSelected && (
+                      <span css={planChoiceSelectedTextStyle}>
+                        <span aria-hidden="true">✓ </span>선택됨
+                      </span>
+                    )}
+                  </span>
+                  <span css={planTitleTextStyle}>{plan.title}</span>
+                  <span css={planChoiceMetaStyle}>{plan.authorName} 제안</span>
+                </label>
+              );
+            })}
           </div>
-        </div>
+        </fieldset>
       </section>
 
       {/* 비교 대조 항목 2: 날짜 및 도시 체류 (PL-04 시안 1) */}
@@ -467,30 +480,24 @@ export function PlanComparePage() {
       </section>
 
       {/* PL-04 시안 1 하단 고정 확정 CTA */}
-      <div css={fixedCtaContainerStyle}>
-        {isRoomConfirmed ? (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
-          >
-            확정 일정 보기
-          </Button>
-        ) : (
-          <Button
-            display="block"
-            size="large"
-            type="button"
-            disabled={confirmPlanMutation.isPending}
-            onClick={handleConfirm}
-          >
-            {confirmPlanMutation.isPending
-              ? "일정 확정 중..."
-              : `선택한 [${selectedPlan?.planTagLabel}]으로 일정 확정하기`}
-          </Button>
-        )}
-      </div>
+      {isRoomConfirmed ? (
+        <FixedBottomCTA
+          containerStyle={fixedCtaContainerStyle}
+          onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+        >
+          확정 일정 보기
+        </FixedBottomCTA>
+      ) : (
+        <FixedBottomCTA
+          containerStyle={fixedCtaContainerStyle}
+          disabled={confirmPlanMutation.isPending}
+          onClick={handleConfirm}
+        >
+          {confirmPlanMutation.isPending
+            ? "일정 확정 중..."
+            : `선택한 [${selectedPlan?.planTagLabel}]으로 일정 확정하기`}
+        </FixedBottomCTA>
+      )}
     </div>
   );
 }
