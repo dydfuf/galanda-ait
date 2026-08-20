@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Effect, Layer } from "effect";
-import { TestClock } from "effect/testing";
 import { createTripRoom } from "../create-room.ts";
 import { createPlan } from "../save-plan.ts";
 import { TripRoomRepository, type CreateRoomParams } from "../../ports/trip-room-repository.ts";
@@ -39,8 +38,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
           id: params.id,
           title: params.title,
           destination: params.destination ?? "여행지",
-          startDate: params.startDate ?? "",
-          endDate: params.endDate ?? "",
           revision: RevisionSchema.make(1),
           members: [params.hostUser],
           plans: [],
@@ -88,56 +85,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
     });
   });
 
-  describe("2. createTripRoom Effect Clock 기반 기본 날짜 생성 테스트", () => {
-    it("TestClock으로 시간을 2026-01-01로 고정했을 때 기본 시작일은 2026-01-01, 종료일은 2026-01-04가 된다", async () => {
-      const fixedIdGenerator = createTestIdGenerator({ tripId: "trip-fixed-time" });
-      const testEnv = Layer.merge(
-        Layer.merge(
-          Layer.merge(createInMemoryRepo(), createSessionLayer()),
-          fixedIdGenerator
-        ),
-        TestClock.layer()
-      );
-
-      const program = Effect.gen(function* () {
-        yield* TestClock.setTime(new Date("2026-01-01T00:00:00.000Z").getTime());
-        return yield* createTripRoom({
-          title: "겨울 여행",
-        });
-      }).pipe(Effect.provide(testEnv));
-
-      const room = await Effect.runPromise(program);
-
-      expect(room.startDate).toBe("2026-01-01");
-      expect(room.endDate).toBe("2026-01-04");
-    });
-
-    it("사용자가 시작일과 종료일을 명시적으로 입력한 경우 기본 날짜 대신 입력값을 사용한다", async () => {
-      const fixedIdGenerator = createTestIdGenerator({ tripId: "trip-custom-date" });
-      const testEnv = Layer.merge(
-        Layer.merge(
-          Layer.merge(createInMemoryRepo(), createSessionLayer()),
-          fixedIdGenerator
-        ),
-        TestClock.layer()
-      );
-
-      const program = Effect.gen(function* () {
-        yield* TestClock.setTime(new Date("2026-01-01T00:00:00.000Z").getTime());
-        return yield* createTripRoom({
-          title: "가을 여행",
-          startDate: "2026-09-10",
-          endDate: "2026-09-15",
-        });
-      }).pipe(Effect.provide(testEnv));
-
-      const room = await Effect.runPromise(program);
-
-      expect(room.startDate).toBe("2026-09-10");
-      expect(room.endDate).toBe("2026-09-15");
-    });
-  });
-
   describe("3. Repository가 ID를 재생성하지 않는지 검증 (Input ID = Stored ID = Returned ID)", () => {
     let memoryStore: Record<string, string> = {};
 
@@ -175,8 +122,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
       const program = createTripRoom({
         title: "오사카 여행",
         destination: "오사카",
-        startDate: "2026-05-01",
-        endDate: "2026-05-05",
       }).pipe(Effect.provide(testEnv));
 
       const room = await Effect.runPromise(program);
@@ -198,8 +143,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         id: TripIdSchema.make("room-plan-test"),
         title: "플랜 테스트 방",
         destination: "서울",
-        startDate: "2026-07-01",
-        endDate: "2026-07-04",
         revision: RevisionSchema.make(1),
         members: [{ id: aliceSession.userId, name: aliceSession.name, role: "HOST" }],
         plans: [],
@@ -244,8 +187,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         id: TripIdSchema.make("room-contract-001"),
         title: "유럽 배낭여행",
         destination: "파리",
-        startDate: "2026-08-01",
-        endDate: "2026-08-15",
         hostUser,
       };
 
@@ -271,8 +212,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
                       id: row.id,
                       title: row.title,
                       destination: row.destination,
-                      startDate: row.start_date,
-                      endDate: row.end_date,
                       revision: 1,
                       members: [row.host_user],
                       plans: [],
@@ -304,8 +243,6 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
 
       expect(localResult.title).toBe(supabaseResult.title);
       expect(localResult.destination).toBe(supabaseResult.destination);
-      expect(localResult.startDate).toBe(supabaseResult.startDate);
-      expect(localResult.endDate).toBe(supabaseResult.endDate);
       expect(localResult.revision).toBe(supabaseResult.revision);
     });
   });

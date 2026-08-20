@@ -209,4 +209,28 @@ describe("LocalTripRoomRepository", () => {
     expect(plan?.memberOpinions?.[0].reaction).toBe("HARD");
     expect(plan?.voteCount).toBe(0);
   });
+
+  it("legacy Room 날짜와 nights 기반 routes를 adapter 입구에서 날짜 기반 모델로 정상화한다", async () => {
+    memoryStore[STORAGE_KEY] = JSON.stringify([{
+      id: "legacy-room",
+      title: "일본 여행",
+      destination: "일본",
+      startDate: "2026-12-10",
+      endDate: "2026-12-15",
+      revision: 1,
+      members: [{ id: "host-1", name: "Host", role: "HOST" }],
+      plans: [{ id: "plan-a", title: "기본안", status: "DRAFT", routes: [{ city: "도쿄", nights: 3 }, { city: "하코네", nights: 2 }], places: [], voteCount: 0 }],
+    }]);
+
+    const room = await Effect.runPromise(Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      return yield* repo.getRoom(TripIdSchema.make("legacy-room"));
+    }).pipe(Effect.provide(LocalTripRoomRepositoryLayer)));
+
+    expect("startDate" in room).toBe(false);
+    expect(room.plans[0].routes).toEqual([
+      { city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-13" },
+      { city: "하코네", arrivalDate: "2026-12-13", departureDate: "2026-12-15" },
+    ]);
+  });
 });

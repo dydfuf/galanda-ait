@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
@@ -10,7 +10,7 @@ import {
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
-import type { TripPlan } from "../domain/room.ts";
+import { getRouteValidationError, TripPlanSchema, type TripPlan } from "../domain/room.ts";
 import { ValidationError } from "../domain/errors.ts";
 
 export interface CreatePlanInput {
@@ -38,6 +38,11 @@ export const createPlan = Effect.fn("createPlan")(
       return yield* Effect.fail(
         new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
       );
+    }
+
+    const routeError = getRouteValidationError(input.plan.routes ?? []);
+    if (routeError) {
+      return yield* Effect.fail(new ValidationError({ message: routeError }));
     }
 
     const repo = yield* TripRoomRepository;
@@ -78,6 +83,10 @@ export const createPlan = Effect.fn("createPlan")(
       }
     }
 
+    if (!Schema.is(TripPlanSchema)(finalPlan)) {
+      return yield* Effect.fail(new ValidationError({ message: "여행안 날짜 형식이 올바르지 않습니다." }));
+    }
+
     return yield* repo.createPlan(
       input.roomId,
       finalPlan,
@@ -111,6 +120,11 @@ export const updatePlan = Effect.fn("updatePlan")(
       return yield* Effect.fail(
         new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
       );
+    }
+
+    const routeError = getRouteValidationError(input.plan.routes ?? []);
+    if (routeError) {
+      return yield* Effect.fail(new ValidationError({ message: routeError }));
     }
 
     const repo = yield* TripRoomRepository;
@@ -181,6 +195,10 @@ export const updatePlan = Effect.fn("updatePlan")(
           differenceSummary: diff.summaryText,
         };
       }
+    }
+
+    if (!Schema.is(TripPlanSchema)(finalPlan)) {
+      return yield* Effect.fail(new ValidationError({ message: "여행안 날짜 형식이 올바르지 않습니다." }));
     }
 
     return yield* repo.updatePlan(

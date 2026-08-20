@@ -13,8 +13,6 @@ export interface CreateRoomParams {
   readonly id: TripId;
   readonly title: string;
   readonly destination?: string;
-  readonly startDate?: string;
-  readonly endDate?: string;
   /** 방장으로 등록할 사용자. Use Case가 세션에서 결정해 반드시 채워준다 */
   readonly hostUser: TripMember;
 }
@@ -22,8 +20,6 @@ export interface CreateRoomParams {
 export interface UpdateRoomParams {
   readonly title?: string;
   readonly destination?: string;
-  readonly startDate?: string;
-  readonly endDate?: string;
 }
 
 export class TripRoomRepository extends Context.Service<
@@ -73,5 +69,4 @@ export class TripRoomRepository extends Context.Service<
     ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
   }
 >()("galanda/ports/TripRoomRepository") {}
-
 

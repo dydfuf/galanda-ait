@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { appRuntime } from "../../app/runtime.ts";
 import { joinTripRoom } from "../../core/usecases/join-room.ts";
+import { getTripRoomDisplayDate } from "../../core/domain/room.ts";
 import { TripIdSchema } from "../../core/domain/ids.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { tripRoomKeys } from "../plan-home/queries.ts";
@@ -196,7 +197,7 @@ export function InvitePage(): JSX.Element {
             <span css={summaryLabelStyle}>목적지: </span>{room.destination}
           </div>
           <div css={summaryRowStyle}>
-            <span css={summaryLabelStyle}>일정: </span>{room.startDate} ~ {room.endDate}
+            <span css={summaryLabelStyle}>일정: </span>{(() => { const range = getTripRoomDisplayDate(room); return range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정"; })()}
           </div>
           <div>
             <span css={summaryLabelStyle}>참여 인원: </span>

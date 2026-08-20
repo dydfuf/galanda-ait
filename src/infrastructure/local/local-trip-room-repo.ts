@@ -23,6 +23,56 @@ import type { PlanId, Revision, TripId } from "../../core/domain/ids.ts";
 
 const STORAGE_KEY = "galanda_rooms_v1";
 
+const addDays = (date: string, days: number): string => {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+};
+
+const normalizeLegacyRooms = (value: unknown): unknown => {
+  if (!Array.isArray(value)) return value;
+  return value.map((candidate) => {
+    if (!candidate || typeof candidate !== "object") return candidate;
+    const room = candidate as Record<string, unknown>;
+    const legacyStart = typeof room.startDate === "string" ? room.startDate : undefined;
+    const plans = Array.isArray(room.plans)
+      ? room.plans.map((candidatePlan) => {
+          if (!candidatePlan || typeof candidatePlan !== "object") return candidatePlan;
+          const plan = candidatePlan as Record<string, unknown>;
+          if (!Array.isArray(plan.routes)) return plan;
+          let cursor = legacyStart;
+          const routes = plan.routes.flatMap((candidateStay) => {
+            if (!candidateStay || typeof candidateStay !== "object") return [];
+            const stay = candidateStay as Record<string, unknown>;
+            if (typeof stay.arrivalDate === "string" && typeof stay.departureDate === "string") {
+              cursor = stay.departureDate;
+              return [stay];
+            }
+            if (!cursor || typeof stay.nights !== "number" || stay.nights <= 0) return [];
+            const departureDate = addDays(cursor, stay.nights);
+            const normalized = {
+              city: typeof stay.city === "string" ? stay.city : "",
+              arrivalDate: cursor,
+              departureDate,
+            };
+            cursor = departureDate;
+            return [normalized];
+          });
+          const accommodations = Array.isArray(plan.accommodations)
+            ? plan.accommodations.map((item) =>
+                item && typeof item === "object" && (item as Record<string, unknown>).nights === null
+                  ? { ...(item as Record<string, unknown>), nights: 0 }
+                  : item
+              )
+            : plan.accommodations;
+          return { ...plan, routes, accommodations };
+        })
+      : room.plans;
+    const { startDate: _startDate, endDate: _endDate, ...currentRoom } = room;
+    return { ...currentRoom, plans };
+  });
+};
+
 const getStorage = (): Storage | null => {
   if (typeof window !== "undefined" && window.localStorage) {
     return window.localStorage;
@@ -62,7 +112,7 @@ const decodeRooms = (
 ): Effect.Effect<ReadonlyArray<TripRoom>, RepositoryError> =>
   Schema.decodeUnknownEffect(
     Schema.Array(TripRoomSchema)
-  )(value).pipe(
+  )(normalizeLegacyRooms(value)).pipe(
     Effect.mapError(
       () =>
         new RepositoryError({
@@ -165,8 +215,6 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
           id: params.id,
           title: params.title.trim(),
           destination: params.destination?.trim() || "여행지",
-          startDate: params.startDate ?? "",
-          endDate: params.endDate ?? "",
           revision: RevisionSchema.make(1),
           members: [params.hostUser],
           plans: [],
@@ -191,8 +239,6 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
           params.destination !== undefined
             ? params.destination.trim()
             : room.destination,
-        startDate: params.startDate ?? room.startDate,
-        endDate: params.endDate ?? room.endDate,
         revision: RevisionSchema.make(room.revision + 1),
       })),
 
@@ -323,4 +369,3 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         return updatedRoom;
       }),
   });
-

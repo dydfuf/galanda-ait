@@ -1,7 +1,12 @@
-import type {
-  BookingStatus,
-  PublicPlanMemberOpinion,
-  TripRoom,
+import {
+  getConfirmedPlan,
+  getPlanDateRange,
+  getPlanNightCount,
+  getStayNightCount,
+  getTripRoomDisplayDate,
+  type BookingStatus,
+  type PublicPlanMemberOpinion,
+  type TripRoom,
 } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
 import {
@@ -62,7 +67,7 @@ export const toPlanDetailViewModel = (
   room: TripRoom,
   currentUserId?: UserId | string
 ): PlanDetailViewModel => {
-  const confirmed = room.plans.find((p) => p.id === room.confirmedPlanId);
+  const confirmed = getConfirmedPlan(room);
   const isConfirmed = Boolean(room.confirmedPlanId);
   const viewer = getRoomActor(room, currentUserId as UserId | undefined);
 
@@ -96,7 +101,7 @@ export const toPlanDetailViewModel = (
 
     const route =
       p.routes && p.routes.length > 0
-        ? p.routes.map((r) => ({ city: r.city, nights: r.nights }))
+        ? p.routes.map((r) => ({ city: r.city, nights: getStayNightCount(r) }))
         : p.places.length > 0
           ? p.places.slice(0, 3).map((place, pIdx) => ({
               city: place.name.split(" ")[0] || room.destination,
@@ -104,8 +109,9 @@ export const toPlanDetailViewModel = (
             }))
           : [{ city: room.destination, nights: 1 }];
 
-    const nights = route.reduce((acc, curr) => acc + curr.nights, 0) || 1;
-    const days = nights + 1;
+    const range = getPlanDateRange(p);
+    const nights = getPlanNightCount(p);
+    const days = nights > 0 ? nights + 1 : 0;
 
     // 비용 계산
     const costSummary = calculatePlanCost(p.accommodations, p.transports, headcount);
@@ -258,7 +264,7 @@ export const toPlanDetailViewModel = (
       title: p.title,
       planTag: isPlanConfirmed ? "CONFIRMED" : isBasic ? "BASIC" : "ALTERNATIVE",
       planTagLabel: isBasic ? "기본안" : `대안 ${idx}`,
-      period: `${room.startDate} ~ ${room.endDate}`,
+      period: range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정",
       nights,
       days,
       route,
@@ -286,11 +292,12 @@ export const toPlanDetailViewModel = (
     };
   });
 
+  const displayDate = getTripRoomDisplayDate(room);
   return {
     id: room.id,
     title: room.title,
     destination: room.destination,
-    period: `${room.startDate} ~ ${room.endDate}`,
+    period: displayDate ? `${displayDate.startDate} ~ ${displayDate.endDate}` : "일정 미정",
     memberCount: room.members.length,
     memberNames: room.members.map((m) => m.name).join(", "),
     revision: room.revision,

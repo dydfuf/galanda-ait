@@ -1,4 +1,4 @@
-import { DateTime, Effect, Result, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
@@ -8,8 +8,6 @@ import type { TripMember } from "../domain/room.ts";
 export const CreateRoomInputSchema = Schema.Struct({
   title: Schema.NonEmptyString,
   destination: Schema.optional(Schema.String),
-  startDate: Schema.optional(Schema.String),
-  endDate: Schema.optional(Schema.String),
 });
 
 /**
@@ -19,8 +17,6 @@ export const CreateRoomInputSchema = Schema.Struct({
 export interface CreateRoomInput {
   readonly title: string;
   readonly destination?: string;
-  readonly startDate?: string;
-  readonly endDate?: string;
 }
 
 export const createTripRoom = Effect.fn("createTripRoom")(
@@ -47,27 +43,9 @@ export const createTripRoom = Effect.fn("createTripRoom")(
 
     const validated = decodeResult.success;
 
-    // 3. 날짜 정합성 검증
-    if (
-      validated.startDate &&
-      validated.endDate &&
-      validated.startDate > validated.endDate
-    ) {
-      return yield* Effect.fail(
-        new ValidationError({
-          message: "여행 종료일은 시작일 이후여야 합니다.",
-        })
-      );
-    }
-
-    // 4. 비결정적 값(ID, 기본 일정) 결정 (Use Case / Effect 경계)
+    // 3. 비결정적 값(ID) 결정 (Use Case / Effect 경계)
     const ids = yield* IdGenerator;
     const id = yield* ids.tripId;
-
-    const now = yield* DateTime.now;
-    const threeDaysLater = DateTime.add(now, { days: 3 });
-    const defaultStartDate = DateTime.formatIsoDateUtc(now);
-    const defaultEndDate = DateTime.formatIsoDateUtc(threeDaysLater);
 
     const hostUser: TripMember = {
       id: session.userId,
@@ -75,14 +53,12 @@ export const createTripRoom = Effect.fn("createTripRoom")(
       role: "HOST",
     };
 
-    // 5. 저장소 생성 요청
+    // 4. 저장소 생성 요청
     const repo = yield* TripRoomRepository;
     return yield* repo.createRoom({
       id,
       title: validated.title,
       destination: validated.destination,
-      startDate: validated.startDate || defaultStartDate,
-      endDate: validated.endDate || defaultEndDate,
       hostUser,
     });
   }

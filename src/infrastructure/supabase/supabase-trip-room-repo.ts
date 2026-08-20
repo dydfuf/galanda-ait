@@ -243,8 +243,6 @@ export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
                   id: params.id,
                   title: params.title.trim(),
                   destination: params.destination?.trim() || "여행지",
-                  start_date: params.startDate,
-                  end_date: params.endDate,
                   host_user: params.hostUser,
                 })
                 .select()
@@ -384,5 +382,4 @@ export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
     };
   })
 );
-
 

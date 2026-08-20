@@ -118,7 +118,7 @@ export function PlanCreatePage(): JSX.Element {
         status: "DRAFT" as const,
         proposalReason: proposalReason.trim() || undefined,
         baseHeadcount,
-        routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
+        routes: routes.map((r) => ({ ...r, city: r.city.trim() })),
         accommodations: [...accommodations],
         transports: [...transports],
         places: [],

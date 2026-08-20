@@ -13,11 +13,73 @@ export const PriceRangeSchema = Schema.Struct({
 });
 export type PriceRange = typeof PriceRangeSchema.Type;
 
+const isValidTravelDate = (value: string): boolean => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+};
+
+export const TravelDateSchema = Schema.String.check(
+  Schema.makeFilter(isValidTravelDate, { message: "YYYY-MM-DD 형식의 유효한 날짜여야 합니다." })
+);
+export type TravelDate = typeof TravelDateSchema.Type;
+
 export const CityStaySchema = Schema.Struct({
   city: Schema.String,
-  nights: Schema.Number,
+  arrivalDate: TravelDateSchema,
+  departureDate: TravelDateSchema,
 });
 export type CityStay = typeof CityStaySchema.Type;
+
+export interface PlanDateRange {
+  readonly startDate: TravelDate;
+  readonly endDate: TravelDate;
+}
+
+export const getStayNightCount = (stay: CityStay): number => {
+  const nights = Math.round(
+    (Date.parse(`${stay.departureDate}T00:00:00Z`) -
+      Date.parse(`${stay.arrivalDate}T00:00:00Z`)) /
+      86_400_000
+  );
+  return Number.isFinite(nights) ? nights : 0;
+};
+
+export const getPlanDateRange = (
+  plan: Pick<TripPlan, "routes">
+): PlanDateRange | undefined => {
+  const routes = plan.routes ?? [];
+  const first = routes[0];
+  const last = routes[routes.length - 1];
+  return first && last
+    ? { startDate: first.arrivalDate, endDate: last.departureDate }
+    : undefined;
+};
+
+export const getPlanNightCount = (plan: Pick<TripPlan, "routes">): number => {
+  const range = getPlanDateRange(plan);
+  return range
+    ? Math.round((Date.parse(`${range.endDate}T00:00:00Z`) - Date.parse(`${range.startDate}T00:00:00Z`)) / 86_400_000)
+    : 0;
+};
+
+/** 공백은 허용하지만, 잘못된 체류 구간과 앞 체류와의 겹침은 거부한다. */
+export const getRouteValidationError = (
+  routes: ReadonlyArray<CityStay>
+): string | undefined => {
+  for (let index = 0; index < routes.length; index += 1) {
+    const stay = routes[index];
+    if (stay.arrivalDate >= stay.departureDate) {
+      return `${stay.city || "도시"}의 출발일은 도착일 이후여야 합니다.`;
+    }
+    const previous = routes[index - 1];
+    if (previous && previous.departureDate > stay.arrivalDate) {
+      return "도시 체류 일정은 서로 겹칠 수 없습니다.";
+    }
+  }
+  return undefined;
+};
 
 export const AccommodationSnapshotSchema = Schema.Struct({
   id: Schema.String,
@@ -99,14 +161,22 @@ export const TripRoomSchema = Schema.Struct({
   id: TripIdSchema,
   title: Schema.String,
   destination: Schema.String,
-  startDate: Schema.String,
-  endDate: Schema.String,
   revision: RevisionSchema,
   members: Schema.Array(TripMemberSchema),
   plans: Schema.Array(TripPlanSchema),
   confirmedPlanId: Schema.optional(PlanIdSchema),
 });
 export type TripRoom = typeof TripRoomSchema.Type;
+
+export const getConfirmedPlan = (room: TripRoom): TripPlan | undefined =>
+  room.plans.find((plan) => plan.id === room.confirmedPlanId);
+
+export const getTripRoomDisplayDate = (
+  room: TripRoom
+): PlanDateRange | undefined => {
+  const plan = getConfirmedPlan(room);
+  return plan ? getPlanDateRange(plan) : undefined;
+};
 
 export const UserSessionSchema = Schema.Struct({
   userId: UserIdSchema,

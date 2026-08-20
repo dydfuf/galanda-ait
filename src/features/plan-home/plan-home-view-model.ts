@@ -1,4 +1,4 @@
-import type { TripRoom } from "../../core/domain/room.ts";
+import { getConfirmedPlan, getPlanDateRange, getPlanNightCount, getTripRoomDisplayDate, type TripRoom } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
 import { isPlanAuthor, canManagePlan } from "../../core/domain/auth-guards.ts";
 
@@ -30,8 +30,8 @@ export interface TripRoomViewModel {
   readonly id: string;
   readonly title: string;
   readonly destination: string;
-  readonly startDate?: string;
-  readonly endDate?: string;
+  readonly displayStartDate?: string;
+  readonly displayEndDate?: string;
   readonly period: string;
   readonly memberCount: number;
   readonly memberNames: string;
@@ -60,7 +60,7 @@ export const toTripRoomViewModel = (
   room: TripRoom,
   currentUserId?: UserId | string
 ): TripRoomViewModel => {
-  const confirmed = room.plans.find((p) => p.id === room.confirmedPlanId);
+  const confirmed = getConfirmedPlan(room);
   const isConfirmed = Boolean(room.confirmedPlanId);
 
   // 결정 상태 문구 결정 (기획 문서 PL-01 명세)
@@ -88,18 +88,9 @@ export const toTripRoomViewModel = (
       p.authorName ??
       room.members.find((m) => m.id === p.authorId)?.name ??
       (room.members[0]?.name ?? "작성자");
-    const route =
-      p.routes && p.routes.length > 0
-        ? p.routes.map((r) => ({ city: r.city, nights: r.nights }))
-        : p.places.length > 0
-          ? p.places.slice(0, 3).map((place, pIdx) => ({
-              city: place.name.split(" ")[0] || room.destination,
-              nights: pIdx === 0 ? 1 : 2,
-            }))
-          : [{ city: room.destination, nights: 1 }];
-
-    const nights = route.reduce((acc, curr) => acc + curr.nights, 0) || 1;
-    const days = nights + 1;
+    const range = getPlanDateRange(p);
+    const nights = getPlanNightCount(p);
+    const days = nights > 0 ? nights + 1 : 0;
 
     const likeCount = p.memberOpinions
       ? p.memberOpinions.filter((m) => m.reaction === "LIKE").length
@@ -124,7 +115,7 @@ export const toTripRoomViewModel = (
       title: p.title,
       planTag: isPlanConfirmed ? "CONFIRMED" : isBasic ? "BASIC" : "ALTERNATIVE",
       planTagLabel: isBasic ? "기본안" : `대안 ${idx}`,
-      period: `${room.startDate} ~ ${room.endDate}`,
+      period: range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정",
       nights,
       days,
       differenceSummary: p.differenceSummary,
@@ -142,13 +133,14 @@ export const toTripRoomViewModel = (
     };
   });
 
+  const displayDate = getTripRoomDisplayDate(room);
   return {
     id: room.id,
     title: room.title,
     destination: room.destination,
-    startDate: room.startDate,
-    endDate: room.endDate,
-    period: `${room.startDate} ~ ${room.endDate}`,
+    displayStartDate: displayDate?.startDate,
+    displayEndDate: displayDate?.endDate,
+    period: displayDate ? `${displayDate.startDate} ~ ${displayDate.endDate}` : "일정 미정",
     memberCount: room.members.length,
     memberNames: room.members.map((m) => m.name).join(", "),
     revision: room.revision,

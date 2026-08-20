@@ -172,8 +172,6 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
     id: TripIdSchema.make("room-101"),
     title: "제주도 3박 4일",
     destination: "제주도",
-    startDate: "2026-09-01",
-    endDate: "2026-09-04",
     revision: RevisionSchema.make(1),
     members: [hostUser, authorUser, strangerUser],
     plans: [hostPlan, authorPlan],
@@ -916,7 +914,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
             title: "  공백이 정리된 제목  ",
             proposalReason: "숙소를 바꿨어요",
             baseHeadcount: 5,
-            routes: [{ city: "서귀포", nights: 3 }],
+            routes: [{ city: "서귀포", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
           },
           expectedRevision: roomWithOpinions.revision,
         }).pipe(Effect.provide(env))
@@ -926,7 +924,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(target?.title).toBe("공백이 정리된 제목");
       expect(target?.proposalReason).toBe("숙소를 바꿨어요");
       expect(target?.baseHeadcount).toBe(5);
-      expect(target?.routes).toEqual([{ city: "서귀포", nights: 3 }]);
+      expect(target?.routes).toEqual([{ city: "서귀포", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }]);
     });
 
     it("확정된 여행안은 작성자도 수정할 수 없고 원본이 보존된다", async () => {

@@ -1,7 +1,6 @@
 import { css } from "@emotion/react";
-import type { CityStay } from "../../../core/domain/room.ts";
+import { getStayNightCount, type CityStay } from "../../../core/domain/room.ts";
 import { RouteRail } from "../../common/RouteRail.tsx";
-import { visuallyHiddenStyle } from "../../common/a11y.ts";
 
 const cardStyle = css`
   background-color: var(--adaptiveBackground, #ffffff);
@@ -90,44 +89,6 @@ const cityInputStyle = css`
   }
 `;
 
-const nightControlsStyle = css`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-`;
-
-const nightBtnStyle = css`
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid var(--adaptiveGrey300, #d1d6db);
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey800, #333d4b);
-  font-size: 14px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-`;
-
-const nightValueStyle = css`
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-  min-width: 28px;
-  text-align: center;
-`;
-
 const deleteCityBtnStyle = css`
   background: none;
   border: none;
@@ -162,7 +123,7 @@ interface RouteCitySectionProps {
   readonly totalTripNights: number;
   readonly currentTotalNights: number;
   readonly differenceSummary?: string;
-  readonly onAddCity: (city?: string, nights?: number) => void;
+  readonly onAddCity: (city?: string) => void;
   readonly onUpdateCity: (index: number, updated: Partial<CityStay>) => void;
   readonly onRemoveCity: (index: number) => void;
 }
@@ -192,7 +153,7 @@ export function RouteCitySection({
       {/* 실시간 압축 경로 레일 미리보기 */}
       <div css={previewBoxStyle}>
         <span css={previewLabelStyle}>경로 미리보기</span>
-        <RouteRail route={routes} differenceSummary={differenceSummary} />
+        <RouteRail route={routes.map((stay) => ({ city: stay.city, nights: Math.max(0, getStayNightCount(stay)) }))} differenceSummary={differenceSummary} />
       </div>
 
       {/* 도시 목록 입력 및 박수 조절 */}
@@ -210,30 +171,8 @@ export function RouteCitySection({
               onChange={(e) => onUpdateCity(idx, { city: e.target.value })}
               css={cityInputStyle}
             />
-            <fieldset css={nightControlsStyle}>
-              <legend css={visuallyHiddenStyle}>{`도시 ${idx + 1} 체류 박수`}</legend>
-              <button
-                type="button"
-                css={nightBtnStyle}
-                aria-label={`도시 ${idx + 1} 체류 1박 줄이기`}
-                disabled={stay.nights <= 1}
-                onClick={() => onUpdateCity(idx, { nights: Math.max(1, stay.nights - 1) })}
-              >
-                <span aria-hidden="true">-</span>
-              </button>
-              <span css={nightValueStyle} aria-live="polite">
-                {stay.nights}박
-              </span>
-              <button
-                type="button"
-                css={nightBtnStyle}
-                aria-label={`도시 ${idx + 1} 체류 1박 늘리기`}
-                disabled={stay.nights >= 30}
-                onClick={() => onUpdateCity(idx, { nights: stay.nights + 1 })}
-              >
-                <span aria-hidden="true">+</span>
-              </button>
-            </fieldset>
+            <input type="date" aria-label={`도시 ${idx + 1} 도착일`} value={stay.arrivalDate} onChange={(e) => onUpdateCity(idx, { arrivalDate: e.target.value })} />
+            <input type="date" aria-label={`도시 ${idx + 1} 출발일`} value={stay.departureDate} onChange={(e) => onUpdateCity(idx, { departureDate: e.target.value })} />
             {routes.length > 1 && (
               <button
                 type="button"
@@ -249,7 +188,7 @@ export function RouteCitySection({
 
         <button
           type="button"
-          onClick={() => onAddCity("", 1)}
+          onClick={() => onAddCity("")}
           css={addCityButtonStyle}
         >
           + 경유 도시 추가

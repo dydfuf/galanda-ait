@@ -51,8 +51,6 @@ const createInMemoryRepositoryLayer = (
         id: params.id,
         title: params.title,
         destination: params.destination ?? "목적지",
-        startDate: params.startDate ?? "2026-09-01",
-        endDate: params.endDate ?? "2026-09-05",
         revision: RevisionSchema.make(1),
         members: [params.hostUser],
         plans: [],
@@ -84,8 +82,6 @@ const createInMemoryRepositoryLayer = (
         ...room,
         title: params.title ?? room.title,
         destination: params.destination ?? room.destination,
-        startDate: params.startDate ?? room.startDate,
-        endDate: params.endDate ?? room.endDate,
         revision: RevisionSchema.make(room.revision + 1),
       };
       rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
@@ -341,8 +337,6 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     id: TripIdSchema.make("room-1"),
     title: "제주도 힐링 여행",
     destination: "제주도",
-    startDate: "2026-09-01",
-    endDate: "2026-09-05",
     revision: RevisionSchema.make(1),
     members: [
       { id: UserIdSchema.make("user-alice"), name: "앨리스", role: "HOST" },

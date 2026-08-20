@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { AccommodationSnapshot, CityStay, TransportSnapshot, TripPlan, TripRoom } from "../../../core/domain/room.ts";
+import { getRouteValidationError, getStayNightCount, type AccommodationSnapshot, type CityStay, type TransportSnapshot, type TripPlan, type TripRoom } from "../../../core/domain/room.ts";
 import { calculatePlanCost } from "../../../core/calculations/plan-cost.ts";
 import { calculatePlanDifference } from "../../../core/calculations/plan-diff.ts";
 
@@ -13,28 +13,11 @@ export interface PlanEditorFormData {
   readonly clonedFromPlanId?: string;
 }
 
-export function getTripTotalNights(startDate: string, endDate: string): number {
-  try {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = end.getTime() - start.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 3;
-  } catch {
-    return 3;
-  }
-}
-
 export function usePlanEditorState(
   room: TripRoom | undefined,
   initialPlan?: TripPlan,
   cloneFromPlan?: TripPlan
 ) {
-  const totalTripNights = useMemo(() => {
-    if (!room) return 3;
-    return getTripTotalNights(room.startDate, room.endDate);
-  }, [room]);
-
   const defaultRoutes: ReadonlyArray<CityStay> = useMemo(() => {
     if (cloneFromPlan?.routes && cloneFromPlan.routes.length > 0) {
       return cloneFromPlan.routes;
@@ -43,11 +26,8 @@ export function usePlanEditorState(
       return initialPlan.routes;
     }
     const dest = room?.destination || "제주도";
-    return [
-      { city: dest, nights: Math.max(1, totalTripNights - 1) },
-      { city: "인근 지역", nights: 1 },
-    ];
-  }, [cloneFromPlan, initialPlan, room, totalTripNights]);
+    return [{ city: dest, arrivalDate: "", departureDate: "" }];
+  }, [cloneFromPlan, initialPlan, room]);
 
   const defaultAccommodations: ReadonlyArray<AccommodationSnapshot> = useMemo(() => {
     if (cloneFromPlan?.accommodations && cloneFromPlan.accommodations.length > 0) {
@@ -61,14 +41,14 @@ export function usePlanEditorState(
         id: `stay-temp-1`,
         city: defaultRoutes[0]?.city ?? (room?.destination || "제주도"),
         period: "전체 일정",
-        nights: defaultRoutes[0]?.nights ?? totalTripNights,
+        nights: defaultRoutes[0] ? Math.max(0, getStayNightCount(defaultRoutes[0])) : 0,
         hotelName: "숙소 찾는 중",
         isSearching: true,
         bookingStatus: "NEED_CHECK",
         priceRange: { min: 0, max: 0 },
       },
     ];
-  }, [cloneFromPlan, initialPlan, defaultRoutes, room, totalTripNights]);
+  }, [cloneFromPlan, initialPlan, defaultRoutes, room]);
 
   const defaultTransports: ReadonlyArray<TransportSnapshot> = useMemo(() => {
     if (cloneFromPlan?.transports && cloneFromPlan.transports.length > 0) {
@@ -108,7 +88,7 @@ export function usePlanEditorState(
 
   // 도시 박수 합계 계산
   const currentTotalNights = useMemo(() => {
-    return routes.reduce((sum, r) => sum + r.nights, 0);
+    return routes.reduce((sum, r) => sum + Math.max(0, getStayNightCount(r)), 0);
   }, [routes]);
 
   // 비용 계산
@@ -138,19 +118,15 @@ export function usePlanEditorState(
     if (routes.length === 0) {
       errors.push("최소 1개 이상의 방문 도시를 추가해주세요.");
     }
-    if (currentTotalNights !== totalTripNights) {
-      errors.push(`도시 체류 박수 합계(${currentTotalNights}박)가 전체 여행 박수(${totalTripNights}박)와 일치해야 합니다.`);
-    }
     for (const r of routes) {
       if (!r.city.trim()) {
         errors.push("도시 이름을 모두 입력해주세요.");
         break;
       }
-      if (r.nights <= 0) {
-        errors.push(`${r.city || "도시"}의 체류 박수는 1박 이상이어야 합니다.`);
-        break;
-      }
+      if (!r.arrivalDate || !r.departureDate) errors.push(`${r.city || "도시"}의 도착일과 출발일을 입력해주세요.`);
     }
+    const routeError = getRouteValidationError(routes);
+    if (routeError) errors.push(routeError);
 
     return {
       isValid: errors.length === 0,
@@ -158,11 +134,11 @@ export function usePlanEditorState(
       errorCount: errors.length,
       errors,
     };
-  }, [title, routes, currentTotalNights, totalTripNights]);
+  }, [title, routes]);
 
   // 도시 관리 핸들러
-  const handleAddCity = useCallback((city: string = "", nights: number = 1) => {
-    setRoutes((prev) => [...prev, { city, nights }]);
+  const handleAddCity = useCallback((city: string = "") => {
+    setRoutes((prev) => [...prev, { city, arrivalDate: "", departureDate: "" }]);
     setLastSavedTime(new Date());
   }, []);
 
@@ -258,7 +234,7 @@ export function usePlanEditorState(
     setBaseHeadcount: (val: number) => { setBaseHeadcount(val); setLastSavedTime(new Date()); },
     routes,
     setRoutes,
-    totalTripNights,
+    totalTripNights: currentTotalNights,
     currentTotalNights,
     handleAddCity,
     handleUpdateCity,

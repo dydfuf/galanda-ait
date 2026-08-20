@@ -175,7 +175,7 @@ export function PlanEditPage(): JSX.Element {
         title: title.trim(),
         proposalReason: proposalReason.trim() || undefined,
         baseHeadcount,
-        routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
+        routes: routes.map((r) => ({ ...r, city: r.city.trim() })),
         accommodations: [...accommodations],
         transports: [...transports],
       };

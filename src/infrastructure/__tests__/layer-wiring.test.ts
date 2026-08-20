@@ -129,8 +129,6 @@ describe("Infrastructure Layer Wiring & Config", () => {
       const program = createTripRoom({
         title: "제주도 여행",
         destination: "제주",
-        startDate: "2026-09-01",
-        endDate: "2026-09-05",
       });
 
       const room = await Effect.runPromise(

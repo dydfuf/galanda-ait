@@ -34,14 +34,14 @@ const getTripEntryPath = (room: TripRoomViewModel): string => {
 };
 
 const getTripPeriodText = (room: TripRoomViewModel): string => {
-  if (!room.startDate || !room.endDate) return "일정 미정";
+  if (!room.displayStartDate || !room.displayEndDate) return "일정 미정";
 
   const formatDate = (date: string): string => {
     const match = /^(?:\d{4})-(\d{2})-(\d{2})$/.exec(date);
     return match ? `${Number(match[1])}.${Number(match[2])}` : date;
   };
 
-  return `${formatDate(room.startDate)} ~ ${formatDate(room.endDate)}`;
+  return `${formatDate(room.displayStartDate)} ~ ${formatDate(room.displayEndDate)}`;
 };
 
 export function TripListPage() {
@@ -63,14 +63,14 @@ export function TripListPage() {
   const now = new Date();
   const ongoingRooms =
     rooms?.filter((room) => {
-      if (!room.endDate) return true;
-      const end = new Date(room.endDate);
+      if (!room.displayEndDate) return true;
+      const end = new Date(room.displayEndDate);
       return end >= now || Number.isNaN(end.getTime());
     }) ?? [];
   const pastRooms =
     rooms?.filter((room) => {
-      if (!room.endDate) return false;
-      const end = new Date(room.endDate);
+      if (!room.displayEndDate) return false;
+      const end = new Date(room.displayEndDate);
       return end < now && !Number.isNaN(end.getTime());
     }) ?? [];
   const displayRooms = activeTab === "ONGOING" ? ongoingRooms : pastRooms;
