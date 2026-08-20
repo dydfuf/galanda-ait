@@ -1,6 +1,6 @@
 import { FixedBottomCTA, List, ListHeader, Top } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
-import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
+import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
@@ -8,9 +8,11 @@ import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { DecisionStatusBanner } from "../common/DecisionStatusBanner.tsx";
 import { PageState } from "../common/PageState.tsx";
-import { PlanCard } from "./components/PlanCard.tsx";
+import { PlanListRow } from "./components/PlanListRow.tsx";
+import { toTripRoomViewModel } from "./plan-home-view-model.ts";
 import {
   fixedCtaContainerStyle,
+  tdsPageStyle,
   tdsPageWithBottomCtaStyle,
 } from "../common/tds-layout.ts";
 
@@ -24,15 +26,16 @@ export function PlanHomePage() {
   const {
     isError: isSessionError,
     error: sessionError,
+    data: session,
     refetch: refetchSession,
   } = useSessionQuery();
   const {
-    data: room,
+    data: rawRoom,
     isLoading,
     isError,
     error,
     refetch: refetchRoom,
-  } = useTripRoomDetailQuery(tripId);
+  } = useTripRoomRawQuery(tripId);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -53,7 +56,7 @@ export function PlanHomePage() {
     );
   }
 
-  if (isError || !room) {
+  if (isError || !rawRoom) {
     return (
       <RouteErrorFallback
         title="여행 정보를 찾을 수 없습니다"
@@ -63,6 +66,8 @@ export function PlanHomePage() {
       />
     );
   }
+
+  const room = toTripRoomViewModel(rawRoom, session?.userId);
 
   const isConfirmed = Boolean(room.confirmedPlanId);
   const plans = room.plans;
@@ -74,7 +79,7 @@ export function PlanHomePage() {
       }
     : plans.length >= 2
       ? {
-          label: `여행안 비교하기 (${plans.length}개)`,
+          label: "여행안 비교하기",
           onClick: () =>
             navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`),
         }
@@ -84,12 +89,12 @@ export function PlanHomePage() {
         };
 
   return (
-    <div css={tdsPageWithBottomCtaStyle}>
+    <div css={plans.length === 0 ? tdsPageStyle : tdsPageWithBottomCtaStyle}>
       <Top
         title={<Top.TitleParagraph>{room.title}</Top.TitleParagraph>}
         subtitleBottom={
           <Top.SubtitleParagraph>
-            {room.destination} · {room.period} · {room.memberNames}
+            {room.destination} · {room.period} · 참여 {room.memberCount}명
           </Top.SubtitleParagraph>
         }
       />
@@ -103,10 +108,10 @@ export function PlanHomePage() {
       <ListHeader
         size="medium"
         descriptionPosition="bottom"
-        title={<ListHeader.TitleParagraph>제안된 여행안 ({plans.length})</ListHeader.TitleParagraph>}
+        title={<ListHeader.TitleParagraph>여행안</ListHeader.TitleParagraph>}
         description={
           <ListHeader.DescriptionParagraph>
-            여행안을 눌러 상세 일정과 숙소·교통을 확인하세요.
+            후보를 훑어보고 자세히 볼 여행안을 선택하세요.
           </ListHeader.DescriptionParagraph>
         }
       />
@@ -114,15 +119,15 @@ export function PlanHomePage() {
       {plans.length === 0 ? (
         <PageState
           status="empty"
-          title="아직 제안된 여행안이 없습니다"
-          description="첫 여행안을 만들어 친구들과 비교해보세요."
-          actionText="첫 여행안 만들기"
-          onAction={() => navigate(`/trips/${tripId}/plans/new`)}
+          title="아직 여행안이 없어요"
+          description="첫 여행안을 만들어 친구들과 함께 골라보세요."
+          actionText={primaryCta.label}
+          onAction={primaryCta.onClick}
         />
       ) : (
         <List aria-label="제안된 여행안">
           {plans.map((plan) => (
-            <PlanCard
+            <PlanListRow
               key={plan.id}
               plan={plan}
               to={`/trips/${tripId}/plans/${plan.id}`}
@@ -131,9 +136,11 @@ export function PlanHomePage() {
         </List>
       )}
 
-      <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={primaryCta.onClick}>
-        {primaryCta.label}
-      </FixedBottomCTA>
+      {plans.length > 0 && (
+        <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={primaryCta.onClick}>
+          {primaryCta.label}
+        </FixedBottomCTA>
+      )}
     </div>
   );
 }

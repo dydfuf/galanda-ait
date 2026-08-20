@@ -1,7 +1,30 @@
 import type { TripRoom } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
 import { isPlanAuthor, canManagePlan } from "../../core/domain/auth-guards.ts";
-import type { PlanCardData } from "./components/PlanCard.tsx";
+
+export interface PlanOpinionCounts {
+  readonly likeCount: number;
+  readonly okayCount: number;
+  readonly hardCount: number;
+}
+
+export interface PlanSummaryData {
+  readonly id: string;
+  readonly title: string;
+  readonly planTag: "BASIC" | "ALTERNATIVE" | "CONFIRMED";
+  readonly planTagLabel: string;
+  readonly period: string;
+  readonly nights: number;
+  readonly days: number;
+  readonly differenceSummary?: string;
+  readonly authorId?: string;
+  readonly authorName: string;
+  readonly isAuthor?: boolean;
+  readonly canManage?: boolean;
+  readonly opinions: PlanOpinionCounts;
+  readonly myReaction?: "LIKE" | "OKAY" | "HARD";
+  readonly isConfirmed: boolean;
+}
 
 export interface TripRoomViewModel {
   readonly id: string;
@@ -17,7 +40,7 @@ export interface TripRoomViewModel {
   readonly confirmedPlanTitle?: string;
   readonly decisionStatusText: string;
   readonly decisionSubText: string;
-  readonly plans: ReadonlyArray<PlanCardData>;
+  readonly plans: ReadonlyArray<PlanSummaryData>;
 }
 
 export const toTripRoomViewModel = (
@@ -45,17 +68,13 @@ export const toTripRoomViewModel = (
     decisionSubText = "마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.";
   }
 
-  const baseMembers = room.members.length > 0 ? room.members.length : 1;
-
-  const plans: ReadonlyArray<PlanCardData> = room.plans.map((p, idx) => {
+  const plans: ReadonlyArray<PlanSummaryData> = room.plans.map((p, idx) => {
     const isPlanConfirmed = p.id === room.confirmedPlanId;
     const isBasic = idx === 0;
     const authorName =
       p.authorName ??
       room.members.find((m) => m.id === p.authorId)?.name ??
       (room.members[0]?.name ?? "작성자");
-    const headcount = p.baseHeadcount ?? baseMembers;
-
     const route =
       p.routes && p.routes.length > 0
         ? p.routes.map((r) => ({ city: r.city, nights: r.nights }))
@@ -68,55 +87,6 @@ export const toTripRoomViewModel = (
 
     const nights = route.reduce((acc, curr) => acc + curr.nights, 0) || 1;
     const days = nights + 1;
-
-    let minTotal = 0;
-    let maxTotal = 0;
-    let hasCost = false;
-
-    if (p.accommodations) {
-      for (const a of p.accommodations) {
-        if (a.priceRange && (a.priceRange.min > 0 || a.priceRange.max > 0)) {
-          minTotal += a.priceRange.min;
-          maxTotal += a.priceRange.max;
-          hasCost = true;
-        }
-      }
-    }
-    if (p.transports) {
-      for (const t of p.transports) {
-        if (t.priceRange && (t.priceRange.min > 0 || t.priceRange.max > 0)) {
-          minTotal += t.priceRange.min;
-          maxTotal += t.priceRange.max;
-          hasCost = true;
-        }
-      }
-    }
-
-    const groupCostText = hasCost
-      ? minTotal === maxTotal
-        ? `그룹 총액 약 ${Math.round(minTotal / 10000)}만원`
-        : `그룹 총액 약 ${Math.round(minTotal / 10000)}~${Math.round(maxTotal / 10000)}만원`
-      : "예상 경비 미정";
-
-    const perPersonCostText = hasCost
-      ? minTotal === maxTotal
-        ? `${headcount}명 기준 1인 ${Math.round(minTotal / headcount / 10000)}만원`
-        : `${headcount}명 기준 1인 ${Math.round(minTotal / headcount / 10000)}~${Math.round(maxTotal / headcount / 10000)}만원`
-      : "비용 미정";
-
-    // 예약 경고 상태 계산
-    let bookingAlert: string | undefined = undefined;
-    if (p.accommodations) {
-      const fullStay = p.accommodations.find((a) => a.bookingStatus === "FULL");
-      const checkStay = p.accommodations.find(
-        (a) => a.bookingStatus === "NEED_CHECK"
-      );
-      if (fullStay) {
-        bookingAlert = `${fullStay.city} 숙소 만실 확인 필요`;
-      } else if (checkStay) {
-        bookingAlert = `${checkStay.city} 숙소 잔여 객실 확인 필요`;
-      }
-    }
 
     const likeCount = p.memberOpinions
       ? p.memberOpinions.filter((m) => m.reaction === "LIKE").length
@@ -144,11 +114,7 @@ export const toTripRoomViewModel = (
       period: `${room.startDate} ~ ${room.endDate}`,
       nights,
       days,
-      route,
       differenceSummary: p.differenceSummary,
-      groupCostText,
-      perPersonCostText,
-      bookingAlert,
       authorId: p.authorId,
       authorName,
       isAuthor,
