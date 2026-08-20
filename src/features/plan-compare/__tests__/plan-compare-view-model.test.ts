@@ -9,6 +9,7 @@ import type { TripRoom } from "../../../core/domain/room.ts";
 import { toPlanDetailViewModel } from "../../plan-detail/plan-detail-view-model.ts";
 import {
   buildConfirmPlanSummary,
+  buildPlanCompareDifferences,
   canSubmitConfirm,
   getCompareConfirmState,
 } from "../plan-compare-view-model.ts";
@@ -161,5 +162,52 @@ describe("확정 전 재확인 요약 (RAON-143)", (): void => {
 
     expect(summary.groupCostText).toBe("예상 경비 미정");
     expect(summary.needCheckMessages).toHaveLength(0);
+  });
+});
+
+describe("변경 항목 우선 비교 (RAON-166)", (): void => {
+  it("일정·예약·비용 순서로 다른 행만 반환한다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const left = vm.plans.find((plan) => plan.id === "plan-basic");
+    const right = vm.plans.find((plan) => plan.id === "plan-alt");
+    if (!left || !right) throw new Error("fixture에 비교할 두 여행안이 있어야 한다");
+
+    const differences = buildPlanCompareDifferences(left, right);
+
+    expect(differences.map((difference) => difference.kind)).toEqual([
+      "SCHEDULE",
+      "BOOKING",
+      "COST",
+    ]);
+    expect(differences.find((difference) => difference.kind === "BOOKING")?.leftValue).toContain("1건");
+  });
+
+  it("차이가 없으면 모든 항목을 접는다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    expect(buildPlanCompareDifferences(plan, plan)).toEqual([]);
+  });
+
+  it("비용 차이는 1인 기준 delta로 표현한다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const changedCostPlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      costSummary: {
+        ...plan.costSummary,
+        minPerPerson: plan.costSummary.minPerPerson + 10000,
+        maxPerPerson: plan.costSummary.maxPerPerson + 10000,
+      },
+    };
+    const costDifference = buildPlanCompareDifferences(plan, changedCostPlan).find(
+      (difference) => difference.kind === "COST"
+    );
+
+    expect(costDifference?.deltaText).toBe("1인 기준 +1만원");
   });
 });

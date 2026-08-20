@@ -10,7 +10,11 @@ import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
 import type { TimelineItem } from "./components/DetailTimeline.tsx";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
 import type { PlanSummaryData } from "../plan-home/plan-home-view-model.ts";
-import { calculatePlanCost, formatCostRangeText } from "../../core/calculations/plan-cost.ts";
+import {
+  calculatePlanCost,
+  formatCostRangeText,
+  type PlanCostSummary,
+} from "../../core/calculations/plan-cost.ts";
 
 export interface PlanMemberOpinionViewModel {
   readonly userId: string;
@@ -21,6 +25,7 @@ export interface PlanMemberOpinionViewModel {
 
 export interface DetailedPlanViewModel extends PlanSummaryData {
   readonly route: ReadonlyArray<{ readonly city: string; readonly nights: number }>;
+  readonly costSummary: PlanCostSummary;
   readonly groupCostText: string;
   readonly perPersonCostText: string;
   readonly bookingAlert?: string;
@@ -254,6 +259,7 @@ export const toPlanDetailViewModel = (
       nights,
       days,
       route,
+      costSummary,
       differenceSummary: p.differenceSummary,
       groupCostText,
       perPersonCostText,
