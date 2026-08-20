@@ -33,46 +33,47 @@ const formatRoute = (plan: DetailedPlanViewModel): string =>
 const formatSchedule = (plan: DetailedPlanViewModel): string =>
   `${plan.period} · ${plan.nights}박 ${plan.days}일 · ${formatRoute(plan)}`;
 
-const formatBooking = (plan: DetailedPlanViewModel): string => {
-  if (plan.bookingRisks.length === 0) return "확인 필요 0건";
-  if (plan.timelineItems.length === 0) return "예약 정보 없음";
-
-  const hasDanger = plan.bookingRisks.some((risk) => risk.level === "DANGER");
-  const riskDetails = plan.bookingRisks.map((risk) => risk.message).join(" · ");
-  return `${plan.bookingRisks.length}건 확인 필요${hasDanger ? " · 예약 불가 포함" : ""} · ${riskDetails}`;
+const formatBookingStatus = (
+  status: "AVAILABLE" | "NEED_CHECK" | "FULL" | "SEARCHING"
+): string => {
+  switch (status) {
+    case "FULL":
+      return "예약 불가";
+    case "NEED_CHECK":
+      return "확인 필요";
+    case "SEARCHING":
+      return "아직 확인 전";
+    default:
+      return "예약 가능";
+  }
 };
 
-const bookingItemSignature = (
+const formatBookingItem = (
   item: DetailedPlanViewModel["timelineItems"][number]
 ): string | undefined => {
   if (item.type === "STAY" && item.stay) {
     if (item.stay.bookingStatus === "AVAILABLE") return undefined;
-    return JSON.stringify([
-      "STAY",
-      item.stay.id,
-      item.stay.city,
-      item.stay.period,
-      item.stay.nights,
-      item.stay.hotelName,
-      item.stay.bookingStatus,
-    ]);
+    return `숙소 ${item.stay.city} · ${item.stay.period} · ${item.stay.nights}박 · ${item.stay.hotelName} · ${formatBookingStatus(item.stay.bookingStatus)}`;
   }
 
   if (item.type === "TRANSPORT" && item.transport) {
     if (item.transport.bookingStatus === "AVAILABLE") return undefined;
-    return JSON.stringify([
-      "TRANSPORT",
-      item.transport.id,
-      item.transport.fromCity,
-      item.transport.toCity,
-      item.transport.mode,
-      item.transport.hasTransfer,
-      item.transport.durationText,
-      item.transport.bookingStatus,
-    ]);
+    return `이동 ${item.transport.fromCity} → ${item.transport.toCity} · ${item.transport.mode} · ${item.transport.hasTransfer ? "환승 필요" : "직통"} · ${item.transport.durationText} · ${formatBookingStatus(item.transport.bookingStatus)}`;
   }
 
   return undefined;
+};
+
+const formatBooking = (plan: DetailedPlanViewModel): string => {
+  if (plan.bookingRisks.length === 0) return "확인 필요 0건";
+
+  const hasDanger = plan.bookingRisks.some((risk) => risk.level === "DANGER");
+  const riskDetails = plan.bookingRisks.map((risk) => risk.message).join(" · ");
+  const bookingDetails = plan.timelineItems
+    .map(formatBookingItem)
+    .filter((detail): detail is string => detail !== undefined)
+    .join(" · ");
+  return `${plan.bookingRisks.length}건 확인 필요${hasDanger ? " · 예약 불가 포함" : ""} · ${riskDetails}${bookingDetails ? ` · ${bookingDetails}` : ""}`;
 };
 
 const bookingSignature = (plan: DetailedPlanViewModel): string =>
@@ -82,7 +83,7 @@ const bookingSignature = (plan: DetailedPlanViewModel): string =>
       plan.bookingRisks.length === 0
         ? []
         : plan.timelineItems
-            .map(bookingItemSignature)
+            .map(formatBookingItem)
             .filter((signature): signature is string => signature !== undefined),
   });
 
