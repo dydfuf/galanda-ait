@@ -108,31 +108,33 @@ export const toPlanDetailViewModel = (
       ? `${headcount}명 기준 1인 ${formatCostRangeText(costSummary.minPerPerson, costSummary.maxPerPerson)}`
       : "비용 미정";
 
+    const accommodations = p.accommodations ?? [];
+    const transports = p.transports ?? [];
+
     // 예약 위험 요약 (PL-02 2번 섹션)
     const bookingRisks: BookingRiskItem[] = [];
-    if (p.accommodations) {
-      for (const acc of p.accommodations) {
-        if (acc.bookingStatus === "NEED_CHECK") {
-          bookingRisks.push({
-            level: "WARNING",
-            message: `${acc.city} 숙소(${acc.hotelName}) 잔여 객실 확인이 필요해요`,
-            snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
-          });
-        } else if (acc.bookingStatus === "FULL") {
-          bookingRisks.push({
-            level: "DANGER",
-            message: `${acc.city} 숙소(${acc.hotelName})가 현재 만실 상태예요`,
-            snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
-          });
-        }
+    for (const acc of accommodations) {
+      if (acc.bookingStatus === "NEED_CHECK") {
+        bookingRisks.push({
+          level: "WARNING",
+          message: `${acc.city} 숙소(${acc.hotelName}) 잔여 객실 확인이 필요해요`,
+          snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
+        });
+      } else if (acc.bookingStatus === "FULL") {
+        bookingRisks.push({
+          level: "DANGER",
+          message: `${acc.city} 숙소(${acc.hotelName})가 현재 만실 상태예요`,
+          snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
+        });
       }
     }
 
     // 타임라인 아이템 (체류 + 이동 구간)
     const timelineItems: TimelineItem[] = [];
-    if (p.accommodations && p.accommodations.length > 0) {
-      for (let i = 0; i < p.accommodations.length; i++) {
-        const acc = p.accommodations[i];
+    const timelineLength = Math.max(accommodations.length, transports.length);
+    for (let i = 0; i < timelineLength; i++) {
+      const acc = accommodations[i];
+      if (acc) {
         const stayStatus =
           acc.bookingStatus === "NOT_CHECKED" || acc.isSearching
             ? "SEARCHING"
@@ -154,32 +156,29 @@ export const toPlanDetailViewModel = (
             bookingUrl: acc.bookingUrl,
           },
         });
+      }
 
-        if (p.transports && p.transports[i]) {
-          const trans = p.transports[i];
-          const transStatus =
-            trans.bookingStatus === "FULL" || trans.bookingStatus === "NOT_CHECKED"
-              ? "SEARCHING"
-              : trans.bookingStatus;
+      const trans = transports[i];
+      if (trans) {
+        const transStatus = trans.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : trans.bookingStatus;
 
-          timelineItems.push({
-            type: "TRANSPORT",
-            transport: {
-              id: trans.id,
-              fromCity: trans.fromCity,
-              toCity: trans.toCity,
-              mode: trans.mode,
-              hasTransfer: trans.hasTransfer,
-              durationText: trans.durationText,
-              priceText: trans.priceRange
-                ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
-                : "가격 미정",
-              bookingStatus: transStatus,
-              confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
-              bookingUrl: trans.bookingUrl,
-            },
-          });
-        }
+        timelineItems.push({
+          type: "TRANSPORT",
+          transport: {
+            id: trans.id,
+            fromCity: trans.fromCity,
+            toCity: trans.toCity,
+            mode: trans.mode,
+            hasTransfer: trans.hasTransfer,
+            durationText: trans.durationText,
+            priceText: trans.priceRange
+              ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
+              : "가격 미정",
+            bookingStatus: transStatus,
+            confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
+            bookingUrl: trans.bookingUrl,
+          },
+        });
       }
     }
 

@@ -84,4 +84,36 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     // 목록 자체는 그대로 유지된다
     expect(plan.memberOpinions).toHaveLength(2);
   });
+
+  it("숙소가 없어도 교통 상세를 타임라인에 남긴다", (): void => {
+    const roomWithTransport: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          routes: [
+            { city: "도쿄", nights: 1 },
+            { city: "하코네", nights: 1 },
+          ],
+          transports: [
+            {
+              id: "transport-1",
+              fromCity: "도쿄",
+              toCity: "하코네",
+              mode: "기차",
+              hasTransfer: false,
+              durationText: "약 1시간",
+              bookingStatus: "FULL",
+            },
+          ],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(roomWithTransport, undefined).plans[0];
+
+    expect(plan.timelineItems).toHaveLength(1);
+    expect(plan.timelineItems[0]?.type).toBe("TRANSPORT");
+    expect(plan.timelineItems[0]?.transport?.bookingStatus).toBe("FULL");
+  });
 });
