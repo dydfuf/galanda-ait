@@ -85,7 +85,9 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     expect(plan.memberOpinions).toHaveLength(2);
   });
 
-  it("숙소가 없어도 교통 상세를 타임라인에 남긴다", (): void => {
+  it.each(["FULL", "NEED_CHECK", "NOT_CHECKED"] as const)(
+    "숙소가 없어도 교통 상태(%s)를 예약 위험으로 집계한다",
+    (bookingStatus): void => {
     const roomWithTransport: TripRoom = {
       ...room,
       plans: [
@@ -103,7 +105,7 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
               mode: "기차",
               hasTransfer: false,
               durationText: "약 1시간",
-              bookingStatus: "FULL",
+              bookingStatus,
             },
           ],
         },
@@ -114,6 +116,12 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
 
     expect(plan.timelineItems).toHaveLength(1);
     expect(plan.timelineItems[0]?.type).toBe("TRANSPORT");
-    expect(plan.timelineItems[0]?.transport?.bookingStatus).toBe("FULL");
-  });
+    expect(plan.timelineItems[0]?.transport?.bookingStatus).toBe(
+      bookingStatus === "NOT_CHECKED" ? "SEARCHING" : bookingStatus
+    );
+    expect(plan.bookingRisks).toHaveLength(1);
+    expect(plan.bookingRisks[0]?.message).toContain("도쿄 → 하코네");
+    expect(plan.bookingRisks[0]?.level).toBe(bookingStatus === "FULL" ? "DANGER" : "WARNING");
+    }
+  );
 });
