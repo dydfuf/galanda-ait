@@ -1,6 +1,7 @@
 import { css } from "@emotion/react";
 import { Badge, CTAButton, FixedBottomCTA, List, ListHeader, ListRow, Text, Top } from "@toss/tds-mobile";
 import { formatCostRangeText } from "../../../core/calculations/plan-cost.ts";
+import { getStayNightCount } from "../../../core/domain/room.ts";
 import { fixedCtaContainerStyle } from "../../common/tds-layout.ts";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
 import type { PlanEditorSection } from "../plan-editor-section.ts";
@@ -96,8 +97,7 @@ export function PlanEditorSections({
 }: PlanEditorSectionsProps): JSX.Element {
   const routeComplete =
     editor.routes.length > 0 &&
-    editor.routes.every((route) => route.city.trim() && route.nights > 0) &&
-    editor.currentTotalNights === editor.totalTripNights;
+    editor.routes.every((route) => route.city.trim() && getStayNightCount(route) > 0);
   const accommodationChecks = editor.accommodations.filter(
     (item) => item.isSearching || item.bookingStatus !== "AVAILABLE"
   ).length;
@@ -165,7 +165,7 @@ export function PlanEditorSections({
           />
           <SummaryRow
             title="여행 경로"
-            summary={editor.routes.map((route) => `${route.city || "도시 미정"} ${route.nights}박`).join(" · ")}
+            summary={editor.routes.map((route) => `${route.city || "도시 미정"} ${Math.max(0, getStayNightCount(route))}박`).join(" · ")}
             status={routeComplete ? "완료" : "확인 필요"}
             complete={routeComplete}
             onClick={() => onOpenSection("route")}

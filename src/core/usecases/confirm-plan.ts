@@ -7,7 +7,8 @@ import {
   requirePlanInRoom,
   requireRoomHost,
 } from "../domain/auth-guards.ts";
-import { ConflictError } from "../domain/errors.ts";
+import { getPlanDateRange } from "../domain/room.ts";
+import { ConflictError, ValidationError } from "../domain/errors.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
   function* (
@@ -42,6 +43,12 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
           expectedRevision,
           actualRevision: room.revision,
         })
+      );
+    }
+
+    if (!getPlanDateRange(plan)) {
+      return yield* Effect.fail(
+        new ValidationError({ message: "날짜가 있는 여행안만 확정할 수 있습니다." })
       );
     }
 

@@ -1,4 +1,4 @@
-import type { CityStay, TripPlan } from "../domain/room.ts";
+import { getStayNightCount, type CityStay, type TripPlan } from "../domain/room.ts";
 import { calculatePlanCost, formatCostText } from "./plan-cost.ts";
 
 export interface PlanDifference {
@@ -27,12 +27,12 @@ export function calculatePlanDifference(
 
   const originalMap = new Map<string, number>();
   for (const r of originalRoutes) {
-    originalMap.set(r.city, (originalMap.get(r.city) ?? 0) + r.nights);
+    originalMap.set(r.city, (originalMap.get(r.city) ?? 0) + getStayNightCount(r));
   }
 
   const currentMap = new Map<string, number>();
   for (const r of currentRoutes) {
-    currentMap.set(r.city, (currentMap.get(r.city) ?? 0) + r.nights);
+    currentMap.set(r.city, (currentMap.get(r.city) ?? 0) + getStayNightCount(r));
   }
 
   // 도시별 박수 차이 계산

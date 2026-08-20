@@ -21,8 +21,6 @@ const makeRoom = (confirmedPlanId?: string): TripRoom => ({
   id: TripIdSchema.make("room-1"),
   title: "제주도 여행",
   destination: "제주도",
-  startDate: "2026-09-01",
-  endDate: "2026-09-04",
   revision: RevisionSchema.make(3),
   members: [
     { id: HOST_ID, name: "방장", role: "HOST" },
@@ -37,8 +35,8 @@ const makeRoom = (confirmedPlanId?: string): TripRoom => ({
       authorName: "방장",
       baseHeadcount: 4,
       routes: [
-        { city: "제주시", nights: 2 },
-        { city: "서귀포시", nights: 1 },
+        { city: "제주시", arrivalDate: "2026-09-01", departureDate: "2026-09-03" },
+        { city: "서귀포시", arrivalDate: "2026-09-03", departureDate: "2026-09-04" },
       ],
       accommodations: [
         {

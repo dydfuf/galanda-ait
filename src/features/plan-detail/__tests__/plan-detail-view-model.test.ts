@@ -16,8 +16,6 @@ const room: TripRoom = {
   id: TripIdSchema.make("room-1"),
   title: "제주도 힐링 여행",
   destination: "제주도",
-  startDate: "2026-09-01",
-  endDate: "2026-09-05",
   revision: RevisionSchema.make(1),
   members: [
     { id: UserIdSchema.make("user-local-me"), name: "나", role: "HOST" },
@@ -99,8 +97,8 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
         {
           ...room.plans[0],
           routes: [
-            { city: "도쿄", nights: 1 },
-            { city: "하코네", nights: 1 },
+            { city: "도쿄", arrivalDate: "2026-09-01", departureDate: "2026-09-02" },
+            { city: "하코네", arrivalDate: "2026-09-02", departureDate: "2026-09-03" },
           ],
           transports: [
             {

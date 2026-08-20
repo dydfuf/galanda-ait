@@ -7,8 +7,6 @@ import { tripRoomKeys } from "../plan-home/queries.ts";
 export interface CreateTripRoomVariables {
   readonly title: string;
   readonly destination?: string;
-  readonly startDate?: string;
-  readonly endDate?: string;
 }
 
 export const useCreateTripRoomMutation = (): UseMutationResult<
@@ -27,4 +25,3 @@ export const useCreateTripRoomMutation = (): UseMutationResult<
     },
   });
 };
-

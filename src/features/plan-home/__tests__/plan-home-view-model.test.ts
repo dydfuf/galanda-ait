@@ -12,8 +12,6 @@ const room: TripRoom = {
   id: TripIdSchema.make("room-1"),
   title: "제주도 힐링 여행",
   destination: "제주도",
-  startDate: "2026-09-01",
-  endDate: "2026-09-05",
   revision: RevisionSchema.make(1),
   members: [
     { id: UserIdSchema.make("user-local-me"), name: "나", role: "HOST" },
@@ -86,5 +84,11 @@ describe("getTripListStatusText (RAON-161)", (): void => {
     expect(getTripListStatusText(toTripRoomViewModel(confirmedRoom))).toBe(
       "일정 확정 · 기본 1안"
     );
+  });
+
+  it("미확정 방은 일정 미정, 확정 방은 확정안 날짜를 표시한다", () => {
+    const datedPlan = { ...room.plans[0], routes: [{ city: "도쿄", arrivalDate: "2026-12-12", departureDate: "2026-12-17" }] };
+    expect(toTripRoomViewModel({ ...room, plans: [datedPlan] }).period).toBe("일정 미정");
+    expect(toTripRoomViewModel({ ...room, plans: [datedPlan], confirmedPlanId: datedPlan.id }).period).toBe("2026-12-12 ~ 2026-12-17");
   });
 });

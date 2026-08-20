@@ -39,23 +39,6 @@ export const updateTripRoom = Effect.fn("updateTripRoom")(
       "방장만 방 정보를 수정할 수 있습니다."
     );
 
-    // 4. 날짜 정합성 검증 (수정될 날짜와 기존 날짜 결합 확인)
-    const effectiveStartDate =
-      input.params.startDate ?? currentRoom.startDate;
-    const effectiveEndDate = input.params.endDate ?? currentRoom.endDate;
-
-    if (
-      effectiveStartDate &&
-      effectiveEndDate &&
-      effectiveStartDate > effectiveEndDate
-    ) {
-      return yield* Effect.fail(
-        new ValidationError({
-          message: "여행 종료일은 시작일 이후여야 합니다.",
-        })
-      );
-    }
-
     const sanitizedParams: UpdateRoomParams = {
       ...input.params,
       title:

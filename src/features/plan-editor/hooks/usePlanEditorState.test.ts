@@ -12,7 +12,7 @@ const validDraft = {
   title: "도쿄 여행",
   proposalReason: "이동을 줄인 안",
   baseHeadcount: 4,
-  routes: [{ city: "도쿄", nights: 3 }],
+  routes: [{ city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-13" }],
   accommodations: [{
     id: "stay-1",
     city: "도쿄",
@@ -40,7 +40,7 @@ describe("parsePlanEditorDraft", () => {
   it("정상 draft만 복원하고 손상된 저장값은 무시한다", () => {
     expect(parsePlanEditorDraft(JSON.stringify(validDraft))?.title).toBe("도쿄 여행");
     expect(parsePlanEditorDraft("{broken")).toBeUndefined();
-    expect(parsePlanEditorDraft(JSON.stringify({ ...validDraft, routes: [{ nights: 3 }] }))).toBeUndefined();
+    expect(parsePlanEditorDraft(JSON.stringify({ ...validDraft, routes: [{ city: "도쿄" }] }))).toBeUndefined();
     expect(parsePlanEditorDraft(JSON.stringify({ ...validDraft, transports: [{ id: "broken" }] }))).toBeUndefined();
   });
 

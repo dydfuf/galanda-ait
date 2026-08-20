@@ -86,8 +86,6 @@ describe("UseCases Error Propagation", () => {
       id: TripIdSchema.make("room-1"),
       title: "제주 여행",
       destination: "제주",
-      startDate: "2026-09-01",
-      endDate: "2026-09-05",
       revision: RevisionSchema.make(1),
       members: [],
       plans: [
