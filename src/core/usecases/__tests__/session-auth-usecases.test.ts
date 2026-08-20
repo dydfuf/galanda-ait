@@ -14,6 +14,7 @@ import {
 } from "../submit-opinion.ts";
 import { confirmTripPlan } from "../confirm-plan.ts";
 import { updateTripRoom } from "../update-room.ts";
+import { ROLE_PERMISSIONS } from "../../domain/auth-guards.ts";
 import {
   NotFoundError,
   ConflictError,
@@ -1196,7 +1197,13 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
   });
 
   describe("6. confirmTripPlan", (): void => {
-    it("방 참여자가 여행안을 확정할 수 있다", async (): Promise<void> => {
+    it("확정 권한은 HOST에게만 부여된다", (): void => {
+      expect(ROLE_PERMISSIONS.HOST.has("plan:confirm")).toBe(true);
+      expect(ROLE_PERMISSIONS.MEMBER.has("plan:confirm")).toBe(false);
+      expect(ROLE_PERMISSIONS.GUEST.has("plan:confirm")).toBe(false);
+    });
+
+    it("방장만 여행안을 확정할 수 있다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(aliceUser)
@@ -1210,6 +1217,34 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const room = await Effect.runPromise(program);
       expect(room.confirmedPlanId).toBe("plan-1");
+    });
+
+    it("일반 참여자가 직접 호출하면 실패하고 저장 상태를 바꾸지 않는다", async (): Promise<void> => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const program = confirmTripPlan(
+        sampleRoom.id,
+        PlanIdSchema.make("plan-1"),
+        sampleRoom.revision
+      ).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("member should not confirm a plan");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(UnauthorizedError);
+      }
+
+      const room = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(sampleRoom.id)),
+          Effect.provide(testEnv)
+        )
+      );
+      expect(room).toEqual(sampleRoom);
     });
 
     it("비로그인 상태에서는 여행안 확정이 실패한다", async (): Promise<void> => {
@@ -1230,6 +1265,69 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       } catch (err: unknown) {
         expect(err).toBeInstanceOf(UnauthorizedError);
       }
+    });
+
+    it("이미 확정된 여행안은 다시 확정할 수 없고 저장 상태를 보존한다", async (): Promise<void> => {
+      const confirmedRoom: TripRoom = {
+        ...sampleRoom,
+        confirmedPlanId: PlanIdSchema.make("plan-1"),
+        plans: sampleRoom.plans.map((plan) =>
+          plan.id === "plan-1" ? { ...plan, status: "CONFIRMED" as const } : plan
+        ),
+      };
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([confirmedRoom]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const program = confirmTripPlan(
+        confirmedRoom.id,
+        PlanIdSchema.make("plan-1"),
+        confirmedRoom.revision
+      ).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("confirmed room should reject reconfirmation");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(ConflictError);
+      }
+
+      const room = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(confirmedRoom.id)),
+          Effect.provide(testEnv)
+        )
+      );
+      expect(room).toEqual(confirmedRoom);
+    });
+
+    it("존재하지 않는 여행안은 실패하고 저장 상태를 바꾸지 않는다", async (): Promise<void> => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      const program = confirmTripPlan(
+        sampleRoom.id,
+        PlanIdSchema.make("plan-missing"),
+        sampleRoom.revision
+      ).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("missing plan should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(NotFoundError);
+      }
+
+      const room = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(sampleRoom.id)),
+          Effect.provide(testEnv)
+        )
+      );
+      expect(room).toEqual(sampleRoom);
     });
   });
 
