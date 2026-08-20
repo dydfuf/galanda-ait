@@ -88,7 +88,9 @@ export function PlanEditorHeader({
       header: <BottomSheet.Header>작성 내용을 초기화할까요?</BottomSheet.Header>,
       children: (
         <BottomSheet.HeaderDescription>
-          지금까지 입력한 여행안 내용이 사라집니다.
+          {isEditMode
+            ? "임시 수정 내용만 사라지고 공개된 여행안은 바뀌지 않아요."
+            : "지금 입력한 임시 내용이 사라지고 처음 상태로 돌아가요."}
         </BottomSheet.HeaderDescription>
       ),
       leftButton: "취소",

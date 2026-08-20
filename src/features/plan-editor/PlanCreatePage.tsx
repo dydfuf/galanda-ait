@@ -1,26 +1,22 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
 import { FixedBottomCTA } from "@toss/tds-mobile";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
-import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
-import { DiffBanner } from "./components/DiffBanner.tsx";
-import { BasicInfoSection } from "./components/BasicInfoSection.tsx";
-import { RouteCitySection } from "./components/RouteCitySection.tsx";
-import { AccommodationSection } from "./components/AccommodationSection.tsx";
-import { TransportSection } from "./components/TransportSection.tsx";
-import { CostSummarySection } from "./components/CostSummarySection.tsx";
+import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
+import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
 import { toUserMessage } from "../common/error-message.ts";
 
 const pageContainerStyle = css`
-  padding: 16px 20px 24px;
+  padding: 16px 20px var(--app-cta-space, 112px);
   max-width: 640px;
   width: 100%;
   min-width: 0;
@@ -49,12 +45,20 @@ export function PlanCreatePage(): JSX.Element {
   const params = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const cloneFromPlanId = searchParams.get("cloneFrom");
+  const section = isPlanEditorSection(params.section) ? params.section : undefined;
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
   const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
+  const {
+    data: session,
+    isLoading: isSessionLoading,
+    isError: isSessionError,
+    error: sessionError,
+  } = useSessionQuery();
   const createPlanMutation = useCreatePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -62,39 +66,13 @@ export function PlanCreatePage(): JSX.Element {
   // 복제 원본 플랜 찾기
   const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
 
-  const {
-    title,
-    setTitle,
-    proposalReason,
-    setProposalReason,
-    baseHeadcount,
-    setBaseHeadcount,
-    routes,
-    totalTripNights,
-    currentTotalNights,
-    handleAddCity,
-    handleUpdateCity,
-    handleRemoveCity,
-    accommodations,
-    handleAddAccommodation,
-    handleUpdateAccommodation,
-    handleRemoveAccommodation,
-    transports,
-    handleAddTransport,
-    handleUpdateTransport,
-    handleRemoveTransport,
-    costSummary,
-    diffFromOriginal,
-    validation,
-    lastSavedTime,
-    clearDraft,
-  } = usePlanEditorState(room, undefined, cloneFromPlan);
+  const editor = usePlanEditorState(room, undefined, cloneFromPlan, session?.userId);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
   }
 
-  if (isLoading) {
+  if (isLoading || isSessionLoading) {
     return <div css={loadingContainerStyle}>여행방 정보를 불러오는 중입니다...</div>;
   }
 
@@ -107,23 +85,34 @@ export function PlanCreatePage(): JSX.Element {
     );
   }
 
+  if (isSessionError || !session) {
+    return (
+      <RouteErrorFallback
+        title="로그인 정보를 확인할 수 없습니다"
+        message={isSessionError
+          ? toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")
+          : "여행안을 작성하려면 로그인이 필요합니다."}
+      />
+    );
+  }
+
   const handleSubmit = async (): Promise<void> => {
-    if (!validation.isValid || isSubmitting) return;
+    if (!editor.validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
       const newPlan = {
-        title: title.trim(),
+        title: editor.title.trim(),
         status: "DRAFT" as const,
-        proposalReason: proposalReason.trim() || undefined,
-        baseHeadcount,
-        routes: routes.map((r) => ({ ...r, city: r.city.trim() })),
-        accommodations: [...accommodations],
-        transports: [...transports],
+        proposalReason: editor.proposalReason.trim() || undefined,
+        baseHeadcount: editor.baseHeadcount,
+        routes: editor.routes.map((r) => ({ ...r, city: r.city.trim() })),
+        accommodations: [...editor.accommodations],
+        transports: [...editor.transports],
         places: [],
         clonedFromPlanId: cloneFromPlan ? cloneFromPlan.id : undefined,
-        differenceSummary: diffFromOriginal?.hasChanges ? diffFromOriginal.summaryText : undefined,
+        differenceSummary: editor.diffFromOriginal?.hasChanges ? editor.diffFromOriginal.summaryText : undefined,
         voteCount: 0,
       };
 
@@ -133,7 +122,7 @@ export function PlanCreatePage(): JSX.Element {
         expectedRevision: room.revision,
       });
 
-      clearDraft();
+      editor.discardDraft();
       const createdPlan = updatedRoom.plans[updatedRoom.plans.length - 1];
       if (createdPlan) {
         navigate(`/trips/${tripId}/plans/${createdPlan.id}`, { replace: true });
@@ -145,73 +134,42 @@ export function PlanCreatePage(): JSX.Element {
     }
   };
 
+  const editorBasePath = `/trips/${tripId}/plans/new`;
+  const openSection = (nextSection: PlanEditorSection): void => {
+    navigate(`${editorBasePath}/${nextSection}${location.search}`, {
+      state: { fromEditorSummary: true },
+    });
+  };
+  const completeSection = (): void => {
+    if ((location.state as { fromEditorSummary?: boolean } | null)?.fromEditorSummary) {
+      navigate(-1);
+    } else {
+      navigate(`${editorBasePath}${location.search}`, { replace: true });
+    }
+  };
+
   return (
     <div css={pageContainerStyle}>
-      <PlanEditorHeader
+      <PlanEditorSections
+        editor={editor}
+        section={section}
         isEditMode={false}
         isCloneMode={Boolean(cloneFromPlan)}
-        lastSavedTime={lastSavedTime}
-        onClearDraft={clearDraft}
+        cloneTitle={cloneFromPlan?.title}
+        onOpenSection={openSection}
+        onCompleteSection={completeSection}
       />
 
-      {cloneFromPlan && diffFromOriginal && (
-        <DiffBanner diff={diffFromOriginal} originalTitle={cloneFromPlan.title} />
-      )}
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleSubmit();
-        }}
-      >
-        <BasicInfoSection
-          title={title}
-          onTitleChange={setTitle}
-          proposalReason={proposalReason}
-          onProposalReasonChange={setProposalReason}
-          baseHeadcount={baseHeadcount}
-          onBaseHeadcountChange={setBaseHeadcount}
-        />
-
-        <RouteCitySection
-          routes={routes}
-          totalTripNights={totalTripNights}
-          currentTotalNights={currentTotalNights}
-          differenceSummary={diffFromOriginal?.summaryText}
-          onAddCity={handleAddCity}
-          onUpdateCity={handleUpdateCity}
-          onRemoveCity={handleRemoveCity}
-        />
-
-        <AccommodationSection
-          accommodations={accommodations}
-          routes={routes}
-          onAdd={handleAddAccommodation}
-          onUpdate={handleUpdateAccommodation}
-          onRemove={handleRemoveAccommodation}
-        />
-
-        <TransportSection
-          transports={transports}
-          onAdd={handleAddTransport}
-          onUpdate={handleUpdateTransport}
-          onRemove={handleRemoveTransport}
-        />
-
-        <CostSummarySection costSummary={costSummary} />
-
-      </form>
-
       {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      <FixedBottomCTA
+      {!section && !editor.draftConflict && <FixedBottomCTA
         containerStyle={fixedCtaContainerStyle}
         topAccessory={
-          validation.firstError || errorMsg ? (
+          editor.validation.firstError || errorMsg ? (
             <>
-              {validation.firstError && (
+              {editor.validation.firstError && (
                 <ValidationBanner
-                  firstError={validation.firstError}
-                  errorCount={validation.errorCount}
+                  firstError={editor.validation.firstError}
+                  errorCount={editor.validation.errorCount}
                 />
               )}
               {errorMsg && (
@@ -222,7 +180,7 @@ export function PlanCreatePage(): JSX.Element {
             </>
           ) : undefined
         }
-        disabled={!validation.isValid || isSubmitting}
+        disabled={!editor.validation.isValid || isSubmitting}
         onClick={() => void handleSubmit()}
       >
         {isSubmitting
@@ -230,7 +188,7 @@ export function PlanCreatePage(): JSX.Element {
           : cloneFromPlan
           ? "대안 여행안 제안하기"
           : "여행안 제안 등록"}
-      </FixedBottomCTA>
+      </FixedBottomCTA>}
     </div>
   );
 }

@@ -12,13 +12,6 @@ const cardStyle = css`
   gap: 16px;
 `;
 
-const sectionTitleStyle = css`
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-  margin: 0 0 4px 0;
-`;
-
 const fieldStyle = css`
   display: flex;
   flex-direction: column;
@@ -116,8 +109,6 @@ export function BasicInfoSection({
 }: BasicInfoSectionProps) {
   return (
     <section css={cardStyle}>
-      <h2 css={sectionTitleStyle}>1. 기본 정보</h2>
-
       <div css={fieldStyle}>
         <label css={labelStyle} htmlFor="plan-title">
           여행안 제목 *

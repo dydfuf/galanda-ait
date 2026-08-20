@@ -30,13 +30,13 @@ const mainStyle = css`
 
 /** 현재 경로에 맞는 상단 내비게이션 제목을 정해요. */
 function resolveTitle(pathname: string): string {
-  if (pathname.endsWith("/plans/new")) {
+  if (pathname.includes("/plans/new")) {
     return "새 여행안";
   }
   if (pathname.endsWith("/plans/compare")) {
     return "여행안 비교";
   }
-  if (pathname.endsWith("/edit")) {
+  if (pathname.includes("/edit")) {
     return "여행안 수정";
   }
   return "여행안 상세";
