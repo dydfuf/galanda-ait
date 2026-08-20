@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import type { AccommodationSnapshot, BookingStatus, CityStay } from "../../../core/domain/room.ts";
+import { getStayNightCount, type AccommodationSnapshot, type BookingStatus, type CityStay } from "../../../core/domain/room.ts";
 
 const cardStyle = css`
   background-color: var(--adaptiveBackground, #ffffff);
@@ -137,12 +137,12 @@ export function AccommodationSection({
   onRemove,
 }: AccommodationSectionProps) {
   const handleAddNew = () => {
-    const firstCity = routes[0]?.city || "방문 도시";
+    const route = routes[accommodations.length] ?? routes[0];
     onAdd({
       id: `stay-${Date.now()}`,
-      city: firstCity,
+      city: route?.city || "방문 도시",
       period: "체류 기간",
-      nights: 1,
+      nights: route ? Math.max(0, getStayNightCount(route)) : 0,
       hotelName: "숙소 찾는 중",
       isSearching: true,
       bookingStatus: "NEED_CHECK",
