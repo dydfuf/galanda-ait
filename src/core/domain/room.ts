@@ -56,6 +56,8 @@ export const PlanMemberOpinionSchema = Schema.Struct({
   reason: Schema.optional(Schema.String),
 });
 export type PlanMemberOpinion = typeof PlanMemberOpinionSchema.Type;
+/** 공개 응답에 포함해도 되는 의견 정보. HARD 사유는 작성자 전용 데이터다. */
+export type PublicPlanMemberOpinion = Omit<PlanMemberOpinion, "reason">;
 
 export const TripPlaceSchema = Schema.Struct({
   id: Schema.String,

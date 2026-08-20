@@ -265,18 +265,11 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
 
         const plan = room.plans[planIndex];
         const existingOpinions = plan.memberOpinions ?? [];
-        const opinionIndex = existingOpinions.findIndex(
-          (o) => o.userId === opinion.userId
-        );
-
-        const nextOpinions =
-          opinionIndex >= 0
-            ? [
-                ...existingOpinions.slice(0, opinionIndex),
-                opinion,
-                ...existingOpinions.slice(opinionIndex + 1),
-              ]
-            : [...existingOpinions, opinion];
+        // 정상 입력은 이미 한 건이지만, 레거시 중복도 함께 정리해 최신 의견 1건만 남긴다.
+        const nextOpinions = [
+          ...existingOpinions.filter((existing) => existing.userId !== opinion.userId),
+          opinion,
+        ];
 
         const voteCount = nextOpinions.filter((o) => o.reaction === "LIKE").length;
 
@@ -330,5 +323,4 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         return updatedRoom;
       }),
   });
-
 

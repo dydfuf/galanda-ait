@@ -1,4 +1,8 @@
-import type { BookingStatus, TripRoom } from "../../core/domain/room.ts";
+import type {
+  BookingStatus,
+  PublicPlanMemberOpinion,
+  TripRoom,
+} from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
 import {
   isPlanAuthor,
@@ -16,7 +20,6 @@ export interface PlanMemberOpinionViewModel {
   readonly userId: string;
   readonly userName: string;
   readonly reaction: ReactionType;
-  readonly reason?: string;
 }
 
 export interface DetailedPlanViewModel extends PlanSummaryData {
@@ -222,19 +225,19 @@ export const toPlanDetailViewModel = (
     }
 
     // 구성원 의견 목록
+    const privateOpinions = p.memberOpinions ?? [];
     const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> =
-      p.memberOpinions && p.memberOpinions.length > 0
-        ? p.memberOpinions.map((mo) => ({
-            userId: mo.userId,
-            userName: mo.userName,
-            reaction: mo.reaction,
-            reason: mo.reason,
-          }))
-        : [];
+      privateOpinions.map(
+        ({ userId, userName, reaction }: PublicPlanMemberOpinion) => ({
+          userId,
+          userName,
+          reaction,
+        })
+      );
 
-    const likeCount = memberOpinions.filter((m) => m.reaction === "LIKE").length;
-    const okayCount = memberOpinions.filter((m) => m.reaction === "OKAY").length;
-    const hardCount = memberOpinions.filter((m) => m.reaction === "HARD").length;
+    const likeCount = privateOpinions.filter((m) => m.reaction === "LIKE").length;
+    const okayCount = privateOpinions.filter((m) => m.reaction === "OKAY").length;
+    const hardCount = privateOpinions.filter((m) => m.reaction === "HARD").length;
 
     const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
     const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
@@ -242,7 +245,7 @@ export const toPlanDetailViewModel = (
     // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
     // (하드코딩된 로컬 사용자 폴백은 남의 의견을 내 것으로 표시하므로 사용하지 않는다)
     const myOpinion = currentUserId
-      ? memberOpinions.find((m) => m.userId === currentUserId)
+      ? privateOpinions.find((m) => m.userId === currentUserId)
       : undefined;
 
     return {
@@ -269,7 +272,7 @@ export const toPlanDetailViewModel = (
         hardCount,
       },
       myReaction: myOpinion?.reaction,
-      myOpinionReason: myOpinion?.reason,
+      myOpinionReason: myOpinion?.reaction === "HARD" ? myOpinion.reason : undefined,
       isConfirmed: isPlanConfirmed,
       bookingRisks,
       timelineItems,

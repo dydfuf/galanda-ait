@@ -17,7 +17,7 @@ export const useTripRoomDetailQuery = (
   const { data: session } = useSessionQuery();
 
   return useQuery<TripRoom, Error, PlanDetailViewModel>({
-    queryKey: tripRoomKeys.detail(roomId),
+    queryKey: tripRoomKeys.detail(roomId, session?.userId),
     queryFn: ({ signal }): Promise<TripRoom> =>
       appRuntime.runPromise(getTripRoom(TripIdSchema.make(roomId)), {
         signal,
@@ -30,13 +30,15 @@ export const useTripRoomDetailQuery = (
 
 export const useTripRoomRawQuery = (
   roomId: string
-): UseQueryResult<TripRoom, Error> =>
-  useQuery<TripRoom, Error>({
-    queryKey: tripRoomKeys.detail(roomId),
+): UseQueryResult<TripRoom, Error> => {
+  const { data: session } = useSessionQuery();
+
+  return useQuery<TripRoom, Error>({
+    queryKey: tripRoomKeys.detail(roomId, session?.userId),
     queryFn: ({ signal }): Promise<TripRoom> =>
       appRuntime.runPromise(getTripRoom(TripIdSchema.make(roomId)), {
         signal,
       }),
     enabled: Boolean(roomId),
   });
-
+};

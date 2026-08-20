@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Effect, Exit } from "effect";
 import { LocalTripRoomRepositoryLayer } from "../local-trip-room-repo.ts";
 import { TripRoomRepository } from "../../../core/ports/trip-room-repository.ts";
-import { RevisionSchema, TripIdSchema, UserIdSchema } from "../../../core/domain/ids.ts";
+import {
+  PlanIdSchema,
+  RevisionSchema,
+  TripIdSchema,
+  UserIdSchema,
+} from "../../../core/domain/ids.ts";
 
 const STORAGE_KEY = "galanda_rooms_v1";
 
@@ -154,5 +159,54 @@ describe("LocalTripRoomRepository", () => {
       const err = exit.cause;
       expect(JSON.stringify(err)).toContain("RepositoryError");
     }
+  });
+
+  it("7. 같은 사용자의 의견을 교체해도 최신 의견 한 건과 새 집계만 유지한다", async () => {
+    const program = Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      const room = yield* repo.createRoom({
+        id: TripIdSchema.make("room-1"),
+        title: "제주도 여행",
+        hostUser: { id: UserIdSchema.make("host-1"), name: "Host", role: "HOST" },
+      });
+      const withPlan = yield* repo.createPlan(
+        room.id,
+        {
+          id: PlanIdSchema.make("plan-1"),
+          title: "기본안",
+          status: "DRAFT",
+          places: [],
+          voteCount: 0,
+        },
+        room.revision
+      );
+      const liked = yield* repo.setPlanOpinion(
+        room.id,
+        PlanIdSchema.make("plan-1"),
+        {
+          userId: UserIdSchema.make("member-1"),
+          userName: "Member",
+          reaction: "LIKE",
+        },
+        withPlan.revision
+      );
+      return yield* repo.setPlanOpinion(
+        room.id,
+        PlanIdSchema.make("plan-1"),
+        {
+          userId: UserIdSchema.make("member-1"),
+          userName: "Member",
+          reaction: "HARD",
+          reason: "이동이 길어요",
+        },
+        liked.revision
+      );
+    }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
+
+    const room = await Effect.runPromise(program);
+    const plan = room.plans[0];
+    expect(plan?.memberOpinions).toHaveLength(1);
+    expect(plan?.memberOpinions?.[0].reaction).toBe("HARD");
+    expect(plan?.voteCount).toBe(0);
   });
 });

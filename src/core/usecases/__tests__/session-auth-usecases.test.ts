@@ -235,15 +235,10 @@ const createInMemoryRepositoryLayer = (
       }
       const targetPlan = room.plans[planIndex];
       const existingOpinions = targetPlan.memberOpinions ?? [];
-      const opinionIndex = existingOpinions.findIndex((o) => o.userId === opinion.userId);
-      const nextOpinions =
-        opinionIndex >= 0
-          ? [
-              ...existingOpinions.slice(0, opinionIndex),
-              opinion,
-              ...existingOpinions.slice(opinionIndex + 1),
-            ]
-          : [...existingOpinions, opinion];
+      const nextOpinions = [
+        ...existingOpinions.filter((existing) => existing.userId !== opinion.userId),
+        opinion,
+      ];
       const voteCount = nextOpinions.filter((o) => o.reaction === "LIKE").length;
       const updatedPlan: TripPlan = {
         ...targetPlan,
@@ -1140,6 +1135,63 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(plan?.memberOpinions?.[0].userId).toBe("user-bob");
       expect(plan?.memberOpinions?.[0].userName).toBe("밥");
       expect(plan?.voteCount).toBe(1);
+    });
+
+    it("같은 사용자의 의견을 바꾸면 한 건을 교체하고 집계를 다시 계산한다", async (): Promise<void> => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const firstRoom = await Effect.runPromise(
+        submitOpinion({
+          roomId: sampleRoom.id,
+          planId: PlanIdSchema.make("plan-1"),
+          opinion: { reaction: "LIKE", reason: "좋아요 사유는 저장하지 않음" },
+          expectedRevision: sampleRoom.revision,
+        }).pipe(Effect.provide(testEnv))
+      );
+
+      const secondRoom = await Effect.runPromise(
+        submitOpinion({
+          roomId: sampleRoom.id,
+          planId: PlanIdSchema.make("plan-1"),
+          opinion: { reaction: "HARD", reason: "이동 시간이 길어요" },
+          expectedRevision: firstRoom.revision,
+        }).pipe(Effect.provide(testEnv))
+      );
+
+      const plan = secondRoom.plans.find((candidate) => candidate.id === "plan-1");
+      expect(plan?.memberOpinions).toEqual([
+        {
+          userId: bobUser.userId,
+          userName: bobUser.name,
+          reaction: "HARD",
+          reason: "이동 시간이 길어요",
+        },
+      ]);
+      expect(plan?.voteCount).toBe(0);
+    });
+
+    it("HARD 의견에는 사유가 필요하다", async (): Promise<void> => {
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
+
+      const program = submitOpinion({
+        roomId: sampleRoom.id,
+        planId: PlanIdSchema.make("plan-1"),
+        opinion: { reaction: "HARD", reason: "   " },
+        expectedRevision: sampleRoom.revision,
+      }).pipe(Effect.provide(testEnv));
+
+      try {
+        await Effect.runPromise(program);
+        expect.unreachable("should fail");
+      } catch (err: unknown) {
+        expect(err).toBeInstanceOf(ValidationError);
+      }
     });
 
     it("클라이언트가 다른 userId를 전달해도 세션 사용자의 userId로 기록된다 (의견 위조 방지)", async (): Promise<void> => {
