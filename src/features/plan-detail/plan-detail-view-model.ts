@@ -9,7 +9,7 @@ import {
 import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
 import type { TimelineItem } from "./components/DetailTimeline.tsx";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
-import type { PlanCardData } from "../plan-home/components/PlanCard.tsx";
+import type { PlanSummaryData } from "../plan-home/plan-home-view-model.ts";
 import { calculatePlanCost, formatCostRangeText } from "../../core/calculations/plan-cost.ts";
 
 export interface PlanMemberOpinionViewModel {
@@ -19,12 +19,13 @@ export interface PlanMemberOpinionViewModel {
   readonly reason?: string;
 }
 
-export interface DetailedPlanViewModel extends PlanCardData {
-  readonly authorId?: string;
+export interface DetailedPlanViewModel extends PlanSummaryData {
+  readonly route: ReadonlyArray<{ readonly city: string; readonly nights: number }>;
+  readonly groupCostText: string;
+  readonly perPersonCostText: string;
+  readonly bookingAlert?: string;
   /** 세션 사용자가 남긴 "어려워요" 사유 등 본인 의견 내용 (비로그인 시 undefined) */
   readonly myOpinionReason?: string;
-  readonly isAuthor: boolean;
-  readonly canManage: boolean;
   readonly proposalReason: string;
   readonly bookingRisks: ReadonlyArray<BookingRiskItem>;
   readonly timelineItems: ReadonlyArray<TimelineItem>;

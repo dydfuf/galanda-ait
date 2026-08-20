@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Badge } from "@toss/tds-mobile";
+import { Badge, List, ListRow, Text } from "@toss/tds-mobile";
 
 interface DecisionStatusBannerProps {
   readonly statusText: string;
@@ -7,25 +7,15 @@ interface DecisionStatusBannerProps {
   readonly isConfirmed?: boolean;
 }
 
-const statusContainerStyle = css`
-  padding: 0 var(--app-inline-padding);
+const statusListStyle = css`
+  margin-bottom: 16px;
+`;
+
+const contentsStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 24px;
-`;
-
-const titleStyle = css`
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const subTextStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey600, #6b7684);
-  line-height: 1.3;
+  gap: 4px;
 `;
 
 export function DecisionStatusBanner({
@@ -34,16 +24,29 @@ export function DecisionStatusBanner({
   isConfirmed = false,
 }: DecisionStatusBannerProps) {
   return (
-    <div css={statusContainerStyle} aria-live="polite">
-      <Badge
-        size="small"
-        variant="weak"
-        color={isConfirmed ? "green" : "blue"}
-      >
-        {isConfirmed ? "확정됨" : "의견 수집 중"}
-      </Badge>
-      <h2 css={titleStyle}>{statusText}</h2>
-      {subText && <p css={subTextStyle}>{subText}</p>}
-    </div>
+    <List aria-label="여행방 결정 상태" css={statusListStyle}>
+      <ListRow
+        border="none"
+        verticalPadding="small"
+        horizontalPadding="small"
+        left={
+          <Badge size="small" variant="weak" color={isConfirmed ? "green" : "blue"}>
+            {isConfirmed ? "확정됨" : "의견 수집 중"}
+          </Badge>
+        }
+        contents={
+          <div css={contentsStyle} aria-live="polite">
+            <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
+              {statusText}
+            </Text>
+            {subText && (
+              <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
+                {subText}
+              </Text>
+            )}
+          </div>
+        }
+      />
+    </List>
   );
 }
