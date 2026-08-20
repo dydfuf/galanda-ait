@@ -20,6 +20,19 @@ export interface TripRoomViewModel {
   readonly plans: ReadonlyArray<PlanCardData>;
 }
 
+export const getTripListStatusText = (
+  room: Pick<TripRoomViewModel, "confirmedPlanId" | "confirmedPlanTitle" | "plans">
+): string => {
+  if (room.confirmedPlanId) {
+    return room.confirmedPlanTitle
+      ? `일정 확정 · ${room.confirmedPlanTitle}`
+      : "일정 확정";
+  }
+  if (room.plans.length === 0) return "첫 여행안을 만들어보세요";
+  if (room.plans.length === 1) return "여행안 1개 · 의견을 모으는 중";
+  return `여행안 ${room.plans.length}개 · 비교 중`;
+};
+
 export const toTripRoomViewModel = (
   room: TripRoom,
   currentUserId?: UserId | string
