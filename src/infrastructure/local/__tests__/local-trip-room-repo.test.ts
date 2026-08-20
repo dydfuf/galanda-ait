@@ -233,4 +233,24 @@ describe("LocalTripRoomRepository", () => {
       { city: "하코네", arrivalDate: "2026-12-13", departureDate: "2026-12-15" },
     ]);
   });
+
+  it("잘못된 legacy 시작일은 예외를 던지지 않고 복원 불가능한 route를 제외한다", async () => {
+    memoryStore[STORAGE_KEY] = JSON.stringify([{
+      id: "invalid-date-room",
+      title: "손상된 여행",
+      destination: "미정",
+      startDate: "invalid",
+      endDate: "2026-12-15",
+      revision: 1,
+      members: [{ id: "host-1", name: "Host", role: "HOST" }],
+      plans: [{ id: "plan-a", title: "기본안", status: "DRAFT", routes: [{ city: "도쿄", nights: 3 }], places: [], voteCount: 0 }],
+    }]);
+
+    const room = await Effect.runPromise(Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      return yield* repo.getRoom(TripIdSchema.make("invalid-date-room"));
+    }).pipe(Effect.provide(LocalTripRoomRepositoryLayer)));
+
+    expect(room.plans[0].routes).toEqual([]);
+  });
 });

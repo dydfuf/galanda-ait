@@ -4,7 +4,7 @@ import {
   type CreateRoomParams,
   type UpdateRoomParams,
 } from "../../core/ports/trip-room-repository.ts";
-import { TripRoomSchema } from "../../core/domain/room.ts";
+import { TravelDateSchema, TripRoomSchema } from "../../core/domain/room.ts";
 import {
   RevisionSchema,
 } from "../../core/domain/ids.ts";
@@ -23,10 +23,12 @@ import type { PlanId, Revision, TripId } from "../../core/domain/ids.ts";
 
 const STORAGE_KEY = "galanda_rooms_v1";
 
-const addDays = (date: string, days: number): string => {
+const addDays = (date: string, days: number): string | undefined => {
+  if (!Schema.is(TravelDateSchema)(date)) return undefined;
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
+  const result = value.toISOString().slice(0, 10);
+  return Schema.is(TravelDateSchema)(result) ? result : undefined;
 };
 
 const normalizeLegacyRooms = (value: unknown): unknown => {
@@ -50,6 +52,7 @@ const normalizeLegacyRooms = (value: unknown): unknown => {
             }
             if (!cursor || typeof stay.nights !== "number" || stay.nights <= 0) return [];
             const departureDate = addDays(cursor, stay.nights);
+            if (!departureDate) return [];
             const normalized = {
               city: typeof stay.city === "string" ? stay.city : "",
               arrivalDate: cursor,

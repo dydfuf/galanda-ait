@@ -13,6 +13,17 @@ export interface PlanEditorFormData {
   readonly clonedFromPlanId?: string;
 }
 
+export const syncAccommodationNights = (
+  routes: ReadonlyArray<CityStay>,
+  accommodations: ReadonlyArray<AccommodationSnapshot>
+): ReadonlyArray<AccommodationSnapshot> =>
+  accommodations.map((accommodation, index) => {
+    const route = routes[index] ?? routes.find((stay) => stay.city === accommodation.city);
+    return route
+      ? { ...accommodation, nights: Math.max(0, getStayNightCount(route)) }
+      : accommodation;
+  });
+
 export function usePlanEditorState(
   room: TripRoom | undefined,
   initialPlan?: TripPlan,
@@ -85,6 +96,10 @@ export function usePlanEditorState(
   const [accommodations, setAccommodations] = useState<ReadonlyArray<AccommodationSnapshot>>(defaultAccommodations);
   const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(defaultTransports);
   const [lastSavedTime, setLastSavedTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    setAccommodations((current) => syncAccommodationNights(routes, current));
+  }, [routes]);
 
   // 도시 박수 합계 계산
   const currentTotalNights = useMemo(() => {

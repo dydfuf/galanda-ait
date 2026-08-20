@@ -349,6 +349,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         status: "DRAFT",
         authorId: UserIdSchema.make("user-alice"),
         authorName: "앨리스",
+        routes: [{ city: "제주도", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
         places: [],
         voteCount: 0,
       },
@@ -1263,6 +1264,33 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const room = await Effect.runPromise(program);
       expect(room.confirmedPlanId).toBe("plan-1");
+    });
+
+    it("날짜가 없는 여행안은 확정할 수 없고 저장 상태를 보존한다", async (): Promise<void> => {
+      const undatedRoom: TripRoom = {
+        ...sampleRoom,
+        plans: sampleRoom.plans.map((plan) => ({ ...plan, routes: [] })),
+      };
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([undatedRoom]),
+        createTestSessionLayer(aliceUser)
+      );
+
+      await expect(
+        Effect.runPromise(
+          confirmTripPlan(undatedRoom.id, undatedRoom.plans[0].id, undatedRoom.revision).pipe(
+            Effect.provide(testEnv)
+          )
+        )
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      const stored = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(undatedRoom.id)),
+          Effect.provide(testEnv)
+        )
+      );
+      expect(stored).toEqual(undatedRoom);
     });
 
     it("일반 참여자가 직접 호출하면 실패하고 저장 상태를 바꾸지 않는다", async (): Promise<void> => {
