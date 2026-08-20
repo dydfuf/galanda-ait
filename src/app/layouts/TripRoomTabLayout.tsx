@@ -1,7 +1,7 @@
 import { css } from "@emotion/react";
 import { Tab, TopNavigation, TopNavigationBackButton, TopNavigationTextButton, useToast } from "@toss/tds-mobile";
 import { Clipboard, Share } from "@apps-in-toss/web-framework";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
@@ -44,6 +44,11 @@ export function TripRoomTabLayout() {
   const { goBack, platformNavigation } = useAppNavigation();
   const { openToast } = useToast();
   const [isShareAccessoryReady, setIsShareAccessoryReady] = useState(false);
+  const accessoryRegistrationId = useRef(0);
+  const isCurrentAccessoryRegistration = useCallback(
+    (registrationId: number) => registrationId === accessoryRegistrationId.current,
+    [],
+  );
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
@@ -97,27 +102,36 @@ export function TripRoomTabLayout() {
     if (!platformNavigation || !tripId) return;
 
     setIsShareAccessoryReady(false);
+    const registrationId = ++accessoryRegistrationId.current;
     let isActive = true;
 
-    void platformNavigation
-      .addAccessoryButton({
-        id: "galanda-share-invite",
-        title: "공유",
-        iconName: "icon-share-mono",
-        callback: () => void handleShareInvite(),
-      })
-      .then(() => {
+    const registration = platformNavigation.addAccessoryButton({
+      id: "galanda-share-invite",
+      title: "공유",
+      iconName: "icon-share-mono",
+      callback: () => void handleShareInvite(),
+    });
+
+    void registration.then(
+      () => {
         if (isActive) setIsShareAccessoryReady(true);
-      })
-      .catch(() => {
+      },
+      () => {
         if (isActive) setIsShareAccessoryReady(false);
-      });
+      },
+    );
 
     return () => {
       isActive = false;
-      platformNavigation.removeAccessoryButton();
+      const removeIfCurrent = () => {
+        if (isCurrentAccessoryRegistration(registrationId)) {
+          platformNavigation.removeAccessoryButton();
+        }
+      };
+
+      void registration.then(removeIfCurrent, removeIfCurrent);
     };
-  }, [handleShareInvite, platformNavigation, tripId]);
+  }, [handleShareInvite, isCurrentAccessoryRegistration, platformNavigation, tripId]);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
