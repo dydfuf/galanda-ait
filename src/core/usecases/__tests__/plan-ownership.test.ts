@@ -320,25 +320,57 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         createSessionLayer(authorSession)
       );
 
-      const newPlan: TripPlan = {
-        id: PlanIdSchema.make("plan-new-1"),
-        title: "신규 제안",
-        status: "DRAFT",
-        places: [],
-        voteCount: 0,
-      };
-
       const res = await Effect.runPromise(
         createPlan({
           roomId: sampleRoom.id,
-          plan: newPlan,
+          title: "신규 제안",
+          places: [],
           expectedRevision: sampleRoom.revision,
         }).pipe(Effect.provide(env))
       );
 
-      const created = res.plans.find((p) => p.id === "plan-new-1");
+      const created = res.plans.find((p) => p.title === "신규 제안");
       expect(created?.authorId).toBe(authorUser.id);
       expect(created?.authorName).toBe(authorUser.name);
+      expect(created?.status).toBe("DRAFT");
+      expect(created?.memberOpinions).toEqual([]);
+      expect(created?.voteCount).toBe(0);
+    });
+
+    it("clone은 현재 세션 작성자와 새 서버 소유 상태로 생성된다", async () => {
+      const sourcePlan: TripPlan = {
+        ...hostPlan,
+        status: "CONFIRMED",
+        memberOpinions: [{
+          userId: authorUser.id,
+          userName: authorUser.name,
+          reaction: "LIKE",
+        }],
+        voteCount: 1,
+      };
+      const room = { ...sampleRoom, plans: [sourcePlan] };
+      const env = Layer.merge(
+        createInMemoryRepo([room]),
+        createSessionLayer(authorSession)
+      );
+
+      const res = await Effect.runPromise(
+        createPlan({
+          roomId: room.id,
+          title: "복제한 대안",
+          places: [],
+          cloneFromPlanId: sourcePlan.id,
+          expectedRevision: room.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const clone = res.plans.find((p) => p.title === "복제한 대안");
+      expect(clone?.id).not.toBe(sourcePlan.id);
+      expect(clone?.authorId).toBe(authorUser.id);
+      expect(clone?.status).toBe("DRAFT");
+      expect(clone?.memberOpinions).toEqual([]);
+      expect(clone?.voteCount).toBe(0);
+      expect(clone?.clonedFromPlanId).toBe(sourcePlan.id);
     });
   });
 

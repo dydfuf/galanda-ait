@@ -157,12 +157,8 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
 
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: {
-          title: "알찬 3박 4일 코스",
-          status: "DRAFT",
-          places: [],
-          voteCount: 0,
-        },
+        title: "알찬 3박 4일 코스",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
