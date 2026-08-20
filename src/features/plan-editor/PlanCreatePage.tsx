@@ -102,24 +102,21 @@ export function PlanCreatePage(): JSX.Element {
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      const newPlan = {
+      const command = {
         title: editor.title.trim(),
-        status: "DRAFT" as const,
         proposalReason: editor.proposalReason.trim() || undefined,
         baseHeadcount: editor.baseHeadcount,
         routes: editor.routes.map((r) => ({ ...r, city: r.city.trim() })),
         accommodations: [...editor.accommodations],
         transports: [...editor.transports],
-        places: [],
-        clonedFromPlanId: cloneFromPlan ? cloneFromPlan.id : undefined,
-        differenceSummary: editor.diffFromOriginal?.hasChanges ? editor.diffFromOriginal.summaryText : undefined,
-        voteCount: 0,
+        places: cloneFromPlan?.places ?? [],
+        cloneFromPlanId: cloneFromPlan ? cloneFromPlan.id : undefined,
       };
 
       const updatedRoom = await createPlanMutation.mutateAsync({
         roomId: tripId,
-        plan: newPlan,
         expectedRevision: room.revision,
+        ...command,
       });
 
       editor.discardDraft();

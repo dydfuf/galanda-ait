@@ -496,22 +496,15 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(bobUser)
       );
 
-      const newPlan: TripPlan = {
-        id: PlanIdSchema.make("plan-2"),
-        title: "밥의 대안",
-        status: "DRAFT",
-        places: [],
-        voteCount: 0,
-      };
-
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: newPlan,
+        title: "밥의 대안",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
       const room = await Effect.runPromise(program);
-      const createdPlan = room.plans.find((p) => p.id === "plan-2");
+      const createdPlan = room.plans.find((p) => p.title === "밥의 대안");
       expect(createdPlan?.authorId).toBe("user-bob");
       expect(createdPlan?.authorName).toBe("밥");
     });
@@ -522,24 +515,15 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(bobUser)
       );
 
-      const spoofedPlan: TripPlan = {
-        id: PlanIdSchema.make("plan-3"),
-        title: "위조된 작성자 여행안",
-        status: "DRAFT",
-        authorId: UserIdSchema.make("user-alice"), // 앨리스인 척 위조
-        authorName: "앨리스",
-        places: [],
-        voteCount: 0,
-      };
-
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: spoofedPlan,
+        title: "위조된 작성자 여행안",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
       const room = await Effect.runPromise(program);
-      const createdPlan = room.plans.find((p) => p.id === "plan-3");
+      const createdPlan = room.plans.find((p) => p.title === "위조된 작성자 여행안");
       expect(createdPlan?.authorId).toBe("user-bob"); // 실제 세션인 밥이어야 함
       expect(createdPlan?.authorName).toBe("밥");
     });
@@ -550,17 +534,10 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createTestSessionLayer(strangerUser)
       );
 
-      const newPlan: TripPlan = {
-        id: PlanIdSchema.make("plan-4"),
-        title: "이방인의 여행안",
-        status: "DRAFT",
-        places: [],
-        voteCount: 0,
-      };
-
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: newPlan,
+        title: "이방인의 여행안",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
@@ -580,13 +557,8 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: {
-          id: PlanIdSchema.make("plan-5"),
-          title: "비로그인 작성",
-          status: "DRAFT",
-          places: [],
-          voteCount: 0,
-        },
+        title: "비로그인 작성",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
@@ -1470,13 +1442,8 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: {
-          id: PlanIdSchema.make("plan-new"),
-          title: "세션 장애 중 작성 시도",
-          status: "DRAFT",
-          places: [],
-          voteCount: 0,
-        },
+        title: "세션 장애 중 작성 시도",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
@@ -1552,13 +1519,8 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const program = createPlan({
         roomId: sampleRoom.id,
-        plan: {
-          id: PlanIdSchema.make("plan-empty"),
-          title: "  ",
-          status: "DRAFT",
-          places: [],
-          voteCount: 0,
-        },
+        title: "  ",
+        places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
 
