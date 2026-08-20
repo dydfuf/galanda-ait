@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
@@ -9,9 +9,20 @@ import {
   requirePlanInRoom,
   requireRoomPermission,
 } from "../domain/auth-guards.ts";
-import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import {
+  PlanIdSchema,
+  RevisionSchema,
+  TripIdSchema,
+  type PlanId,
+  type Revision,
+  type TripId,
+} from "../domain/ids.ts";
+import {
+  BookingStatusSchema,
+  CityStaySchema,
   getRouteValidationError,
+  PriceRangeSchema,
+  TripPlaceSchema,
   TripPlanSchema,
   type AccommodationSnapshot,
   type CityStay,
@@ -60,6 +71,39 @@ export interface CreatePlanCommand {
   readonly cloneFromPlanId?: PlanId;
 }
 
+const CreatePlanCommandSchema = Schema.Struct({
+  roomId: TripIdSchema,
+  expectedRevision: RevisionSchema,
+  title: Schema.String,
+  proposalReason: Schema.optional(Schema.String),
+  baseHeadcount: Schema.optional(Schema.Number),
+  routes: Schema.optional(Schema.Array(CityStaySchema)),
+  accommodations: Schema.optional(Schema.Array(Schema.Struct({
+    id: Schema.String,
+    city: Schema.String,
+    period: Schema.String,
+    nights: Schema.Number,
+    hotelName: Schema.String,
+    isSearching: Schema.optional(Schema.Boolean),
+    bookingStatus: BookingStatusSchema,
+    priceRange: Schema.optional(PriceRangeSchema),
+    bookingUrl: Schema.optional(Schema.String),
+  }))),
+  transports: Schema.optional(Schema.Array(Schema.Struct({
+    id: Schema.String,
+    fromCity: Schema.String,
+    toCity: Schema.String,
+    mode: Schema.String,
+    hasTransfer: Schema.Boolean,
+    durationText: Schema.String,
+    bookingStatus: BookingStatusSchema,
+    priceRange: Schema.optional(PriceRangeSchema),
+    bookingUrl: Schema.optional(Schema.String),
+  }))),
+  places: Schema.Array(TripPlaceSchema),
+  cloneFromPlanId: Schema.optional(PlanIdSchema),
+});
+
 export const createPlan = Effect.fn("createPlan")(
   function* (input: CreatePlanCommand) {
     // 1. 인증 세션 확인 (단일 권한 주체, 입력 검증보다 먼저 수행)
@@ -67,8 +111,16 @@ export const createPlan = Effect.fn("createPlan")(
       "여행안을 작성하려면 로그인이 필요합니다."
     );
 
+    const decodeResult = Schema.decodeUnknownResult(CreatePlanCommandSchema)(input);
+    if (Result.isFailure(decodeResult)) {
+      return yield* Effect.fail(
+        new ValidationError({ message: "여행안 입력 형식이 올바르지 않습니다." })
+      );
+    }
+    const command = decodeResult.success;
+
     const repo = yield* TripRoomRepository;
-    const room = yield* repo.getRoom(input.roomId);
+    const room = yield* repo.getRoom(command.roomId);
 
     // 2. RBAC: 세션 사용자의 'plan:create' 권한 검증
     yield* requireRoomPermission(
@@ -79,25 +131,25 @@ export const createPlan = Effect.fn("createPlan")(
     );
 
     // 3. 여행안 입력 유효성 검증
-    if (!input.title?.trim()) {
+    if (!command.title.trim()) {
       return yield* Effect.fail(
         new ValidationError({ message: "여행안 제목을 입력해주세요." })
       );
     }
 
-    if (input.baseHeadcount !== undefined && input.baseHeadcount < 1) {
+    if (command.baseHeadcount !== undefined && command.baseHeadcount < 1) {
       return yield* Effect.fail(
         new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
       );
     }
 
-    const routeError = getRouteValidationError(input.routes ?? []);
+    const routeError = getRouteValidationError(command.routes ?? []);
     if (routeError) {
       return yield* Effect.fail(new ValidationError({ message: routeError }));
     }
 
-    const sourcePlan = input.cloneFromPlanId
-      ? yield* requirePlanInRoom(room, input.cloneFromPlanId)
+    const sourcePlan = command.cloneFromPlanId
+      ? yield* requirePlanInRoom(room, command.cloneFromPlanId)
       : undefined;
 
     // 4. 비결정적 값과 서버 소유 필드 결정 (Application 경계)
@@ -105,13 +157,13 @@ export const createPlan = Effect.fn("createPlan")(
     const generatedPlanId = yield* ids.planId;
     let finalPlan: TripPlan = {
       id: generatedPlanId,
-      title: input.title.trim(),
-      proposalReason: input.proposalReason,
-      baseHeadcount: input.baseHeadcount,
-      routes: input.routes,
-      accommodations: input.accommodations,
-      transports: input.transports,
-      places: input.places,
+      title: command.title.trim(),
+      proposalReason: command.proposalReason,
+      baseHeadcount: command.baseHeadcount,
+      routes: command.routes,
+      accommodations: command.accommodations,
+      transports: command.transports,
+      places: command.places,
       authorId: session.userId,
       authorName: session.name,
       status: "DRAFT",
@@ -130,9 +182,9 @@ export const createPlan = Effect.fn("createPlan")(
     }
 
     return yield* repo.createPlan(
-      input.roomId,
+      command.roomId,
       finalPlan,
-      input.expectedRevision
+      command.expectedRevision
     );
   }
 );

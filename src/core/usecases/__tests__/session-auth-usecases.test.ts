@@ -528,6 +528,33 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(createdPlan?.authorName).toBe("밥");
     });
 
+    it("runtime command가 깨져 있어도 ValidationError로 거부한다", async (): Promise<void> => {
+      const testEnv = createTestSessionLayer(bobUser);
+      const invalidInputs = [
+        {
+          roomId: sampleRoom.id,
+          title: 123,
+          places: [],
+          expectedRevision: sampleRoom.revision,
+        },
+        {
+          roomId: sampleRoom.id,
+          title: "잘못된 경로",
+          routes: [null],
+          places: [],
+          expectedRevision: sampleRoom.revision,
+        },
+      ];
+
+      for (const input of invalidInputs) {
+        await expect(
+          Effect.runPromise(
+            createPlan(input as never).pipe(Effect.provide(testEnv))
+          )
+        ).rejects.toBeInstanceOf(ValidationError);
+      }
+    });
+
     it("방 멤버가 아닌 이방인(GUEST)은 여행안 작성이 거부된다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
