@@ -206,6 +206,25 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
     expect(buildPlanCompareDifferences(left, right).some((difference) => difference.kind === "BOOKING")).toBe(false);
   });
 
+  it("예약 정보가 없는 위험 없는 여행안도 예약 항목이 있는 위험 없는 여행안과 다르지 않다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const emptyPlan = { ...plan, bookingRisks: [], timelineItems: [] };
+    const availablePlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      bookingRisks: [],
+    };
+
+    expect(
+      buildPlanCompareDifferences(emptyPlan, availablePlan).some(
+        (difference) => difference.kind === "BOOKING"
+      )
+    ).toBe(false);
+  });
+
   it("예약 위험 수가 같아도 위험 대상이 다르면 예약 차이를 보여준다", (): void => {
     const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
     const plan = vm.plans[0];
@@ -222,6 +241,29 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
     );
 
     expect(bookingDifference?.leftValue).not.toBe(bookingDifference?.rightValue);
+  });
+
+  it("위험 메시지가 같아도 다른 예약 레코드면 예약 차이를 보여준다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const changedRecordPlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      timelineItems: plan.timelineItems.map((item) =>
+        item.type === "STAY" && item.stay
+          ? { ...item, stay: { ...item.stay, id: "stay-2" } }
+          : item
+      ),
+    };
+
+    const bookingDifference = buildPlanCompareDifferences(plan, changedRecordPlan).find(
+      (difference) => difference.kind === "BOOKING"
+    );
+
+    expect(bookingDifference?.leftValue).toBe(bookingDifference?.rightValue);
+    expect(bookingDifference).toBeDefined();
   });
 
   it("비용 차이는 1인 기준 delta로 표현한다", (): void => {

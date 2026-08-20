@@ -34,13 +34,57 @@ const formatSchedule = (plan: DetailedPlanViewModel): string =>
   `${plan.period} · ${plan.nights}박 ${plan.days}일 · ${formatRoute(plan)}`;
 
 const formatBooking = (plan: DetailedPlanViewModel): string => {
-  if (plan.timelineItems.length === 0) return "예약 정보 없음";
   if (plan.bookingRisks.length === 0) return "확인 필요 0건";
+  if (plan.timelineItems.length === 0) return "예약 정보 없음";
 
   const hasDanger = plan.bookingRisks.some((risk) => risk.level === "DANGER");
   const riskDetails = plan.bookingRisks.map((risk) => risk.message).join(" · ");
   return `${plan.bookingRisks.length}건 확인 필요${hasDanger ? " · 예약 불가 포함" : ""} · ${riskDetails}`;
 };
+
+const bookingItemSignature = (
+  item: DetailedPlanViewModel["timelineItems"][number]
+): string | undefined => {
+  if (item.type === "STAY" && item.stay) {
+    if (item.stay.bookingStatus === "AVAILABLE") return undefined;
+    return JSON.stringify([
+      "STAY",
+      item.stay.id,
+      item.stay.city,
+      item.stay.period,
+      item.stay.nights,
+      item.stay.hotelName,
+      item.stay.bookingStatus,
+    ]);
+  }
+
+  if (item.type === "TRANSPORT" && item.transport) {
+    if (item.transport.bookingStatus === "AVAILABLE") return undefined;
+    return JSON.stringify([
+      "TRANSPORT",
+      item.transport.id,
+      item.transport.fromCity,
+      item.transport.toCity,
+      item.transport.mode,
+      item.transport.hasTransfer,
+      item.transport.durationText,
+      item.transport.bookingStatus,
+    ]);
+  }
+
+  return undefined;
+};
+
+const bookingSignature = (plan: DetailedPlanViewModel): string =>
+  JSON.stringify({
+    risks: plan.bookingRisks.map((risk) => [risk.level, risk.message]),
+    items:
+      plan.bookingRisks.length === 0
+        ? []
+        : plan.timelineItems
+            .map(bookingItemSignature)
+            .filter((signature): signature is string => signature !== undefined),
+  });
 
 const formatOpinions = (plan: DetailedPlanViewModel): string => {
   const total = plan.opinions.likeCount + plan.opinions.okayCount + plan.opinions.hardCount;
@@ -132,7 +176,7 @@ export const buildPlanCompareDifferences = (
     right,
     leftValue: formatBooking(left),
     rightValue: formatBooking(right),
-    isChanged: formatBooking(left) !== formatBooking(right),
+    isChanged: bookingSignature(left) !== bookingSignature(right),
   });
   const cost = makeDifference({
     kind: "COST",
