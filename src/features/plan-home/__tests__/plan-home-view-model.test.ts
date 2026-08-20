@@ -6,7 +6,7 @@ import {
   UserIdSchema,
 } from "../../../core/domain/ids.ts";
 import type { TripRoom } from "../../../core/domain/room.ts";
-import { toTripRoomViewModel } from "../plan-home-view-model.ts";
+import { getTripListStatusText, toTripRoomViewModel } from "../plan-home-view-model.ts";
 
 const room: TripRoom = {
   id: TripIdSchema.make("room-1"),
@@ -60,5 +60,31 @@ describe("toTripRoomViewModel 세션 신원 처리 (RAON-149)", (): void => {
     const vm = toTripRoomViewModel(room, UserIdSchema.make("user-bob"));
 
     expect(vm.plans[0].myReaction).toBeUndefined();
+  });
+});
+
+describe("getTripListStatusText (RAON-161)", (): void => {
+  it.each([
+    [0, "첫 여행안을 만들어보세요"],
+    [1, "여행안 1개 · 의견을 모으는 중"],
+    [2, "여행안 2개 · 비교 중"],
+  ])("여행안 %i개 상태를 표시한다", (planCount, expected) => {
+    const plans = Array.from({ length: planCount }, (_, index) => ({
+      ...room.plans[0],
+      id: PlanIdSchema.make(`plan-${index + 1}`),
+    }));
+
+    expect(getTripListStatusText(toTripRoomViewModel({ ...room, plans }))).toBe(expected);
+  });
+
+  it("확정된 여행은 확정안 제목을 함께 표시한다", () => {
+    const confirmedRoom = {
+      ...room,
+      confirmedPlanId: room.plans[0].id,
+    };
+
+    expect(getTripListStatusText(toTripRoomViewModel(confirmedRoom))).toBe(
+      "일정 확정 · 기본 1안"
+    );
   });
 });
