@@ -181,7 +181,7 @@ export function RouteCitySection({
   return (
     <section css={cardStyle}>
       <div css={sectionHeaderStyle}>
-        <h2 css={sectionTitleStyle}>2. 날짜와 도시 체류 배분</h2>
+        <h2 css={sectionTitleStyle}>날짜와 도시 체류 배분</h2>
         <span css={nightsStatusBadgeStyle(isNightMatched)}>
           {isNightMatched
             ? `총 ${totalTripNights}박 배분 완료`

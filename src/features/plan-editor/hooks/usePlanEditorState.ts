@@ -13,6 +13,110 @@ export interface PlanEditorFormData {
   readonly clonedFromPlanId?: string;
 }
 
+interface StoredPlanEditorDraft extends PlanEditorFormData {
+  readonly ownerId: string;
+  readonly basePlanFingerprint?: string;
+  readonly updatedAt: string;
+}
+
+export function getPlanEditorDraftKey(
+  userId: string,
+  roomId: string,
+  draftTarget: string
+): string {
+  return `galanda_draft_${userId}_${roomId}_${draftTarget}`;
+}
+
+export function getPlanFingerprint(
+  plan: Pick<TripPlan, "title" | "proposalReason" | "baseHeadcount" | "routes" | "accommodations" | "transports"> | undefined
+): string | undefined {
+  if (!plan) return undefined;
+  return JSON.stringify({
+    title: plan.title,
+    proposalReason: plan.proposalReason,
+    baseHeadcount: plan.baseHeadcount,
+    routes: plan.routes,
+    accommodations: plan.accommodations,
+    transports: plan.transports,
+  });
+}
+
+export function hasDraftBaseChanged(
+  storedFingerprint: string | undefined,
+  currentFingerprint: string | undefined
+): boolean {
+  return storedFingerprint !== currentFingerprint;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function hasPriceRange(value: unknown): boolean {
+  return value === undefined || (
+    isRecord(value) && Number.isFinite(value.min) && Number.isFinite(value.max)
+  );
+}
+
+function hasBookingStatus(value: unknown): boolean {
+  return ["AVAILABLE", "NEED_CHECK", "FULL", "NOT_CHECKED"].includes(String(value));
+}
+
+function isAccommodation(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.city === "string" &&
+    typeof value.period === "string" &&
+    Number.isFinite(value.nights) &&
+    typeof value.hotelName === "string" &&
+    (value.isSearching === undefined || typeof value.isSearching === "boolean") &&
+    hasBookingStatus(value.bookingStatus) &&
+    hasPriceRange(value.priceRange);
+}
+
+function isTransport(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.fromCity === "string" &&
+    typeof value.toCity === "string" &&
+    typeof value.mode === "string" &&
+    typeof value.hasTransfer === "boolean" &&
+    typeof value.durationText === "string" &&
+    hasBookingStatus(value.bookingStatus) &&
+    hasPriceRange(value.priceRange);
+}
+
+export function parsePlanEditorDraft(raw: string | null): StoredPlanEditorDraft | undefined {
+  if (!raw) return undefined;
+
+  try {
+    const draft: unknown = JSON.parse(raw);
+    if (
+      !isRecord(draft) ||
+      typeof draft.ownerId !== "string" ||
+      typeof draft.title !== "string" ||
+      typeof draft.proposalReason !== "string" ||
+      !Number.isFinite(draft.baseHeadcount) ||
+      Number(draft.baseHeadcount) < 1 ||
+      !Array.isArray(draft.routes) ||
+      !draft.routes.every((route) => isRecord(route) && typeof route.city === "string" && Number.isFinite(route.nights)) ||
+      !Array.isArray(draft.accommodations) ||
+      !draft.accommodations.every(isAccommodation) ||
+      !Array.isArray(draft.transports) ||
+      !draft.transports.every(isTransport) ||
+      typeof draft.updatedAt !== "string" ||
+      (draft.basePlanFingerprint !== undefined && typeof draft.basePlanFingerprint !== "string") ||
+      (draft.clonedFromPlanId !== undefined && typeof draft.clonedFromPlanId !== "string")
+    ) {
+      return undefined;
+    }
+
+    return draft as unknown as StoredPlanEditorDraft;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getTripTotalNights(startDate: string, endDate: string): number {
   try {
     const start = new Date(startDate);
@@ -28,7 +132,8 @@ export function getTripTotalNights(startDate: string, endDate: string): number {
 export function usePlanEditorState(
   room: TripRoom | undefined,
   initialPlan?: TripPlan,
-  cloneFromPlan?: TripPlan
+  cloneFromPlan?: TripPlan,
+  userId?: string
 ) {
   const totalTripNights = useMemo(() => {
     if (!room) return 3;
@@ -105,6 +210,59 @@ export function usePlanEditorState(
   const [accommodations, setAccommodations] = useState<ReadonlyArray<AccommodationSnapshot>>(defaultAccommodations);
   const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(defaultTransports);
   const [lastSavedTime, setLastSavedTime] = useState<Date>(new Date());
+  const [hydratedEditorId, setHydratedEditorId] = useState<string>();
+  const [draftConflict, setDraftConflict] = useState<StoredPlanEditorDraft>();
+
+  const draftTarget = initialPlan?.id ?? (cloneFromPlan ? `clone_${cloneFromPlan.id}` : "new");
+  const draftKey = room && userId
+    ? getPlanEditorDraftKey(userId, room.id, draftTarget)
+    : undefined;
+  const editorId = draftKey;
+  const basePlanFingerprint = getPlanFingerprint(initialPlan ?? cloneFromPlan);
+
+  const resetToInitialData = useCallback(() => {
+    setTitle(initialPlan?.title || (cloneFromPlan ? `${cloneFromPlan.title} 대안` : ""));
+    setProposalReason(initialPlan?.proposalReason || cloneFromPlan?.proposalReason || "");
+    setBaseHeadcount(
+      initialPlan?.baseHeadcount || cloneFromPlan?.baseHeadcount || (room?.members.length || 4)
+    );
+    setRoutes(defaultRoutes);
+    setAccommodations(defaultAccommodations);
+    setTransports(defaultTransports);
+    setLastSavedTime(new Date());
+  }, [initialPlan, cloneFromPlan, room, defaultRoutes, defaultAccommodations, defaultTransports]);
+
+  useEffect(() => {
+    if (!draftKey || !editorId || hydratedEditorId === editorId) return;
+
+    setDraftConflict(undefined);
+    let draft: StoredPlanEditorDraft | undefined;
+    try {
+      draft = parsePlanEditorDraft(localStorage.getItem(draftKey));
+    } catch {
+      // 저장소 접근이 차단된 경우 공개본/초기값으로 계속 편집해요.
+    }
+    if (
+      draft &&
+      draft.ownerId === userId &&
+      draft.clonedFromPlanId === cloneFromPlan?.id &&
+      hasDraftBaseChanged(draft.basePlanFingerprint, basePlanFingerprint)
+    ) {
+      resetToInitialData();
+      setDraftConflict(draft);
+    } else if (draft && draft.ownerId === userId && draft.clonedFromPlanId === cloneFromPlan?.id) {
+      setTitle(draft.title);
+      setProposalReason(draft.proposalReason);
+      setBaseHeadcount(draft.baseHeadcount);
+      setRoutes(draft.routes);
+      setAccommodations(draft.accommodations);
+      setTransports(draft.transports);
+      setLastSavedTime(new Date(draft.updatedAt));
+    } else {
+      resetToInitialData();
+    }
+    setHydratedEditorId(editorId);
+  }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, userId, basePlanFingerprint, resetToInitialData]);
 
   // 도시 박수 합계 계산
   const currentTotalNights = useMemo(() => {
@@ -220,9 +378,10 @@ export function usePlanEditorState(
 
   // 자동 임시 저장 (로컬스토리지 Draft)
   useEffect(() => {
-    if (!room) return;
-    const draftKey = `galanda_draft_${room.id}_${initialPlan?.id || "new"}`;
+    if (!draftKey || !userId || hydratedEditorId !== editorId || draftConflict) return;
     const draftData = {
+      ownerId: userId,
+      basePlanFingerprint,
       title,
       proposalReason,
       baseHeadcount,
@@ -237,17 +396,39 @@ export function usePlanEditorState(
     } catch {
       // ignore
     }
-  }, [room, initialPlan, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
+  }, [draftKey, editorId, hydratedEditorId, draftConflict, userId, basePlanFingerprint, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
 
-  const clearDraft = useCallback(() => {
-    if (!room) return;
-    const draftKey = `galanda_draft_${room.id}_${initialPlan?.id || "new"}`;
+  const discardDraft = useCallback(() => {
+    if (!draftKey) return;
     try {
       localStorage.removeItem(draftKey);
     } catch {
       // ignore
     }
-  }, [room, initialPlan]);
+  }, [draftKey]);
+
+  const clearDraft = useCallback(() => {
+    discardDraft();
+    resetToInitialData();
+  }, [discardDraft, resetToInitialData]);
+
+  const restoreConflictingDraft = useCallback(() => {
+    if (!draftConflict) return;
+    setTitle(draftConflict.title);
+    setProposalReason(draftConflict.proposalReason);
+    setBaseHeadcount(draftConflict.baseHeadcount);
+    setRoutes(draftConflict.routes);
+    setAccommodations(draftConflict.accommodations);
+    setTransports(draftConflict.transports);
+    setLastSavedTime(new Date(draftConflict.updatedAt));
+    setDraftConflict(undefined);
+  }, [draftConflict]);
+
+  const useLatestPublishedPlan = useCallback(() => {
+    discardDraft();
+    resetToInitialData();
+    setDraftConflict(undefined);
+  }, [discardDraft, resetToInitialData]);
 
   return {
     title,
@@ -257,7 +438,6 @@ export function usePlanEditorState(
     baseHeadcount,
     setBaseHeadcount: (val: number) => { setBaseHeadcount(val); setLastSavedTime(new Date()); },
     routes,
-    setRoutes,
     totalTripNights,
     currentTotalNights,
     handleAddCity,
@@ -276,5 +456,9 @@ export function usePlanEditorState(
     validation,
     lastSavedTime,
     clearDraft,
+    discardDraft,
+    draftConflict: Boolean(draftConflict),
+    restoreConflictingDraft,
+    useLatestPublishedPlan,
   };
 }
