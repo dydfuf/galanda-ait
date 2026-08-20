@@ -45,9 +45,11 @@ export function AppRouter() {
         {/* 여행방 서브페이지 레이아웃 (뒤로가기 헤더): 계획 생성, 상세, 편집, 비교 */}
         <Route path="/trips/:tripId/plans" element={<TripRoomChildLayout />}>
           <Route path="new" element={<PlanCreatePage />} />
+          <Route path="new/:section" element={<PlanCreatePage />} />
           <Route path="compare" element={<PlanComparePage />} />
           <Route path=":planId" element={<PlanDetailPage />} />
           <Route path=":planId/edit" element={<PlanEditPage />} />
+          <Route path=":planId/edit/:section" element={<PlanEditPage />} />
         </Route>
 
         {/* 404 Not Found */}

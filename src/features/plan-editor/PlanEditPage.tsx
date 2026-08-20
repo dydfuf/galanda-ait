@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
 import { BottomSheet, CTAButton, FixedBottomCTA, useBottomSheet } from "@toss/tds-mobile";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -11,18 +11,14 @@ import { canManagePlan } from "../../core/domain/auth-guards.ts";
 import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
-import { PlanEditorHeader } from "./components/PlanEditorHeader.tsx";
-import { BasicInfoSection } from "./components/BasicInfoSection.tsx";
-import { RouteCitySection } from "./components/RouteCitySection.tsx";
-import { AccommodationSection } from "./components/AccommodationSection.tsx";
-import { TransportSection } from "./components/TransportSection.tsx";
-import { CostSummarySection } from "./components/CostSummarySection.tsx";
+import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
+import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useUpdatePlanMutation, useDeletePlanMutation } from "./mutations.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
 
 const pageContainerStyle = css`
-  padding: 16px 20px 24px;
+  padding: 16px 20px var(--app-cta-space, 112px);
   max-width: 640px;
   width: 100%;
   min-width: 0;
@@ -48,6 +44,8 @@ const actionErrorStyle = css`
 export function PlanEditPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const section = isPlanEditorSection(params.section) ? params.section : undefined;
 
   const validated = decodeRouteParams(PlanParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
@@ -68,32 +66,7 @@ export function PlanEditPage(): JSX.Element {
 
   const plan = room?.plans.find((p) => p.id === planId);
 
-  const {
-    title,
-    setTitle,
-    proposalReason,
-    setProposalReason,
-    baseHeadcount,
-    setBaseHeadcount,
-    routes,
-    totalTripNights,
-    currentTotalNights,
-    handleAddCity,
-    handleUpdateCity,
-    handleRemoveCity,
-    accommodations,
-    handleAddAccommodation,
-    handleUpdateAccommodation,
-    handleRemoveAccommodation,
-    transports,
-    handleAddTransport,
-    handleUpdateTransport,
-    handleRemoveTransport,
-    costSummary,
-    validation,
-    lastSavedTime,
-    clearDraft,
-  } = usePlanEditorState(room, plan, undefined);
+  const editor = usePlanEditorState(room, plan, undefined);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -165,19 +138,19 @@ export function PlanEditPage(): JSX.Element {
   }
 
   const handleSubmit = async (): Promise<void> => {
-    if (!validation.isValid || isSubmitting) return;
+    if (!editor.validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
     setActionError(null);
     try {
       const updatedPlan: TripPlan = {
         ...plan,
-        title: title.trim(),
-        proposalReason: proposalReason.trim() || undefined,
-        baseHeadcount,
-        routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
-        accommodations: [...accommodations],
-        transports: [...transports],
+        title: editor.title.trim(),
+        proposalReason: editor.proposalReason.trim() || undefined,
+        baseHeadcount: editor.baseHeadcount,
+        routes: editor.routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
+        accommodations: [...editor.accommodations],
+        transports: [...editor.transports],
       };
 
       await updatePlanMutation.mutateAsync({
@@ -186,7 +159,7 @@ export function PlanEditPage(): JSX.Element {
         expectedRevision: room.revision,
       });
 
-      clearDraft();
+      editor.discardDraft();
       navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
     } catch (err: unknown) {
       setIsSubmitting(false);
@@ -217,7 +190,7 @@ export function PlanEditPage(): JSX.Element {
             planId: plan.id,
             expectedRevision: room.revision,
           });
-          clearDraft();
+          editor.discardDraft();
           navigate(`/trips/${tripId}/plans`, { replace: true });
         } catch (err: unknown) {
           setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
@@ -226,73 +199,44 @@ export function PlanEditPage(): JSX.Element {
     });
   };
 
+  const editorBasePath = `/trips/${tripId}/plans/${planId}/edit`;
+  const openSection = (nextSection: PlanEditorSection): void => {
+    navigate(`${editorBasePath}/${nextSection}`, { state: { fromEditorSummary: true } });
+  };
+  const completeSection = (): void => {
+    if ((location.state as { fromEditorSummary?: boolean } | null)?.fromEditorSummary) {
+      navigate(-1);
+    } else {
+      navigate(editorBasePath, { replace: true });
+    }
+  };
+
   return (
     <div css={pageContainerStyle}>
-      <PlanEditorHeader
+      <PlanEditorSections
+        editor={editor}
+        section={section}
         isEditMode={true}
         isCloneMode={false}
-        lastSavedTime={lastSavedTime}
-        onClearDraft={clearDraft}
+        onOpenSection={openSection}
+        onCompleteSection={completeSection}
       />
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleSubmit();
-        }}
-      >
-        <BasicInfoSection
-          title={title}
-          onTitleChange={setTitle}
-          proposalReason={proposalReason}
-          onProposalReasonChange={setProposalReason}
-          baseHeadcount={baseHeadcount}
-          onBaseHeadcountChange={setBaseHeadcount}
-        />
-
-        <RouteCitySection
-          routes={routes}
-          totalTripNights={totalTripNights}
-          currentTotalNights={currentTotalNights}
-          onAddCity={handleAddCity}
-          onUpdateCity={handleUpdateCity}
-          onRemoveCity={handleRemoveCity}
-        />
-
-        <AccommodationSection
-          accommodations={accommodations}
-          routes={routes}
-          onAdd={handleAddAccommodation}
-          onUpdate={handleUpdateAccommodation}
-          onRemove={handleRemoveAccommodation}
-        />
-
-        <TransportSection
-          transports={transports}
-          onAdd={handleAddTransport}
-          onUpdate={handleUpdateTransport}
-          onRemove={handleRemoveTransport}
-        />
-
-        <CostSummarySection costSummary={costSummary} />
-
-      </form>
-
       {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      <FixedBottomCTA.Double
+      {!section && <FixedBottomCTA.Double
         containerStyle={fixedCtaContainerStyle}
         topAccessory={
-          validation.firstError || actionError ? (
+          editor.validation.firstError || actionError ? (
             <>
               {actionError && (
                 <span css={actionErrorStyle} role="alert">
                   {actionError}
                 </span>
               )}
-              {validation.firstError && (
+              {editor.validation.firstError && (
                 <ValidationBanner
-                  firstError={validation.firstError}
-                  errorCount={validation.errorCount}
+                  firstError={editor.validation.firstError}
+                  errorCount={editor.validation.errorCount}
                 />
               )}
             </>
@@ -310,13 +254,13 @@ export function PlanEditPage(): JSX.Element {
         }
         rightButton={
           <CTAButton
-            disabled={!validation.isValid || isSubmitting}
+            disabled={!editor.validation.isValid || isSubmitting}
             onClick={() => void handleSubmit()}
           >
             {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
           </CTAButton>
         }
-      />
+      />}
     </div>
   );
 }

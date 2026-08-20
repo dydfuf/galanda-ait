@@ -143,7 +143,7 @@ export function TransportSection({
 
   return (
     <section css={cardStyle}>
-      <h2 css={sectionTitleStyle}>4. 이동 교통편 스냅샷</h2>
+      <h2 css={sectionTitleStyle}>이동 교통편</h2>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {transports.map((trans, idx) => (

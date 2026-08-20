@@ -13,6 +13,77 @@ export interface PlanEditorFormData {
   readonly clonedFromPlanId?: string;
 }
 
+interface StoredPlanEditorDraft extends PlanEditorFormData {
+  readonly updatedAt: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function hasPriceRange(value: unknown): boolean {
+  return value === undefined || (
+    isRecord(value) && Number.isFinite(value.min) && Number.isFinite(value.max)
+  );
+}
+
+function hasBookingStatus(value: unknown): boolean {
+  return ["AVAILABLE", "NEED_CHECK", "FULL", "NOT_CHECKED"].includes(String(value));
+}
+
+function isAccommodation(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.city === "string" &&
+    typeof value.period === "string" &&
+    Number.isFinite(value.nights) &&
+    typeof value.hotelName === "string" &&
+    (value.isSearching === undefined || typeof value.isSearching === "boolean") &&
+    hasBookingStatus(value.bookingStatus) &&
+    hasPriceRange(value.priceRange);
+}
+
+function isTransport(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.fromCity === "string" &&
+    typeof value.toCity === "string" &&
+    typeof value.mode === "string" &&
+    typeof value.hasTransfer === "boolean" &&
+    typeof value.durationText === "string" &&
+    hasBookingStatus(value.bookingStatus) &&
+    hasPriceRange(value.priceRange);
+}
+
+export function parsePlanEditorDraft(raw: string | null): StoredPlanEditorDraft | undefined {
+  if (!raw) return undefined;
+
+  try {
+    const draft: unknown = JSON.parse(raw);
+    if (
+      !isRecord(draft) ||
+      typeof draft.title !== "string" ||
+      typeof draft.proposalReason !== "string" ||
+      !Number.isFinite(draft.baseHeadcount) ||
+      Number(draft.baseHeadcount) < 1 ||
+      !Array.isArray(draft.routes) ||
+      !draft.routes.every((route) => isRecord(route) && typeof route.city === "string" && Number.isFinite(route.nights)) ||
+      !Array.isArray(draft.accommodations) ||
+      !draft.accommodations.every(isAccommodation) ||
+      !Array.isArray(draft.transports) ||
+      !draft.transports.every(isTransport) ||
+      typeof draft.updatedAt !== "string" ||
+      (draft.clonedFromPlanId !== undefined && typeof draft.clonedFromPlanId !== "string")
+    ) {
+      return undefined;
+    }
+
+    return draft as unknown as StoredPlanEditorDraft;
+  } catch {
+    return undefined;
+  }
+}
+
 export function getTripTotalNights(startDate: string, endDate: string): number {
   try {
     const start = new Date(startDate);
@@ -105,6 +176,46 @@ export function usePlanEditorState(
   const [accommodations, setAccommodations] = useState<ReadonlyArray<AccommodationSnapshot>>(defaultAccommodations);
   const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(defaultTransports);
   const [lastSavedTime, setLastSavedTime] = useState<Date>(new Date());
+  const [hydratedEditorId, setHydratedEditorId] = useState<string>();
+
+  const draftTarget = initialPlan?.id ?? (cloneFromPlan ? `clone_${cloneFromPlan.id}` : "new");
+  const draftKey = room ? `galanda_draft_${room.id}_${draftTarget}` : undefined;
+  const editorId = draftKey;
+
+  const resetToInitialData = useCallback(() => {
+    setTitle(initialPlan?.title || (cloneFromPlan ? `${cloneFromPlan.title} 대안` : ""));
+    setProposalReason(initialPlan?.proposalReason || cloneFromPlan?.proposalReason || "");
+    setBaseHeadcount(
+      initialPlan?.baseHeadcount || cloneFromPlan?.baseHeadcount || (room?.members.length || 4)
+    );
+    setRoutes(defaultRoutes);
+    setAccommodations(defaultAccommodations);
+    setTransports(defaultTransports);
+    setLastSavedTime(new Date());
+  }, [initialPlan, cloneFromPlan, room, defaultRoutes, defaultAccommodations, defaultTransports]);
+
+  useEffect(() => {
+    if (!draftKey || !editorId || hydratedEditorId === editorId) return;
+
+    let draft: StoredPlanEditorDraft | undefined;
+    try {
+      draft = parsePlanEditorDraft(localStorage.getItem(draftKey));
+    } catch {
+      // 저장소 접근이 차단된 경우 공개본/초기값으로 계속 편집해요.
+    }
+    if (draft && draft.clonedFromPlanId === cloneFromPlan?.id) {
+      setTitle(draft.title);
+      setProposalReason(draft.proposalReason);
+      setBaseHeadcount(draft.baseHeadcount);
+      setRoutes(draft.routes);
+      setAccommodations(draft.accommodations);
+      setTransports(draft.transports);
+      setLastSavedTime(new Date(draft.updatedAt));
+    } else {
+      resetToInitialData();
+    }
+    setHydratedEditorId(editorId);
+  }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, resetToInitialData]);
 
   // 도시 박수 합계 계산
   const currentTotalNights = useMemo(() => {
@@ -220,8 +331,7 @@ export function usePlanEditorState(
 
   // 자동 임시 저장 (로컬스토리지 Draft)
   useEffect(() => {
-    if (!room) return;
-    const draftKey = `galanda_draft_${room.id}_${initialPlan?.id || "new"}`;
+    if (!draftKey || hydratedEditorId !== editorId) return;
     const draftData = {
       title,
       proposalReason,
@@ -237,17 +347,21 @@ export function usePlanEditorState(
     } catch {
       // ignore
     }
-  }, [room, initialPlan, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
+  }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
 
-  const clearDraft = useCallback(() => {
-    if (!room) return;
-    const draftKey = `galanda_draft_${room.id}_${initialPlan?.id || "new"}`;
+  const discardDraft = useCallback(() => {
+    if (!draftKey) return;
     try {
       localStorage.removeItem(draftKey);
     } catch {
       // ignore
     }
-  }, [room, initialPlan]);
+  }, [draftKey]);
+
+  const clearDraft = useCallback(() => {
+    discardDraft();
+    resetToInitialData();
+  }, [discardDraft, resetToInitialData]);
 
   return {
     title,
@@ -257,7 +371,6 @@ export function usePlanEditorState(
     baseHeadcount,
     setBaseHeadcount: (val: number) => { setBaseHeadcount(val); setLastSavedTime(new Date()); },
     routes,
-    setRoutes,
     totalTripNights,
     currentTotalNights,
     handleAddCity,
@@ -276,5 +389,6 @@ export function usePlanEditorState(
     validation,
     lastSavedTime,
     clearDraft,
+    discardDraft,
   };
 }

@@ -152,7 +152,7 @@ export function AccommodationSection({
 
   return (
     <section css={cardStyle}>
-      <h2 css={sectionTitleStyle}>3. 숙소 체류 구간 스냅샷</h2>
+      <h2 css={sectionTitleStyle}>숙소 체류 구간</h2>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {accommodations.map((acc, idx) => (
