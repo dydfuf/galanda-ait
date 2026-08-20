@@ -18,7 +18,10 @@ export const syncAccommodationNights = (
   accommodations: ReadonlyArray<AccommodationSnapshot>
 ): ReadonlyArray<AccommodationSnapshot> =>
   accommodations.map((accommodation, index) => {
-    const route = routes.find((stay) => stay.city === accommodation.city) ?? routes[index];
+    const indexedRoute = routes[index];
+    const route = indexedRoute?.city === accommodation.city
+      ? indexedRoute
+      : routes.find((stay) => stay.city === accommodation.city) ?? indexedRoute;
     return route
       ? { ...accommodation, nights: Math.max(0, getStayNightCount(route)) }
       : accommodation;
