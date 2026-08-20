@@ -1,458 +1,447 @@
+import { useState } from "react";
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
-import { useParams, useNavigate } from "react-router-dom";
+import {
+  Badge,
+  BottomSheet,
+  List,
+  ListHeader,
+  ListRow,
+  Text,
+  Top,
+} from "@toss/tds-mobile";
+import { useNavigate, useParams } from "react-router-dom";
+import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
-import { Result } from "effect";
-import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
+import { PageState } from "../common/PageState.tsx";
 import { RouteRail } from "../common/RouteRail.tsx";
+import { tdsPageStyle } from "../common/tds-layout.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
+import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import {
+  toItineraryViewModel,
+  type ItineraryItem,
+} from "./itinerary-view-model.ts";
 
-const pageContainerStyle = css`
-  padding: 16px 20px calc(64px + env(safe-area-inset-bottom, 0px));
+const pageStyle = css`
+  ${tdsPageStyle};
   max-width: 640px;
   margin: 0 auto;
-  min-height: 100vh;
   box-sizing: border-box;
 `;
 
-const loadingContainerStyle = css`
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--adaptiveGrey500, #8b95a1);
-  font-size: 15px;
-`;
-
-const emptyContainerStyle = css`
-  padding: 48px 20px;
-  text-align: center;
-  background-color: var(--adaptiveBackground, #ffffff);
-  margin: 20px;
-  border-radius: 16px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-`;
-
-const emptyIconStyle = css`
-  font-size: 36px;
-  margin-bottom: 12px;
-`;
-
-const emptyTitleStyle = css`
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const emptyDescStyle = css`
-  font-size: 14px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin: 0 0 24px 0;
-  line-height: 1.5;
-`;
-
-const headerCardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
-  border-radius: 16px;
-  padding: 20px;
-  border: 2px solid var(--adaptiveGreen500, #2da44e);
-  margin-bottom: 20px;
+const summaryContainerStyle = css`
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  gap: 8px;
 `;
 
-const headerTopStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+const topBadgeRowStyle = css`
+  padding: 0 var(--app-inline-padding, 16px);
+  margin-top: 4px;
 `;
 
-const confirmedBadgeStyle = css`
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  background-color: var(--adaptiveGreen50, #f0fbf4);
-  color: var(--adaptiveGreen700, #15803d);
+const railWrapperStyle = css`
+  padding: 0 var(--app-inline-padding, 16px) 16px;
 `;
 
-const destinationTextStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
+const needCheckSectionStyle = css`
+  margin-bottom: 16px;
 `;
 
-const planTitleStyle = css`
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const periodTextStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey600, #6b7684);
-  margin: 0;
-`;
-
-// IT-01 시안 2 핵심 1: 확인할 내용 주황색 배너
-const needCheckBannerStyle = css`
-  background-color: var(--adaptiveYellow50, #fff8e1);
-  border: 1px solid #ffe082;
-  border-radius: 14px;
-  padding: 16px 18px;
-  margin-bottom: 24px;
-`;
-
-const needCheckHeaderStyle = css`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--adaptiveYellow700, #b78103);
+const sectionStyle = css`
   margin-bottom: 8px;
 `;
 
-const needCheckListStyle = css`
-  margin: 0;
-  padding: 0 0 0 18px;
-  font-size: 13px;
-  color: var(--adaptiveGrey800, #333d4b);
+const contentsStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  line-height: 1.4;
 `;
 
-// IT-01 시안 2 핵심 2: 세로 여정 타임라인 레일
-const timelineContainerStyle = css`
-  position: relative;
-  margin-bottom: 28px;
-  padding-left: 12px;
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 14px;
-    bottom: 20px;
-    left: 17px;
-    width: 2px;
-    background-color: var(--adaptiveGrey200, #e5e8eb);
-    z-index: 1;
-  }
+const ellipsisStyle = css`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
-const daySectionStyle = css`
-  position: relative;
-  margin-bottom: 24px;
-  padding-left: 28px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-`;
-
-const dayDotStyle = css`
-  position: absolute;
-  top: 4px;
-  left: 0;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--adaptiveBlue500, #3182f6);
-  border: 3px solid #ffffff;
-  box-shadow: 0 0 0 2px var(--adaptiveBlue200, #b8d7ff);
-  z-index: 2;
-`;
-
-const dayHeaderStyle = css`
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 10px;
-`;
-
-const dayNumberStyle = css`
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--adaptiveBlue600, #1b64da);
-`;
-
-const dayCityStyle = css`
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--adaptiveGrey800, #333d4b);
-`;
-
-const dayContentBoxStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
-  border-radius: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const itemHeaderRowStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const itemTypeBadgeStyle = (bg: string, color: string) => css`
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: ${bg};
-  color: ${color};
-`;
-
-const itemTitleStyle = css`
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-  margin: 0;
-`;
-
-const itemDescStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey700, #4e5968);
-  margin: 0;
-`;
-
-const itemLinkStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveBlue500, #3182f6);
-  font-weight: 600;
-  text-decoration: none;
-  display: inline-block;
-  align-self: flex-start;
-
-  &:hover {
-    text-decoration: underline;
-  }
-`;
-
-const bottomActionStyle = css`
+const secondaryActionStyle = css`
   margin-top: 24px;
-  text-align: center;
+  padding-bottom: 32px;
 `;
 
-export function ItineraryPage() {
+const sheetListStyle = css`
+  padding-bottom: 16px;
+`;
+
+export function ItineraryPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
-  const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
+  const {
+    isError: isSessionError,
+    error: sessionError,
+    data: session,
+    refetch: refetchSession,
+  } = useSessionQuery();
+
+  const {
+    data: rawRoom,
+    isLoading,
+    isError,
+    error,
+    refetch: refetchRoom,
+  } = useTripRoomRawQuery(tripId);
+
+  const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
+  const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
   }
 
   if (isLoading) {
-    return <div css={loadingContainerStyle}>확정 일정을 불러오는 중...</div>;
+    return <PageState status="loading" message="확정 일정을 불러오는 중입니다..." />;
   }
 
-  if (isError || !room) {
+  if (isSessionError) {
     return (
       <RouteErrorFallback
-        title="일정 정보를 찾을 수 없습니다"
-        message={toUserMessage(error, "요청한 정보를 찾을 수 없습니다.")}
+        title="로그인 정보를 확인할 수 없습니다"
+        message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
+        actionText="다시 시도"
+        onAction={() => void refetchSession()}
       />
     );
   }
 
-  const confirmedPlan = room.plans.find((p) => p.id === room.confirmedPlanId);
-
-  if (!confirmedPlan) {
+  if (isError || !rawRoom) {
     return (
-      <div css={emptyContainerStyle}>
-        <div css={emptyIconStyle}>📅</div>
-        <h2 css={emptyTitleStyle}>아직 확정된 일정이 없습니다</h2>
-        <p css={emptyDescStyle}>
-          팀원들과 제안된 후보 여행안을 검토하고<br />
-          마음에 드는 계획을 확정해보세요.
-        </p>
-        <Button
-          size="medium"
-          type="button"
-          onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
-        >
-          후보 여행안 보러가기
-        </Button>
+      <RouteErrorFallback
+        title="일정 정보를 찾을 수 없습니다"
+        message={toUserMessage(error, "요청한 정보를 찾을 수 없습니다.")}
+        actionText="다시 시도"
+        onAction={() => void refetchRoom()}
+      />
+    );
+  }
+
+  const viewModel = toItineraryViewModel(rawRoom, session?.userId);
+
+  if (!viewModel.isConfirmed || !viewModel.confirmedPlanId) {
+    return (
+      <div css={tdsPageStyle}>
+        <PageState
+          status="empty"
+          title="아직 확정된 일정이 없어요"
+          description="팀원들과 후보 여행안을 검토하고 마음에 드는 계획을 확정해보세요."
+          actionText="후보 여행안 보러가기"
+          onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+        />
       </div>
     );
   }
 
-  // 확인할 내용 (Need-Check 요약)
-  const needCheckRisks = confirmedPlan.bookingRisks || [];
-
   return (
-    <div css={pageContainerStyle}>
-      {/* 상단 확정 요약 배너 */}
-      <header css={headerCardStyle}>
-        <div css={headerTopStyle}>
-          <span css={confirmedBadgeStyle}>✓ 최종 확정된 공동 일정</span>
-          <span css={destinationTextStyle}>📍 {room.destination}</span>
+    <div css={pageStyle}>
+      {/* 1. 상단 확정 Summary */}
+      <section css={summaryContainerStyle} aria-label="확정 일정 요약">
+        <div css={topBadgeRowStyle}>
+          <Badge size="small" variant="weak" color="green">
+            최종 확정
+          </Badge>
         </div>
+        <Top
+          title={<Top.TitleParagraph>{viewModel.confirmedPlanTitle}</Top.TitleParagraph>}
+          subtitleBottom={
+            <Top.SubtitleParagraph>
+              {viewModel.destination} · {viewModel.periodText} · {viewModel.nights}박 {viewModel.days}일
+            </Top.SubtitleParagraph>
+          }
+        />
+      </section>
 
-        <h1 css={planTitleStyle}>{confirmedPlan.title}</h1>
-
-        <p css={periodTextStyle}>
-          {room.period} · {confirmedPlan.nights}박 {confirmedPlan.days}일
-        </p>
-
-        <RouteRail route={confirmedPlan.route} />
-      </header>
-
-      {/* IT-01 시안 2 핵심 1: 확인할 내용 주황색 배너 */}
-      {needCheckRisks.length > 0 ? (
-        <div css={needCheckBannerStyle}>
-          <div css={needCheckHeaderStyle}>
-            <span>⚠️</span>
-            <span>확인할 내용 ({needCheckRisks.length}건)</span>
-          </div>
-          <ul css={needCheckListStyle}>
-            {needCheckRisks.map((risk, idx) => (
-              <li key={idx}>
-                <strong>{risk.message}</strong> ({risk.snapshotInfo})
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <div
-          css={css`
-            background-color: var(--adaptiveGreen50, #f0fbf4);
-            border: 1px solid #bbf7d0;
-            border-radius: 14px;
-            padding: 14px 16px;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: var(--adaptiveGreen700, #15803d);
-            font-weight: 600;
-          `}
-        >
-          <span>✓</span>
-          <span>모든 숙소와 교통 예약 확인이 완료된 일정입니다.</span>
+      {/* 경로 레일 (RouteRail) */}
+      {viewModel.route.length > 0 && (
+        <div css={railWrapperStyle}>
+          <RouteRail route={viewModel.route} differenceSummary={viewModel.differenceSummary} />
         </div>
       )}
 
-      {/* IT-01 시안 2 핵심 2: 세로 여정 타임라인 레일 */}
-      <section>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 16px 0", color: "var(--adaptiveGrey900, #191f28)" }}>
-          날짜별 상세 일정
-        </h2>
+      {/* 2. 확인 필요 예약 Summary Row (Need-Check) */}
+      {viewModel.needCheckCount > 0 && (
+        <section css={needCheckSectionStyle} aria-label="확인 필요 예약 요약">
+          <List aria-label="확인 필요 예약">
+            <ListRow
+              border="indented"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              withTouchEffect
+              arrowType="right"
+              onClick={() => setIsNeedCheckSheetOpen(true)}
+              aria-label={`확인이 필요한 예약 ${viewModel.needCheckCount}개`}
+              left={
+                <Badge
+                  size="small"
+                  variant="weak"
+                  color={viewModel.hasNeedCheckDanger ? "red" : "yellow"}
+                >
+                  확인 필요
+                </Badge>
+              }
+              contents={
+                <div css={contentsStyle}>
+                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
+                    확인이 필요한 예약 {viewModel.needCheckCount}개
+                  </Text>
+                  <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
+                    예약 상태를 확인하고 일정을 점검해주세요.
+                  </Text>
+                </div>
+              }
+              right={
+                <Badge
+                  size="small"
+                  variant="weak"
+                  color={viewModel.hasNeedCheckDanger ? "red" : "yellow"}
+                >
+                  {viewModel.needCheckCount}건
+                </Badge>
+              }
+            />
+          </List>
+        </section>
+      )}
 
-        <div css={timelineContainerStyle}>
-          {confirmedPlan.timelineItems.map((item, idx) => {
-            const dayNum = idx + 1;
-
-            if (item.type === "STAY" && item.stay) {
-              const stay = item.stay;
-              const isNeedCheck = stay.bookingStatus === "NEED_CHECK" || stay.bookingStatus === "FULL";
-
-              return (
-                <div key={stay.id || idx} css={daySectionStyle}>
-                  <div css={dayDotStyle} />
-                  <div css={dayHeaderStyle}>
-                    <span css={dayNumberStyle}>Day {dayNum}</span>
-                    <span css={dayCityStyle}>📍 {stay.city} ({stay.nights}박)</span>
-                  </div>
-
-                  <div css={dayContentBoxStyle}>
-                    <div css={itemHeaderRowStyle}>
-                      <span css={itemTypeBadgeStyle("var(--adaptiveBlue50, #e8f3ff)", "var(--adaptiveBlue700, #1b64da)")}>
-                        숙소
-                      </span>
-                      <span
-                        css={itemTypeBadgeStyle(
-                          isNeedCheck ? "var(--adaptiveYellow50, #fff8e1)" : "var(--adaptiveGreen50, #f0fbf4)",
-                          isNeedCheck ? "var(--adaptiveYellow700, #b78103)" : "var(--adaptiveGreen700, #15803d)"
-                        )}
+      {/* 3. 날짜별 일정 목록 (Date-based Sections) */}
+      <section aria-label="날짜별 상세 일정">
+        {viewModel.sections.length === 0 ? (
+          <List aria-label="날짜별 상세 일정">
+            <ListRow
+              border="none"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              contents={
+                <Text typography="t6" color="var(--adaptiveGrey600, #6b7684)">
+                  등록된 숙소·교통 일정이 없어요.
+                </Text>
+              }
+            />
+          </List>
+        ) : (
+          viewModel.sections.map((section) => (
+            <div key={section.id} id={section.id} css={sectionStyle}>
+              <ListHeader
+                size="small"
+                title={<ListHeader.TitleParagraph>{section.dateHeader}</ListHeader.TitleParagraph>}
+              />
+              <List aria-label={section.dateHeader}>
+                {section.items.map((item) => (
+                  <ListRow
+                    key={item.id}
+                    border="indented"
+                    verticalPadding="medium"
+                    horizontalPadding="small"
+                    withTouchEffect
+                    arrowType="right"
+                    onClick={() => setSelectedItem(item)}
+                    aria-label={`${item.type === "STAY" ? item.hotelName : item.routeTitle}, ${item.subText}`}
+                    left={
+                      <Badge
+                        size="small"
+                        variant="weak"
+                        color={item.type === "STAY" ? "blue" : "elephant"}
                       >
-                        {stay.bookingStatus === "AVAILABLE" && "예약 완료/가능"}
-                        {stay.bookingStatus === "NEED_CHECK" && "확인 필요"}
-                        {stay.bookingStatus === "FULL" && "만실"}
-                        {stay.bookingStatus === "SEARCHING" && "탐색 중"}
-                      </span>
-                    </div>
-
-                    <h4 css={itemTitleStyle}>{stay.hotelName}</h4>
-                    <p css={itemDescStyle}>{stay.priceText} · {stay.confirmedInfo}</p>
-
-                    {stay.bookingUrl && (
-                      <a href={stay.bookingUrl} target="_blank" rel="noreferrer" css={itemLinkStyle}>
-                        숙소 예약 상세 보기 ↗
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            if (item.type === "TRANSPORT" && item.transport) {
-              const transport = item.transport;
-
-              return (
-                <div key={transport.id || idx} css={daySectionStyle}>
-                  <div css={dayDotStyle} />
-                  <div css={dayHeaderStyle}>
-                    <span css={dayNumberStyle}>이동</span>
-                    <span css={dayCityStyle}>{transport.fromCity} → {transport.toCity}</span>
-                  </div>
-
-                  <div css={dayContentBoxStyle}>
-                    <div css={itemHeaderRowStyle}>
-                      <span css={itemTypeBadgeStyle("var(--adaptiveGrey100, #f2f4f6)", "var(--adaptiveGrey700, #4e5968)")}>
-                        교통편
-                      </span>
-                      <span css={itemTypeBadgeStyle("var(--adaptiveGreen50, #f0fbf4)", "var(--adaptiveGreen700, #15803d)")}>
-                        {transport.bookingStatus === "AVAILABLE" ? "예매 가능" : "확인 필요"}
-                      </span>
-                    </div>
-
-                    <h4 css={itemTitleStyle}>{transport.mode} ({transport.durationText})</h4>
-                    <p css={itemDescStyle}>
-                      {transport.hasTransfer ? "환승 필요" : "직통"} · {transport.priceText} · {transport.confirmedInfo}
-                    </p>
-
-                    {transport.bookingUrl && (
-                      <a href={transport.bookingUrl} target="_blank" rel="noreferrer" css={itemLinkStyle}>
-                        교통편 예매 정보 보기 ↗
-                      </a>
-                    )}
-                  </div>
-                </div>
-              );
-            }
-
-            return null;
-          })}
-        </div>
+                        {item.type === "STAY" ? "숙소" : "이동"}
+                      </Badge>
+                    }
+                    contents={
+                      <div css={contentsStyle}>
+                        <Text
+                          typography="t6"
+                          fontWeight="bold"
+                          color="var(--adaptiveGrey900, #191f28)"
+                          css={ellipsisStyle}
+                        >
+                          {item.type === "STAY" ? item.hotelName : item.routeTitle}
+                        </Text>
+                        <Text
+                          typography="t7"
+                          color="var(--adaptiveGrey600, #6b7684)"
+                          css={ellipsisStyle}
+                        >
+                          {item.subText}
+                        </Text>
+                      </div>
+                    }
+                    right={
+                      <Badge size="small" variant="weak" color={item.statusColor}>
+                        {item.statusLabel}
+                      </Badge>
+                    }
+                  />
+                ))}
+              </List>
+            </div>
+          ))
+        )}
       </section>
 
-      {/* 하단 보조 액션: 검토 기록 보기 */}
-      <div css={bottomActionStyle}>
-        <Button
-          display="block"
-          size="medium"
-          type="button"
-          onClick={() => navigate(`/trips/${tripId}/plans`)}
-        >
-          검토했던 여행안 기록 보기
-        </Button>
+      {/* 4. 하단 보조 작업: 후보 여행안 목록 보기 */}
+      <div css={secondaryActionStyle}>
+        <List aria-label="여행안 목록으로 이동">
+          <ListRow
+            border="none"
+            verticalPadding="medium"
+            horizontalPadding="small"
+            withTouchEffect
+            arrowType="right"
+            onClick={() => navigate(`/trips/${tripId}/plans`)}
+            contents={
+              <div css={contentsStyle}>
+                <Text typography="t6" color="var(--adaptiveGrey800, #333d4b)">
+                  검토했던 여행안 기록 보기
+                </Text>
+                <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
+                  후보 여행안 목록과 참여자 의견을 확인해요.
+                </Text>
+              </div>
+            }
+          />
+        </List>
       </div>
+
+      {/* 확인 필요 예약 BottomSheet */}
+      <BottomSheet
+        open={isNeedCheckSheetOpen}
+        onClose={() => setIsNeedCheckSheetOpen(false)}
+        header={<BottomSheet.Header>확인이 필요한 예약</BottomSheet.Header>}
+        headerDescription={
+          <BottomSheet.HeaderDescription>
+            예약 상태를 확인해야 하는 항목 {viewModel.needCheckCount}건이에요.
+          </BottomSheet.HeaderDescription>
+        }
+        cta={<BottomSheet.CTA onClick={() => setIsNeedCheckSheetOpen(false)}>닫기</BottomSheet.CTA>}
+      >
+        <List aria-label="확인 필요 예약 목록" css={sheetListStyle}>
+          {viewModel.needCheckItems.map((item) => (
+            <ListRow
+              key={item.id}
+              border="indented"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              left={
+                <Badge size="small" variant="weak" color={item.statusColor}>
+                  {item.statusLabel}
+                </Badge>
+              }
+              contents={
+                <div css={contentsStyle}>
+                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
+                    {item.message}
+                  </Text>
+                  <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)">
+                    {item.snapshotInfo}
+                  </Text>
+                </div>
+              }
+            />
+          ))}
+        </List>
+      </BottomSheet>
+
+      {/* 일정 항목 상세 BottomSheet */}
+      <BottomSheet
+        open={selectedItem !== null}
+        onClose={() => setSelectedItem(null)}
+        header={
+          <BottomSheet.Header>
+            {selectedItem?.type === "STAY" ? selectedItem.hotelName : selectedItem?.routeTitle}
+          </BottomSheet.Header>
+        }
+        headerDescription={
+          <BottomSheet.HeaderDescription>
+            {selectedItem?.type === "STAY"
+              ? `${selectedItem.city} · ${selectedItem.periodText} · ${selectedItem.nights}박`
+              : `${selectedItem?.mode} · ${selectedItem?.hasTransfer ? "환승 필요" : "직통"} · ${selectedItem?.durationText}`}
+          </BottomSheet.HeaderDescription>
+        }
+        cta={<BottomSheet.CTA onClick={() => setSelectedItem(null)}>닫기</BottomSheet.CTA>}
+      >
+        {selectedItem && (
+          <List aria-label="일정 상세 정보" css={sheetListStyle}>
+            <ListRow
+              border="indented"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              contents={<Text typography="t6">구분</Text>}
+              right={
+                <Badge
+                  size="small"
+                  variant="weak"
+                  color={selectedItem.type === "STAY" ? "blue" : "elephant"}
+                >
+                  {selectedItem.type === "STAY" ? "숙소" : "교통편"}
+                </Badge>
+              }
+            />
+            <ListRow
+              border="indented"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              contents={<Text typography="t6">예약 상태</Text>}
+              right={
+                <Badge size="small" variant="weak" color={selectedItem.statusColor}>
+                  {selectedItem.statusLabel}
+                </Badge>
+              }
+            />
+            <ListRow
+              border="indented"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              contents={<Text typography="t6">예상 경비</Text>}
+              right={<Text typography="t6" fontWeight="bold">{selectedItem.priceText}</Text>}
+            />
+            <ListRow
+              border="indented"
+              verticalPadding="medium"
+              horizontalPadding="small"
+              contents={<Text typography="t6">확인 정보</Text>}
+              right={
+                <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
+                  {selectedItem.confirmedInfo}
+                </Text>
+              }
+            />
+            {selectedItem.bookingUrl && (
+              <ListRow
+                border="none"
+                verticalPadding="medium"
+                horizontalPadding="small"
+                withTouchEffect
+                arrowType="right"
+                onClick={() => {
+                  if (selectedItem.bookingUrl) {
+                    window.open(selectedItem.bookingUrl, "_blank", "noopener,noreferrer");
+                  }
+                }}
+                contents={
+                  <Text typography="t6" color="var(--adaptiveBlue500, #3182f6)" fontWeight="bold">
+                    {selectedItem.type === "STAY" ? "숙소 예약 링크 열기" : "교통 예매 링크 열기"}
+                  </Text>
+                }
+              />
+            )}
+          </List>
+        )}
+      </BottomSheet>
     </div>
   );
 }
