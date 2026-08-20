@@ -30,17 +30,20 @@ export function useAppNavigation() {
     return {
       addAccessoryButton: ({ id, title, iconName, callback }: AccessoryButtonOptions) => {
         removeAccessoryListener?.();
-        removeAccessoryListener = tdsEvent.addEventListener("navigationAccessoryEvent", {
+        const removeListener = tdsEvent.addEventListener("navigationAccessoryEvent", {
           onEvent: (event) => {
             if (event.id === id) callback();
           },
         });
+        removeAccessoryListener = removeListener;
 
         return partner
           .addAccessoryButton({ id, title, icon: { name: iconName } })
           .catch((error: unknown) => {
-            removeAccessoryListener?.();
-            removeAccessoryListener = undefined;
+            removeListener();
+            if (removeAccessoryListener === removeListener) {
+              removeAccessoryListener = undefined;
+            }
             console.error("앱인토스 액세서리 등록 실패:", error);
             throw error;
           });
