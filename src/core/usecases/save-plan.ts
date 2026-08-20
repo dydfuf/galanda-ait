@@ -21,6 +21,32 @@ import {
 } from "../domain/room.ts";
 import { ValidationError } from "../domain/errors.ts";
 
+export type CreateAccommodationSnapshot = Pick<
+  AccommodationSnapshot,
+  | "id"
+  | "city"
+  | "period"
+  | "nights"
+  | "hotelName"
+  | "isSearching"
+  | "bookingStatus"
+  | "priceRange"
+  | "bookingUrl"
+>;
+
+export type CreateTransportSnapshot = Pick<
+  TransportSnapshot,
+  | "id"
+  | "fromCity"
+  | "toCity"
+  | "mode"
+  | "hasTransfer"
+  | "durationText"
+  | "bookingStatus"
+  | "priceRange"
+  | "bookingUrl"
+>;
+
 export interface CreatePlanCommand {
   readonly roomId: TripId;
   readonly expectedRevision: Revision;
@@ -28,8 +54,8 @@ export interface CreatePlanCommand {
   readonly proposalReason?: string;
   readonly baseHeadcount?: number;
   readonly routes?: ReadonlyArray<CityStay>;
-  readonly accommodations?: ReadonlyArray<AccommodationSnapshot>;
-  readonly transports?: ReadonlyArray<TransportSnapshot>;
+  readonly accommodations?: ReadonlyArray<CreateAccommodationSnapshot>;
+  readonly transports?: ReadonlyArray<CreateTransportSnapshot>;
   readonly places: ReadonlyArray<TripPlace>;
   readonly cloneFromPlanId?: PlanId;
 }
