@@ -222,7 +222,7 @@ export function PlanComparePage() {
   const isSelectionLocked = confirmState.kind === "LOCKED";
   const confirmedInPair = [leftPlan, rightPlan].find((plan) => plan.id === room.confirmedPlanId);
   const currentSelectedId = isSelectionLocked
-    ? confirmedInPair?.id ?? leftPlan.id
+    ? confirmedInPair?.id
     : selectedPlanId ?? leftPlan.id;
   const selectedPlan = currentSelectedId === rightPlan.id ? rightPlan : leftPlan;
   const differences = buildPlanCompareDifferences(leftPlan, rightPlan);

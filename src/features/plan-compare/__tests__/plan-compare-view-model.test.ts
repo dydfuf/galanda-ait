@@ -190,6 +190,22 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
     expect(buildPlanCompareDifferences(plan, plan)).toEqual([]);
   });
 
+  it("예약 위험이 없고 예약 항목 수만 달라도 예약 차이를 만들지 않는다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const left = { ...plan, bookingRisks: [], timelineItems: plan.timelineItems.slice(0, 1) };
+    const right = {
+      ...plan,
+      planTagLabel: "대안 1",
+      bookingRisks: [],
+      timelineItems: [...plan.timelineItems, ...plan.timelineItems.slice(0, 1)],
+    };
+
+    expect(buildPlanCompareDifferences(left, right).some((difference) => difference.kind === "BOOKING")).toBe(false);
+  });
+
   it("비용 차이는 1인 기준 delta로 표현한다", (): void => {
     const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
     const plan = vm.plans[0];

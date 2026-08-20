@@ -41,12 +41,6 @@ const formatBooking = (plan: DetailedPlanViewModel): string => {
   return `${plan.bookingRisks.length}건 확인 필요${hasDanger ? " · 예약 불가 포함" : ""}`;
 };
 
-const bookingSignature = (plan: DetailedPlanViewModel): string =>
-  [
-    plan.timelineItems.length,
-    ...plan.bookingRisks.map((risk) => `${risk.level}:${risk.message}`),
-  ].join("|");
-
 const formatOpinions = (plan: DetailedPlanViewModel): string => {
   const total = plan.opinions.likeCount + plan.opinions.okayCount + plan.opinions.hardCount;
   if (total === 0) return "아직 의견 없음";
@@ -137,7 +131,7 @@ export const buildPlanCompareDifferences = (
     right,
     leftValue: formatBooking(left),
     rightValue: formatBooking(right),
-    isChanged: bookingSignature(left) !== bookingSignature(right),
+    isChanged: formatBooking(left) !== formatBooking(right),
   });
   const cost = makeDifference({
     kind: "COST",
