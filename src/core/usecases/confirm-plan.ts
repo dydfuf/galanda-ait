@@ -3,9 +3,11 @@ import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import {
+  isPlanConfirmed,
   requirePlanInRoom,
-  requireRoomPermission,
+  requireRoomHost,
 } from "../domain/auth-guards.ts";
+import { ConflictError } from "../domain/errors.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
   function* (
@@ -22,20 +24,25 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     const repo = yield* TripRoomRepository;
     const room = yield* repo.getRoom(roomId);
 
-    // 3. RBAC: 'plan:confirm' 권한 검증 (GUEST 차단 및 참여자 확인)
-    yield* requireRoomPermission(
+    // 3. RBAC: 확정은 방장만 수행할 수 있다.
+    yield* requireRoomHost(
       room,
       session.userId,
-      "plan:confirm",
-      "여행방 참여자만 여행안을 확정할 수 있습니다."
+      "방장만 여행안을 확정할 수 있습니다."
     );
 
     // 4. 대상 플랜 유효성 검증
     const plan = yield* requirePlanInRoom(room, planId);
 
-    // 5. 이미 확정된 상태인 경우 멱등하게 현재 방 반환
-    if (room.confirmedPlanId === planId && plan.status === "CONFIRMED") {
-      return room;
+    // 5. 확정은 한 번만 가능하며, 실패 시 저장소를 호출하지 않는다.
+    if (room.confirmedPlanId !== undefined || isPlanConfirmed(room, plan)) {
+      return yield* Effect.fail(
+        new ConflictError({
+          message: "이미 확정된 여행안이 있어 다시 확정할 수 없습니다.",
+          expectedRevision,
+          actualRevision: room.revision,
+        })
+      );
     }
 
     // 6. 확정 실행 (Revision 낙관적 락 보장)

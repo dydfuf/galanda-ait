@@ -49,7 +49,6 @@ export const ROLE_PERMISSIONS: Record<RoomRole, ReadonlySet<RoomAction>> = {
     "plan:create",
     "plan:update",
     "plan:delete",
-    "plan:confirm",
     "opinion:submit",
   ]),
   GUEST: new Set<RoomAction>([
