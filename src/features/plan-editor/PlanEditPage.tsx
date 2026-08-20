@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { CTAButton, FixedBottomCTA } from "@toss/tds-mobile";
+import { BottomSheet, CTAButton, FixedBottomCTA, useBottomSheet } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
@@ -37,6 +37,14 @@ const loadingContainerStyle = css`
   font-size: 15px;
 `;
 
+const actionErrorStyle = css`
+  display: block;
+  color: var(--adaptiveRed600, #e0383e);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+`;
+
 export function PlanEditPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
@@ -55,6 +63,8 @@ export function PlanEditPage(): JSX.Element {
   const updatePlanMutation = useUpdatePlanMutation();
   const deletePlanMutation = useDeletePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { openAsyncTwoButtonSheet } = useBottomSheet();
 
   const plan = room?.plans.find((p) => p.id === planId);
 
@@ -158,6 +168,7 @@ export function PlanEditPage(): JSX.Element {
     if (!validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
+    setActionError(null);
     try {
       const updatedPlan: TripPlan = {
         ...plan,
@@ -179,25 +190,40 @@ export function PlanEditPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
     } catch (err: unknown) {
       setIsSubmitting(false);
-      alert(toUserMessage(err, "여행안 수정에 실패했습니다."));
+      setActionError(toUserMessage(err, "여행안 수정에 실패했습니다."));
     }
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!window.confirm(`'${plan.title}' 여행안을 삭제하시겠습니까?`)) {
+    if (isSubmitting || deletePlanMutation.isPending) {
       return;
     }
-    try {
-      await deletePlanMutation.mutateAsync({
-        roomId: tripId,
-        planId: plan.id,
-        expectedRevision: room.revision,
-      });
-      clearDraft();
-      navigate(`/trips/${tripId}/plans`, { replace: true });
-    } catch (err: unknown) {
-      alert(toUserMessage(err, "여행안 삭제에 실패했습니다."));
-    }
+
+    await openAsyncTwoButtonSheet({
+      header: (
+        <>
+          <BottomSheet.Header>여행안을 삭제할까요?</BottomSheet.Header>
+          <BottomSheet.HeaderDescription>
+            '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
+          </BottomSheet.HeaderDescription>
+        </>
+      ),
+      leftButton: "취소",
+      rightButton: "삭제하기",
+      onRightButtonClick: async (): Promise<void> => {
+        try {
+          await deletePlanMutation.mutateAsync({
+            roomId: tripId,
+            planId: plan.id,
+            expectedRevision: room.revision,
+          });
+          clearDraft();
+          navigate(`/trips/${tripId}/plans`, { replace: true });
+        } catch (err: unknown) {
+          setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+        }
+      },
+    });
   };
 
   return (
@@ -256,11 +282,20 @@ export function PlanEditPage(): JSX.Element {
       <FixedBottomCTA.Double
         containerStyle={fixedCtaContainerStyle}
         topAccessory={
-          validation.firstError ? (
-            <ValidationBanner
-              firstError={validation.firstError}
-              errorCount={validation.errorCount}
-            />
+          validation.firstError || actionError ? (
+            <>
+              {actionError && (
+                <span css={actionErrorStyle} role="alert">
+                  {actionError}
+                </span>
+              )}
+              {validation.firstError && (
+                <ValidationBanner
+                  firstError={validation.firstError}
+                  errorCount={validation.errorCount}
+                />
+              )}
+            </>
           ) : undefined
         }
         leftButton={

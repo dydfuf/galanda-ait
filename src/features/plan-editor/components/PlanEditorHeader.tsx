@@ -1,4 +1,5 @@
 import { css } from "@emotion/react";
+import { BottomSheet, useBottomSheet } from "@toss/tds-mobile";
 
 const headerStyle = css`
   display: flex;
@@ -78,6 +79,27 @@ export function PlanEditorHeader({
   lastSavedTime: _lastSavedTime,
   onClearDraft,
 }: PlanEditorHeaderProps) {
+  const { openAsyncTwoButtonSheet } = useBottomSheet();
+
+  const handleClearDraft = async (): Promise<void> => {
+    if (!onClearDraft) return;
+
+    const action = await openAsyncTwoButtonSheet({
+      header: <BottomSheet.Header>작성 내용을 초기화할까요?</BottomSheet.Header>,
+      children: (
+        <BottomSheet.HeaderDescription>
+          지금까지 입력한 여행안 내용이 사라집니다.
+        </BottomSheet.HeaderDescription>
+      ),
+      leftButton: "취소",
+      rightButton: "초기화하기",
+    });
+
+    if (action === "rightButtonClick") {
+      onClearDraft();
+    }
+  };
+
   return (
     <header css={headerStyle}>
       <div css={titleAreaStyle}>
@@ -98,7 +120,7 @@ export function PlanEditorHeader({
           ✓ 자동 저장됨
         </span>
         {onClearDraft && (
-          <button type="button" onClick={onClearDraft} css={clearButtonStyle}>
+          <button type="button" onClick={() => void handleClearDraft()} css={clearButtonStyle}>
             작성 초기화
           </button>
         )}
