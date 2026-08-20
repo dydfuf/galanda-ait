@@ -311,113 +311,254 @@ export function toItineraryViewModel(
     }
   }
 
-  // 2. 날짜별 섹션 생성 (Date Sections)
-  const sections: ItineraryDateSection[] = [];
+  // 2. 날짜별 섹션 생성 (Chronological Timeline Scheduling)
   const startYMD = parseYMD(room.startDate);
-  let currentYMD: YMD | undefined = startYMD ?? undefined;
+  const normalize = (s?: string) => (s ? s.trim().toLowerCase().replace(/\s+/g, "") : "");
+
+  interface ScheduledStay {
+    readonly acc: (typeof accommodations)[number];
+    readonly index: number;
+    readonly startYMD?: YMD;
+    readonly endYMD?: YMD;
+    readonly startDay: number;
+    readonly endDay: number;
+    readonly orderKey: number;
+  }
+
+  const scheduledStays: ScheduledStay[] = [];
+  let currentStayYMD: YMD | undefined = startYMD ?? undefined;
   let currentDay = 1;
 
-  const maxLen = Math.max(accommodations.length, transports.length);
-
-  for (let i = 0; i < maxLen; i++) {
+  for (let i = 0; i < accommodations.length; i++) {
     const acc = accommodations[i];
-    if (acc) {
-      const stayStartYMD = currentYMD;
-      const stayNights = acc.nights || 1;
-      const stayEndYMD = currentYMD ? addDaysToYMD(currentYMD, stayNights) : undefined;
-      const stayStatus: ItineraryStatus =
-        acc.bookingStatus === "NOT_CHECKED" || acc.isSearching
-          ? "SEARCHING"
-          : acc.bookingStatus;
+    const stayNights = acc.nights || 1;
+    const stayStartYMD = currentStayYMD;
+    const stayEndYMD = currentStayYMD ? addDaysToYMD(currentStayYMD, stayNights) : undefined;
+    const startDay = currentDay;
+    const endDay = currentDay + stayNights;
+    const orderKey = i * 10 + 5; // e.g., 5, 15, 25...
 
-      const statusBadge = getStayStatusBadge(stayStatus);
-      const priceText = acc.priceRange
-        ? `그룹 총액 ${formatCostRangeText(acc.priceRange.min, acc.priceRange.max)} (${headcount}명 기준)`
-        : "가격 미정";
-      const subText = `${stayNights}박 · ${statusBadge.label}`;
-      const itemPeriodText =
-        stayStartYMD && stayEndYMD
-          ? `${formatDotDate(stayStartYMD)} ~ ${formatDotDate(stayEndYMD)}`
-          : acc.period;
+    scheduledStays.push({
+      acc,
+      index: i,
+      startYMD: stayStartYMD,
+      endYMD: stayEndYMD,
+      startDay,
+      endDay,
+      orderKey,
+    });
 
-      const dateHeader = stayStartYMD
-        ? `${formatKoreanDate(stayStartYMD)} · ${acc.city}`
-        : `Day ${currentDay} · ${acc.city}`;
+    currentStayYMD = stayEndYMD;
+    currentDay = endDay;
+  }
 
-      const stayItem: ItineraryStayItem = {
-        type: "STAY",
-        id: acc.id || `stay-${i}`,
-        city: acc.city,
-        hotelName: acc.hotelName,
-        period: acc.period,
-        periodText: itemPeriodText,
-        nights: stayNights,
-        priceText,
-        bookingStatus: stayStatus,
-        statusLabel: statusBadge.label,
-        statusColor: statusBadge.color,
-        confirmedInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근 확인"}`,
-        bookingUrl: acc.bookingUrl,
-        subText,
-      };
+  interface TimelineEvent {
+    readonly orderKey: number;
+    readonly type: "STAY" | "TRANSPORT";
+    readonly stayItem?: ItineraryStayItem;
+    readonly transItem?: ItineraryTransportItem;
+    readonly dateHeader: string;
+    readonly dateStr?: string;
+    readonly id: string;
+  }
 
-      sections.push({
-        id: `section-stay-${acc.id || i}`,
-        dateHeader,
-        dateStr: stayStartYMD
-          ? `${stayStartYMD.year}-${String(stayStartYMD.month).padStart(2, "0")}-${String(stayStartYMD.day).padStart(2, "0")}`
-          : undefined,
-        items: [stayItem],
-      });
+  const events: TimelineEvent[] = [];
 
-      currentDay += stayNights;
-      currentYMD = stayEndYMD;
+  // 숙소 이벤트 등록
+  for (const stay of scheduledStays) {
+    const acc = stay.acc;
+    const stayStatus: ItineraryStatus =
+      acc.bookingStatus === "NOT_CHECKED" || acc.isSearching
+        ? "SEARCHING"
+        : acc.bookingStatus;
+    const statusBadge = getStayStatusBadge(stayStatus);
+    const priceText = acc.priceRange
+      ? `그룹 총액 ${formatCostRangeText(acc.priceRange.min, acc.priceRange.max)} (${headcount}명 기준)`
+      : "가격 미정";
+    const subText = `${stay.acc.nights || 1}박 · ${statusBadge.label}`;
+    const itemPeriodText =
+      stay.startYMD && stay.endYMD
+        ? `${formatDotDate(stay.startYMD)} ~ ${formatDotDate(stay.endYMD)}`
+        : acc.period;
+    const dateHeader = stay.startYMD
+      ? `${formatKoreanDate(stay.startYMD)} · ${acc.city}`
+      : `Day ${stay.startDay} · ${acc.city}`;
+
+    const stayItem: ItineraryStayItem = {
+      type: "STAY",
+      id: acc.id || `stay-${stay.index}`,
+      city: acc.city,
+      hotelName: acc.hotelName,
+      period: acc.period,
+      periodText: itemPeriodText,
+      nights: stay.acc.nights || 1,
+      priceText,
+      bookingStatus: stayStatus,
+      statusLabel: statusBadge.label,
+      statusColor: statusBadge.color,
+      confirmedInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근 확인"}`,
+      bookingUrl: acc.bookingUrl,
+      subText,
+    };
+
+    events.push({
+      orderKey: stay.orderKey,
+      type: "STAY",
+      stayItem,
+      dateHeader,
+      dateStr: stay.startYMD
+        ? `${stay.startYMD.year}-${String(stay.startYMD.month).padStart(2, "0")}-${String(stay.startYMD.day).padStart(2, "0")}`
+        : undefined,
+      id: `section-stay-${acc.id || stay.index}`,
+    });
+  }
+
+  // 교통편 이벤트 등록 (독립적 시간순 배치)
+  for (let j = 0; j < transports.length; j++) {
+    const trans = transports[j];
+    const fromCity = normalize(trans.fromCity);
+    const toCity = normalize(trans.toCity);
+
+    let transOrderKey: number;
+    let transYMD: YMD | undefined;
+    let transDay: number | undefined;
+
+    if (scheduledStays.length === 0) {
+      transYMD = startYMD ? (j === 0 ? startYMD : addDaysToYMD(startYMD, j)) : undefined;
+      transDay = j + 1;
+      transOrderKey = j * 10;
+    } else {
+      const firstStay = scheduledStays[0];
+      const lastStay = scheduledStays[scheduledStays.length - 1];
+
+      // 1) 인바운드 이동 (첫 숙소 도착 전)
+      const isInbound =
+        j === 0 &&
+        toCity === normalize(firstStay.acc.city) &&
+        fromCity !== normalize(firstStay.acc.city);
+
+      // 2) 도시 간 이동 (숙소 k -> 숙소 k+1)
+      let transferMatchIndex = -1;
+      for (let k = 0; k < scheduledStays.length - 1; k++) {
+        const currentStayCity = normalize(scheduledStays[k].acc.city);
+        const nextStayCity = normalize(scheduledStays[k + 1].acc.city);
+        if (fromCity === currentStayCity && toCity === nextStayCity) {
+          transferMatchIndex = k;
+          break;
+        }
+      }
+
+      if (isInbound) {
+        transYMD = firstStay.startYMD;
+        transDay = firstStay.startDay;
+        transOrderKey = firstStay.orderKey - 2 + j * 0.01;
+      } else if (transferMatchIndex !== -1) {
+        const stayK = scheduledStays[transferMatchIndex];
+        transYMD = stayK.endYMD;
+        transDay = stayK.endDay;
+        transOrderKey = stayK.orderKey + 2 + j * 0.01;
+      } else if (
+        fromCity === normalize(lastStay.acc.city) &&
+        toCity !== normalize(lastStay.acc.city)
+      ) {
+        // 3) 아웃바운드 이동 (마지막 숙소 체크아웃 후)
+        transYMD = lastStay.endYMD;
+        transDay = lastStay.endDay;
+        transOrderKey = lastStay.orderKey + 2 + j * 0.01;
+      } else {
+        // 4) 도시 매칭 폴백
+        const fromStayIdx = scheduledStays.findIndex(
+          (s) => normalize(s.acc.city) === fromCity
+        );
+        const toStayIdx = scheduledStays.findIndex(
+          (s) => normalize(s.acc.city) === toCity
+        );
+
+        if (fromStayIdx !== -1) {
+          const stayFrom = scheduledStays[fromStayIdx];
+          transYMD = stayFrom.endYMD;
+          transDay = stayFrom.endDay;
+          transOrderKey = stayFrom.orderKey + 2 + j * 0.01;
+        } else if (toStayIdx !== -1) {
+          const stayTo = scheduledStays[toStayIdx];
+          transYMD = stayTo.startYMD;
+          transDay = stayTo.startDay;
+          transOrderKey = stayTo.orderKey - 2 + j * 0.01;
+        } else {
+          // 5) 순서 기반 fallback
+          if (j === 0 && transports.length > scheduledStays.length) {
+            transYMD = firstStay.startYMD;
+            transDay = firstStay.startDay;
+            transOrderKey = firstStay.orderKey - 2 + j * 0.01;
+          } else {
+            const targetIdx = Math.min(j, scheduledStays.length - 1);
+            const targetStay = scheduledStays[targetIdx];
+            transYMD = targetStay.endYMD;
+            transDay = targetStay.endDay;
+            transOrderKey = targetStay.orderKey + 2 + j * 0.01;
+          }
+        }
+      }
     }
 
-    const trans = transports[i];
-    if (trans) {
-      const transYMD = currentYMD;
-      const transStatus: ItineraryStatus =
-        trans.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : trans.bookingStatus;
-      const statusBadge = getTransportStatusBadge(transStatus);
-      const priceText = trans.priceRange
-        ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
-        : "가격 미정";
-      const subText = `${trans.mode} · ${statusBadge.label}`;
-      const routeTitle = `${trans.fromCity} → ${trans.toCity}`;
-
-      const dateHeader = transYMD
-        ? `${formatKoreanDate(transYMD)} · 이동`
+    const transStatus: ItineraryStatus =
+      trans.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : trans.bookingStatus;
+    const statusBadge = getTransportStatusBadge(transStatus);
+    const priceText = trans.priceRange
+      ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
+      : "가격 미정";
+    const subText = `${trans.mode} · ${statusBadge.label}`;
+    const routeTitle = `${trans.fromCity} → ${trans.toCity}`;
+    const dateHeader = transYMD
+      ? `${formatKoreanDate(transYMD)} · 이동`
+      : transDay
+        ? `Day ${transDay} · 이동`
         : "이동";
 
-      const transItem: ItineraryTransportItem = {
-        type: "TRANSPORT",
-        id: trans.id || `trans-${i}`,
-        fromCity: trans.fromCity,
-        toCity: trans.toCity,
-        routeTitle,
-        mode: trans.mode,
-        hasTransfer: trans.hasTransfer,
-        durationText: trans.durationText,
-        priceText,
-        bookingStatus: transStatus,
-        statusLabel: statusBadge.label,
-        statusColor: statusBadge.color,
-        confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
-        bookingUrl: trans.bookingUrl,
-        subText,
-      };
+    const transItem: ItineraryTransportItem = {
+      type: "TRANSPORT",
+      id: trans.id || `trans-${j}`,
+      fromCity: trans.fromCity,
+      toCity: trans.toCity,
+      routeTitle,
+      mode: trans.mode,
+      hasTransfer: trans.hasTransfer,
+      durationText: trans.durationText,
+      priceText,
+      bookingStatus: transStatus,
+      statusLabel: statusBadge.label,
+      statusColor: statusBadge.color,
+      confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
+      bookingUrl: trans.bookingUrl,
+      subText,
+    };
 
-      sections.push({
-        id: `section-trans-${trans.id || i}`,
-        dateHeader,
-        dateStr: transYMD
-          ? `${transYMD.year}-${String(transYMD.month).padStart(2, "0")}-${String(transYMD.day).padStart(2, "0")}`
-          : undefined,
-        items: [transItem],
-      });
-    }
+    events.push({
+      orderKey: transOrderKey,
+      type: "TRANSPORT",
+      transItem,
+      dateHeader,
+      dateStr: transYMD
+        ? `${transYMD.year}-${String(transYMD.month).padStart(2, "0")}-${String(transYMD.day).padStart(2, "0")}`
+        : undefined,
+      id: `section-trans-${trans.id || j}`,
+    });
   }
+
+  // 3. 시간 순서대로 정렬 후 섹션 생성
+  events.sort((a, b) => a.orderKey - b.orderKey);
+
+  const sections: ItineraryDateSection[] = events.map((event) => ({
+    id: event.id,
+    dateHeader: event.dateHeader,
+    dateStr: event.dateStr,
+    items:
+      event.type === "STAY" && event.stayItem
+        ? [event.stayItem]
+        : event.transItem
+          ? [event.transItem]
+          : [],
+  }));
 
   return {
     tripId: room.id,
