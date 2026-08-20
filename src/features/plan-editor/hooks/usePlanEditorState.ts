@@ -14,7 +14,38 @@ export interface PlanEditorFormData {
 }
 
 interface StoredPlanEditorDraft extends PlanEditorFormData {
+  readonly ownerId: string;
+  readonly basePlanFingerprint?: string;
   readonly updatedAt: string;
+}
+
+export function getPlanEditorDraftKey(
+  userId: string,
+  roomId: string,
+  draftTarget: string
+): string {
+  return `galanda_draft_${userId}_${roomId}_${draftTarget}`;
+}
+
+export function getPlanFingerprint(
+  plan: Pick<TripPlan, "title" | "proposalReason" | "baseHeadcount" | "routes" | "accommodations" | "transports"> | undefined
+): string | undefined {
+  if (!plan) return undefined;
+  return JSON.stringify({
+    title: plan.title,
+    proposalReason: plan.proposalReason,
+    baseHeadcount: plan.baseHeadcount,
+    routes: plan.routes,
+    accommodations: plan.accommodations,
+    transports: plan.transports,
+  });
+}
+
+export function hasDraftBaseChanged(
+  storedFingerprint: string | undefined,
+  currentFingerprint: string | undefined
+): boolean {
+  return storedFingerprint !== currentFingerprint;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,6 +93,7 @@ export function parsePlanEditorDraft(raw: string | null): StoredPlanEditorDraft 
     const draft: unknown = JSON.parse(raw);
     if (
       !isRecord(draft) ||
+      typeof draft.ownerId !== "string" ||
       typeof draft.title !== "string" ||
       typeof draft.proposalReason !== "string" ||
       !Number.isFinite(draft.baseHeadcount) ||
@@ -73,6 +105,7 @@ export function parsePlanEditorDraft(raw: string | null): StoredPlanEditorDraft 
       !Array.isArray(draft.transports) ||
       !draft.transports.every(isTransport) ||
       typeof draft.updatedAt !== "string" ||
+      (draft.basePlanFingerprint !== undefined && typeof draft.basePlanFingerprint !== "string") ||
       (draft.clonedFromPlanId !== undefined && typeof draft.clonedFromPlanId !== "string")
     ) {
       return undefined;
@@ -99,7 +132,8 @@ export function getTripTotalNights(startDate: string, endDate: string): number {
 export function usePlanEditorState(
   room: TripRoom | undefined,
   initialPlan?: TripPlan,
-  cloneFromPlan?: TripPlan
+  cloneFromPlan?: TripPlan,
+  userId?: string
 ) {
   const totalTripNights = useMemo(() => {
     if (!room) return 3;
@@ -177,10 +211,14 @@ export function usePlanEditorState(
   const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(defaultTransports);
   const [lastSavedTime, setLastSavedTime] = useState<Date>(new Date());
   const [hydratedEditorId, setHydratedEditorId] = useState<string>();
+  const [draftConflict, setDraftConflict] = useState<StoredPlanEditorDraft>();
 
   const draftTarget = initialPlan?.id ?? (cloneFromPlan ? `clone_${cloneFromPlan.id}` : "new");
-  const draftKey = room ? `galanda_draft_${room.id}_${draftTarget}` : undefined;
+  const draftKey = room && userId
+    ? getPlanEditorDraftKey(userId, room.id, draftTarget)
+    : undefined;
   const editorId = draftKey;
+  const basePlanFingerprint = getPlanFingerprint(initialPlan ?? cloneFromPlan);
 
   const resetToInitialData = useCallback(() => {
     setTitle(initialPlan?.title || (cloneFromPlan ? `${cloneFromPlan.title} 대안` : ""));
@@ -197,13 +235,22 @@ export function usePlanEditorState(
   useEffect(() => {
     if (!draftKey || !editorId || hydratedEditorId === editorId) return;
 
+    setDraftConflict(undefined);
     let draft: StoredPlanEditorDraft | undefined;
     try {
       draft = parsePlanEditorDraft(localStorage.getItem(draftKey));
     } catch {
       // 저장소 접근이 차단된 경우 공개본/초기값으로 계속 편집해요.
     }
-    if (draft && draft.clonedFromPlanId === cloneFromPlan?.id) {
+    if (
+      draft &&
+      draft.ownerId === userId &&
+      draft.clonedFromPlanId === cloneFromPlan?.id &&
+      hasDraftBaseChanged(draft.basePlanFingerprint, basePlanFingerprint)
+    ) {
+      resetToInitialData();
+      setDraftConflict(draft);
+    } else if (draft && draft.ownerId === userId && draft.clonedFromPlanId === cloneFromPlan?.id) {
       setTitle(draft.title);
       setProposalReason(draft.proposalReason);
       setBaseHeadcount(draft.baseHeadcount);
@@ -215,7 +262,7 @@ export function usePlanEditorState(
       resetToInitialData();
     }
     setHydratedEditorId(editorId);
-  }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, resetToInitialData]);
+  }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, userId, basePlanFingerprint, resetToInitialData]);
 
   // 도시 박수 합계 계산
   const currentTotalNights = useMemo(() => {
@@ -331,8 +378,10 @@ export function usePlanEditorState(
 
   // 자동 임시 저장 (로컬스토리지 Draft)
   useEffect(() => {
-    if (!draftKey || hydratedEditorId !== editorId) return;
+    if (!draftKey || !userId || hydratedEditorId !== editorId || draftConflict) return;
     const draftData = {
+      ownerId: userId,
+      basePlanFingerprint,
       title,
       proposalReason,
       baseHeadcount,
@@ -347,7 +396,7 @@ export function usePlanEditorState(
     } catch {
       // ignore
     }
-  }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
+  }, [draftKey, editorId, hydratedEditorId, draftConflict, userId, basePlanFingerprint, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
 
   const discardDraft = useCallback(() => {
     if (!draftKey) return;
@@ -361,6 +410,24 @@ export function usePlanEditorState(
   const clearDraft = useCallback(() => {
     discardDraft();
     resetToInitialData();
+  }, [discardDraft, resetToInitialData]);
+
+  const restoreConflictingDraft = useCallback(() => {
+    if (!draftConflict) return;
+    setTitle(draftConflict.title);
+    setProposalReason(draftConflict.proposalReason);
+    setBaseHeadcount(draftConflict.baseHeadcount);
+    setRoutes(draftConflict.routes);
+    setAccommodations(draftConflict.accommodations);
+    setTransports(draftConflict.transports);
+    setLastSavedTime(new Date(draftConflict.updatedAt));
+    setDraftConflict(undefined);
+  }, [draftConflict]);
+
+  const useLatestPublishedPlan = useCallback(() => {
+    discardDraft();
+    resetToInitialData();
+    setDraftConflict(undefined);
   }, [discardDraft, resetToInitialData]);
 
   return {
@@ -390,5 +457,8 @@ export function usePlanEditorState(
     lastSavedTime,
     clearDraft,
     discardDraft,
+    draftConflict: Boolean(draftConflict),
+    restoreConflictingDraft,
+    useLatestPublishedPlan,
   };
 }

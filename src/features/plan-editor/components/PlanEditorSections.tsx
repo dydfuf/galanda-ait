@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Badge, FixedBottomCTA, List, ListHeader, ListRow, Text, Top } from "@toss/tds-mobile";
+import { Badge, CTAButton, FixedBottomCTA, List, ListHeader, ListRow, Text, Top } from "@toss/tds-mobile";
 import { formatCostRangeText } from "../../../core/calculations/plan-cost.ts";
 import { fixedCtaContainerStyle } from "../../common/tds-layout.ts";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
@@ -36,6 +36,13 @@ const listStyle = css`
 
 const sectionFormStyle = css`
   padding-bottom: var(--app-cta-space, 112px);
+`;
+
+const conflictActionsStyle = css`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 20px;
 `;
 
 function statusBadge(label: string, complete: boolean): JSX.Element {
@@ -97,6 +104,29 @@ export function PlanEditorSections({
   const transportChecks = editor.transports.filter(
     (item) => item.bookingStatus !== "AVAILABLE"
   ).length;
+
+  if (editor.draftConflict) {
+    return (
+      <>
+        <Top
+          title={<Top.TitleParagraph>공개된 여행안이 변경됐어요</Top.TitleParagraph>}
+          subtitleBottom={
+            <Top.SubtitleParagraph>
+              저장된 임시안은 이전 공개본을 기준으로 작성됐습니다. 사용할 내용을 선택해주세요.
+            </Top.SubtitleParagraph>
+          }
+        />
+        <div css={conflictActionsStyle} role="alert">
+          <CTAButton variant="weak" onClick={editor.restoreConflictingDraft}>
+            이전 임시안 복원
+          </CTAButton>
+          <CTAButton onClick={editor.useLatestPublishedPlan}>
+            최신 공개본으로 시작
+          </CTAButton>
+        </div>
+      </>
+    );
+  }
 
   if (!section) {
     const perPersonCost = editor.costSummary.hasCost

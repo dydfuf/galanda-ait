@@ -65,8 +65,12 @@ export function PlanEditPage(): JSX.Element {
   const { openAsyncTwoButtonSheet } = useBottomSheet();
 
   const plan = room?.plans.find((p) => p.id === planId);
+  const isConfirmed = plan
+    ? plan.id === room?.confirmedPlanId || plan.status === "CONFIRMED"
+    : false;
+  const canEdit = Boolean(room && plan && session && canManagePlan(room, plan, session.userId) && !isConfirmed);
 
-  const editor = usePlanEditorState(room, plan, undefined);
+  const editor = usePlanEditorState(room, plan, undefined, canEdit ? session?.userId : undefined);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -125,7 +129,6 @@ export function PlanEditPage(): JSX.Element {
   }
 
   // 4. 확정 여부 확인
-  const isConfirmed = plan.id === room.confirmedPlanId || plan.status === "CONFIRMED";
   if (isConfirmed) {
     return (
       <RouteErrorFallback
@@ -223,7 +226,7 @@ export function PlanEditPage(): JSX.Element {
       />
 
       {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      {!section && <FixedBottomCTA.Double
+      {!section && !editor.draftConflict && <FixedBottomCTA.Double
         containerStyle={fixedCtaContainerStyle}
         topAccessory={
           editor.validation.firstError || actionError ? (

@@ -7,6 +7,7 @@ import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-para
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
 import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
@@ -52,6 +53,12 @@ export function PlanCreatePage(): JSX.Element {
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
   const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
+  const {
+    data: session,
+    isLoading: isSessionLoading,
+    isError: isSessionError,
+    error: sessionError,
+  } = useSessionQuery();
   const createPlanMutation = useCreatePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -59,13 +66,13 @@ export function PlanCreatePage(): JSX.Element {
   // 복제 원본 플랜 찾기
   const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
 
-  const editor = usePlanEditorState(room, undefined, cloneFromPlan);
+  const editor = usePlanEditorState(room, undefined, cloneFromPlan, session?.userId);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
   }
 
-  if (isLoading) {
+  if (isLoading || isSessionLoading) {
     return <div css={loadingContainerStyle}>여행방 정보를 불러오는 중입니다...</div>;
   }
 
@@ -74,6 +81,17 @@ export function PlanCreatePage(): JSX.Element {
       <RouteErrorFallback
         title="여행방을 찾을 수 없습니다"
         message="요청하신 정보가 없거나 삭제되었습니다."
+      />
+    );
+  }
+
+  if (isSessionError || !session) {
+    return (
+      <RouteErrorFallback
+        title="로그인 정보를 확인할 수 없습니다"
+        message={isSessionError
+          ? toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")
+          : "여행안을 작성하려면 로그인이 필요합니다."}
       />
     );
   }
@@ -143,7 +161,7 @@ export function PlanCreatePage(): JSX.Element {
       />
 
       {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      {!section && <FixedBottomCTA
+      {!section && !editor.draftConflict && <FixedBottomCTA
         containerStyle={fixedCtaContainerStyle}
         topAccessory={
           editor.validation.firstError || errorMsg ? (
