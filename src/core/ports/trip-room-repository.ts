@@ -10,6 +10,7 @@ import type { ConflictError, NotFoundError } from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
 
 export interface CreateRoomParams {
+  readonly id: TripId;
   readonly title: string;
   readonly destination?: string;
   readonly startDate?: string;

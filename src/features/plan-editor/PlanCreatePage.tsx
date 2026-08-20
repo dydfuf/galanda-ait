@@ -17,8 +17,6 @@ import { TransportSection } from "./components/TransportSection.tsx";
 import { CostSummarySection } from "./components/CostSummarySection.tsx";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
-import { PlanIdSchema } from "../../core/domain/ids.ts";
-import type { TripPlan } from "../../core/domain/room.ts";
 import { toUserMessage } from "../common/error-message.ts";
 
 const pageContainerStyle = css`
@@ -115,12 +113,9 @@ export function PlanCreatePage(): JSX.Element {
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      const newPlanId = PlanIdSchema.make(`plan-${Date.now()}`);
-
-      const newPlan: TripPlan = {
-        id: newPlanId,
+      const newPlan = {
         title: title.trim(),
-        status: "DRAFT",
+        status: "DRAFT" as const,
         proposalReason: proposalReason.trim() || undefined,
         baseHeadcount,
         routes: routes.map((r) => ({ city: r.city.trim(), nights: r.nights })),
@@ -132,14 +127,17 @@ export function PlanCreatePage(): JSX.Element {
         voteCount: 0,
       };
 
-      await createPlanMutation.mutateAsync({
+      const updatedRoom = await createPlanMutation.mutateAsync({
         roomId: tripId,
         plan: newPlan,
         expectedRevision: room.revision,
       });
 
       clearDraft();
-      navigate(`/trips/${tripId}/plans/${newPlan.id}`, { replace: true });
+      const createdPlan = updatedRoom.plans[updatedRoom.plans.length - 1];
+      if (createdPlan) {
+        navigate(`/trips/${tripId}/plans/${createdPlan.id}`, { replace: true });
+      }
     } catch (err: unknown) {
       // 비로그인·권한 부족 등 작성 실패 사유를 화면에 그대로 전달한다
       setIsSubmitting(false);

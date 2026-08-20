@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
+import { IdGenerator } from "../ports/id-generator.ts";
 import { calculatePlanDifference } from "../calculations/plan-diff.ts";
 import {
   requireMutablePlan,
@@ -14,7 +15,7 @@ import { ValidationError } from "../domain/errors.ts";
 
 export interface CreatePlanInput {
   readonly roomId: TripId;
-  readonly plan: TripPlan;
+  readonly plan: Omit<TripPlan, "id"> & { readonly id?: PlanId };
   readonly expectedRevision: Revision;
 }
 
@@ -50,8 +51,14 @@ export const createPlan = Effect.fn("createPlan")(
       "여행방 참여자만 여행안을 작성할 수 있습니다."
     );
 
+    // 5. 비결정적 값(PlanId) 결정 (Use Case / Effect 경계)
+    const ids = yield* IdGenerator;
+    const generatedPlanId = yield* ids.planId;
+    const planId = input.plan.id ?? generatedPlanId;
+
     let finalPlan: TripPlan = {
       ...input.plan,
+      id: planId,
       title: input.plan.title.trim(),
       authorId: session.userId,
       authorName: session.name,

@@ -100,6 +100,7 @@ describe("LocalTripRoomRepository", () => {
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
       const room = yield* repo.createRoom({
+        id: TripIdSchema.make("room-1"),
         title: "제주도 여행",
         hostUser: { id: UserIdSchema.make("host-1"), name: "Host", role: "HOST" },
       });
@@ -140,6 +141,7 @@ describe("LocalTripRoomRepository", () => {
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
       return yield* repo.createRoom({
+        id: TripIdSchema.make("room-1"),
         title: "제주도 여행",
         hostUser: { id: UserIdSchema.make("host-1"), name: "Host", role: "HOST" },
       });

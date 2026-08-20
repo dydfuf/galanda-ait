@@ -1,6 +1,7 @@
-import { Effect, Result, Schema } from "effect";
+import { DateTime, Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
+import { IdGenerator } from "../ports/id-generator.ts";
 import { ValidationError } from "../domain/errors.ts";
 import type { TripMember } from "../domain/room.ts";
 
@@ -59,19 +60,29 @@ export const createTripRoom = Effect.fn("createTripRoom")(
       );
     }
 
+    // 4. 비결정적 값(ID, 기본 일정) 결정 (Use Case / Effect 경계)
+    const ids = yield* IdGenerator;
+    const id = yield* ids.tripId;
+
+    const now = yield* DateTime.now;
+    const threeDaysLater = DateTime.add(now, { days: 3 });
+    const defaultStartDate = DateTime.formatIsoDateUtc(now);
+    const defaultEndDate = DateTime.formatIsoDateUtc(threeDaysLater);
+
     const hostUser: TripMember = {
       id: session.userId,
       name: session.name,
       role: "HOST",
     };
 
-    // 4. 저장소 생성 요청
+    // 5. 저장소 생성 요청
     const repo = yield* TripRoomRepository;
     return yield* repo.createRoom({
+      id,
       title: validated.title,
       destination: validated.destination,
-      startDate: validated.startDate,
-      endDate: validated.endDate,
+      startDate: validated.startDate || defaultStartDate,
+      endDate: validated.endDate || defaultEndDate,
       hostUser,
     });
   }

@@ -6,7 +6,6 @@ import {
 } from "../../core/ports/trip-room-repository.ts";
 import { TripRoomSchema } from "../../core/domain/room.ts";
 import {
-  TripIdSchema,
   RevisionSchema,
 } from "../../core/domain/ids.ts";
 import {
@@ -162,17 +161,12 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         const stored = yield* loadRooms("createRoom");
         const rooms = yield* decodeRooms(stored, "createRoom.decode");
 
-        const now = new Date();
-        const threeDaysLater = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-        const defaultStartDate = now.toISOString().split("T")[0];
-        const defaultEndDate = threeDaysLater.toISOString().split("T")[0];
-
         const newRoom: TripRoom = {
-          id: TripIdSchema.make(`room-${Date.now()}`),
+          id: params.id,
           title: params.title.trim(),
           destination: params.destination?.trim() || "여행지",
-          startDate: params.startDate || defaultStartDate,
-          endDate: params.endDate || defaultEndDate,
+          startDate: params.startDate ?? "",
+          endDate: params.endDate ?? "",
           revision: RevisionSchema.make(1),
           members: [params.hostUser],
           plans: [],
