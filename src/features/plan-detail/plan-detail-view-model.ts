@@ -1,6 +1,11 @@
 import type { TripRoom } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
-import { isPlanAuthor, canManagePlan } from "../../core/domain/auth-guards.ts";
+import {
+  isPlanAuthor,
+  canManagePlan,
+  getRoomActor,
+  type RoomRole,
+} from "../../core/domain/auth-guards.ts";
 import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
 import type { TimelineItem } from "./components/DetailTimeline.tsx";
 import type { ReactionType } from "./components/OpinionBottomSheet.tsx";
@@ -34,6 +39,9 @@ export interface PlanDetailViewModel {
   readonly memberCount: number;
   readonly memberNames: string;
   readonly revision: number;
+  /** 세션 사용자의 방 내 역할. 방장 전용 동작(확정 등) 노출 판단에 사용해요. */
+  readonly viewerRole: RoomRole;
+  readonly isViewerHost: boolean;
   readonly confirmedPlanId?: string;
   readonly confirmedPlanTitle?: string;
   readonly decisionStatusText: string;
@@ -47,6 +55,7 @@ export const toPlanDetailViewModel = (
 ): PlanDetailViewModel => {
   const confirmed = room.plans.find((p) => p.id === room.confirmedPlanId);
   const isConfirmed = Boolean(room.confirmedPlanId);
+  const viewer = getRoomActor(room, currentUserId as UserId | undefined);
 
   let decisionStatusText = "여행안을 고르고 있어요";
   let decisionSubText = "후보 여행안을 살펴보고 의견을 남겨보세요.";
@@ -237,6 +246,8 @@ export const toPlanDetailViewModel = (
     memberCount: room.members.length,
     memberNames: room.members.map((m) => m.name).join(", "),
     revision: room.revision,
+    viewerRole: viewer.role,
+    isViewerHost: viewer.isHost,
     confirmedPlanId: room.confirmedPlanId,
     confirmedPlanTitle: confirmed?.title,
     decisionStatusText,
