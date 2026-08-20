@@ -13,7 +13,7 @@ interface AccessoryButtonOptions {
 }
 
 interface PlatformNavigation {
-  readonly addAccessoryButton: (options: AccessoryButtonOptions) => void;
+  readonly addAccessoryButton: (options: AccessoryButtonOptions) => Promise<void>;
   readonly removeAccessoryButton: VoidFunction;
 }
 
@@ -36,9 +36,14 @@ export function useAppNavigation() {
           },
         });
 
-        void partner
+        return partner
           .addAccessoryButton({ id, title, icon: { name: iconName } })
-          .catch((error: unknown) => console.error("앱인토스 액세서리 등록 실패:", error));
+          .catch((error: unknown) => {
+            removeAccessoryListener?.();
+            removeAccessoryListener = undefined;
+            console.error("앱인토스 액세서리 등록 실패:", error);
+            throw error;
+          });
       },
       removeAccessoryButton: () => {
         removeAccessoryListener?.();

@@ -1,7 +1,7 @@
 import { css } from "@emotion/react";
 import { Tab, TopNavigation, TopNavigationBackButton, TopNavigationTextButton, useToast } from "@toss/tds-mobile";
 import { Clipboard, Share } from "@apps-in-toss/web-framework";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
@@ -43,6 +43,7 @@ export function TripRoomTabLayout() {
   const navigate = useNavigate();
   const { goBack, platformNavigation } = useAppNavigation();
   const { openToast } = useToast();
+  const [isShareAccessoryReady, setIsShareAccessoryReady] = useState(false);
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
@@ -95,14 +96,27 @@ export function TripRoomTabLayout() {
   useEffect(() => {
     if (!platformNavigation || !tripId) return;
 
-    platformNavigation.addAccessoryButton({
-      id: "galanda-share-invite",
-      title: "공유",
-      iconName: "icon-share-mono",
-      callback: () => void handleShareInvite(),
-    });
+    setIsShareAccessoryReady(false);
+    let isActive = true;
 
-    return () => platformNavigation.removeAccessoryButton();
+    void platformNavigation
+      .addAccessoryButton({
+        id: "galanda-share-invite",
+        title: "공유",
+        iconName: "icon-share-mono",
+        callback: () => void handleShareInvite(),
+      })
+      .then(() => {
+        if (isActive) setIsShareAccessoryReady(true);
+      })
+      .catch(() => {
+        if (isActive) setIsShareAccessoryReady(false);
+      });
+
+    return () => {
+      isActive = false;
+      platformNavigation.removeAccessoryButton();
+    };
   }, [handleShareInvite, platformNavigation, tripId]);
 
   if (Result.isFailure(validated)) {
@@ -118,7 +132,7 @@ export function TripRoomTabLayout() {
     <div css={containerStyle}>
       {/* Apps in Toss에서는 shell이 back/title/accessory를 소유하고, 브라우저에서만 TDS fallback을 보여줘요. */}
       <header css={headerStyle}>
-        {!platformNavigation && (
+        {(!platformNavigation || !isShareAccessoryReady) && (
           <TopNavigation
             background="transparent"
             leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />}
