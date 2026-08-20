@@ -1,4 +1,4 @@
-import type { TripRoom } from "../../core/domain/room.ts";
+import type { BookingStatus, TripRoom } from "../../core/domain/room.ts";
 import type { UserId } from "../../core/domain/ids.ts";
 import {
   isPlanAuthor,
@@ -108,31 +108,72 @@ export const toPlanDetailViewModel = (
       ? `${headcount}명 기준 1인 ${formatCostRangeText(costSummary.minPerPerson, costSummary.maxPerPerson)}`
       : "비용 미정";
 
+    const accommodations = p.accommodations ?? [];
+    const transports = p.transports ?? [];
+
     // 예약 위험 요약 (PL-02 2번 섹션)
     const bookingRisks: BookingRiskItem[] = [];
-    if (p.accommodations) {
-      for (const acc of p.accommodations) {
-        if (acc.bookingStatus === "NEED_CHECK") {
-          bookingRisks.push({
-            level: "WARNING",
-            message: `${acc.city} 숙소(${acc.hotelName}) 잔여 객실 확인이 필요해요`,
-            snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
-          });
-        } else if (acc.bookingStatus === "FULL") {
-          bookingRisks.push({
-            level: "DANGER",
-            message: `${acc.city} 숙소(${acc.hotelName})가 현재 만실 상태예요`,
-            snapshotInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근"} 확인`,
-          });
-        }
-      }
+    const addBookingRisk = ({
+      status,
+      message,
+      confirmedBy,
+      confirmedAt,
+      isSearching = false,
+    }: {
+      readonly status: BookingStatus;
+      readonly message: string;
+      readonly confirmedBy?: string;
+      readonly confirmedAt?: string;
+      readonly isSearching?: boolean;
+    }): void => {
+      if (status === "AVAILABLE" && !isSearching) return;
+
+      const isUnchecked = status === "NOT_CHECKED" || isSearching;
+      bookingRisks.push({
+        level: status === "FULL" ? "DANGER" : "WARNING",
+        message,
+        snapshotInfo: isUnchecked
+          ? "아직 예약 상태를 확인하지 않았어요"
+          : `${confirmedBy ?? authorName} · ${confirmedAt ?? "최근"} 확인`,
+      });
+    };
+
+    for (const acc of accommodations) {
+      const isUnchecked = acc.bookingStatus === "NOT_CHECKED" || acc.isSearching;
+      addBookingRisk({
+        status: acc.bookingStatus,
+        isSearching: acc.isSearching,
+        message:
+          acc.bookingStatus === "FULL"
+            ? `${acc.city} 숙소(${acc.hotelName})가 현재 만실 상태예요`
+            : isUnchecked
+              ? `${acc.city} 숙소(${acc.hotelName}) 예약 상태를 아직 확인하지 않았어요`
+              : `${acc.city} 숙소(${acc.hotelName}) 잔여 객실 확인이 필요해요`,
+        confirmedBy: acc.confirmedBy,
+        confirmedAt: acc.confirmedAt,
+      });
+    }
+
+    for (const trans of transports) {
+      addBookingRisk({
+        status: trans.bookingStatus,
+        message:
+          trans.bookingStatus === "FULL"
+            ? `${trans.fromCity} → ${trans.toCity} 교통편이 매진/불가 상태예요`
+            : trans.bookingStatus === "NOT_CHECKED"
+              ? `${trans.fromCity} → ${trans.toCity} 교통 예약 상태를 아직 확인하지 않았어요`
+              : `${trans.fromCity} → ${trans.toCity} 교통 예약 확인이 필요해요`,
+        confirmedBy: trans.confirmedBy,
+        confirmedAt: trans.confirmedAt,
+      });
     }
 
     // 타임라인 아이템 (체류 + 이동 구간)
     const timelineItems: TimelineItem[] = [];
-    if (p.accommodations && p.accommodations.length > 0) {
-      for (let i = 0; i < p.accommodations.length; i++) {
-        const acc = p.accommodations[i];
+    const timelineLength = Math.max(accommodations.length, transports.length);
+    for (let i = 0; i < timelineLength; i++) {
+      const acc = accommodations[i];
+      if (acc) {
         const stayStatus =
           acc.bookingStatus === "NOT_CHECKED" || acc.isSearching
             ? "SEARCHING"
@@ -154,32 +195,29 @@ export const toPlanDetailViewModel = (
             bookingUrl: acc.bookingUrl,
           },
         });
+      }
 
-        if (p.transports && p.transports[i]) {
-          const trans = p.transports[i];
-          const transStatus =
-            trans.bookingStatus === "FULL" || trans.bookingStatus === "NOT_CHECKED"
-              ? "SEARCHING"
-              : trans.bookingStatus;
+      const trans = transports[i];
+      if (trans) {
+        const transStatus = trans.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : trans.bookingStatus;
 
-          timelineItems.push({
-            type: "TRANSPORT",
-            transport: {
-              id: trans.id,
-              fromCity: trans.fromCity,
-              toCity: trans.toCity,
-              mode: trans.mode,
-              hasTransfer: trans.hasTransfer,
-              durationText: trans.durationText,
-              priceText: trans.priceRange
-                ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
-                : "가격 미정",
-              bookingStatus: transStatus,
-              confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
-              bookingUrl: trans.bookingUrl,
-            },
-          });
-        }
+        timelineItems.push({
+          type: "TRANSPORT",
+          transport: {
+            id: trans.id,
+            fromCity: trans.fromCity,
+            toCity: trans.toCity,
+            mode: trans.mode,
+            hasTransfer: trans.hasTransfer,
+            durationText: trans.durationText,
+            priceText: trans.priceRange
+              ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
+              : "가격 미정",
+            bookingStatus: transStatus,
+            confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
+            bookingUrl: trans.bookingUrl,
+          },
+        });
       }
     }
 
