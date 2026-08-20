@@ -20,7 +20,7 @@ export const useTripRoomsQuery = (): UseQueryResult<
   ReadonlyArray<TripRoomViewModel>,
   Error
 > => {
-  const { data: session } = useSessionQuery();
+  const { data: session, isSuccess: isSessionReady } = useSessionQuery();
 
   return useQuery<ReadonlyArray<TripRoom>, Error, ReadonlyArray<TripRoomViewModel>>({
     queryKey: [...tripRoomKeys.list(), session?.userId ?? "anonymous"],
@@ -28,5 +28,6 @@ export const useTripRoomsQuery = (): UseQueryResult<
       appRuntime.runPromise(getTripRooms(), { signal }),
     select: (rooms: ReadonlyArray<TripRoom>): ReadonlyArray<TripRoomViewModel> =>
       rooms.map((r) => toTripRoomViewModel(r, session?.userId)),
+    enabled: isSessionReady,
   });
 };
