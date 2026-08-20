@@ -57,6 +57,11 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
 
     expect(plan.myReaction).toBe("HARD");
     expect(plan.myOpinionReason).toBe("이동이 너무 많아요");
+    expect(plan.memberOpinions).toEqual([
+      { userId: "user-local-me", userName: "나", reaction: "LIKE" },
+      { userId: "user-bob", userName: "밥", reaction: "HARD" },
+    ]);
+    expect("reason" in (plan.memberOpinions[1] ?? {})).toBe(false);
   });
 
   it("세션 사용자가 없으면 '내 의견'이 존재하지 않는다 (user-local-me 폴백 금지)", (): void => {

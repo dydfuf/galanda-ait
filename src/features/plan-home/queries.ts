@@ -12,22 +12,22 @@ import { useSessionQuery } from "../../hooks/useSession.ts";
 export const tripRoomKeys = {
   all: ["trip-rooms"] as const,
   list: (): readonly ["trip-rooms", "list"] => [...tripRoomKeys.all, "list"] as const,
-  detail: (id: string): readonly ["trip-rooms", "detail", string] =>
-    [...tripRoomKeys.all, "detail", id] as const,
+  detail: (id: string, viewerId?: string): readonly ["trip-rooms", "detail", string, string] =>
+    [...tripRoomKeys.all, "detail", id, viewerId ?? "anonymous"] as const,
 };
 
 export const useTripRoomsQuery = (): UseQueryResult<
   ReadonlyArray<TripRoomViewModel>,
   Error
 > => {
-  const { data: session } = useSessionQuery();
+  const { data: session, isSuccess: isSessionReady } = useSessionQuery();
 
   return useQuery<ReadonlyArray<TripRoom>, Error, ReadonlyArray<TripRoomViewModel>>({
-    queryKey: tripRoomKeys.list(),
+    queryKey: [...tripRoomKeys.list(), session?.userId ?? "anonymous"],
     queryFn: ({ signal }): Promise<ReadonlyArray<TripRoom>> =>
       appRuntime.runPromise(getTripRooms(), { signal }),
     select: (rooms: ReadonlyArray<TripRoom>): ReadonlyArray<TripRoomViewModel> =>
       rooms.map((r) => toTripRoomViewModel(r, session?.userId)),
+    enabled: isSessionReady,
   });
 };
-

@@ -31,9 +31,17 @@ export const submitOpinion = Effect.fn("submitOpinion")(
     );
 
     // 2. 의견 입력값 유효성 검증
-    if (!["LIKE", "OKAY", "HARD"].includes(input.opinion?.reaction)) {
+    const reaction = input.opinion?.reaction;
+    if (!["LIKE", "OKAY", "HARD"].includes(reaction)) {
       return yield* Effect.fail(
         new ValidationError({ message: "올바른 반응(리액션)을 선택해주세요." })
+      );
+    }
+
+    const reason = reaction === "HARD" ? input.opinion.reason?.trim() : undefined;
+    if (reaction === "HARD" && !reason) {
+      return yield* Effect.fail(
+        new ValidationError({ message: "어려운 이유를 입력해주세요." })
       );
     }
 
@@ -55,10 +63,8 @@ export const submitOpinion = Effect.fn("submitOpinion")(
     const sanitizedOpinion: PlanMemberOpinion = {
       userId: session.userId,
       userName: session.name,
-      reaction: input.opinion.reaction,
-      reason: input.opinion.reason?.trim()
-        ? input.opinion.reason.trim()
-        : undefined,
+      reaction,
+      reason,
     };
 
     return yield* repo.setPlanOpinion(

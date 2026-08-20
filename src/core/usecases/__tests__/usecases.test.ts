@@ -1,15 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { Effect, Exit, Layer, Option } from "effect";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
-import { findTripRoom, getTripRooms } from "../get-room.ts";
+import { findTripRoom, getTripRoom, getTripRooms } from "../get-room.ts";
 import { createTripRoom } from "../create-room.ts";
-import { LocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
+import {
+  createLocalSessionLayer,
+  LocalSessionLayer,
+} from "../../../infrastructure/local/local-session.ts";
 import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
 import {
   NotFoundError,
   RepositoryError,
 } from "../../domain/errors.ts";
-import { TripIdSchema, type TripId } from "../../domain/ids.ts";
+import {
+  PlanIdSchema,
+  RevisionSchema,
+  TripIdSchema,
+  UserIdSchema,
+  type TripId,
+} from "../../domain/ids.ts";
+import type { TripRoom } from "../../domain/room.ts";
 
 describe("UseCases Error Propagation", () => {
   it("getTripRooms()는 RepositoryError를 숨기지 않고 상위로 전파한다", async () => {
@@ -23,7 +33,9 @@ describe("UseCases Error Propagation", () => {
         ),
     } as any);
 
-    const program = getTripRooms().pipe(Effect.provide(FailingRepoLayer));
+    const program = getTripRooms().pipe(
+      Effect.provide(Layer.merge(FailingRepoLayer, LocalSessionLayer))
+    );
     const exit = await Effect.runPromiseExit(program);
 
     expect(Exit.isFailure(exit)).toBe(true);
@@ -39,7 +51,7 @@ describe("UseCases Error Propagation", () => {
     } as any);
 
     const nfProgram = findTripRoom(TripIdSchema.make("room-1")).pipe(
-      Effect.provide(NotFoundRepoLayer)
+      Effect.provide(Layer.merge(NotFoundRepoLayer, LocalSessionLayer))
     );
     const nfExit = await Effect.runPromiseExit(nfProgram);
 
@@ -59,7 +71,7 @@ describe("UseCases Error Propagation", () => {
     } as any);
 
     const errProgram = findTripRoom(TripIdSchema.make("room-1")).pipe(
-      Effect.provide(ErrorRepoLayer)
+      Effect.provide(Layer.merge(ErrorRepoLayer, LocalSessionLayer))
     );
     const errExit = await Effect.runPromiseExit(errProgram);
 
@@ -67,6 +79,75 @@ describe("UseCases Error Propagation", () => {
     if (Exit.isFailure(errExit)) {
       expect(JSON.stringify(errExit.cause)).toContain("RepositoryError");
     }
+  });
+
+  it("공개 방 조회는 현재 사용자의 HARD 사유만 남긴다", async () => {
+    const room: TripRoom = {
+      id: TripIdSchema.make("room-1"),
+      title: "제주 여행",
+      destination: "제주",
+      startDate: "2026-09-01",
+      endDate: "2026-09-05",
+      revision: RevisionSchema.make(1),
+      members: [],
+      plans: [
+        {
+          id: PlanIdSchema.make("plan-1"),
+          title: "기본안",
+          status: "DRAFT",
+          places: [],
+          voteCount: 0,
+          memberOpinions: [
+            {
+              userId: UserIdSchema.make("user-me"),
+              userName: "나",
+              reaction: "HARD",
+              reason: "내 사유",
+            },
+            {
+              userId: UserIdSchema.make("user-bob"),
+              userName: "밥",
+              reaction: "HARD",
+              reason: "밥의 사유",
+            },
+          ],
+        },
+      ],
+    };
+    const RepoLayer = Layer.succeed(TripRoomRepository, {
+      getRoom: () => Effect.succeed(room),
+      getRooms: () => Effect.succeed([room]),
+    } as any);
+    const MemberSessionLayer = createLocalSessionLayer({
+      userId: UserIdSchema.make("user-me"),
+      name: "나",
+      isAuthenticated: true,
+    });
+
+    const visibleRoom = await Effect.runPromise(
+      getTripRoom(room.id).pipe(
+        Effect.provide(Layer.merge(RepoLayer, MemberSessionLayer))
+      )
+    );
+    const visibleOpinions = visibleRoom.plans[0]?.memberOpinions ?? [];
+    expect(visibleOpinions[0]?.reason).toBe("내 사유");
+    expect("reason" in (visibleOpinions[1] ?? {})).toBe(false);
+
+    const anonymousRooms = await Effect.runPromise(
+      getTripRooms().pipe(
+        Effect.provide(
+          Layer.merge(
+            RepoLayer,
+            createLocalSessionLayer({
+              userId: UserIdSchema.make("anonymous"),
+              name: "게스트",
+              isAuthenticated: false,
+            })
+          )
+        )
+      )
+    );
+    expect("reason" in (anonymousRooms[0]?.plans[0]?.memberOpinions?.[0] ?? {})).toBe(false);
   });
 
   it("createTripRoom()는 스키마 유효성 실패 시 ValidationError, 저장소 실패 시 RepositoryError를 전파한다", async () => {
