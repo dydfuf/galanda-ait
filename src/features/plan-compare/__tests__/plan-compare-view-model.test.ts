@@ -9,6 +9,7 @@ import type { TripRoom } from "../../../core/domain/room.ts";
 import { toPlanDetailViewModel } from "../../plan-detail/plan-detail-view-model.ts";
 import {
   buildConfirmPlanSummary,
+  buildPlanCompareDifferences,
   canSubmitConfirm,
   getCompareConfirmState,
 } from "../plan-compare-view-model.ts";
@@ -161,5 +162,150 @@ describe("확정 전 재확인 요약 (RAON-143)", (): void => {
 
     expect(summary.groupCostText).toBe("예상 경비 미정");
     expect(summary.needCheckMessages).toHaveLength(0);
+  });
+});
+
+describe("변경 항목 우선 비교 (RAON-166)", (): void => {
+  it("일정·예약·비용 순서로 다른 행만 반환한다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const left = vm.plans.find((plan) => plan.id === "plan-basic");
+    const right = vm.plans.find((plan) => plan.id === "plan-alt");
+    if (!left || !right) throw new Error("fixture에 비교할 두 여행안이 있어야 한다");
+
+    const differences = buildPlanCompareDifferences(left, right);
+
+    expect(differences.map((difference) => difference.kind)).toEqual([
+      "SCHEDULE",
+      "BOOKING",
+      "COST",
+    ]);
+    expect(differences.find((difference) => difference.kind === "BOOKING")?.leftValue).toContain("1건");
+  });
+
+  it("차이가 없으면 모든 항목을 접는다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    expect(buildPlanCompareDifferences(plan, plan)).toEqual([]);
+  });
+
+  it("예약 위험이 없고 예약 항목 수만 달라도 예약 차이를 만들지 않는다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const left = { ...plan, bookingRisks: [], timelineItems: plan.timelineItems.slice(0, 1) };
+    const right = {
+      ...plan,
+      planTagLabel: "대안 1",
+      bookingRisks: [],
+      timelineItems: [...plan.timelineItems, ...plan.timelineItems.slice(0, 1)],
+    };
+
+    expect(buildPlanCompareDifferences(left, right).some((difference) => difference.kind === "BOOKING")).toBe(false);
+  });
+
+  it("예약 정보가 없는 위험 없는 여행안도 예약 항목이 있는 위험 없는 여행안과 다르지 않다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const emptyPlan = { ...plan, bookingRisks: [], timelineItems: [] };
+    const availablePlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      bookingRisks: [],
+    };
+
+    expect(
+      buildPlanCompareDifferences(emptyPlan, availablePlan).some(
+        (difference) => difference.kind === "BOOKING"
+      )
+    ).toBe(false);
+  });
+
+  it("예약 위험 수가 같아도 위험 대상이 다르면 예약 차이를 보여준다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    const risk = plan?.bookingRisks[0];
+    if (!plan || !risk) throw new Error("fixture에 예약 위험이 있는 여행안이 있어야 한다");
+
+    const changedRiskPlan = {
+      ...plan,
+      bookingRisks: [{ ...risk, message: "다른 숙소의 예약 조건을 확인해야 해요" }],
+    };
+
+    const bookingDifference = buildPlanCompareDifferences(plan, changedRiskPlan).find(
+      (difference) => difference.kind === "BOOKING"
+    );
+
+    expect(bookingDifference?.leftValue).not.toBe(bookingDifference?.rightValue);
+  });
+
+  it("표시되지 않는 예약 레코드 ID만 다르면 예약 차이를 만들지 않는다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const changedRecordPlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      timelineItems: plan.timelineItems.map((item) =>
+        item.type === "STAY" && item.stay
+          ? { ...item, stay: { ...item.stay, id: "stay-2" } }
+          : item
+      ),
+    };
+
+    const bookingDifference = buildPlanCompareDifferences(plan, changedRecordPlan).find(
+      (difference) => difference.kind === "BOOKING"
+    );
+
+    expect(bookingDifference).toBeUndefined();
+  });
+
+  it("위험 메시지가 같아도 예약 상세가 다르면 변경 내용을 함께 보여준다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const changedRecordPlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      timelineItems: plan.timelineItems.map((item) =>
+        item.type === "STAY" && item.stay
+          ? { ...item, stay: { ...item.stay, period: "4일차" } }
+          : item
+      ),
+    };
+
+    const bookingDifference = buildPlanCompareDifferences(plan, changedRecordPlan).find(
+      (difference) => difference.kind === "BOOKING"
+    );
+
+    expect(bookingDifference?.leftValue).toContain("3일차");
+    expect(bookingDifference?.rightValue).toContain("4일차");
+  });
+
+  it("비용 차이는 1인 기준 delta로 표현한다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const changedCostPlan = {
+      ...plan,
+      planTagLabel: "대안 1",
+      costSummary: {
+        ...plan.costSummary,
+        minPerPerson: plan.costSummary.minPerPerson + 10000,
+        maxPerPerson: plan.costSummary.maxPerPerson + 10000,
+      },
+    };
+    const costDifference = buildPlanCompareDifferences(plan, changedCostPlan).find(
+      (difference) => difference.kind === "COST"
+    );
+
+    expect(costDifference?.deltaText).toBe("1인 기준 +1만원");
   });
 });
