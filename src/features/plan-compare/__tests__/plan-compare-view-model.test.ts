@@ -206,6 +206,24 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
     expect(buildPlanCompareDifferences(left, right).some((difference) => difference.kind === "BOOKING")).toBe(false);
   });
 
+  it("예약 위험 수가 같아도 위험 대상이 다르면 예약 차이를 보여준다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const plan = vm.plans[0];
+    const risk = plan?.bookingRisks[0];
+    if (!plan || !risk) throw new Error("fixture에 예약 위험이 있는 여행안이 있어야 한다");
+
+    const changedRiskPlan = {
+      ...plan,
+      bookingRisks: [{ ...risk, message: "다른 숙소의 예약 조건을 확인해야 해요" }],
+    };
+
+    const bookingDifference = buildPlanCompareDifferences(plan, changedRiskPlan).find(
+      (difference) => difference.kind === "BOOKING"
+    );
+
+    expect(bookingDifference?.leftValue).not.toBe(bookingDifference?.rightValue);
+  });
+
   it("비용 차이는 1인 기준 delta로 표현한다", (): void => {
     const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
     const plan = vm.plans[0];

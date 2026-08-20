@@ -38,7 +38,8 @@ const formatBooking = (plan: DetailedPlanViewModel): string => {
   if (plan.bookingRisks.length === 0) return "확인 필요 0건";
 
   const hasDanger = plan.bookingRisks.some((risk) => risk.level === "DANGER");
-  return `${plan.bookingRisks.length}건 확인 필요${hasDanger ? " · 예약 불가 포함" : ""}`;
+  const riskDetails = plan.bookingRisks.map((risk) => risk.message).join(" · ");
+  return `${plan.bookingRisks.length}건 확인 필요${hasDanger ? " · 예약 불가 포함" : ""} · ${riskDetails}`;
 };
 
 const formatOpinions = (plan: DetailedPlanViewModel): string => {
