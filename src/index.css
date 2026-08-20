@@ -37,9 +37,15 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 
+  /* 앱 화면 공통 여백. TDS 컴포넌트는 자체 horizontal padding을 사용해요. */
+  --app-inline-padding: 20px;
+  --app-page-padding-top: 16px;
+  --app-page-padding-bottom: calc(24px + var(--safe-bottom));
+  --app-cta-space: calc(104px + var(--safe-bottom));
+
   font-family: var(--sans);
   color: var(--adaptiveGrey900);
-  background-color: var(--adaptiveGreyBackground);
+  background-color: var(--adaptiveBackground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -54,20 +60,17 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--adaptiveGreyBackground);
-  display: flex;
-  justify-content: center;
+  background-color: var(--adaptiveBackground);
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-x: hidden;
 }
 
 #root {
   width: 100%;
-  max-width: 480px;
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: var(--adaptiveGreyBackground);
-  box-shadow: 0 0 24px rgba(0, 0, 0, 0.05);
+  background-color: var(--adaptiveBackground);
   display: flex;
   flex-direction: column;
   position: relative;
