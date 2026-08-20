@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { css } from "@emotion/react";
-import { FixedBottomCTA, TopNavigation, TopNavigationBackButton } from "@toss/tds-mobile";
+import { FixedBottomCTA, TextField, TopNavigation, TopNavigationBackButton } from "@toss/tds-mobile";
 import { useNavigate } from "react-router-dom";
 import { useAppNavigation } from "../../hooks/useAppNavigation.ts";
 import { useCreateTripRoomMutation } from "./mutations.ts";
@@ -50,68 +50,6 @@ const formStyle = css`
   display: flex;
   flex-direction: column;
   flex: 1;
-`;
-
-const inputCardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const fieldLabelStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--adaptiveGrey700, #4e5968);
-`;
-
-const countStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveGrey400, #b0b8c1);
-`;
-
-const countWarningStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveRed500, #f04452);
-  font-weight: 600;
-`;
-
-const textInputStyle = css`
-  width: 100%;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
-  font-size: 16px;
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  color: var(--adaptiveGrey900, #191f28);
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-
-  &:focus {
-    background-color: var(--adaptiveBackground, #ffffff);
-    border-color: var(--adaptiveBlue500, #3182f6);
-  }
-`;
-
-const helperTextStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin: 4px 0 0 0;
-`;
-
-const errorMessageStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveRed600, #e0383e);
-  margin-top: 12px;
-  text-align: center;
 `;
 
 const MAX_TITLE_LENGTH = 30;
@@ -170,43 +108,26 @@ export function TripCreatePage() {
           }}
           css={formStyle}
         >
-          <div css={inputCardStyle}>
-            <label css={fieldLabelStyle} htmlFor="trip-title">
-              <span>여행 이름 *</span>
-              {isCloseToLimit && (
-                <span css={title.length > MAX_TITLE_LENGTH ? countWarningStyle : countStyle}>
-                  {title.length}/{MAX_TITLE_LENGTH}
-                </span>
-              )}
-            </label>
-
-            <input
-              id="trip-title"
-              ref={inputRef}
-              type="text"
-              placeholder="예: 일본 여행, 2026 제주 힐링"
-              value={title}
-              maxLength={MAX_TITLE_LENGTH}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (errorMsg) setErrorMsg(null);
-              }}
-              css={textInputStyle}
-              aria-describedby="trip-title-help"
-              required
-            />
-
-            <p css={helperTextStyle} id="trip-title-help">
-              <span aria-hidden="true">💡 </span>
-              여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.
-            </p>
-          </div>
-
-          {errorMsg && (
-            <p css={errorMessageStyle} role="alert">
-              {errorMsg}
-            </p>
-          )}
+          <TextField
+            id="trip-title"
+            ref={inputRef}
+            variant="box"
+            label="여행 이름 *"
+            labelOption="sustain"
+            placeholder="예: 일본 여행, 2026 제주 힐링"
+            value={title}
+            maxLength={MAX_TITLE_LENGTH}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (errorMsg) setErrorMsg(null);
+            }}
+            help={
+              errorMsg ??
+              `여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.${isCloseToLimit ? ` (${title.length}/${MAX_TITLE_LENGTH})` : ""}`
+            }
+            hasError={Boolean(errorMsg)}
+            required
+          />
         </form>
       </div>
 

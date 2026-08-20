@@ -6,7 +6,7 @@ const containerStyle = css`
   flex: 1;
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: var(--adaptiveGreyBackground, #f2f4f6);
+  background-color: var(--adaptiveBackground, #ffffff);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -19,4 +19,3 @@ export function AppRootLayout() {
     </div>
   );
 }
-

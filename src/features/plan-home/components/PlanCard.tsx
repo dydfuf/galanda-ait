@@ -1,5 +1,6 @@
 import { css } from "@emotion/react";
-import { Link } from "react-router-dom";
+import { Badge, ListRow, Text } from "@toss/tds-mobile";
+import { useNavigate } from "react-router-dom";
 import { RouteRail } from "../../common/RouteRail.tsx";
 
 export interface PlanCardOpinionCounts {
@@ -32,156 +33,83 @@ export interface PlanCardData {
 
 interface PlanCardProps {
   readonly plan: PlanCardData;
-  /** 카드 전체가 하나의 링크예요. 클릭 핸들러 대신 이동할 경로를 받아요. */
   readonly to: string;
 }
 
-const cardStyle = (isConfirmed: boolean) => css`
-  background-color: var(--adaptiveBackground, #ffffff);
-  border-radius: 16px;
-  padding: 18px 20px;
-  border: ${isConfirmed ? "2px solid var(--adaptiveGreen500, #2da44e)" : "1px solid var(--adaptiveGrey200, #e5e8eb)"};
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+const contentsStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  color: inherit;
-  text-decoration: none;
-
-  &:active {
-    transform: scale(0.985);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-  }
+  gap: 8px;
 `;
 
-const cardHeaderStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-`;
-
-const tagGroupStyle = css`
+const tagRowStyle = css`
   display: flex;
   align-items: center;
-  gap: 6px;
-`;
-
-const badgeStyle = (bg: string, color: string, border: string) => css`
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 7px;
-  border-radius: 6px;
-  background-color: ${bg};
-  color: ${color};
-  border: 1px solid ${border};
-`;
-
-const authorTextStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
-`;
-
-const detailLinkStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveBlue500, #3182f6);
-  font-weight: 600;
+  gap: 8px;
+  min-width: 0;
 `;
 
 const titleStyle = css`
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-  margin: 0 0 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
-const periodTextStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin: 0;
-`;
-
-const costBoxStyle = css`
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border-radius: 10px;
-  padding: 10px 12px;
+const costRowStyle = css`
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-`;
-
-const costLabelStyle = css`
-  color: var(--adaptiveGrey700, #4e5968);
-  font-weight: 500;
-`;
-
-const costValueAlignStyle = css`
-  text-align: right;
-`;
-
-const costGroupTextStyle = css`
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-`;
-
-const costPerPersonTextStyle = css`
-  font-size: 11px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  margin-left: 6px;
-`;
-
-const alertBoxStyle = css`
-  background-color: var(--adaptiveYellow50, #fff8e1);
-  border: 1px solid #ffe082;
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: var(--adaptiveYellow600, #b78103);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-const footerStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 10px;
+  align-items: baseline;
+  gap: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--adaptiveGrey100, #f2f4f6);
-  font-size: 12px;
 `;
 
-const opinionCountGroupStyle = css`
+const costValueStyle = css`
+  text-align: right;
+  white-space: nowrap;
+`;
+
+const alertStyle = css`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+`;
+
+const opinionRowStyle = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding-top: 4px;
+`;
+
+const opinionCountsStyle = css`
   display: flex;
   gap: 8px;
-  color: var(--adaptiveGrey700, #4e5968);
+  white-space: nowrap;
 `;
 
 const hardCountStyle = css`
   color: var(--adaptiveRed600, #e0383e);
-  font-weight: 600;
 `;
 
-const myReactionLabelStyle = (hasReaction: boolean) => css`
-  color: ${hasReaction ? "var(--adaptiveBlue500, #3182f6)" : "var(--adaptiveGrey500, #8b95a1)"};
+const reactionStyle = (hasReaction: boolean) => css`
+  color: ${hasReaction
+    ? "var(--adaptiveBlue600, #1b64da)"
+    : "var(--adaptiveGrey500, #8b95a1)"};
   font-weight: ${hasReaction ? 600 : 400};
+  text-align: right;
 `;
 
 export function PlanCard({ plan, to }: PlanCardProps) {
-  const getBadgeColors = () => {
-    if (plan.isConfirmed) {
-      return { bg: "var(--adaptiveGreen50, #f0fbf4)", color: "var(--adaptiveGreen600, #15803d)", border: "#bbf7d0" };
-    }
-    if (plan.planTag === "BASIC") {
-      return { bg: "var(--adaptiveBlue50, #e8f3ff)", color: "var(--adaptiveBlue600, #1b64da)", border: "#cfe4ff" };
-    }
-    return { bg: "var(--adaptiveGrey100, #f2f4f6)", color: "var(--adaptiveGrey700, #4e5968)", border: "var(--adaptiveGrey200, #e5e8eb)" };
-  };
-
-  const badgeColors = getBadgeColors();
+  const navigate = useNavigate();
+  const badgeColor = plan.isConfirmed
+    ? "green"
+    : plan.planTag === "BASIC"
+      ? "blue"
+      : "elephant";
 
   const getMyReactionLabel = () => {
     if (!plan.myReaction) {
@@ -198,76 +126,83 @@ export function PlanCard({ plan, to }: PlanCardProps) {
   };
 
   return (
-    <Link
-      to={to}
-      css={cardStyle(plan.isConfirmed)}
-    >
-      {/* 1. 상단: 태그 & 제목 & 상세 바로가기 화살표 */}
-      <div>
-        <div css={cardHeaderStyle}>
-          <div css={tagGroupStyle}>
-            <span
-              css={badgeStyle(badgeColors.bg, badgeColors.color, badgeColors.border)}
-            >
+    <ListRow
+      border="indented"
+      verticalPadding="large"
+      withTouchEffect
+      aria-label={`${plan.title} 상세 보기`}
+      onClick={() => navigate(to)}
+      arrowType="right"
+      right={
+        <Text typography="t7" color="var(--adaptiveBlue500, #3182f6)">
+          상세
+        </Text>
+      }
+      contents={
+        <div css={contentsStyle}>
+          <div css={tagRowStyle}>
+            <Badge size="small" variant={plan.isConfirmed ? "fill" : "weak"} color={badgeColor}>
               {plan.isConfirmed ? "확정안" : plan.planTagLabel}
-            </span>
-            <span css={authorTextStyle}>
+            </Badge>
+            <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)">
               {plan.authorName} 제안
-            </span>
+            </Text>
           </div>
 
-          <span css={detailLinkStyle}>
-            상세보기<span aria-hidden="true"> →</span>
-          </span>
-        </div>
+          <Text typography="t5" color="var(--adaptiveGrey900, #191f28)" css={titleStyle}>
+            {plan.title}
+          </Text>
+          <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)">
+            {plan.period} · {plan.nights}박 {plan.days}일
+          </Text>
 
-        <h3 css={titleStyle}>
-          {plan.title}
-        </h3>
+          <RouteRail route={plan.route} differenceSummary={plan.differenceSummary} />
 
-        <p css={periodTextStyle}>
-          {plan.period} · {plan.nights}박 {plan.days}일
-        </p>
-      </div>
+          <div css={costRowStyle}>
+            <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)">
+              예상 비용
+            </Text>
+            <div css={costValueStyle}>
+              <Text typography="t7" color="var(--adaptiveGrey900, #191f28)" fontWeight="bold">
+                {plan.groupCostText}
+              </Text>{" "}
+              <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)">
+                ({plan.perPersonCostText})
+              </Text>
+            </div>
+          </div>
 
-      {/* 2. 도시별 체류 압축 경로 레일 */}
-      <RouteRail route={plan.route} differenceSummary={plan.differenceSummary} />
-
-      {/* 3. 예상 비용 영역 */}
-      <div css={costBoxStyle}>
-        <span css={costLabelStyle}>예상 비용</span>
-        <div css={costValueAlignStyle}>
-          <span css={costGroupTextStyle}>{plan.groupCostText}</span>
-          <span css={costPerPersonTextStyle}>
-            ({plan.perPersonCostText})
-          </span>
-        </div>
-      </div>
-
-      {/* 4. 예약 상태 알림 (있는 경우) */}
-      {plan.bookingAlert && (
-        <div css={alertBoxStyle}>
-          <span aria-hidden="true">⚠️</span>
-          <span>{plan.bookingAlert}</span>
-        </div>
-      )}
-
-      {/* 5. 의견 현황 및 내 의견 상태 */}
-      <div css={footerStyle}>
-        <div css={opinionCountGroupStyle}>
-          <span>👍 {plan.opinions.likeCount}</span>
-          <span>🙂 {plan.opinions.okayCount}</span>
-          {plan.opinions.hardCount > 0 && (
-            <span css={hardCountStyle}>
-              😢 {plan.opinions.hardCount}
-            </span>
+          {plan.bookingAlert && (
+            <div css={alertStyle}>
+              <Badge size="xsmall" variant="weak" color="yellow">
+                확인 필요
+              </Badge>
+              <Text typography="t7" color="var(--adaptiveYellow600, #b78103)">
+                {plan.bookingAlert}
+              </Text>
+            </div>
           )}
-        </div>
 
-        <span css={myReactionLabelStyle(Boolean(plan.myReaction))}>
-          {getMyReactionLabel()}
-        </span>
-      </div>
-    </Link>
+          <div css={opinionRowStyle}>
+            <div css={opinionCountsStyle}>
+              <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)">
+                👍 {plan.opinions.likeCount}
+              </Text>
+              <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)">
+                🙂 {plan.opinions.okayCount}
+              </Text>
+              {plan.opinions.hardCount > 0 && (
+                <Text typography="t7" css={hardCountStyle}>
+                  😢 {plan.opinions.hardCount}
+                </Text>
+              )}
+            </div>
+            <Text typography="t7" css={reactionStyle(Boolean(plan.myReaction))}>
+              {getMyReactionLabel()}
+            </Text>
+          </div>
+        </div>
+      }
+    />
   );
 }
