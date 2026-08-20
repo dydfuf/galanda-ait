@@ -56,7 +56,7 @@ const MAX_TITLE_LENGTH = 30;
 
 export function TripCreatePage() {
   const navigate = useNavigate();
-  const { goBack } = useAppNavigation();
+  const { goBack, platformNavigation } = useAppNavigation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
@@ -89,7 +89,9 @@ export function TripCreatePage() {
 
   return (
     <div css={screenStyle}>
-      <TopNavigation leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />} />
+      {!platformNavigation && (
+        <TopNavigation leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />} />
+      )}
 
       <div css={pageContainerStyle}>
         <header css={pageHeaderStyle}>

@@ -1,13 +1,62 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Screen } from "@apps-in-toss/web-framework";
-import { useCallback, useEffect } from "react";
+import { partner, Screen, tdsEvent } from "@apps-in-toss/web-framework";
+import { useCallback, useEffect, useMemo } from "react";
 
 // 세션 내에서 라우트 이동이 있었는지 추적하기 위한 counter
 let navigationCount = 0;
 
+interface AccessoryButtonOptions {
+  readonly id: string;
+  readonly title: string;
+  readonly iconName: string;
+  readonly callback: VoidFunction;
+}
+
+interface PlatformNavigation {
+  readonly addAccessoryButton: (options: AccessoryButtonOptions) => Promise<void>;
+  readonly removeAccessoryButton: VoidFunction;
+}
+
 export function useAppNavigation() {
   const navigate = useNavigate();
   const location = useLocation();
+  const platformNavigation = useMemo<PlatformNavigation | undefined>(() => {
+    if (typeof navigator === "undefined" || !navigator.userAgent.includes("TossApp/")) {
+      return undefined;
+    }
+
+    let removeAccessoryListener: (() => void) | undefined;
+
+    return {
+      addAccessoryButton: ({ id, title, iconName, callback }: AccessoryButtonOptions) => {
+        removeAccessoryListener?.();
+        const removeListener = tdsEvent.addEventListener("navigationAccessoryEvent", {
+          onEvent: (event) => {
+            if (event.id === id) callback();
+          },
+        });
+        removeAccessoryListener = removeListener;
+
+        return partner
+          .addAccessoryButton({ id, title, icon: { name: iconName } })
+          .catch((error: unknown) => {
+            removeListener();
+            if (removeAccessoryListener === removeListener) {
+              removeAccessoryListener = undefined;
+            }
+            console.error("앱인토스 액세서리 등록 실패:", error);
+            throw error;
+          });
+      },
+      removeAccessoryButton: () => {
+        removeAccessoryListener?.();
+        removeAccessoryListener = undefined;
+        void partner
+          .removeAccessoryButton()
+          .catch((error: unknown) => console.error("앱인토스 액세서리 제거 실패:", error));
+      },
+    };
+  }, []);
 
   useEffect(() => {
     navigationCount += 1;
@@ -32,5 +81,6 @@ export function useAppNavigation() {
     navigate,
     goBack,
     location,
+    platformNavigation,
   };
 }

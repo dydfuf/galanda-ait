@@ -23,4 +23,11 @@ Apps in Toss 화면은 웹 컨테이너가 아니라 흰색 surface 위의 TDS �
 - generic card, custom badge, action box, text input을 새로 만들지 않는다. 필요한 경우 먼저 TDS primitive로 표현한다.
 - `RouteRail`과 여행안 차이 요약처럼 여행 의사결정에만 필요한 시각화는 제품 고유 컴포넌트로 유지한다.
 
+## Apps in Toss shell ownership
+
+- 토스 앱에서는 shell이 back/title/accessory를 소유한다. `TripRoom*Layout`과 생성 화면은 앱 환경에서 자체 `TopNavigation`을 렌더링하지 않는다.
+- 브라우저에서는 TDS `TopNavigation`을 fallback으로 사용해 키보드·뒤로가기 테스트를 계속할 수 있다.
+- 공유는 `Share.sendMessage`를 먼저 사용하고, 미지원 환경은 Web Share와 `Clipboard`/브라우저 clipboard 순서로 복구한다. 완료·실패 안내는 `useToast`를 사용한다.
+- 삭제·초기화·확정은 `useBottomSheet`의 명확한 취소/주요 행동 label을 사용하며 `window.alert`와 `window.confirm`은 사용하지 않는다.
+
 새 화면은 `Top → ListHeader/ListRow → BottomCTA` 조합을 먼저 검토하고, 카드 CSS는 이 조합으로 정보를 표현할 수 없을 때만 사용한다.

@@ -45,7 +45,7 @@ function resolveTitle(pathname: string): string {
 export function TripRoomChildLayout() {
   const params = useParams();
   const location = useLocation();
-  const { goBack } = useAppNavigation();
+  const { goBack, platformNavigation } = useAppNavigation();
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   if (Result.isFailure(validated)) {
@@ -56,14 +56,16 @@ export function TripRoomChildLayout() {
 
   return (
     <div css={containerStyle}>
-      {/* 서브페이지 상단 내비게이션 (TDS TopNavigation) */}
-      <header css={headerStyle}>
-        <TopNavigation
-          background="transparent"
-          leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />}
-          content={resolveTitle(location.pathname)}
-        />
-      </header>
+      {/* Apps in Toss에서는 shell이 navigation을 소유하고, 브라우저에서만 TDS fallback을 보여줘요. */}
+      {!platformNavigation && (
+        <header css={headerStyle}>
+          <TopNavigation
+            background="transparent"
+            leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />}
+            content={resolveTitle(location.pathname)}
+          />
+        </header>
+      )}
 
       <main css={mainStyle}>
         <Outlet context={{ tripId }} />

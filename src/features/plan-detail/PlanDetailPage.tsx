@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { css, type SerializedStyles } from "@emotion/react";
-import { FixedBottomCTA } from "@toss/tds-mobile";
+import { BottomSheet, FixedBottomCTA, useBottomSheet, useToast } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomDetailQuery } from "./queries.ts";
 import { useSubmitOpinionMutation } from "./mutations.ts";
@@ -300,6 +300,8 @@ export function PlanDetailPage(): JSX.Element {
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
   const deletePlanMutation = useDeletePlanMutation();
+  const { openAsyncTwoButtonSheet } = useBottomSheet();
+  const { openToast } = useToast();
 
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
 
@@ -369,24 +371,39 @@ export function PlanDetailPage(): JSX.Element {
       });
       setIsBottomSheetOpen(false);
     } catch (err: unknown) {
-      alert(toUserMessage(err, "의견을 등록하지 못했습니다."));
+      openToast(toUserMessage(err, "의견을 등록하지 못했습니다."));
     }
   };
 
   const handleDeletePlan = async (): Promise<void> => {
-    if (!window.confirm(`'${plan.title}' 여행안을 삭제하시겠습니까?`)) {
+    if (deletePlanMutation.isPending) {
       return;
     }
-    try {
-      await deletePlanMutation.mutateAsync({
-        roomId: room.id,
-        planId: plan.id,
-        expectedRevision: room.revision,
-      });
-      navigate(`/trips/${tripId}/plans`, { replace: true });
-    } catch (err: unknown) {
-      alert(toUserMessage(err, "여행안 삭제에 실패했습니다."));
-    }
+
+    await openAsyncTwoButtonSheet({
+      header: (
+        <>
+          <BottomSheet.Header>여행안을 삭제할까요?</BottomSheet.Header>
+          <BottomSheet.HeaderDescription>
+            '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
+          </BottomSheet.HeaderDescription>
+        </>
+      ),
+      leftButton: "취소",
+      rightButton: "삭제하기",
+      onRightButtonClick: async (): Promise<void> => {
+        try {
+          await deletePlanMutation.mutateAsync({
+            roomId: room.id,
+            planId: plan.id,
+            expectedRevision: room.revision,
+          });
+          navigate(`/trips/${tripId}/plans`, { replace: true });
+        } catch (err: unknown) {
+          openToast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+        }
+      },
+    });
   };
 
   return (
@@ -549,4 +566,3 @@ export function PlanDetailPage(): JSX.Element {
     </div>
   );
 }
-
