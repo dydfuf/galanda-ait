@@ -1,4 +1,3 @@
-import { FixedBottomCTA, List, ListHeader, Top } from "@toss/tds-mobile";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
@@ -8,13 +7,14 @@ import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { DecisionStatusBanner } from "../common/DecisionStatusBanner.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
+import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageTitle } from "@/components/galanda/page-title.tsx";
+import { SectionHeader } from "@/components/galanda/section-header.tsx";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { MobileList } from "@/components/galanda/mobile-list.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { PlanListRow } from "./components/PlanListRow.tsx";
 import { toTripRoomViewModel } from "./plan-home-view-model.ts";
-import {
-  fixedCtaContainerStyle,
-  tdsPageStyle,
-  tdsPageWithBottomCtaStyle,
-} from "../common/tds-layout.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -89,14 +89,10 @@ export function PlanHomePage() {
         };
 
   return (
-    <div css={plans.length === 0 ? tdsPageStyle : tdsPageWithBottomCtaStyle}>
-      <Top
-        title={<Top.TitleParagraph>{room.title}</Top.TitleParagraph>}
-        subtitleBottom={
-          <Top.SubtitleParagraph>
-            {room.destination} · {room.period} · 참여 {room.memberCount}명
-          </Top.SubtitleParagraph>
-        }
+    <PageBody withBottomAction={plans.length > 0}>
+      <PageTitle
+        title={room.title}
+        description={`${room.destination} · ${room.period} · 참여 ${room.memberCount}명`}
       />
 
       <DecisionStatusBanner
@@ -105,16 +101,7 @@ export function PlanHomePage() {
         isConfirmed={isConfirmed}
       />
 
-      <ListHeader
-        size="medium"
-        descriptionPosition="bottom"
-        title={<ListHeader.TitleParagraph>여행안</ListHeader.TitleParagraph>}
-        description={
-          <ListHeader.DescriptionParagraph>
-            후보를 훑어보고 자세히 볼 여행안을 선택하세요.
-          </ListHeader.DescriptionParagraph>
-        }
-      />
+      <SectionHeader title="여행안" description="후보를 훑어보고 자세히 볼 여행안을 선택하세요." />
 
       {plans.length === 0 ? (
         <PageState
@@ -125,22 +112,20 @@ export function PlanHomePage() {
           onAction={primaryCta.onClick}
         />
       ) : (
-        <List aria-label="제안된 여행안">
+        <MobileList aria-label="제안된 여행안">
           {plans.map((plan) => (
-            <PlanListRow
-              key={plan.id}
-              plan={plan}
-              to={`/trips/${tripId}/plans/${plan.id}`}
-            />
+            <PlanListRow key={plan.id} plan={plan} to={`/trips/${tripId}/plans/${plan.id}`} />
           ))}
-        </List>
+        </MobileList>
       )}
 
       {plans.length > 0 && (
-        <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={primaryCta.onClick}>
-          {primaryCta.label}
-        </FixedBottomCTA>
+        <BottomAction>
+          <Button type="button" size="xl" onClick={primaryCta.onClick}>
+            {primaryCta.label}
+          </Button>
+        </BottomAction>
       )}
-    </div>
+    </PageBody>
   );
 }

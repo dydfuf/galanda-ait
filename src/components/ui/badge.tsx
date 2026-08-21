@@ -19,6 +19,16 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // Galanda 상태 배지 (soft 톤): 동일 상태는 화면마다 동일 variant를 사용해요.
+        info: "bg-info-muted text-info",
+        success: "bg-success-muted text-success",
+        warning: "bg-warning-muted text-warning",
+        danger: "bg-destructive-muted text-destructive-strong",
+        neutral: "bg-muted text-muted-foreground",
+        // 강조(solid) 톤: 확정안 등 채워진 배지에 사용해요.
+        "info-solid": "bg-primary text-primary-foreground",
+        "success-solid": "bg-success text-white",
+        "neutral-solid": "bg-muted-foreground text-white",
       },
     },
     defaultVariants: {

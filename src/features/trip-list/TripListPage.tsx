@@ -1,27 +1,21 @@
 import { useState } from "react";
-import { css } from "@emotion/react";
-import { FixedBottomCTA, List, ListRow, Top } from "@toss/tds-mobile";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { useNavigate } from "react-router-dom";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
 import { toUserMessage } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { PageState } from "@/components/galanda/page-state.tsx";
-import { fixedCtaContainerStyle, tdsPageWithBottomCtaStyle } from "../common/tds-layout.ts";
+import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageTitle } from "@/components/galanda/page-title.tsx";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { cn } from "@/lib/utils.ts";
 import {
   getTripListStatusText,
   type TripRoomViewModel,
 } from "../plan-home/plan-home-view-model.ts";
-
-const pageStyle = css`
-  ${tdsPageWithBottomCtaStyle};
-  max-width: 600px;
-  margin: 0 auto;
-`;
-
-const filterContainerStyle = css`
-  margin: 20px 24px 12px;
-`;
 
 type TripListTab = "ONGOING" | "PAST";
 
@@ -107,58 +101,39 @@ export function TripListPage() {
       }
     />
   ) : (
-    <List aria-label={activeTab === "ONGOING" ? "진행 중인 여행" : "지난 여행"}>
+    <MobileList aria-label={activeTab === "ONGOING" ? "진행 중인 여행" : "지난 여행"}>
       {displayRooms.map((room) => {
         const statusText = getTripListStatusText(room);
         const periodText = getTripPeriodText(room);
 
         return (
-          <ListRow
+          <MobileListItem
             key={room.id}
-            border="indented"
-            verticalPadding="large"
-            withTouchEffect
+            chevron
             aria-label={`${room.title}, ${periodText}, ${statusText}`}
             onClick={() => navigate(getTripEntryPath(room))}
-            arrowType="right"
-            contents={
-              <ListRow.Texts
-                type="3RowTypeA"
-                top={room.title}
-                middle={`${periodText} · ${room.memberCount}명`}
-                bottom={statusText}
-                topProps={{
-                  typography: "t5",
-                  color: "var(--adaptiveGrey900, #191f28)",
-                  fontWeight: "bold",
-                }}
-                middleProps={{
-                  typography: "t7",
-                  color: "var(--adaptiveGrey600, #6b7684)",
-                }}
-                bottomProps={{
-                  typography: "t7",
-                  color: room.confirmedPlanId
-                    ? "var(--adaptiveGreen600, #15803d)"
-                    : "var(--adaptiveBlue600, #1b64da)",
-                  fontWeight: "medium",
-                }}
-              />
-            }
-          />
+            className="py-4"
+          >
+            <ItemTitle className="text-[17px]">{room.title}</ItemTitle>
+            <ItemDescription>
+              {periodText} · {room.memberCount}명
+            </ItemDescription>
+            <ItemDescription
+              className={cn("font-medium", room.confirmedPlanId ? "text-success" : "text-info")}
+            >
+              {statusText}
+            </ItemDescription>
+          </MobileListItem>
         );
       })}
-    </List>
+    </MobileList>
   );
 
   return (
-    <div css={pageStyle}>
-      <Top
-        title={<Top.TitleParagraph>내 여행</Top.TitleParagraph>}
-        subtitleBottom={<Top.SubtitleParagraph>참여 중인 여행을 한눈에 확인해요.</Top.SubtitleParagraph>}
-      />
+    <PageBody withBottomAction className="mx-auto max-w-[600px]">
+      <PageTitle title="내 여행" description="참여 중인 여행을 한눈에 확인해요." />
 
-      <div css={filterContainerStyle}>
+      <div className="mx-6 mt-4 mb-3">
         <Tabs
           value={activeTab}
           onValueChange={(value) => setActiveTab(value === "PAST" ? "PAST" : "ONGOING")}
@@ -172,9 +147,11 @@ export function TripListPage() {
 
       {content}
 
-      <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={() => navigate("/trips/new")}>
-        새 여행 만들기
-      </FixedBottomCTA>
-    </div>
+      <BottomAction>
+        <Button type="button" size="xl" onClick={() => navigate("/trips/new")}>
+          새 여행 만들기
+        </Button>
+      </BottomAction>
+    </PageBody>
   );
 }

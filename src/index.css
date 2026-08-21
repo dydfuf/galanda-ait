@@ -90,10 +90,11 @@
   --info-muted: #e8f3ff;
 }
 
+/*
+ * box-sizing/margin/padding reset은 Tailwind preflight가 담당해요.
+ * 여기서 unlayered `*` reset을 다시 선언하면 layered Tailwind utility를 덮어써요.
+ */
 * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -124,15 +125,17 @@ button, input, textarea, select {
 
 /*
  * 마우스/터치로 눌렀을 때는 포커스 링을 숨기고, 키보드로 이동했을 때는 항상 보이게 해요.
- * (이전에는 *:focus-visible 까지 outline: none 이어서 키보드 사용자가 현재 위치를 알 수 없었어요.)
+ * base layer에 둬서 shadcn 컴포넌트의 자체 focus-visible ring(utility)이 우선하도록 해요.
  */
-:focus:not(:focus-visible) {
-  outline: none;
-}
+@layer base {
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--adaptiveBlue500, #3182f6);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 2px solid var(--ring, #3182f6);
+    outline-offset: 2px;
+  }
 }
 
 /* Animations */
