@@ -1,12 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { css } from "@emotion/react";
-import {
-  FixedBottomCTA,
-  TextField,
-  Top,
-  TopNavigation,
-  TopNavigationBackButton,
-} from "@toss/tds-mobile";
+import { FixedBottomCTA, TextField, Top } from "@toss/tds-mobile";
+import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { useNavigate } from "react-router-dom";
 import { useAppNavigation } from "../../hooks/useAppNavigation.ts";
 import { useCreateTripRoomMutation } from "./mutations.ts";
@@ -68,9 +63,7 @@ export function TripCreatePage() {
 
   return (
     <div css={screenStyle}>
-      {!platformNavigation && (
-        <TopNavigation leading={<TopNavigationBackButton aria-label="뒤로 가기" onClick={goBack} />} />
-      )}
+      {!platformNavigation && <PageHeader back={{ onClick: goBack }} />}
 
       <main css={tdsPageWithBottomCtaStyle}>
         <Top

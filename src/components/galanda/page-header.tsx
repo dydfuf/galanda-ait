@@ -34,6 +34,9 @@ export function PageHeader({
   className,
   children,
 }: PageHeaderProps) {
+  // bar 내용이 하나도 없으면(예: AIT shell이 navigation을 소유) 하단 행만 렌더링해요.
+  const hasBar = Boolean(title || back || action);
+
   return (
     <header
       className={cn(
@@ -43,29 +46,28 @@ export function PageHeader({
         className,
       )}
     >
-      <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center px-2">
-        <div className="flex justify-start">
-          {back && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-lg"
-              aria-label={back.label ?? "뒤로 가기"}
-              onClick={back.onClick}
-            >
-              <ChevronLeft className="size-6" />
-            </Button>
-          )}
-        </div>
-        {title ? (
-          <h1 className="truncate px-1 text-center text-base font-semibold text-foreground">
+      {hasBar && (
+        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center px-2">
+          <div className="flex justify-start">
+            {back && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-lg"
+                aria-label={back.label ?? "뒤로 가기"}
+                onClick={back.onClick}
+              >
+                <ChevronLeft className="size-6" />
+              </Button>
+            )}
+          </div>
+          {/* 화면의 시맨틱 h1은 본문이 소유하므로 bar 제목은 heading이 아니에요. */}
+          <div className="truncate px-1 text-center text-base font-semibold text-foreground">
             {title}
-          </h1>
-        ) : (
-          <span />
-        )}
-        <div className="flex justify-end pr-1">{action}</div>
-      </div>
+          </div>
+          <div className="flex justify-end pr-1">{action}</div>
+        </div>
+      )}
       {children}
     </header>
   );

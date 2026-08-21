@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { FixedBottomCTA, List, ListRow, SegmentedControl, Top } from "@toss/tds-mobile";
+import { FixedBottomCTA, List, ListRow, Top } from "@toss/tds-mobile";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { useNavigate } from "react-router-dom";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
 import { toUserMessage } from "../common/error-message.ts";
@@ -158,18 +159,15 @@ export function TripListPage() {
       />
 
       <div css={filterContainerStyle}>
-        <SegmentedControl
-          aria-label="여행 목록 필터"
+        <Tabs
           value={activeTab}
-          onChange={(value) => setActiveTab(value as TripListTab)}
+          onValueChange={(value) => setActiveTab(value === "PAST" ? "PAST" : "ONGOING")}
         >
-          <SegmentedControl.Item value="ONGOING">
-            진행 중인 여행 ({ongoingRooms.length})
-          </SegmentedControl.Item>
-          <SegmentedControl.Item value="PAST">
-            지난 여행 ({pastRooms.length})
-          </SegmentedControl.Item>
-        </SegmentedControl>
+          <TabsList aria-label="여행 목록 필터" className="h-10 w-full">
+            <TabsTrigger value="ONGOING">진행 중인 여행 ({ongoingRooms.length})</TabsTrigger>
+            <TabsTrigger value="PAST">지난 여행 ({pastRooms.length})</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {content}
