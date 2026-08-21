@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { PageState } from "./PageState.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 
 interface RouteErrorFallbackProps {
   title?: string;

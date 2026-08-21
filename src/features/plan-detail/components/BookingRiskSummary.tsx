@@ -1,5 +1,6 @@
-import { css } from "@emotion/react";
-import { Badge, ListRow, Text } from "@toss/tds-mobile";
+import { Badge } from "@/components/ui/badge.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
+import { MobileListItem } from "@/components/galanda/mobile-list.tsx";
 
 export interface BookingRiskItem {
   readonly level: "DANGER" | "WARNING" | "SUCCESS";
@@ -13,22 +14,15 @@ interface BookingRiskSummaryProps {
   readonly onClick: () => void;
 }
 
-const contentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
 const getRiskState = (
   items: ReadonlyArray<BookingRiskItem>,
   hasDetails: boolean
-): { label: string; description: string; color: "green" | "red" | "yellow" } => {
+): { label: string; description: string; variant: "success" | "danger" | "warning" } => {
   if (!hasDetails) {
     return {
       label: "미등록",
       description: "숙소·교통 정보가 아직 등록되지 않았어요",
-      color: "yellow",
+      variant: "warning",
     };
   }
 
@@ -36,7 +30,7 @@ const getRiskState = (
     return {
       label: "확인됨",
       description: "모든 예약 정보를 확인했어요",
-      color: "green",
+      variant: "success",
     };
   }
 
@@ -44,7 +38,7 @@ const getRiskState = (
   return {
     label: `${items.length}개`,
     description: `확인이 필요한 항목 ${items.length}개`,
-    color: hasDanger ? "red" : "yellow",
+    variant: hasDanger ? "danger" : "warning",
   };
 };
 
@@ -52,29 +46,15 @@ export function BookingRiskSummary({ items, hasDetails, onClick }: BookingRiskSu
   const state = getRiskState(items, hasDetails);
 
   return (
-    <ListRow
-      border="indented"
-      verticalPadding="medium"
-      horizontalPadding="small"
-      withTouchEffect
-      arrowType="right"
+    <MobileListItem
+      chevron
+      className="px-2"
       onClick={onClick}
       aria-label={`숙소·교통, ${state.description}`}
-      contents={
-        <div css={contentsStyle}>
-          <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-            숙소·교통
-          </Text>
-          <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-            {state.description}
-          </Text>
-        </div>
-      }
-      right={
-        <Badge size="small" variant="weak" color={state.color}>
-          {state.label}
-        </Badge>
-      }
-    />
+      trailing={<Badge variant={state.variant}>{state.label}</Badge>}
+    >
+      <ItemTitle>숙소·교통</ItemTitle>
+      <ItemDescription>{state.description}</ItemDescription>
+    </MobileListItem>
   );
 }

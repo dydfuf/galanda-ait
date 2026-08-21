@@ -529,7 +529,10 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     });
 
     it("runtime command가 깨져 있어도 ValidationError로 거부한다", async (): Promise<void> => {
-      const testEnv = createTestSessionLayer(bobUser);
+      const testEnv = Layer.merge(
+        createInMemoryRepositoryLayer([sampleRoom]),
+        createTestSessionLayer(bobUser)
+      );
       const invalidInputs = [
         {
           roomId: sampleRoom.id,

@@ -2,11 +2,11 @@ import { css } from "@emotion/react";
 import { getStayNightCount, type AccommodationSnapshot, type BookingStatus, type CityStay } from "../../../core/domain/room.ts";
 
 const cardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
+  background-color: var(--background);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  border: 1px solid var(--border);
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
@@ -16,13 +16,13 @@ const cardStyle = css`
 const sectionTitleStyle = css`
   font-size: 16px;
   font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
   margin: 0;
 `;
 
 const accItemStyle = css`
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -39,8 +39,8 @@ const accHeaderStyle = css`
 const accCityBadgeStyle = css`
   font-size: 13px;
   font-weight: 700;
-  color: var(--adaptiveBlue600, #1b64da);
-  background-color: var(--adaptiveBlue50, #e8f3ff);
+  color: var(--info);
+  background-color: var(--info-muted);
   padding: 4px 8px;
   border-radius: 6px;
 `;
@@ -54,7 +54,7 @@ const fieldRowStyle = css`
 const fieldLabelStyle = css`
   font-size: 12px;
   font-weight: 600;
-  color: var(--adaptiveGrey700, #4e5968);
+  color: var(--foreground-muted);
   margin-bottom: 4px;
   display: block;
 `;
@@ -63,26 +63,26 @@ const inputStyle = css`
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--adaptiveGrey300, #d1d6db);
+  border: 1px solid var(--border-strong);
   font-size: 13px;
   outline: none;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
+  background-color: var(--background);
+  color: var(--foreground);
   box-sizing: border-box;
 
   &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
+    border-color: var(--primary);
   }
 `;
 
 const selectStyle = css`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid var(--adaptiveGrey300, #d1d6db);
+  border: 1px solid var(--border-strong);
   font-size: 13px;
   outline: none;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
+  background-color: var(--background);
+  color: var(--foreground);
 `;
 
 const checkboxLabelStyle = css`
@@ -90,34 +90,34 @@ const checkboxLabelStyle = css`
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--adaptiveGrey700, #4e5968);
+  color: var(--foreground-muted);
   cursor: pointer;
 `;
 
 const removeBtnStyle = css`
   background: none;
   border: none;
-  color: var(--adaptiveGrey400, #b0b8c1);
+  color: var(--border-stronger);
   font-size: 14px;
   cursor: pointer;
 
   &:hover {
-    color: var(--adaptiveRed500, #f04452);
+    color: var(--destructive);
   }
 `;
 
 const addAccButtonStyle = css`
   padding: 10px 14px;
-  border: 1px dashed var(--adaptiveBlue300, #82b6ff);
-  background-color: var(--adaptiveBlue50, #f2f7ff);
+  border: 1px dashed var(--primary-border);
+  background-color: var(--info-muted);
   border-radius: 10px;
-  color: var(--adaptiveBlue600, #1b64da);
+  color: var(--info);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
 
   &:hover {
-    background-color: var(--adaptiveBlue100, #e0edff);
+    background-color: var(--primary-muted);
   }
 `;
 

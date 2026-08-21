@@ -14,7 +14,7 @@ import { PlanEditPage } from "../features/plan-editor/PlanEditPage.tsx";
 import { PlanComparePage } from "../features/plan-compare/PlanComparePage.tsx";
 import { ItineraryPage } from "../features/itinerary/ItineraryPage.tsx";
 import { NotFoundPage } from "../pages/NotFoundPage.tsx";
-import { InAppAdsPage } from "../pages/InAppAdsPage.tsx";
+import { platformOnlyRoutes } from "../platform/index.ts";
 
 export function AppRouter() {
   return (
@@ -30,8 +30,10 @@ export function AppRouter() {
         {/* 초대장 */}
         <Route path="/invites/:inviteToken" element={<InvitePage />} />
 
-        {/* 인앱 광고 테스트 (개발/디버그) */}
-        <Route path="/iaa" element={<InAppAdsPage />} />
+        {/* 플랫폼 전용 라우트 (예: AIT 인앱 광고 디버그). Web 빌드에서는 비어 있어요. */}
+        {platformOnlyRoutes.map(({ path, Component }) => (
+          <Route key={path} path={path} element={<Component />} />
+        ))}
 
         {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
         <Route path="/trips/:tripId" element={<TripRoomEntry />} />

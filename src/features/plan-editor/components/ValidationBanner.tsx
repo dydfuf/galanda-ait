@@ -1,8 +1,8 @@
 import { css } from "@emotion/react";
 
 const bannerStyle = css`
-  background-color: var(--adaptiveRed50, #ffeeee);
-  border: 1px solid var(--adaptiveRed200, #fecdd3);
+  background-color: var(--destructive-muted);
+  border: 1px solid var(--destructive-border);
   border-radius: 12px;
   padding: 12px 16px;
   display: flex;
@@ -14,7 +14,7 @@ const bannerStyle = css`
 const textStyle = css`
   font-size: 13px;
   font-weight: 600;
-  color: var(--adaptiveRed600, #e11d48);
+  color: var(--destructive-strong);
   line-height: 1.4;
 `;
 

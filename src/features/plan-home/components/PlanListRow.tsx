@@ -1,45 +1,12 @@
-import { css } from "@emotion/react";
-import { Badge, ListRow, Text } from "@toss/tds-mobile";
-import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
+import { MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import type { PlanSummaryData } from "../plan-home-view-model.ts";
 
 interface PlanListRowProps {
   readonly plan: PlanSummaryData;
   readonly to: string;
 }
-
-const contentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const lineStyle = css`
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const titleStyle = css`
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const durationStyle = css`
-  flex-shrink: 0;
-  white-space: nowrap;
-`;
-
-const detailStyle = css`
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
 
 const getReactionLabel = (reaction: PlanSummaryData["myReaction"]): string | undefined => {
   switch (reaction) {
@@ -67,49 +34,35 @@ const getOpinionSummary = (plan: PlanSummaryData): string => {
 };
 
 export function PlanListRow({ plan, to }: PlanListRowProps) {
-  const navigate = useNavigate();
-  const badgeColor = plan.isConfirmed
-    ? "green"
+  const badgeVariant = plan.isConfirmed
+    ? "success-solid"
     : plan.planTag === "BASIC"
-      ? "blue"
-      : "elephant";
+      ? "info"
+      : "neutral";
   const opinionSummary = getOpinionSummary(plan);
 
   return (
-    <ListRow
-      border="indented"
-      verticalPadding="medium"
-      horizontalPadding="small"
-      withTouchEffect
+    <MobileListItem
+      chevron
+      to={to}
       aria-label={`${plan.title}, ${opinionSummary} · 상세 보기`}
-      onClick={() => navigate(to)}
-      arrowType="right"
-      contents={
-        <div css={contentsStyle}>
-          <div css={lineStyle}>
-            <Badge size="small" variant={plan.isConfirmed ? "fill" : "weak"} color={badgeColor}>
-              {plan.isConfirmed ? "확정안" : plan.planTagLabel}
-            </Badge>
-          </div>
+    >
+      <div>
+        <Badge variant={badgeVariant}>{plan.isConfirmed ? "확정안" : plan.planTagLabel}</Badge>
+      </div>
 
-          <div css={lineStyle}>
-            <Text typography="t5" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)" css={titleStyle}>
-              {plan.title}
-            </Text>
-            <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)" css={durationStyle}>
-              {plan.nights}박 {plan.days}일
-            </Text>
-          </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <ItemTitle className="min-w-0 flex-initial text-[17px]">{plan.title}</ItemTitle>
+        <span className="shrink-0 text-[13px] whitespace-nowrap text-muted-foreground">
+          {plan.nights}박 {plan.days}일
+        </span>
+      </div>
 
-          <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)" css={detailStyle}>
-            {plan.authorName} 제안{plan.differenceSummary ? ` · ${plan.differenceSummary}` : ""}
-          </Text>
+      <ItemDescription className="line-clamp-1">
+        {plan.authorName} 제안{plan.differenceSummary ? ` · ${plan.differenceSummary}` : ""}
+      </ItemDescription>
 
-          <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)" css={detailStyle}>
-            {opinionSummary}
-          </Text>
-        </div>
-      }
-    />
+      <ItemDescription className="line-clamp-1">{opinionSummary}</ItemDescription>
+    </MobileListItem>
   );
 }

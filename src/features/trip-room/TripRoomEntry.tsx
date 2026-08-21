@@ -11,7 +11,7 @@ const loadingContainerStyle = css`
 `;
 
 const loadingTextStyle = css`
-  color: var(--adaptiveGrey600, #6b7684);
+  color: var(--muted-foreground);
   font-size: 15px;
 `;
 

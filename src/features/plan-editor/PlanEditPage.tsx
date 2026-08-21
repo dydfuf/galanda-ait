@@ -1,6 +1,17 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { BottomSheet, CTAButton, FixedBottomCTA, useBottomSheet } from "@toss/tds-mobile";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
@@ -8,7 +19,6 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { toUserMessage } from "../common/error-message.ts";
 import { canManagePlan } from "../../core/domain/auth-guards.ts";
-import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
@@ -29,13 +39,13 @@ const pageContainerStyle = css`
 const loadingContainerStyle = css`
   padding: 40px 20px;
   text-align: center;
-  color: var(--adaptiveGrey600, #6b7684);
+  color: var(--muted-foreground);
   font-size: 15px;
 `;
 
 const actionErrorStyle = css`
   display: block;
-  color: var(--adaptiveRed600, #e0383e);
+  color: var(--destructive-strong);
   font-size: 13px;
   line-height: 1.5;
   text-align: center;
@@ -62,7 +72,7 @@ export function PlanEditPage(): JSX.Element {
   const deletePlanMutation = useDeletePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { openAsyncTwoButtonSheet } = useBottomSheet();
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const plan = room?.plans.find((p) => p.id === planId);
   const isConfirmed = plan
@@ -170,36 +180,23 @@ export function PlanEditPage(): JSX.Element {
     }
   };
 
-  const handleDelete = async (): Promise<void> => {
+  const handleConfirmDelete = async (): Promise<void> => {
     if (isSubmitting || deletePlanMutation.isPending) {
       return;
     }
 
-    await openAsyncTwoButtonSheet({
-      header: (
-        <>
-          <BottomSheet.Header>여행안을 삭제할까요?</BottomSheet.Header>
-          <BottomSheet.HeaderDescription>
-            '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
-          </BottomSheet.HeaderDescription>
-        </>
-      ),
-      leftButton: "취소",
-      rightButton: "삭제하기",
-      onRightButtonClick: async (): Promise<void> => {
-        try {
-          await deletePlanMutation.mutateAsync({
-            roomId: tripId,
-            planId: plan.id,
-            expectedRevision: room.revision,
-          });
-          editor.discardDraft();
-          navigate(`/trips/${tripId}/plans`, { replace: true });
-        } catch (err: unknown) {
-          setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
-        }
-      },
-    });
+    try {
+      await deletePlanMutation.mutateAsync({
+        roomId: tripId,
+        planId: plan.id,
+        expectedRevision: room.revision,
+      });
+      editor.discardDraft();
+      navigate(`/trips/${tripId}/plans`, { replace: true });
+    } catch (err: unknown) {
+      setIsDeleteConfirmOpen(false);
+      setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+    }
   };
 
   const editorBasePath = `/trips/${tripId}/plans/${planId}/edit`;
@@ -225,45 +222,68 @@ export function PlanEditPage(): JSX.Element {
         onCompleteSection={completeSection}
       />
 
-      {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      {!section && !editor.draftConflict && <FixedBottomCTA.Double
-        containerStyle={fixedCtaContainerStyle}
-        topAccessory={
-          editor.validation.firstError || actionError ? (
-            <>
-              {actionError && (
-                <span css={actionErrorStyle} role="alert">
-                  {actionError}
-                </span>
-              )}
-              {editor.validation.firstError && (
-                <ValidationBanner
-                  firstError={editor.validation.firstError}
-                  errorCount={editor.validation.errorCount}
-                />
-              )}
-            </>
-          ) : undefined
-        }
-        leftButton={
-          <CTAButton
-            color="danger"
-            variant="weak"
+      {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
+      {!section && !editor.draftConflict && (
+        <BottomAction
+          accessory={
+            editor.validation.firstError || actionError ? (
+              <>
+                {actionError && (
+                  <span css={actionErrorStyle} role="alert">
+                    {actionError}
+                  </span>
+                )}
+                {editor.validation.firstError && (
+                  <ValidationBanner
+                    firstError={editor.validation.firstError}
+                    errorCount={editor.validation.errorCount}
+                  />
+                )}
+              </>
+            ) : undefined
+          }
+        >
+          <Button
+            type="button"
+            size="xl"
+            variant="destructive"
             disabled={isSubmitting}
-            onClick={() => void handleDelete()}
+            onClick={() => setIsDeleteConfirmOpen(true)}
           >
             삭제하기
-          </CTAButton>
-        }
-        rightButton={
-          <CTAButton
+          </Button>
+          <Button
+            type="button"
+            size="xl"
             disabled={!editor.validation.isValid || isSubmitting}
             onClick={() => void handleSubmit()}
           >
             {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
-          </CTAButton>
-        }
-      />}
+          </Button>
+        </BottomAction>
+      )}
+
+      {/* 여행안 삭제 confirm */}
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>여행안을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePlanMutation.isPending}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deletePlanMutation.isPending}
+              onClick={() => void handleConfirmDelete()}
+            >
+              {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

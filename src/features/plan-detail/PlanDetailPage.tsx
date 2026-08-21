@@ -1,19 +1,7 @@
 import { useState } from "react";
-import { css } from "@emotion/react";
-import {
-  Badge,
-  BottomSheet,
-  FixedBottomCTA,
-  List,
-  ListHeader,
-  ListRow,
-  Text,
-  TextButton,
-  useBottomSheet,
-  useToast,
-} from "@toss/tds-mobile";
 import { useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
+import { toast } from "sonner";
 import { useTripRoomDetailQuery } from "./queries.ts";
 import { useSubmitOpinionMutation } from "./mutations.ts";
 import { useDeletePlanMutation } from "../plan-editor/mutations.ts";
@@ -22,62 +10,37 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
+import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
+import { SectionHeader } from "@/components/galanda/section-header.tsx";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { BookingRiskSummary } from "./components/BookingRiskSummary.tsx";
 import { DetailTimeline } from "./components/DetailTimeline.tsx";
 import { OpinionBottomSheet, type ReactionType } from "./components/OpinionBottomSheet.tsx";
-import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 
 type PlanSheet = "cost" | "details" | "actions" | null;
-
-const pageContainerStyle = css`
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 16px 20px var(--app-cta-space, 112px);
-`;
-
-const summaryStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 4px 4px 20px;
-`;
-
-const metadataStyle = css`
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-`;
-
-const proposalReasonStyle = css`
-  margin: 0;
-  color: var(--adaptiveGrey600, #6b7684);
-  font-size: 14px;
-  line-height: 1.5;
-`;
-
-const listContentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const listRightTextStyle = css`
-  max-width: 150px;
-  text-align: right;
-  white-space: normal;
-`;
-
-const secondaryListStyle = css`
-  margin-bottom: 24px;
-`;
-
-const sheetListStyle = css`
-  padding-bottom: 16px;
-`;
 
 const reactionLabels: Record<ReactionType, string> = {
   LIKE: "좋아요",
@@ -85,8 +48,11 @@ const reactionLabels: Record<ReactionType, string> = {
   HARD: "어려워요",
 };
 
-const getPlanBadgeColor = (isConfirmed: boolean, planTag: string): "blue" | "green" | "elephant" =>
-  isConfirmed ? "green" : planTag === "ALTERNATIVE" ? "elephant" : "blue";
+const getPlanBadgeVariant = (
+  isConfirmed: boolean,
+  planTag: string
+): "info" | "success-solid" | "neutral" =>
+  isConfirmed ? "success-solid" : planTag === "ALTERNATIVE" ? "neutral" : "info";
 
 export function PlanDetailPage(): JSX.Element {
   const params = useParams();
@@ -99,23 +65,16 @@ export function PlanDetailPage(): JSX.Element {
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
   const deletePlanMutation = useDeletePlanMutation();
-  const { openAsyncTwoButtonSheet } = useBottomSheet();
-  const { openToast } = useToast();
   const [isOpinionSheetOpen, setIsOpinionSheetOpen] = useState(false);
   const [sheet, setSheet] = useState<PlanSheet>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
   }
 
   if (isLoading) {
-    return (
-      <div css={pageContainerStyle}>
-        <Text typography="t6" color="var(--adaptiveGrey600, #6b7684)">
-          여행안 상세 정보를 불러오는 중...
-        </Text>
-      </div>
-    );
+    return <PageState status="loading" message="여행안 상세 정보를 불러오는 중이에요." />;
   }
 
   if (isSessionError) {
@@ -172,107 +131,78 @@ export function PlanDetailPage(): JSX.Element {
         expectedRevision: room.revision,
       });
       setIsOpinionSheetOpen(false);
-      openToast("의견을 저장했어요.");
+      toast("의견을 저장했어요.");
     } catch (err: unknown) {
-      openToast(toUserMessage(err, "의견을 등록하지 못했습니다."));
+      toast(toUserMessage(err, "의견을 등록하지 못했습니다."));
     }
   };
 
-  const handleDeletePlan = async (): Promise<void> => {
+  const handleConfirmDelete = async (): Promise<void> => {
     if (deletePlanMutation.isPending) return;
 
-    await openAsyncTwoButtonSheet({
-      header: (
-        <>
-          <BottomSheet.Header>여행안을 삭제할까요?</BottomSheet.Header>
-          <BottomSheet.HeaderDescription>
-            '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
-          </BottomSheet.HeaderDescription>
-        </>
-      ),
-      leftButton: "취소",
-      rightButton: "삭제하기",
-      onRightButtonClick: async (): Promise<void> => {
-        try {
-          await deletePlanMutation.mutateAsync({
-            roomId: room.id,
-            planId: plan.id,
-            expectedRevision: room.revision,
-          });
-          navigate(`/trips/${tripId}/plans`, { replace: true });
-        } catch (err: unknown) {
-          openToast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
-        }
-      },
-    });
+    try {
+      await deletePlanMutation.mutateAsync({
+        roomId: room.id,
+        planId: plan.id,
+        expectedRevision: room.revision,
+      });
+      setIsDeleteConfirmOpen(false);
+      navigate(`/trips/${tripId}/plans`, { replace: true });
+    } catch (err: unknown) {
+      setIsDeleteConfirmOpen(false);
+      toast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+    }
   };
 
   return (
-    <div css={pageContainerStyle}>
-      <ListHeader
-        size="large"
-        descriptionPosition="bottom"
-        title={<ListHeader.TitleParagraph>{plan.title}</ListHeader.TitleParagraph>}
-        description={
-          <ListHeader.DescriptionParagraph>
-            <span css={metadataStyle}>
-              <Badge
-                size="small"
-                variant={isConfirmed ? "fill" : "weak"}
-                color={getPlanBadgeColor(isConfirmed, plan.planTag)}
-              >
-                {isConfirmed ? "확정안" : plan.planTagLabel}
-              </Badge>
-              <span>
-                제안자 {plan.authorName} · {plan.period} · {plan.nights}박 {plan.days}일
-              </span>
+    <PageBody withBottomAction className="mx-auto box-border w-full max-w-[640px] px-5">
+      {/* 헤더: 여행안 제목 + 태그/메타 + 관리 action */}
+      <div className="flex items-start justify-between gap-3 py-2">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-[22px] leading-tight font-bold text-foreground">{plan.title}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={getPlanBadgeVariant(isConfirmed, plan.planTag)}>
+              {isConfirmed ? "확정안" : plan.planTagLabel}
+            </Badge>
+            <span className="text-[13px] text-muted-foreground">
+              제안자 {plan.authorName} · {plan.period} · {plan.nights}박 {plan.days}일
             </span>
-          </ListHeader.DescriptionParagraph>
-        }
-        right={
-          canManage ? (
-            <TextButton
-              size="medium"
-              variant="clear"
-              color="var(--adaptiveBlue500, #3182f6)"
-              onClick={() => setSheet("actions")}
-            >
-              더보기
-            </TextButton>
-          ) : undefined
-        }
-      />
+          </div>
+        </div>
+        {canManage && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="shrink-0 text-primary"
+            onClick={() => setSheet("actions")}
+          >
+            더보기
+          </Button>
+        )}
+      </div>
 
-      <section css={summaryStyle} aria-label="여행안 요약">
+      <section className="flex flex-col gap-4 px-1 pt-1 pb-5" aria-label="여행안 요약">
         <RouteRail route={plan.route} differenceSummary={plan.differenceSummary} />
-        {plan.proposalReason && <p css={proposalReasonStyle}>“{plan.proposalReason}”</p>}
+        {plan.proposalReason && (
+          <p className="text-sm leading-normal text-muted-foreground">“{plan.proposalReason}”</p>
+        )}
       </section>
 
-      <List aria-label="여행안 핵심 정보">
-        <ListRow
-          border="indented"
-          verticalPadding="medium"
-          horizontalPadding="small"
-          withTouchEffect
-          arrowType="right"
+      <MobileList aria-label="여행안 핵심 정보">
+        <MobileListItem
+          chevron
+          className="px-2"
           onClick={() => setSheet("cost")}
           aria-label={`예상 경비, ${plan.perPersonCostText}`}
-          contents={
-            <div css={listContentsStyle}>
-              <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                예상 경비
-              </Text>
-              <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                {plan.groupCostText}
-              </Text>
-            </div>
-          }
-          right={
-            <Text typography="t7" fontWeight="bold" color="var(--adaptiveGrey800, #333d4b)" css={listRightTextStyle}>
+          trailing={
+            <span className="max-w-[150px] text-right text-[13px] font-bold whitespace-normal text-secondary-foreground">
               {plan.perPersonCostText}
-            </Text>
+            </span>
           }
-        />
+        >
+          <ItemTitle>예상 경비</ItemTitle>
+          <ItemDescription>{plan.groupCostText}</ItemDescription>
+        </MobileListItem>
 
         <BookingRiskSummary
           items={plan.bookingRisks}
@@ -280,158 +210,173 @@ export function PlanDetailPage(): JSX.Element {
           onClick={() => setSheet("details")}
         />
 
-        <ListRow
-          border="indented"
-          verticalPadding="medium"
-          horizontalPadding="small"
-          withTouchEffect={canChangeOpinion}
-          arrowType={canChangeOpinion ? "right" : undefined}
+        <MobileListItem
+          chevron={canChangeOpinion}
+          className="px-2"
           onClick={canChangeOpinion ? () => setIsOpinionSheetOpen(true) : undefined}
           aria-label={`참여자 의견, ${opinionSummary}. ${myOpinionSummary}`}
-          contents={
-            <div css={listContentsStyle} aria-live="polite">
-              <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                참여자 의견
-              </Text>
-              <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                {myOpinionSummary}
-              </Text>
-            </div>
-          }
-          right={
-            <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)" css={listRightTextStyle}>
+          trailing={
+            <span className="max-w-[150px] text-right text-[13px] whitespace-normal text-muted-foreground">
               {opinionSummary}
-            </Text>
+            </span>
           }
-        />
-      </List>
+        >
+          <div aria-live="polite" className="flex min-w-0 flex-col gap-1">
+            <ItemTitle>참여자 의견</ItemTitle>
+            <ItemDescription>{myOpinionSummary}</ItemDescription>
+          </div>
+        </MobileListItem>
+      </MobileList>
 
       {!isRoomConfirmed && (
         <>
-          <ListHeader
-            size="small"
-            title={<ListHeader.TitleParagraph>다른 행동</ListHeader.TitleParagraph>}
-          />
-          <List aria-label="여행안 보조 작업" css={secondaryListStyle}>
-            <ListRow
-              border="none"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              withTouchEffect
-              arrowType="right"
+          <SectionHeader className="px-0" title="다른 행동" />
+          <MobileList aria-label="여행안 보조 작업" className="mb-6">
+            <MobileListItem
+              chevron
+              className="px-2"
               onClick={() => navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)}
-              contents={
-                <div css={listContentsStyle}>
-                  <Text typography="t6" color="var(--adaptiveGrey800, #333d4b)">
-                    다른 구성으로 제안하기
-                  </Text>
-                  <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                    이 여행안을 복제해 새 대안을 만들어요.
-                  </Text>
-                </div>
-              }
-            />
-          </List>
+            >
+              <ItemTitle className="font-normal text-secondary-foreground">
+                다른 구성으로 제안하기
+              </ItemTitle>
+              <ItemDescription>이 여행안을 복제해 새 대안을 만들어요.</ItemDescription>
+            </MobileListItem>
+          </MobileList>
         </>
       )}
 
       {isConfirmed ? (
-        <FixedBottomCTA
-          containerStyle={fixedCtaContainerStyle}
-          onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
-        >
-          확정 일정 보기
-        </FixedBottomCTA>
+        <BottomAction>
+          <Button
+            type="button"
+            size="xl"
+            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+          >
+            확정 일정 보기
+          </Button>
+        </BottomAction>
       ) : isRoomConfirmed ? null : (
-        <FixedBottomCTA
-          containerStyle={fixedCtaContainerStyle}
-          disabled={submitOpinionMutation.isPending}
-          onClick={() => setIsOpinionSheetOpen(true)}
-        >
-          {plan.myReaction ? "내 의견 수정하기" : "내 의견 남기기"}
-        </FixedBottomCTA>
+        <BottomAction>
+          <Button
+            type="button"
+            size="xl"
+            disabled={submitOpinionMutation.isPending}
+            onClick={() => setIsOpinionSheetOpen(true)}
+          >
+            {plan.myReaction ? "내 의견 수정하기" : "내 의견 남기기"}
+          </Button>
+        </BottomAction>
       )}
 
-      <BottomSheet
+      {/* 예상 경비 / 숙소·교통 상세 / 관리 Drawer */}
+      <Drawer
         open={sheet !== null}
-        onClose={() => setSheet(null)}
-        header={
-          <BottomSheet.Header>
-            {sheet === "actions" ? "여행안 관리" : sheet === "cost" ? "예상 경비" : "숙소·교통 상세"}
-          </BottomSheet.Header>
-        }
-        headerDescription={
-          sheet === "actions" ? (
-            <BottomSheet.HeaderDescription>작성자만 여행안을 관리할 수 있어요.</BottomSheet.HeaderDescription>
-          ) : sheet === "cost" ? (
-            <BottomSheet.HeaderDescription>여행안에 기록한 예상 비용 스냅샷이에요.</BottomSheet.HeaderDescription>
-          ) : (
-            <BottomSheet.HeaderDescription>숙소·교통 예약 정보와 확인 상태를 살펴보세요.</BottomSheet.HeaderDescription>
-          )
-        }
-        cta={<BottomSheet.CTA onClick={() => setSheet(null)}>닫기</BottomSheet.CTA>}
-        maxHeight={sheet === "details" ? "84vh" : "60vh"}
-        expandedMaxHeight={sheet === "details" ? "94vh" : "80vh"}
-        expandBottomSheet={sheet === "details"}
+        onOpenChange={(open) => {
+          if (!open) setSheet(null);
+        }}
+        showSwipeHandle
+        // 숙소·교통 상세만 기존 expand 동작(84vh → 94vh)을 유지해요.
+        snapPoints={sheet === "details" ? [0.84, 0.94] : undefined}
+        defaultSnapPoint={sheet === "details" ? 0.84 : undefined}
       >
-        {sheet === "actions" ? (
-          <List aria-label="여행안 관리" css={sheetListStyle}>
-            <ListRow
-              border="none"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              withTouchEffect
-              arrowType="right"
-              onClick={() => {
-                setSheet(null);
-                navigate(`/trips/${tripId}/plans/${plan.id}/edit`);
-              }}
-              contents={
-                <div css={listContentsStyle}>
-                  <Text typography="t6" fontWeight="bold">여행안 수정</Text>
-                  <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">작성한 내용을 고쳐요.</Text>
-                </div>
-              }
-            />
-            <ListRow
-              border="none"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              withTouchEffect
-              onClick={() => {
-                setSheet(null);
-                void handleDeletePlan();
-              }}
-              aria-label="여행안 삭제"
-              contents={
-                <div css={listContentsStyle}>
-                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveRed600, #e0383e)">여행안 삭제</Text>
-                  <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">삭제 전 한 번 더 확인해요.</Text>
-                </div>
-              }
-            />
-          </List>
-        ) : sheet === "cost" ? (
-          <List aria-label="예상 경비 상세" css={sheetListStyle}>
-            <ListRow
-              border="none"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              contents={<Text typography="t6">그룹 총액</Text>}
-              right={<Text typography="t6" fontWeight="bold">{plan.groupCostText}</Text>}
-            />
-            <ListRow
-              border="none"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              contents={<Text typography="t6">1인 예상 참고액</Text>}
-              right={<Text typography="t6" fontWeight="bold">{plan.perPersonCostText}</Text>}
-            />
-          </List>
-        ) : (
-          <DetailTimeline items={plan.timelineItems} />
-        )}
-      </BottomSheet>
+        {/*
+          확장이 없던 sheet는 기존 maxHeight 60vh 상한을 유지해요.
+          Drawer 내부의 data-variant sizing 유틸리티보다 우선해야 해서 important를 써요.
+        */}
+        <DrawerContent className={sheet === "details" ? undefined : "max-h-[60vh]!"}>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              {sheet === "actions" ? "여행안 관리" : sheet === "cost" ? "예상 경비" : "숙소·교통 상세"}
+            </DrawerTitle>
+            <DrawerDescription className="text-left">
+              {sheet === "actions"
+                ? "작성자만 여행안을 관리할 수 있어요."
+                : sheet === "cost"
+                  ? "여행안에 기록한 예상 비용 스냅샷이에요."
+                  : "숙소·교통 예약 정보와 확인 상태를 살펴보세요."}
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {sheet === "actions" ? (
+              <MobileList aria-label="여행안 관리" className="pb-2">
+                <MobileListItem
+                  chevron
+                  onClick={() => {
+                    setSheet(null);
+                    navigate(`/trips/${tripId}/plans/${plan.id}/edit`);
+                  }}
+                >
+                  <ItemTitle>여행안 수정</ItemTitle>
+                  <ItemDescription>작성한 내용을 고쳐요.</ItemDescription>
+                </MobileListItem>
+                <MobileListItem
+                  onClick={() => {
+                    setSheet(null);
+                    setIsDeleteConfirmOpen(true);
+                  }}
+                  aria-label="여행안 삭제"
+                >
+                  <ItemTitle className="text-destructive-strong">여행안 삭제</ItemTitle>
+                  <ItemDescription>삭제 전 한 번 더 확인해요.</ItemDescription>
+                </MobileListItem>
+              </MobileList>
+            ) : sheet === "cost" ? (
+              <MobileList aria-label="예상 경비 상세" className="pb-2">
+                <MobileListItem
+                  trailing={
+                    <span className="text-[15px] font-bold text-foreground">
+                      {plan.groupCostText}
+                    </span>
+                  }
+                >
+                  <p className="text-[15px] text-foreground">그룹 총액</p>
+                </MobileListItem>
+                <MobileListItem
+                  trailing={
+                    <span className="text-[15px] font-bold text-foreground">
+                      {plan.perPersonCostText}
+                    </span>
+                  }
+                >
+                  <p className="text-[15px] text-foreground">1인 예상 참고액</p>
+                </MobileListItem>
+              </MobileList>
+            ) : (
+              <DetailTimeline items={plan.timelineItems} />
+            )}
+          </div>
+
+          <DrawerFooter>
+            <Button type="button" size="xl" onClick={() => setSheet(null)}>
+              닫기
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      {/* 여행안 삭제 confirm */}
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>여행안을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePlanMutation.isPending}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deletePlanMutation.isPending}
+              onClick={() => void handleConfirmDelete()}
+            >
+              {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <OpinionBottomSheet
         isOpen={isOpinionSheetOpen}
@@ -441,6 +386,6 @@ export function PlanDetailPage(): JSX.Element {
         isSubmitting={submitOpinionMutation.isPending}
         onSubmit={handleOpinionSubmit}
       />
-    </div>
+    </PageBody>
   );
 }

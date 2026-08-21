@@ -11,7 +11,7 @@ const containerStyle = css`
 const planTitleStyle = css`
   font-size: 17px;
   font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
   margin: 0;
 `;
 
@@ -25,13 +25,13 @@ const rowStyle = css`
 
 const rowLabelStyle = css`
   flex: 0 0 62px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--foreground-subtle);
   font-weight: 600;
 `;
 
 const rowValueStyle = css`
   flex: 1;
-  color: var(--adaptiveGrey800, #333d4b);
+  color: var(--secondary-foreground);
   margin: 0;
   word-break: keep-all;
 `;
@@ -43,7 +43,7 @@ const costValueStyle = css`
 
 const costMainStyle = css`
   display: block;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
   font-weight: 700;
 `;
 
@@ -51,12 +51,12 @@ const costSubStyle = css`
   display: block;
   margin-top: 2px;
   font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--foreground-subtle);
 `;
 
 const needCheckBoxStyle = css`
-  background-color: var(--adaptiveYellow50, #fff8e1);
-  border: 1px solid #ffe082;
+  background-color: var(--warning-muted);
+  border: 1px solid var(--warning-border);
   border-radius: 12px;
   padding: 12px 14px;
 `;
@@ -64,15 +64,16 @@ const needCheckBoxStyle = css`
 const needCheckTitleStyle = css`
   font-size: 13px;
   font-weight: 700;
-  color: var(--adaptiveYellow700, #b78103);
+  color: var(--warning);
   margin: 0 0 6px 0;
 `;
 
 const needCheckListStyle = css`
   margin: 0;
   padding-left: 18px;
+  list-style: disc;
   font-size: 13px;
-  color: var(--adaptiveGrey800, #333d4b);
+  color: var(--secondary-foreground);
   display: flex;
   flex-direction: column;
   gap: 4px;

@@ -2,7 +2,7 @@ import {
   loadFullScreenAd,
   showFullScreenAd,
 } from "@apps-in-toss/web-framework";
-import { useToast } from "@toss/tds-mobile";
+import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Reward {
@@ -19,7 +19,6 @@ interface UseInAppAdsReturn {
 
 // 참고문서: https://developers-apps-in-toss.toss.im/ads/intro.html
 export function useInAppAds(adGroupId: string): UseInAppAdsReturn {
-  const { openToast } = useToast();
   const [isAdLoaded, setIsAdLoaded] = useState(false);
   const [lastReward, setLastReward] = useState<Reward | null>(null);
   const [isSupported, setIsSupported] = useState(false);
@@ -45,9 +44,9 @@ export function useInAppAds(adGroupId: string): UseInAppAdsReturn {
       });
     } catch (error) {
       console.error("광고 로드 실패:", error);
-      openToast("광고를 불러오지 못했어요. 토스 앱에서 다시 시도해 주세요.");
+      toast("광고를 불러오지 못했어요. 토스 앱에서 다시 시도해 주세요.");
     }
-  }, [adGroupId, openToast]);
+  }, [adGroupId]);
 
   useEffect(() => {
     try {

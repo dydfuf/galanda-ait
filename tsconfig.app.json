@@ -22,7 +22,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Path alias. `@platform/current`의 실제 구현은 빌드 타깃이 정해요(vite.config.ts). */
+    "paths": {
+      "@/*": ["./src/*"],
+      "@platform/current": ["./src/platform/current.web.ts"]
+    }
   },
   "include": ["src"],
 }

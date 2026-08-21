@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { Button } from "@/components/ui/button.tsx";
 import { useNavigate } from "react-router-dom";
 
 const containerStyle = css`
@@ -23,12 +23,12 @@ const titleStyle = css`
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 8px 0;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
 `;
 
 const descStyle = css`
   font-size: 14px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--foreground-subtle);
   margin: 0 0 24px 0;
   line-height: 1.5;
 `;
@@ -48,8 +48,8 @@ export function NotFoundPage() {
         요청하신 페이지가 삭제되었거나 주소가 잘못되었습니다.
       </p>
       <Button
-        size="medium"
         type="button"
+        size="lg"
         onClick={() => navigate("/trips", { replace: true })}
       >
         여행 목록으로 이동

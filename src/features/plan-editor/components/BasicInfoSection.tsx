@@ -1,11 +1,11 @@
 import { css } from "@emotion/react";
 
 const cardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
+  background-color: var(--background);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  border: 1px solid var(--border);
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
@@ -21,23 +21,23 @@ const fieldStyle = css`
 const labelStyle = css`
   font-size: 13px;
   font-weight: 600;
-  color: var(--adaptiveGrey700, #4e5968);
+  color: var(--foreground-muted);
 `;
 
 const inputStyle = css`
   width: 100%;
   padding: 12px 14px;
   border-radius: 10px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  border: 1px solid var(--border);
   font-size: 14px;
   outline: none;
   box-sizing: border-box;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
+  background-color: var(--background);
+  color: var(--foreground);
   transition: border-color 0.15s ease;
 
   &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
+    border-color: var(--primary);
   }
 `;
 
@@ -55,9 +55,9 @@ const headcountButtonStyle = css`
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  border: 1px solid var(--adaptiveGrey300, #d1d6db);
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  color: var(--adaptiveGrey900, #191f28);
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface-subtle);
+  color: var(--foreground);
   font-size: 16px;
   font-weight: 700;
   display: flex;
@@ -67,7 +67,7 @@ const headcountButtonStyle = css`
   transition: background-color 0.15s ease;
 
   &:hover {
-    background-color: var(--adaptiveGrey100, #f2f4f6);
+    background-color: var(--muted);
   }
 
   &:disabled {
@@ -79,14 +79,14 @@ const headcountButtonStyle = css`
 const headcountValueStyle = css`
   font-size: 15px;
   font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
   min-width: 40px;
   text-align: center;
 `;
 
 const headcountHintStyle = css`
   font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--foreground-subtle);
   margin-top: 2px;
 `;
 

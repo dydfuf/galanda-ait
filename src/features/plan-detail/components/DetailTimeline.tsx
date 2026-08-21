@@ -1,5 +1,7 @@
-import { css } from "@emotion/react";
-import { Badge, List, ListRow, Text } from "@toss/tds-mobile";
+import { Badge } from "@/components/ui/badge.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
+import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import { ExternalLink } from "@/components/galanda/external-link.tsx";
 
 export interface StaySection {
   readonly id: string;
@@ -36,95 +38,66 @@ interface DetailTimelineProps {
   readonly items: ReadonlyArray<TimelineItem>;
 }
 
-const contentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const linkStyle = css`
-  width: fit-content;
-  margin-top: 4px;
-  color: var(--adaptiveBlue500, #3182f6);
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-`;
-
 type StatusBadge = {
   readonly label: string;
-  readonly color: "green" | "red" | "yellow" | "elephant";
+  readonly variant: "success" | "danger" | "warning" | "neutral";
 };
 
 const getStatusBadge = (status: string): StatusBadge => {
   switch (status) {
     case "AVAILABLE":
-      return { label: "예약 가능", color: "green" };
+      return { label: "예약 가능", variant: "success" };
     case "FULL":
-      return { label: "만실", color: "red" };
+      return { label: "만실", variant: "danger" };
     case "NEED_CHECK":
-      return { label: "확인 필요", color: "yellow" };
+      return { label: "확인 필요", variant: "warning" };
     default:
-      return { label: "아직 확인 전", color: "elephant" };
+      return { label: "아직 확인 전", variant: "neutral" };
   }
 };
 
 export function DetailTimeline({ items }: DetailTimelineProps) {
   if (items.length === 0) {
     return (
-      <List aria-label="숙소와 교통 상세">
-        <ListRow
-          border="none"
-          verticalPadding="medium"
-          horizontalPadding="small"
-          contents={
-            <Text typography="t6" color="var(--adaptiveGrey600, #6b7684)">
-              숙소·교통 정보가 아직 등록되지 않았어요.
-            </Text>
-          }
-        />
-      </List>
+      <MobileList aria-label="숙소와 교통 상세">
+        <MobileListItem>
+          <p className="text-[15px] text-muted-foreground">
+            숙소·교통 정보가 아직 등록되지 않았어요.
+          </p>
+        </MobileListItem>
+      </MobileList>
     );
   }
 
   return (
-    <List aria-label="숙소와 교통 상세">
+    <MobileList aria-label="숙소와 교통 상세">
       {items.map((item, index) => {
         if (item.type === "STAY" && item.stay) {
           const stay = item.stay;
           const status = getStatusBadge(stay.bookingStatus);
 
           return (
-            <ListRow
+            <MobileListItem
               key={stay.id || index}
-              border="indented"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              left={<Badge size="small" variant="weak" color="blue">숙소</Badge>}
-              right={<Badge size="small" variant="weak" color={status.color}>{status.label}</Badge>}
-              contents={
-                <div css={contentsStyle}>
-                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                    {stay.city} · {stay.period} · {stay.nights}박
-                  </Text>
-                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey800, #333d4b)">
-                    {stay.hotelName}
-                  </Text>
-                  <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)">
-                    {stay.priceText}
-                  </Text>
-                  <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)">
-                    {stay.confirmedInfo}
-                  </Text>
-                  {stay.bookingUrl && (
-                    <a href={stay.bookingUrl} target="_blank" rel="noreferrer" css={linkStyle}>
-                      예약 정보 보기 ↗
-                    </a>
-                  )}
-                </div>
-              }
-            />
+              leading={<Badge variant="info">숙소</Badge>}
+              trailing={<Badge variant={status.variant}>{status.label}</Badge>}
+            >
+              <ItemTitle>
+                {stay.city} · {stay.period} · {stay.nights}박
+              </ItemTitle>
+              <ItemTitle className="text-[14px] text-secondary-foreground">
+                {stay.hotelName}
+              </ItemTitle>
+              <ItemDescription>{stay.priceText}</ItemDescription>
+              <ItemDescription className="text-muted-foreground/80">
+                {stay.confirmedInfo}
+              </ItemDescription>
+              {stay.bookingUrl && (
+                <ExternalLink href={stay.bookingUrl} className="mt-1">
+                  예약 정보 보기 ↗
+                </ExternalLink>
+              )}
+            </MobileListItem>
           );
         }
 
@@ -133,40 +106,33 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
           const status = getStatusBadge(transport.bookingStatus);
 
           return (
-            <ListRow
+            <MobileListItem
               key={transport.id || index}
-              border="indented"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              left={<Badge size="small" variant="weak" color="elephant">이동</Badge>}
-              right={<Badge size="small" variant="weak" color={status.color}>{status.label}</Badge>}
-              contents={
-                <div css={contentsStyle}>
-                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                    {transport.fromCity} → {transport.toCity}
-                  </Text>
-                  <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)">
-                    {transport.mode} · {transport.hasTransfer ? "환승 필요" : "직통"} · {transport.durationText}
-                  </Text>
-                  <Text typography="t7" color="var(--adaptiveGrey700, #4e5968)">
-                    {transport.priceText}
-                  </Text>
-                  <Text typography="t7" color="var(--adaptiveGrey500, #8b95a1)">
-                    {transport.confirmedInfo}
-                  </Text>
-                  {transport.bookingUrl && (
-                    <a href={transport.bookingUrl} target="_blank" rel="noreferrer" css={linkStyle}>
-                      교통 정보 보기 ↗
-                    </a>
-                  )}
-                </div>
-              }
-            />
+              leading={<Badge variant="neutral">이동</Badge>}
+              trailing={<Badge variant={status.variant}>{status.label}</Badge>}
+            >
+              <ItemTitle>
+                {transport.fromCity} → {transport.toCity}
+              </ItemTitle>
+              <ItemDescription>
+                {transport.mode} · {transport.hasTransfer ? "환승 필요" : "직통"} ·{" "}
+                {transport.durationText}
+              </ItemDescription>
+              <ItemDescription>{transport.priceText}</ItemDescription>
+              <ItemDescription className="text-muted-foreground/80">
+                {transport.confirmedInfo}
+              </ItemDescription>
+              {transport.bookingUrl && (
+                <ExternalLink href={transport.bookingUrl} className="mt-1">
+                  교통 정보 보기 ↗
+                </ExternalLink>
+              )}
+            </MobileListItem>
           );
         }
 
         return null;
       })}
-    </List>
+    </MobileList>
   );
 }

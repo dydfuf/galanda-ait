@@ -2,8 +2,8 @@ import { css } from "@emotion/react";
 import type { PlanDifference } from "../../../core/calculations/plan-diff.ts";
 
 const bannerStyle = css`
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border: 1px solid var(--adaptiveBlue200, #b8d7ff);
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--primary-border-weak);
   border-radius: 12px;
   padding: 12px 16px;
   margin-bottom: 16px;
@@ -15,13 +15,13 @@ const bannerStyle = css`
 const bannerTitleStyle = css`
   font-size: 12px;
   font-weight: 700;
-  color: var(--adaptiveBlue600, #1b64da);
+  color: var(--info);
 `;
 
 const bannerDescStyle = css`
   font-size: 13px;
   font-weight: 500;
-  color: var(--adaptiveGrey800, #333d4b);
+  color: var(--secondary-foreground);
   line-height: 1.4;
 `;
 

@@ -1,62 +1,15 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { partner, Screen, tdsEvent } from "@apps-in-toss/web-framework";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect } from "react";
+import { platform } from "../platform/index.ts";
 
 // 세션 내에서 라우트 이동이 있었는지 추적하기 위한 counter
 let navigationCount = 0;
 
-interface AccessoryButtonOptions {
-  readonly id: string;
-  readonly title: string;
-  readonly iconName: string;
-  readonly callback: VoidFunction;
-}
-
-interface PlatformNavigation {
-  readonly addAccessoryButton: (options: AccessoryButtonOptions) => Promise<void>;
-  readonly removeAccessoryButton: VoidFunction;
-}
-
 export function useAppNavigation() {
   const navigate = useNavigate();
   const location = useLocation();
-  const platformNavigation = useMemo<PlatformNavigation | undefined>(() => {
-    if (typeof navigator === "undefined" || !navigator.userAgent.includes("TossApp/")) {
-      return undefined;
-    }
-
-    let removeAccessoryListener: (() => void) | undefined;
-
-    return {
-      addAccessoryButton: ({ id, title, iconName, callback }: AccessoryButtonOptions) => {
-        removeAccessoryListener?.();
-        const removeListener = tdsEvent.addEventListener("navigationAccessoryEvent", {
-          onEvent: (event) => {
-            if (event.id === id) callback();
-          },
-        });
-        removeAccessoryListener = removeListener;
-
-        return partner
-          .addAccessoryButton({ id, title, icon: { name: iconName } })
-          .catch((error: unknown) => {
-            removeListener();
-            if (removeAccessoryListener === removeListener) {
-              removeAccessoryListener = undefined;
-            }
-            console.error("앱인토스 액세서리 등록 실패:", error);
-            throw error;
-          });
-      },
-      removeAccessoryButton: () => {
-        removeAccessoryListener?.();
-        removeAccessoryListener = undefined;
-        void partner
-          .removeAccessoryButton()
-          .catch((error: unknown) => console.error("앱인토스 액세서리 제거 실패:", error));
-      },
-    };
-  }, []);
+  // AIT shell이 navigation을 소유할 때만 존재해요. 일반 브라우저에서는 undefined예요.
+  const platformNavigation = platform.navigation;
 
   useEffect(() => {
     navigationCount += 1;
@@ -66,14 +19,9 @@ export function useAppNavigation() {
     // 세션 내 이동 기록이 있거나 기본 entry가 아닌 경우 뒤로가기
     if (navigationCount > 1 && window.history.state?.idx > 0) {
       navigate(-1);
-    } else {
-      // 직접 딥링크 진입 등으로 이전 라우트가 없는 경우 미니앱 닫기
-      try {
-        Screen.close();
-      } catch {
-        // 웹 브라우저 환경 등 fallback
-        navigate("/trips", { replace: true });
-      }
+    } else if (!platform.requestClose()) {
+      // 직접 딥링크 진입 등으로 이전 라우트가 없고 화면을 닫을 수도 없으면 목록으로 이동해요.
+      navigate("/trips", { replace: true });
     }
   }, [navigate]);
 

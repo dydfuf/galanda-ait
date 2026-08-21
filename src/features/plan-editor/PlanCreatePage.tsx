@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { FixedBottomCTA } from "@toss/tds-mobile";
 import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
@@ -27,7 +27,7 @@ const pageContainerStyle = css`
 const loadingContainerStyle = css`
   padding: 40px 20px;
   text-align: center;
-  color: var(--adaptiveGrey600, #6b7684);
+  color: var(--muted-foreground);
   font-size: 15px;
 `;
 
@@ -35,7 +35,7 @@ const loadingContainerStyle = css`
 const errorMessageStyle = css`
   display: block;
   font-size: 13px;
-  color: var(--adaptiveRed600, #e0383e);
+  color: var(--destructive-strong);
   margin: 8px 0 0 0;
   text-align: center;
   line-height: 1.5;
@@ -157,35 +157,41 @@ export function PlanCreatePage(): JSX.Element {
         onCompleteSection={completeSection}
       />
 
-      {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      {!section && !editor.draftConflict && <FixedBottomCTA
-        containerStyle={fixedCtaContainerStyle}
-        topAccessory={
-          editor.validation.firstError || errorMsg ? (
-            <>
-              {editor.validation.firstError && (
-                <ValidationBanner
-                  firstError={editor.validation.firstError}
-                  errorCount={editor.validation.errorCount}
-                />
-              )}
-              {errorMsg && (
-                <span css={errorMessageStyle} role="alert">
-                  {errorMsg}
-                </span>
-              )}
-            </>
-          ) : undefined
-        }
-        disabled={!editor.validation.isValid || isSubmitting}
-        onClick={() => void handleSubmit()}
-      >
-        {isSubmitting
-          ? "등록 중..."
-          : cloneFromPlan
-          ? "대안 여행안 제안하기"
-          : "여행안 제안 등록"}
-      </FixedBottomCTA>}
+      {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
+      {!section && !editor.draftConflict && (
+        <BottomAction
+          accessory={
+            editor.validation.firstError || errorMsg ? (
+              <>
+                {editor.validation.firstError && (
+                  <ValidationBanner
+                    firstError={editor.validation.firstError}
+                    errorCount={editor.validation.errorCount}
+                  />
+                )}
+                {errorMsg && (
+                  <span css={errorMessageStyle} role="alert">
+                    {errorMsg}
+                  </span>
+                )}
+              </>
+            ) : undefined
+          }
+        >
+          <Button
+            type="button"
+            size="xl"
+            disabled={!editor.validation.isValid || isSubmitting}
+            onClick={() => void handleSubmit()}
+          >
+            {isSubmitting
+              ? "등록 중..."
+              : cloneFromPlan
+                ? "대안 여행안 제안하기"
+                : "여행안 제안 등록"}
+          </Button>
+        </BottomAction>
+      )}
     </div>
   );
 }

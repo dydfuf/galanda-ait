@@ -1,24 +1,26 @@
 import { useState } from "react";
-import { css } from "@emotion/react";
-import {
-  Badge,
-  BottomSheet,
-  Button,
-  Checkbox,
-  FixedBottomCTA,
-  List,
-  ListHeader,
-  ListRow,
-  Text,
-  Top,
-  useBottomSheet,
-} from "@toss/tds-mobile";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, CompareQuerySchema, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
-import { fixedCtaContainerStyle, tdsPageWithBottomCtaStyle } from "../common/tds-layout.ts";
+import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageTitle } from "@/components/galanda/page-title.tsx";
+import { SectionHeader } from "@/components/galanda/section-header.tsx";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
 import {
@@ -29,116 +31,10 @@ import {
 } from "./plan-compare-view-model.ts";
 import { ConfirmPlanSummaryView } from "./components/ConfirmPlanSummaryView.tsx";
 
-const pageStyle = css`
-  ${tdsPageWithBottomCtaStyle};
-  max-width: 640px;
-  margin: 0 auto;
-`;
-
-const selectionFieldsetStyle = css`
-  border: 0;
-  min-width: 0;
-  padding: 0;
-  margin: 0 0 28px;
-`;
-
-const selectionContentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const selectionTitleStyle = css`
-  min-width: 0;
-  overflow-wrap: anywhere;
-`;
-
-const selectionCostStyle = css`
-  max-width: 132px;
-  text-align: right;
-  white-space: normal;
-`;
-
-const selectionRightStyle = css`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  min-width: 0;
-`;
-
-const noticeListStyle = css`
-  margin-bottom: 24px;
-`;
-
-const noticeContentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const differenceListStyle = css`
-  margin-bottom: 28px;
-`;
-
-const differenceContentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-`;
-
-const differenceValuesStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const differenceValueStyle = css`
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
-  min-width: 0;
-`;
-
-const differencePlanLabelStyle = css`
-  color: var(--adaptiveGrey600, #6b7684);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.45;
-`;
-
-const differenceValueTextStyle = css`
-  min-width: 0;
-  overflow-wrap: anywhere;
-`;
-
-const differenceDeltaStyle = css`
-  color: var(--adaptiveBlue600, #1b64da);
-  font-size: 12px;
-  font-weight: 700;
-`;
-
-const emptyDifferenceStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const confirmErrorStyle = css`
-  display: block;
-  color: var(--adaptiveRed600, #e0383e);
-  font-size: 13px;
-  line-height: 1.5;
-  text-align: center;
-`;
-
-const getPlanBadgeColor = (planTag: string, isConfirmed: boolean): "blue" | "green" | "elephant" =>
-  isConfirmed ? "green" : planTag === "BASIC" ? "blue" : "elephant";
+const getPlanBadgeVariant = (
+  planTag: string,
+  isConfirmed: boolean
+): "info" | "success" | "neutral" => (isConfirmed ? "success" : planTag === "BASIC" ? "info" : "neutral");
 
 export function PlanComparePage() {
   const params = useParams();
@@ -156,20 +52,16 @@ export function PlanComparePage() {
 
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
-  const { openAsyncTwoButtonSheet } = useBottomSheet();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
 
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
   }
 
   if (isLoading) {
-    return (
-      <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--adaptiveGrey500, #8b95a1)" }}>
-        비교 정보를 불러오는 중...
-      </div>
-    );
+    return <PageState status="loading" message="비교 정보를 불러오는 중이에요." />;
   }
 
   if (isError || !room) {
@@ -183,15 +75,13 @@ export function PlanComparePage() {
 
   if (Result.isFailure(queryValidated) || leftParam === rightParam) {
     return (
-      <div style={{ padding: "40px 20px", textAlign: "center" }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px 0" }}>비교할 두 여행안을 선택해주세요</h2>
-        <p style={{ fontSize: 14, color: "var(--adaptiveGrey500, #8b95a1)", margin: "0 0 24px 0" }}>
-          비교하려는 서로 다른 두 여행안이 지정되지 않았습니다.
-        </p>
-        <Button size="medium" type="button" onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}>
-          계획 홈으로 돌아가기
-        </Button>
-      </div>
+      <PageState
+        status="error"
+        title="비교할 두 여행안을 선택해주세요"
+        description="비교하려는 서로 다른 두 여행안이 지정되지 않았습니다."
+        actionText="계획 홈으로 돌아가기"
+        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+      />
     );
   }
 
@@ -201,15 +91,13 @@ export function PlanComparePage() {
 
   if (!leftPlan || !rightPlan) {
     return (
-      <div style={{ padding: "40px 20px", textAlign: "center" }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px 0" }}>여행안을 찾을 수 없습니다</h2>
-        <p style={{ fontSize: 14, color: "var(--adaptiveGrey500, #8b95a1)", margin: "0 0 24px 0" }}>
-          비교 대상 중 일부 여행안이 존재하지 않거나 삭제되었습니다.
-        </p>
-        <Button size="medium" type="button" onClick={() => navigate(`/trips/${tripId}/plans`, { replace: true })}>
-          계획 홈으로 이동
-        </Button>
-      </div>
+      <PageState
+        status="error"
+        title="여행안을 찾을 수 없습니다"
+        description="비교 대상 중 일부 여행안이 존재하지 않거나 삭제되었습니다."
+        actionText="계획 홈으로 이동"
+        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+      />
     );
   }
 
@@ -233,241 +121,248 @@ export function PlanComparePage() {
         ? `${differences.length}가지 차이를 먼저 보여드려요. 마음에 드는 안을 선택하세요.`
         : "두 여행안의 핵심 구성이 같아요. 마음에 드는 안을 선택하세요.";
 
-  const handleConfirm = async (): Promise<void> => {
+  const openConfirmSheet = (): void => {
     if (!canSubmitConfirm({ state: confirmState, isPending: confirmPlanMutation.isPending })) return;
+    setIsConfirmSheetOpen(true);
+  };
 
-    await openAsyncTwoButtonSheet({
-      header: <BottomSheet.Header>이 여행안으로 확정할까요?</BottomSheet.Header>,
-      children: <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(selectedPlan)} />,
-      leftButton: "다시 보기",
-      rightButton: "확정하기",
-      onRightButtonClick: async (): Promise<void> => {
-        setConfirmError(null);
-        try {
-          await confirmPlanMutation.mutateAsync({
-            roomId: room.id,
-            planId: selectedPlan.id,
-            revision: room.revision,
-          });
-          navigate(`/trips/${tripId}/itinerary`, { replace: true });
-        } catch (err: unknown) {
-          setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
-        }
-      },
-    });
+  const handleConfirmSubmit = async (): Promise<void> => {
+    if (confirmPlanMutation.isPending) return;
+
+    setConfirmError(null);
+    try {
+      await confirmPlanMutation.mutateAsync({
+        roomId: room.id,
+        planId: selectedPlan.id,
+        revision: room.revision,
+      });
+      navigate(`/trips/${tripId}/itinerary`, { replace: true });
+    } catch (err: unknown) {
+      setIsConfirmSheetOpen(false);
+      setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+    }
   };
 
   return (
-    <div css={pageStyle}>
-      <Top
-        title={<Top.TitleParagraph>어떤 여행안이 더 좋나요?</Top.TitleParagraph>}
-        subtitleBottom={<Top.SubtitleParagraph>{pageSubtitle}</Top.SubtitleParagraph>}
-      />
+    <PageBody withBottomAction={confirmState.kind !== "VIEW_ONLY"} className="mx-auto max-w-[640px]">
+      <PageTitle title="어떤 여행안이 더 좋나요?" description={pageSubtitle} />
 
       {confirmState.kind === "LOCKED" && (
-        <List aria-label="확정 상태" css={noticeListStyle}>
-          <ListRow
-            border="none"
-            verticalPadding="small"
-            horizontalPadding="small"
-            left={<Badge size="small" variant="weak" color="green">확정됨</Badge>}
-            contents={
-              <div css={noticeContentsStyle}>
-                <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                  {confirmState.confirmedPlanTitle
-                    ? `'${confirmState.confirmedPlanTitle}'(으)로 일정이 확정되었어요.`
-                    : "이미 일정이 확정된 여행이에요."}
-                </Text>
-                <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                  확정 일정에서 날짜별 여행을 확인할 수 있어요.
-                </Text>
-              </div>
-            }
-          />
-        </List>
+        <section aria-label="확정 상태" className="mb-6 px-(--app-inline-padding)">
+          <div className="flex items-start gap-2.5 py-2">
+            <Badge variant="success" className="mt-0.5 shrink-0">
+              확정됨
+            </Badge>
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="text-[15px] font-bold text-foreground">
+                {confirmState.confirmedPlanTitle
+                  ? `'${confirmState.confirmedPlanTitle}'(으)로 일정이 확정되었어요.`
+                  : "이미 일정이 확정된 여행이에요."}
+              </p>
+              <p className="text-[13px] text-muted-foreground">
+                확정 일정에서 날짜별 여행을 확인할 수 있어요.
+              </p>
+            </div>
+          </div>
+        </section>
       )}
 
       {confirmState.kind === "VIEW_ONLY" && (
-        <List aria-label="확정 권한 안내" css={noticeListStyle}>
-          <ListRow
-            border="none"
-            verticalPadding="small"
-            horizontalPadding="small"
-            left={<Badge size="small" variant="weak" color="blue">참여자</Badge>}
-            contents={
-              <div css={noticeContentsStyle}>
-                <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                  여행안 확정은 방장이 진행해요.
-                </Text>
-                <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                  비교 결과를 보고 마음에 드는 안을 선택해보세요.
-                </Text>
-              </div>
-            }
-          />
-        </List>
+        <section aria-label="확정 권한 안내" className="mb-6 px-(--app-inline-padding)">
+          <div className="flex items-start gap-2.5 py-2">
+            <Badge variant="info" className="mt-0.5 shrink-0">
+              참여자
+            </Badge>
+            <div className="flex min-w-0 flex-col gap-1">
+              <p className="text-[15px] font-bold text-foreground">여행안 확정은 방장이 진행해요.</p>
+              <p className="text-[13px] text-muted-foreground">
+                비교 결과를 보고 마음에 드는 안을 선택해보세요.
+              </p>
+            </div>
+          </div>
+        </section>
       )}
 
-      <ListHeader
-        size="medium"
-        descriptionPosition="bottom"
-        title={<ListHeader.TitleParagraph>여행안 선택</ListHeader.TitleParagraph>}
+      <SectionHeader
+        title="여행안 선택"
         description={
-          <ListHeader.DescriptionParagraph>
-            {isSelectionLocked ? "확정된 여행안은 다시 선택할 수 없어요." : "아래 선택이 마지막 확정 버튼에 반영돼요."}
-          </ListHeader.DescriptionParagraph>
+          isSelectionLocked ? "확정된 여행안은 다시 선택할 수 없어요." : "아래 선택이 마지막 확정 버튼에 반영돼요."
         }
       />
 
-      <fieldset css={selectionFieldsetStyle} disabled={isSelectionLocked}>
-        <legend style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
-          {isSelectionLocked ? "확정된 여행안" : "확정할 여행안 선택"}
-        </legend>
-        <List aria-label="비교할 여행안">
-          {[leftPlan, rightPlan].map((plan) => {
-            const isSelected = currentSelectedId === plan.id;
-            const planColor = getPlanBadgeColor(plan.planTag, plan.isConfirmed);
+      <RadioGroup
+        aria-label={isSelectionLocked ? "확정된 여행안" : "확정할 여행안 선택"}
+        className="mb-7 gap-0 divide-y divide-border"
+        value={currentSelectedId ?? ""}
+        onValueChange={(value) => {
+          if (!isSelectionLocked && typeof value === "string") setSelectedPlanId(value);
+        }}
+        disabled={isSelectionLocked}
+      >
+        {[leftPlan, rightPlan].map((plan) => {
+          const isSelected = currentSelectedId === plan.id;
+          const planVariant = getPlanBadgeVariant(plan.planTag, plan.isConfirmed);
 
-            return (
-              <ListRow
-                key={plan.id}
-                border="indented"
-                verticalPadding="medium"
-                horizontalPadding="small"
-                disabled={isSelectionLocked}
-                withTouchEffect={!isSelectionLocked}
-                onClick={isSelectionLocked ? undefined : () => setSelectedPlanId(plan.id)}
-                aria-label={`${plan.planTagLabel}, ${plan.title}, ${plan.authorName} 제안`}
-                left={
-                  <Checkbox.Circle
-                    inputType="radio"
-                    name="compare-selected-plan"
-                    value={plan.id}
-                    checked={isSelected}
-                    disabled={isSelectionLocked}
-                    aria-label={`${plan.title} 선택`}
-                    onChange={() => setSelectedPlanId(plan.id)}
-                  />
-                }
-                contents={
-                  <div css={selectionContentsStyle}>
-                    <Badge size="small" variant={isSelected ? "fill" : "weak"} color={planColor}>
-                      {plan.isConfirmed ? "확정안" : plan.planTagLabel}
-                    </Badge>
-                    <Text typography="t5" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)" css={selectionTitleStyle}>
-                      {plan.title}
-                    </Text>
-                    <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                      {plan.authorName} 제안{isSelected ? " · 현재 선택" : ""}
-                    </Text>
-                  </div>
-                }
-                right={
-                  <div css={selectionRightStyle}>
-                    <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)" css={selectionCostStyle}>
-                      {plan.perPersonCostText}
-                    </Text>
-                    {isSelectionLocked && isSelected && (
-                      <Badge size="small" variant="weak" color="green">확정 결과</Badge>
-                    )}
-                  </div>
-                }
+          return (
+            <label
+              key={plan.id}
+              className={
+                "flex! w-full items-start gap-3 px-(--app-inline-padding) py-3.5 " +
+                (isSelectionLocked
+                  ? "opacity-70"
+                  : "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted")
+              }
+            >
+              <RadioGroupItem
+                value={plan.id}
+                aria-label={`${plan.title} 선택`}
+                className="mt-1 size-5"
               />
-            );
-          })}
-        </List>
-      </fieldset>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div>
+                  <Badge variant={isSelected ? (plan.isConfirmed ? "success-solid" : planVariant === "info" ? "info-solid" : "neutral-solid") : planVariant}>
+                    {plan.isConfirmed ? "확정안" : plan.planTagLabel}
+                  </Badge>
+                </div>
+                <span className="min-w-0 text-[17px] font-bold break-keep text-foreground">
+                  {plan.title}
+                </span>
+                <span className="text-[13px] text-muted-foreground">
+                  {plan.authorName} 제안{isSelected ? " · 현재 선택" : ""}
+                </span>
+              </div>
+              <div className="flex max-w-[132px] shrink-0 flex-col items-end gap-1">
+                <span className="text-right text-[13px] text-muted-foreground">
+                  {plan.perPersonCostText}
+                </span>
+                {isSelectionLocked && isSelected && <Badge variant="success">확정 결과</Badge>}
+              </div>
+            </label>
+          );
+        })}
+      </RadioGroup>
 
-      <ListHeader
-        size="medium"
-        descriptionPosition="bottom"
-        title={<ListHeader.TitleParagraph>두 안은 이것이 달라요</ListHeader.TitleParagraph>}
+      <SectionHeader
+        title="두 안은 이것이 달라요"
         description={
-          <ListHeader.DescriptionParagraph>
-            {differences.length > 0 ? "일정 구조, 예약 현실성, 비용, 의견 순서로 정리했어요." : "판단에 영향을 줄 만한 차이가 없어요."}
-          </ListHeader.DescriptionParagraph>
+          differences.length > 0
+            ? "일정 구조, 예약 현실성, 비용, 의견 순서로 정리했어요."
+            : "판단에 영향을 줄 만한 차이가 없어요."
         }
       />
 
       {differences.length > 0 ? (
-        <List aria-label="여행안이 다른 항목" css={differenceListStyle}>
+        <MobileList aria-label="여행안이 다른 항목" className="mb-7">
           {differences.map((difference) => (
-            <ListRow
-              key={difference.kind}
-              border="indented"
-              verticalPadding="medium"
-              horizontalPadding="small"
-              contents={
-                <div css={differenceContentsStyle}>
-                  <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                    {difference.label}
-                  </Text>
-                  <div css={differenceValuesStyle}>
-                    <div css={differenceValueStyle}>
-                      <span css={differencePlanLabelStyle}>{difference.leftPlanLabel}</span>
-                      <Text typography="t7" color="var(--adaptiveGrey800, #333d4b)" css={differenceValueTextStyle}>
-                        {difference.leftValue}
-                      </Text>
-                    </div>
-                    <div css={differenceValueStyle}>
-                      <span css={differencePlanLabelStyle}>{difference.rightPlanLabel}</span>
-                      <Text typography="t7" color="var(--adaptiveGrey800, #333d4b)" css={differenceValueTextStyle}>
-                        {difference.rightValue}
-                      </Text>
-                    </div>
-                  </div>
-                  {difference.deltaText && <span css={differenceDeltaStyle}>{difference.deltaText}</span>}
+            <MobileListItem key={difference.kind}>
+              <ItemTitle>{difference.label}</ItemTitle>
+              <div className="flex flex-col gap-2 pt-1.5">
+                <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-start gap-2">
+                  <span className="text-xs leading-relaxed font-bold text-muted-foreground">
+                    {difference.leftPlanLabel}
+                  </span>
+                  <span className="min-w-0 text-[13px] break-words text-secondary-foreground">
+                    {difference.leftValue}
+                  </span>
                 </div>
-              }
-            />
-          ))}
-        </List>
-      ) : (
-        <List aria-label="여행안이 같은 항목" css={differenceListStyle}>
-          <ListRow
-            border="indented"
-            verticalPadding="medium"
-            horizontalPadding="small"
-            contents={
-              <div css={emptyDifferenceStyle}>
-                <Text typography="t6" fontWeight="bold" color="var(--adaptiveGrey900, #191f28)">
-                  핵심 구성은 같아요
-                </Text>
-                <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                  같은 항목은 접어두고 선택만 쉽게 했어요.
-                </Text>
+                <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-start gap-2">
+                  <span className="text-xs leading-relaxed font-bold text-muted-foreground">
+                    {difference.rightPlanLabel}
+                  </span>
+                  <span className="min-w-0 text-[13px] break-words text-secondary-foreground">
+                    {difference.rightValue}
+                  </span>
+                </div>
               </div>
-            }
-            right={<Badge size="small" variant="weak" color="green">차이 없음</Badge>}
-          />
-        </List>
+              {difference.deltaText && (
+                <span className="pt-1 text-xs font-bold text-info">{difference.deltaText}</span>
+              )}
+            </MobileListItem>
+          ))}
+        </MobileList>
+      ) : (
+        <MobileList aria-label="여행안이 같은 항목" className="mb-7">
+          <MobileListItem trailing={<Badge variant="success">차이 없음</Badge>}>
+            <ItemTitle>핵심 구성은 같아요</ItemTitle>
+            <ItemDescription>같은 항목은 접어두고 선택만 쉽게 했어요.</ItemDescription>
+          </MobileListItem>
+        </MobileList>
       )}
 
       {confirmState.kind === "LOCKED" && (
-        <FixedBottomCTA
-          containerStyle={fixedCtaContainerStyle}
-          onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
-        >
-          확정 일정 보기
-        </FixedBottomCTA>
+        <BottomAction>
+          <Button
+            type="button"
+            size="xl"
+            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+          >
+            확정 일정 보기
+          </Button>
+        </BottomAction>
       )}
 
       {confirmState.kind === "CONFIRMABLE" && (
-        <FixedBottomCTA
-          containerStyle={fixedCtaContainerStyle}
-          topAccessory={
+        <BottomAction
+          accessory={
             confirmError ? (
-              <span css={confirmErrorStyle} role="alert">
+              <span role="alert" className="block text-center text-[13px] leading-relaxed text-destructive-strong">
                 {confirmError}
               </span>
             ) : undefined
           }
-          disabled={confirmPlanMutation.isPending}
-          onClick={() => void handleConfirm()}
         >
-          {confirmPlanMutation.isPending ? "일정 확정 중..." : `선택한 '${selectedPlan.title}'으로 여행 확정하기`}
-        </FixedBottomCTA>
+          <Button
+            type="button"
+            size="xl"
+            disabled={confirmPlanMutation.isPending}
+            onClick={openConfirmSheet}
+          >
+            {confirmPlanMutation.isPending
+              ? "일정 확정 중..."
+              : `선택한 '${selectedPlan.title}'으로 여행 확정하기`}
+          </Button>
+        </BottomAction>
       )}
-    </div>
+
+      {/* 확정 요약 Drawer: 날짜/경로/비용/주의 항목을 다시 읽고 확정해요. */}
+      <Drawer
+        open={isConfirmSheetOpen}
+        onOpenChange={(open) => {
+          // 확정 요청 중에는 실수로 닫히지 않게 유지해요.
+          if (!open && !confirmPlanMutation.isPending) setIsConfirmSheetOpen(false);
+        }}
+        showSwipeHandle
+      >
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              이 여행안으로 확정할까요?
+            </DrawerTitle>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+            <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(selectedPlan)} />
+          </div>
+          <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
+            <Button
+              type="button"
+              size="xl"
+              variant="secondary"
+              disabled={confirmPlanMutation.isPending}
+              onClick={() => setIsConfirmSheetOpen(false)}
+            >
+              다시 보기
+            </Button>
+            <Button
+              type="button"
+              size="xl"
+              disabled={confirmPlanMutation.isPending}
+              onClick={() => void handleConfirmSubmit()}
+            >
+              {confirmPlanMutation.isPending ? "확정 중..." : "확정하기"}
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </PageBody>
   );
 }

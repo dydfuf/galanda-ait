@@ -35,15 +35,25 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 
 # galanda
 
-## Apps in Toss
+## Web/PWA (기본)
 
 ```bash
-npm run dev
-npm run build
+npm run dev        # 일반 브라우저 개발
+npm run build      # Web/PWA production build (= build:web)
+```
+
+UI는 shadcn/ui(Base UI) + Tailwind CSS 기반이에요. 규칙은 `docs/ui-foundation.md`를 참고해요.
+
+## Apps in Toss (선택적 target)
+
+```bash
+npm run dev:ait    # AIT devtools를 켠 개발
+npm run build:ait  # Web bundle + AIT packaging
 npm run deploy
 ```
 
-플랫폼 설정은 `apps-in-toss.config.ts`에서 관리해요.
+플랫폼 설정은 `apps-in-toss.config.ts`에서, AIT SDK 사용은 `src/platform/ait/`에서 관리해요.
+일반 feature 코드는 `@apps-in-toss/*`를 직접 import하지 않아요.
 
 ## Effect with AI agents
 

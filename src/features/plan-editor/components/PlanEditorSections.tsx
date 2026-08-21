@@ -1,8 +1,12 @@
-import { css } from "@emotion/react";
-import { Badge, CTAButton, FixedBottomCTA, List, ListHeader, ListRow, Text, Top } from "@toss/tds-mobile";
 import { formatCostRangeText } from "../../../core/calculations/plan-cost.ts";
 import { getStayNightCount } from "../../../core/domain/room.ts";
-import { fixedCtaContainerStyle } from "../../common/tds-layout.ts";
+import { PageTitle } from "@/components/galanda/page-title.tsx";
+import { SectionHeader } from "@/components/galanda/section-header.tsx";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
 import type { PlanEditorSection } from "../plan-editor-section.ts";
 import { AccommodationSection } from "./AccommodationSection.tsx";
@@ -24,36 +28,6 @@ interface PlanEditorSectionsProps {
   readonly onCompleteSection: () => void;
 }
 
-const contentsStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const listStyle = css`
-  margin-bottom: 20px;
-`;
-
-const sectionFormStyle = css`
-  padding-bottom: var(--app-cta-space, 112px);
-`;
-
-const conflictActionsStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 0 20px;
-`;
-
-function statusBadge(label: string, complete: boolean): JSX.Element {
-  return (
-    <Badge size="small" variant="weak" color={complete ? "blue" : "elephant"}>
-      {label}
-    </Badge>
-  );
-}
-
 function SummaryRow({
   title,
   summary,
@@ -68,21 +42,15 @@ function SummaryRow({
   readonly onClick: () => void;
 }): JSX.Element {
   return (
-    <ListRow
-      border="indented"
-      verticalPadding="medium"
-      horizontalPadding="small"
-      withTouchEffect
-      arrowType="right"
+    <MobileListItem
+      chevron
       onClick={onClick}
-      contents={
-        <div css={contentsStyle}>
-          <Text typography="t6" fontWeight="bold">{title}</Text>
-          <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">{summary}</Text>
-        </div>
-      }
-      right={statusBadge(status, complete)}
-    />
+      className="px-2"
+      trailing={<Badge variant={complete ? "info" : "neutral"}>{status}</Badge>}
+    >
+      <ItemTitle>{title}</ItemTitle>
+      <ItemDescription>{summary}</ItemDescription>
+    </MobileListItem>
   );
 }
 
@@ -108,21 +76,18 @@ export function PlanEditorSections({
   if (editor.draftConflict) {
     return (
       <>
-        <Top
-          title={<Top.TitleParagraph>공개된 여행안이 변경됐어요</Top.TitleParagraph>}
-          subtitleBottom={
-            <Top.SubtitleParagraph>
-              저장된 임시안은 이전 공개본을 기준으로 작성됐습니다. 사용할 내용을 선택해주세요.
-            </Top.SubtitleParagraph>
-          }
+        <PageTitle
+          className="px-0"
+          title="공개된 여행안이 변경됐어요"
+          description="저장된 임시안은 이전 공개본을 기준으로 작성됐습니다. 사용할 내용을 선택해주세요."
         />
-        <div css={conflictActionsStyle} role="alert">
-          <CTAButton variant="weak" onClick={editor.restoreConflictingDraft}>
+        <div className="flex flex-col gap-2 pt-2" role="alert">
+          <Button type="button" size="xl" variant="secondary" onClick={editor.restoreConflictingDraft}>
             이전 임시안 복원
-          </CTAButton>
-          <CTAButton onClick={editor.useLatestPublishedPlan}>
+          </Button>
+          <Button type="button" size="xl" onClick={editor.useLatestPublishedPlan}>
             최신 공개본으로 시작
-          </CTAButton>
+          </Button>
         </div>
       </>
     );
@@ -146,16 +111,12 @@ export function PlanEditorSections({
           <DiffBanner diff={editor.diffFromOriginal} originalTitle={cloneTitle} />
         )}
 
-        <ListHeader
-          size="small"
-          title={<ListHeader.TitleParagraph>여행안 구성</ListHeader.TitleParagraph>}
-          description={
-            <ListHeader.DescriptionParagraph>
-              항목을 하나씩 열어 내용을 정리해주세요.
-            </ListHeader.DescriptionParagraph>
-          }
+        <SectionHeader
+          className="px-0"
+          title="여행안 구성"
+          description="항목을 하나씩 열어 내용을 정리해주세요."
         />
-        <List aria-label="여행안 편집 항목" css={listStyle}>
+        <MobileList aria-label="여행안 편집 항목" className="mb-5">
           <SummaryRow
             title="기본 정보"
             summary={editor.title.trim() || "여행안 이름을 입력해주세요."}
@@ -184,47 +145,37 @@ export function PlanEditorSections({
             complete={transportChecks === 0}
             onClick={() => onOpenSection("transport")}
           />
-          <ListRow
-            border="none"
-            verticalPadding="medium"
-            horizontalPadding="small"
-            contents={
-              <div css={contentsStyle}>
-                <Text typography="t6" fontWeight="bold">예상 비용</Text>
-                <Text typography="t7" color="var(--adaptiveGrey600, #6b7684)">
-                  {editor.costSummary.baseHeadcount}명 기준 1인 예상 참고액
-                </Text>
-              </div>
-            }
-            right={<Text typography="t6" fontWeight="bold">{perPersonCost}</Text>}
-          />
-        </List>
+          <MobileListItem
+            className="px-2"
+            trailing={<span className="text-[15px] font-bold text-foreground">{perPersonCost}</span>}
+          >
+            <ItemTitle>예상 비용</ItemTitle>
+            <ItemDescription>
+              {editor.costSummary.baseHeadcount}명 기준 1인 예상 참고액
+            </ItemDescription>
+          </MobileListItem>
+        </MobileList>
       </>
     );
   }
 
   return (
     <>
-      <Top
+      <PageTitle
+        className="px-0"
         title={
-          <Top.TitleParagraph>
-            {section === "basic"
-              ? "기본 정보"
-              : section === "route"
-                ? "여행 경로"
-                : section === "accommodation"
-                  ? "숙소"
-                  : "교통"}
-          </Top.TitleParagraph>
+          section === "basic"
+            ? "기본 정보"
+            : section === "route"
+              ? "여행 경로"
+              : section === "accommodation"
+                ? "숙소"
+                : "교통"
         }
-        subtitleBottom={
-          <Top.SubtitleParagraph>
-            입력한 내용은 임시안에 자동 저장돼요.
-          </Top.SubtitleParagraph>
-        }
+        description="입력한 내용은 임시안에 자동 저장돼요."
       />
 
-      <form css={sectionFormStyle} onSubmit={(event) => event.preventDefault()}>
+      <form className="pb-(--app-cta-space)" onSubmit={(event) => event.preventDefault()}>
         {section === "basic" && (
           <BasicInfoSection
             title={editor.title}
@@ -265,9 +216,11 @@ export function PlanEditorSections({
         )}
       </form>
 
-      <FixedBottomCTA containerStyle={fixedCtaContainerStyle} onClick={onCompleteSection}>
-        편집 완료
-      </FixedBottomCTA>
+      <BottomAction>
+        <Button type="button" size="xl" onClick={onCompleteSection}>
+          편집 완료
+        </Button>
+      </BottomAction>
     </>
   );
 }

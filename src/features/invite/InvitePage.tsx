@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { Button } from "@/components/ui/button.tsx";
 import { useParams, useNavigate } from "react-router-dom";
 import { decodeRouteParams, InviteParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -26,11 +26,11 @@ const pageContainerStyle = css`
 `;
 
 const cardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
+  background-color: var(--background);
   border-radius: 20px;
   padding: 32px 24px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  border: 1px solid var(--border);
   max-width: 400px;
   width: 100%;
   text-align: center;
@@ -47,25 +47,25 @@ const titleStyle = css`
   font-size: 20px;
   font-weight: 700;
   margin: 0 0 8px 0;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
 `;
 
 const descriptionStyle = css`
   font-size: 14px;
-  color: var(--adaptiveGrey600, #6b7684);
+  color: var(--muted-foreground);
   margin: 0 0 24px 0;
   line-height: 1.5;
 `;
 
 const summaryBoxStyle = css`
-  background-color: var(--adaptiveGrey50, #f9fafb);
+  background-color: var(--surface-subtle);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 24px;
   text-align: left;
   font-size: 13px;
-  color: var(--adaptiveGrey700, #4e5968);
-  border: 1px solid var(--adaptiveGrey100, #f2f4f6);
+  color: var(--foreground-muted);
+  border: 1px solid var(--muted);
 `;
 
 const summaryRowStyle = css`
@@ -73,12 +73,12 @@ const summaryRowStyle = css`
 `;
 
 const summaryLabelStyle = css`
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--foreground-subtle);
 `;
 
 const codeStyle = css`
   font-size: 12px;
-  background-color: var(--adaptiveGrey100, #eceef0);
+  background-color: var(--muted);
   padding: 2px 6px;
   border-radius: 4px;
   font-family: inherit;
@@ -87,7 +87,7 @@ const codeStyle = css`
 
 const errorMessageStyle = css`
   font-size: 13px;
-  color: var(--adaptiveRed600, #e0383e);
+  color: var(--destructive-strong);
   margin: 12px 0 0 0;
   line-height: 1.5;
 `;
@@ -97,12 +97,12 @@ const backHomeLinkStyle = css`
   background: none;
   border: none;
   font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: var(--foreground-subtle);
   cursor: pointer;
   padding: 6px 10px;
 
   &:hover {
-    color: var(--adaptiveGrey800, #333d4b);
+    color: var(--secondary-foreground);
   }
 `;
 
@@ -149,7 +149,7 @@ export function InvitePage(): JSX.Element {
   if (isLoading) {
     return (
       <div css={pageContainerStyle}>
-        <p style={{ color: "var(--adaptiveGrey500, #8b95a1)" }}>초대장 정보를 확인하는 중...</p>
+        <p style={{ color: "var(--foreground-subtle)" }}>초대장 정보를 확인하는 중...</p>
       </div>
     );
   }
@@ -164,9 +164,9 @@ export function InvitePage(): JSX.Element {
             초대 링크의 여행방이 이미 삭제되었거나 존재하지 않습니다.
           </p>
           <Button
-            display="block"
-            size="medium"
             type="button"
+            size="lg"
+            className="w-full"
             onClick={() => navigate("/trips", { replace: true })}
           >
             내 여행 목록으로 가기
@@ -208,9 +208,9 @@ export function InvitePage(): JSX.Element {
         </div>
 
         <Button
-          display="block"
-          size="large"
           type="button"
+          size="xl"
+          className="w-full"
           disabled={isAccepting}
           onClick={handleAccept}
         >
