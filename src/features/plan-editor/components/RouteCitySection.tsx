@@ -3,11 +3,11 @@ import { getStayNightCount, type CityStay } from "../../../core/domain/room.ts";
 import { RouteRail } from "../../common/RouteRail.tsx";
 
 const cardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
+  background-color: var(--background);
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  border: 1px solid var(--border);
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
@@ -23,7 +23,7 @@ const sectionHeaderStyle = css`
 const sectionTitleStyle = css`
   font-size: 16px;
   font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
   margin: 0;
 `;
 
@@ -32,13 +32,13 @@ const nightsStatusBadgeStyle = (isMatch: boolean) => css`
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 6px;
-  background-color: ${isMatch ? "var(--adaptiveBlue50, #e8f3ff)" : "var(--adaptiveRed50, #ffeeee)"};
-  color: ${isMatch ? "var(--adaptiveBlue600, #1b64da)" : "var(--adaptiveRed600, #e11d48)"};
+  background-color: ${isMatch ? "var(--info-muted)" : "#ffeeee"};
+  color: ${isMatch ? "var(--info)" : "var(--destructive-strong)"};
 `;
 
 const previewBoxStyle = css`
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  background-color: #f9fafb;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 14px;
 `;
@@ -46,7 +46,7 @@ const previewBoxStyle = css`
 const previewLabelStyle = css`
   font-size: 11px;
   font-weight: 700;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: #8b95a1;
   margin-bottom: 6px;
   display: block;
 `;
@@ -61,8 +61,8 @@ const cityRowStyle = css`
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: var(--adaptiveGrey50, #f9fafb);
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  background-color: #f9fafb;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 12px;
 `;
@@ -70,7 +70,7 @@ const cityRowStyle = css`
 const cityIndexStyle = css`
   font-size: 13px;
   font-weight: 700;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: #8b95a1;
   min-width: 18px;
 `;
 
@@ -78,43 +78,43 @@ const cityInputStyle = css`
   flex: 1;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid var(--adaptiveGrey300, #d1d6db);
+  border: 1px solid #d1d6db;
   font-size: 14px;
   outline: none;
-  background-color: var(--adaptiveBackground, #ffffff);
-  color: var(--adaptiveGrey900, #191f28);
+  background-color: var(--background);
+  color: var(--foreground);
 
   &:focus {
-    border-color: var(--adaptiveBlue500, #3182f6);
+    border-color: var(--primary);
   }
 `;
 
 const deleteCityBtnStyle = css`
   background: none;
   border: none;
-  color: var(--adaptiveGrey400, #b0b8c1);
+  color: #b0b8c1;
   font-size: 16px;
   cursor: pointer;
   padding: 4px;
 
   &:hover {
-    color: var(--adaptiveRed500, #f04452);
+    color: var(--destructive);
   }
 `;
 
 const addCityButtonStyle = css`
   padding: 10px 14px;
-  border: 1px dashed var(--adaptiveBlue300, #82b6ff);
-  background-color: var(--adaptiveBlue50, #f2f7ff);
+  border: 1px dashed #82b6ff;
+  background-color: var(--info-muted);
   border-radius: 10px;
-  color: var(--adaptiveBlue600, #1b64da);
+  color: var(--info);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
   transition: background-color 0.15s ease;
 
   &:hover {
-    background-color: var(--adaptiveBlue100, #e0edff);
+    background-color: #e0edff;
   }
 `;
 

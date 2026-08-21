@@ -27,7 +27,7 @@ const pageContainerStyle = css`
 const loadingContainerStyle = css`
   padding: 40px 20px;
   text-align: center;
-  color: var(--adaptiveGrey600, #6b7684);
+  color: var(--muted-foreground);
   font-size: 15px;
 `;
 
@@ -35,7 +35,7 @@ const loadingContainerStyle = css`
 const errorMessageStyle = css`
   display: block;
   font-size: 13px;
-  color: var(--adaptiveRed600, #e0383e);
+  color: var(--destructive-strong);
   margin: 8px 0 0 0;
   text-align: center;
   line-height: 1.5;

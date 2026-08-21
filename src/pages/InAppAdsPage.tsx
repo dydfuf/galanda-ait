@@ -24,7 +24,7 @@ const backButtonStyle = css`
   padding: 6px 8px;
   cursor: pointer;
   font-size: 15px;
-  color: var(--adaptiveGrey800, #333d4b);
+  color: var(--secondary-foreground);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -33,7 +33,7 @@ const backButtonStyle = css`
 
   &:active {
     opacity: 0.7;
-    background-color: var(--adaptiveGrey100, #f2f4f6);
+    background-color: var(--muted);
   }
 `;
 
@@ -45,12 +45,12 @@ const titleStyle = css`
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 4px 0;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
 `;
 
 const subtitleStyle = css`
   font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: #8b95a1;
   margin: 0;
 `;
 
@@ -61,10 +61,10 @@ const sectionListStyle = css`
 `;
 
 const sectionCardStyle = css`
-  background-color: var(--adaptiveBackground, #ffffff);
+  background-color: var(--background);
   border-radius: 16px;
   padding: 18px 20px;
-  border: 1px solid var(--adaptiveGrey200, #e5e8eb);
+  border: 1px solid var(--border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
@@ -85,21 +85,21 @@ const sectionInfoStyle = css`
 const sectionTitleStyle = css`
   font-size: 16px;
   font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
   margin: 0 0 4px 0;
 `;
 
 const sectionDescStyle = css`
   font-size: 13px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: #8b95a1;
   margin: 0;
 `;
 
 const actionButtonStyle = css`
   padding: 8px 16px;
   border-radius: 8px;
-  background-color: var(--adaptiveBlue50, #e8f3ff);
-  color: var(--adaptiveBlue600, #1b64da);
+  background-color: var(--info-muted);
+  color: var(--info);
   font-size: 14px;
   font-weight: 700;
   border: none;
@@ -123,10 +123,10 @@ const actionButtonStyle = css`
 const rewardMessageStyle = css`
   font-size: 13px;
   font-weight: 600;
-  color: var(--adaptiveBlue500, #3182f6);
+  color: var(--primary);
   margin: 4px 0 0 0;
   padding-top: 8px;
-  border-top: 1px solid var(--adaptiveGrey100, #f2f4f6);
+  border-top: 1px solid var(--muted);
 `;
 
 export function InAppAdsPage({ onBack }: InAppAdsPageProps) {

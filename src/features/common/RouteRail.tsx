@@ -41,7 +41,7 @@ const segmentBoxStyle = css`
   display: flex;
   flex-direction: column;
   align-items: center;
-  background-color: var(--adaptiveGrey100, #f2f4f6);
+  background-color: var(--muted);
   padding: 6px 10px;
   border-radius: 8px;
   min-width: 54px;
@@ -50,25 +50,25 @@ const segmentBoxStyle = css`
 const cityStyle = css`
   font-size: 13px;
   font-weight: 700;
-  color: var(--adaptiveGrey800, #333d4b);
+  color: var(--secondary-foreground);
 `;
 
 const nightsStyle = css`
   font-size: 11px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: #8b95a1;
   margin-top: 2px;
   font-weight: 500;
 `;
 
 const arrowStyle = css`
-  color: var(--adaptiveGrey400, #b0b8c1);
+  color: #b0b8c1;
   font-size: 12px;
   font-weight: 700;
 `;
 
 const differenceStyle = css`
   font-size: 12px;
-  color: var(--adaptiveBlue500, #3182f6);
+  color: var(--primary);
   font-weight: 600;
   margin: 2px 0 0 0;
 `;

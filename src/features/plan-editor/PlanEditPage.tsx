@@ -39,13 +39,13 @@ const pageContainerStyle = css`
 const loadingContainerStyle = css`
   padding: 40px 20px;
   text-align: center;
-  color: var(--adaptiveGrey600, #6b7684);
+  color: var(--muted-foreground);
   font-size: 15px;
 `;
 
 const actionErrorStyle = css`
   display: block;
-  color: var(--adaptiveRed600, #e0383e);
+  color: var(--destructive-strong);
   font-size: 13px;
   line-height: 1.5;
   text-align: center;

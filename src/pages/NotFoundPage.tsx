@@ -23,12 +23,12 @@ const titleStyle = css`
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 8px 0;
-  color: var(--adaptiveGrey900, #191f28);
+  color: var(--foreground);
 `;
 
 const descStyle = css`
   font-size: 14px;
-  color: var(--adaptiveGrey500, #8b95a1);
+  color: #8b95a1;
   margin: 0 0 24px 0;
   line-height: 1.5;
 `;
