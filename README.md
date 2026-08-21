@@ -55,6 +55,19 @@ npm run deploy
 플랫폼 설정은 `apps-in-toss.config.ts`에서, AIT SDK 사용은 `src/platform/ait/`에서 관리해요.
 일반 feature 코드는 `@apps-in-toss/*`를 직접 import하지 않아요.
 
+## CI
+
+Node 24를 사용하며, `main`에 merge하려면 `CI / verify` required check가 통과해야 해요.
+PR은 최신 `main`과 동기화된 상태에서 아래 명령을 모두 통과해야 해요.
+
+```bash
+npm ci
+npm run lint
+npm test
+npm run build
+npm run build:ait
+```
+
 ## Effect with AI agents
 
 `repos/effect` vendors the source matching the installed `effect` package so coding agents can follow real Effect patterns. Application code imports from `effect`, never from `repos/effect`.
