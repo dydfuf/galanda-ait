@@ -45,9 +45,6 @@ export const useSubmitOpinionMutation = (): UseMutationResult<
           expectedRevision: RevisionSchema.make(expectedRevision),
         })
       ),
-    onSuccess: (): void => {
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
 };
-

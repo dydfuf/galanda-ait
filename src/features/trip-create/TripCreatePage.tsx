@@ -53,7 +53,7 @@ export function TripCreatePage() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
-      {!platformNavigation && <PageHeader back={{ onClick: goBack }} />}
+      {!platformNavigation && <PageHeader back={{ onClick: () => void goBack() }} />}
 
       <main className="flex flex-1 flex-col">
         <PageBody withBottomAction>

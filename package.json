@@ -13,7 +13,10 @@
     "build:web": "npm run build",
     "build:ait": "tsc -b && vite build --mode ait && ait build",
     "lint": "oxlint --disable-nested-config",
+    "lint:fix": "oxlint --disable-nested-config --fix",
+    "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
+    "check": "npm run lint && npm test && npm run build && npm run build:ait",
     "preview": "vite preview",
     "deploy": "ait deploy"
   },
@@ -44,8 +47,9 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.4",
-    "oxlint": "^1.75.0",
-    "typescript": "~6.0.2",
+    "oxlint": "^1.79.0",
+    "oxlint-tsgolint": "~7.0.2001",
+    "typescript": "~7.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.11"
   }

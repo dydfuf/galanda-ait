@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Layer, Option } from "effect";
 import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../domain/ids.ts";
-import type { TripMember, TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
+import type { PlanMemberOpinion, TripMember, TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
 import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession } from "../../ports/session.ts";
 import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams } from "../../ports/trip-room-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
@@ -22,7 +22,7 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "../../domain/errors.ts";
-import { IdGenerator } from "../../ports/id-generator.ts";
+import type { IdGenerator } from "../../ports/id-generator.ts";
 import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
 
 /**
@@ -208,7 +208,7 @@ const createInMemoryRepositoryLayer = (
     setPlanOpinion: (
       roomId: typeof TripIdSchema.Type,
       planId: typeof PlanIdSchema.Type,
-      opinion: typeof import("../../domain/room.ts").PlanMemberOpinionSchema.Type,
+      opinion: PlanMemberOpinion,
       expectedRevision: typeof RevisionSchema.Type
     ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);

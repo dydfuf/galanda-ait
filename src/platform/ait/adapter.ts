@@ -79,9 +79,9 @@ export const aitAdapter: PlatformAdapter = {
       await webAdapter.openExternalUrl(url);
     }
   },
-  requestClose: () => {
+  requestClose: async () => {
     try {
-      Screen.close();
+      await Screen.close();
       return true;
     } catch {
       return false;

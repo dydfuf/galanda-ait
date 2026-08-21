@@ -137,7 +137,7 @@ export function InvitePage(): JSX.Element {
           roomId: TripIdSchema.make(room.id),
         })
       );
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
+      await queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
       navigate(`/trips/${room.id}/plans`, { replace: true });
     } catch (err: unknown) {
       // 비로그인·세션 조회 실패 등 참여 실패 사유를 화면에 그대로 전달한다
@@ -212,7 +212,7 @@ export function InvitePage(): JSX.Element {
           size="xl"
           className="w-full"
           disabled={isAccepting}
-          onClick={handleAccept}
+          onClick={() => void handleAccept()}
         >
           {isAccepting ? "참여하는 중..." : "초대 수락하고 참여하기"}
         </Button>

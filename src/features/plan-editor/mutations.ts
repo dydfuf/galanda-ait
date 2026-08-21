@@ -27,9 +27,7 @@ export const useCreatePlanMutation = (): UseMutationResult<
           ...command,
         })
       ),
-    onSuccess: (): void => {
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
 };
 
@@ -56,9 +54,7 @@ export const useUpdatePlanMutation = (): UseMutationResult<
           expectedRevision: RevisionSchema.make(expectedRevision),
         })
       ),
-    onSuccess: (): void => {
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
 };
 
@@ -85,8 +81,6 @@ export const useDeletePlanMutation = (): UseMutationResult<
           expectedRevision: RevisionSchema.make(expectedRevision),
         })
       ),
-    onSuccess: (): void => {
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
 };

@@ -39,6 +39,6 @@ export const webAdapter: PlatformAdapter = {
   openExternalUrl: async (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   },
-  requestClose: () => false,
+  requestClose: async () => false,
   navigation: undefined,
 };

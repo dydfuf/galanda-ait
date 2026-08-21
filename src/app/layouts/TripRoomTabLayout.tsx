@@ -100,7 +100,7 @@ export function TripRoomTabLayout() {
         sticky
         bordered
         title={showHeaderBar ? "여행방" : undefined}
-        back={showHeaderBar ? { onClick: goBack } : undefined}
+        back={showHeaderBar ? { onClick: () => void goBack() } : undefined}
         action={
           showHeaderBar ? (
             <Button type="button" variant="ghost" className="text-primary" onClick={() => void handleShareInvite()}>

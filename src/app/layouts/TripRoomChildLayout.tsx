@@ -39,7 +39,7 @@ export function TripRoomChildLayout() {
           sticky
           bordered
           title={resolveTitle(location.pathname)}
-          back={{ onClick: goBack }}
+          back={{ onClick: () => void goBack() }}
         />
       )}
 

@@ -384,7 +384,7 @@ export function PlanDetailPage(): JSX.Element {
         initialReaction={plan.myReaction as ReactionType | undefined}
         initialReason={plan.myOpinionReason ?? ""}
         isSubmitting={submitOpinionMutation.isPending}
-        onSubmit={handleOpinionSubmit}
+        onSubmit={(reaction, reason) => void handleOpinionSubmit(reaction, reason)}
       />
     </PageBody>
   );

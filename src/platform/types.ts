@@ -44,7 +44,7 @@ export interface PlatformAdapter {
   /** 예약/교통 링크 등 앱 밖 URL 열기. */
   readonly openExternalUrl: (url: string) => Promise<void>;
   /** 미니앱/네이티브 화면 닫기. 처리했으면 true, 브라우저처럼 닫을 수 없으면 false. */
-  readonly requestClose: () => boolean;
+  readonly requestClose: () => Promise<boolean>;
   /**
    * 네이티브 shell navigation.
    * AIT 빌드라도 실제 토스 앱 WebView가 아니면 undefined예요(= 웹 헤더를 그려야 해요).
