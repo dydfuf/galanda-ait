@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { Button } from "@/components/ui/button.tsx";
 import { useParams, useNavigate } from "react-router-dom";
 import { decodeRouteParams, InviteParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -164,9 +164,9 @@ export function InvitePage(): JSX.Element {
             초대 링크의 여행방이 이미 삭제되었거나 존재하지 않습니다.
           </p>
           <Button
-            display="block"
-            size="medium"
             type="button"
+            size="lg"
+            className="w-full"
             onClick={() => navigate("/trips", { replace: true })}
           >
             내 여행 목록으로 가기
@@ -208,9 +208,9 @@ export function InvitePage(): JSX.Element {
         </div>
 
         <Button
-          display="block"
-          size="large"
           type="button"
+          size="xl"
+          className="w-full"
           disabled={isAccepting}
           onClick={handleAccept}
         >

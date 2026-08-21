@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { BottomSheet, CTAButton, FixedBottomCTA, useBottomSheet } from "@toss/tds-mobile";
+import { BottomSheet, useBottomSheet } from "@toss/tds-mobile";
+import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
@@ -8,7 +10,6 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { toUserMessage } from "../common/error-message.ts";
 import { canManagePlan } from "../../core/domain/auth-guards.ts";
-import { fixedCtaContainerStyle } from "../common/tds-layout.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
@@ -225,45 +226,46 @@ export function PlanEditPage(): JSX.Element {
         onCompleteSection={completeSection}
       />
 
-      {/* 화면 하단 고정 CTA: safe-area와 모바일 키보드는 TDS가 처리해요. */}
-      {!section && !editor.draftConflict && <FixedBottomCTA.Double
-        containerStyle={fixedCtaContainerStyle}
-        topAccessory={
-          editor.validation.firstError || actionError ? (
-            <>
-              {actionError && (
-                <span css={actionErrorStyle} role="alert">
-                  {actionError}
-                </span>
-              )}
-              {editor.validation.firstError && (
-                <ValidationBanner
-                  firstError={editor.validation.firstError}
-                  errorCount={editor.validation.errorCount}
-                />
-              )}
-            </>
-          ) : undefined
-        }
-        leftButton={
-          <CTAButton
-            color="danger"
-            variant="weak"
+      {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
+      {!section && !editor.draftConflict && (
+        <BottomAction
+          accessory={
+            editor.validation.firstError || actionError ? (
+              <>
+                {actionError && (
+                  <span css={actionErrorStyle} role="alert">
+                    {actionError}
+                  </span>
+                )}
+                {editor.validation.firstError && (
+                  <ValidationBanner
+                    firstError={editor.validation.firstError}
+                    errorCount={editor.validation.errorCount}
+                  />
+                )}
+              </>
+            ) : undefined
+          }
+        >
+          <Button
+            type="button"
+            size="xl"
+            variant="destructive"
             disabled={isSubmitting}
             onClick={() => void handleDelete()}
           >
             삭제하기
-          </CTAButton>
-        }
-        rightButton={
-          <CTAButton
+          </Button>
+          <Button
+            type="button"
+            size="xl"
             disabled={!editor.validation.isValid || isSubmitting}
             onClick={() => void handleSubmit()}
           >
             {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
-          </CTAButton>
-        }
-      />}
+          </Button>
+        </BottomAction>
+      )}
     </div>
   );
 }

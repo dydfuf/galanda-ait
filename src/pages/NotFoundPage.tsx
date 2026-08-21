@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { Button } from "@toss/tds-mobile";
+import { Button } from "@/components/ui/button.tsx";
 import { useNavigate } from "react-router-dom";
 
 const containerStyle = css`
@@ -48,8 +48,8 @@ export function NotFoundPage() {
         요청하신 페이지가 삭제되었거나 주소가 잘못되었습니다.
       </p>
       <Button
-        size="medium"
         type="button"
+        size="lg"
         onClick={() => navigate("/trips", { replace: true })}
       >
         여행 목록으로 이동
