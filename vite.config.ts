@@ -6,9 +6,10 @@ import tailwindcss from '@tailwindcss/vite'
 import aitDevtools from "@apps-in-toss/devtools/unplugin";
 
 // https://vite.dev/config/
-export default defineConfig({
+// 기본(dev/build)은 일반 Web/PWA이고, `--mode ait`(dev:ait/build:ait)에서만 AIT tooling을 켜요.
+export default defineConfig(({ mode }) => ({
   plugins: [
-    aitDevtools.vite(),
+    ...(mode === 'ait' ? [aitDevtools.vite()] : []),
     tailwindcss(),
     react({
       jsxImportSource: '@emotion/react',
@@ -16,7 +17,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
-})
+}))

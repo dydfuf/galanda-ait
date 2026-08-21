@@ -1,5 +1,5 @@
 import { css } from "@emotion/react";
-import { useInAppAds } from "../hooks/useInAppAds";
+import { useInAppAds } from "@/platform/ait/useInAppAds.tsx";
 import { useAppNavigation } from "../hooks/useAppNavigation.ts";
 
 // TODO: 서비스를 출시하기 전에 앱인토스 콘솔에서 발급한 광고 그룹 ID로 변경해 주세요.

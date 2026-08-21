@@ -1,4 +1,3 @@
-import { Clipboard, Share } from "@apps-in-toss/web-framework";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -6,6 +5,7 @@ import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
 import { Result } from "effect";
 import { useAppNavigation } from "../../hooks/useAppNavigation.ts";
+import { platform } from "../../platform/index.ts";
 import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
@@ -31,44 +31,17 @@ export function TripRoomTabLayout() {
   const selectedTab: TabPath = location.pathname.endsWith("/itinerary") ? "itinerary" : "plans";
 
   const handleShareInvite = useCallback(async () => {
-    const inviteUrl = `${window.location.origin}/invites/invite-${tripId}`;
+    const outcome = await platform.share({
+      title: "Galanda 여행 초대",
+      text: "여행방에 참여해 주세요.",
+      url: `${window.location.origin}/invites/invite-${tripId}`,
+    });
 
-    try {
-      await Share.sendMessage({ message: inviteUrl });
+    if (outcome === "shared") {
       toast("초대 링크를 공유했어요.");
-      return;
-    } catch {
-      // 브라우저나 미지원 앱 버전에서는 아래 fallback을 시도해요.
-    }
-
-    try {
-      if (typeof navigator.share === "function") {
-        await navigator.share({
-          title: "Galanda 여행 초대",
-          text: "여행방에 참여해 주세요.",
-          url: inviteUrl,
-        });
-        toast("초대 링크를 공유했어요.");
-        return;
-      }
-    } catch {
-      // 사용자가 공유 시트를 닫은 경우도 다음 fallback으로 복구해요.
-    }
-
-    try {
-      await Clipboard.setText(inviteUrl);
+    } else if (outcome === "copied") {
       toast("초대 링크를 복사했어요.");
-      return;
-    } catch {
-      // 토스 앱 밖에서는 플랫폼 clipboard가 없을 수 있어요.
-    }
-
-    try {
-      if (!navigator.clipboard) throw new Error("clipboard is unavailable");
-      await navigator.clipboard.writeText(inviteUrl);
-      toast("초대 링크를 복사했어요.");
-      return;
-    } catch {
+    } else {
       toast("공유를 지원하지 않는 환경이에요. 토스 앱에서 다시 시도해 주세요.");
     }
   }, [tripId]);

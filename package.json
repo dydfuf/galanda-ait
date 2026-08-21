@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && ait build",
+    "dev:ait": "vite --mode ait",
+    "build": "tsc -b && vite build",
+    "build:web": "npm run build",
+    "build:ait": "tsc -b && vite build --mode ait && ait build",
     "lint": "oxlint --disable-nested-config",
     "test": "vitest run",
     "preview": "vite preview",
