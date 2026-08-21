@@ -27,7 +27,7 @@ export function RouteErrorFallback({
     if (onAction) {
       onAction();
     } else {
-      navigate("/trips", { replace: true });
+      void navigate("/trips", { replace: true });
     }
   };
 

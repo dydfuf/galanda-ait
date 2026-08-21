@@ -1,4 +1,4 @@
-import { Schema, Result } from "effect";
+import { Schema, type Result } from "effect";
 import { TripIdSchema, PlanIdSchema, InviteTokenSchema } from "../../core/domain/ids.ts";
 
 export const TripParamsSchema = Schema.Struct({

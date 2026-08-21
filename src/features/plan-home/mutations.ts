@@ -32,9 +32,6 @@ export const useConfirmPlanMutation = (): UseMutationResult<
           RevisionSchema.make(revision)
         )
       ),
-    onSuccess: (): void => {
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
 };
-

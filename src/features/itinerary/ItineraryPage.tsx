@@ -101,7 +101,7 @@ export function ItineraryPage(): JSX.Element {
           title="아직 확정된 일정이 없어요"
           description="팀원들과 후보 여행안을 검토하고 마음에 드는 계획을 확정해보세요."
           actionText="후보 여행안 보러가기"
-          onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+          onAction={() => void navigate(`/trips/${tripId}/plans`, { replace: true })}
         />
       </PageBody>
     );
@@ -195,7 +195,7 @@ export function ItineraryPage(): JSX.Element {
       {/* 4. 하단 보조 작업: 후보 여행안 목록 보기 */}
       <div className="mt-6 pb-8">
         <MobileList aria-label="여행안 목록으로 이동">
-          <MobileListItem chevron onClick={() => navigate(`/trips/${tripId}/plans`)}>
+          <MobileListItem chevron onClick={() => void navigate(`/trips/${tripId}/plans`)}>
             <ItemTitle className="font-normal text-secondary-foreground">
               검토했던 여행안 기록 보기
             </ItemTitle>

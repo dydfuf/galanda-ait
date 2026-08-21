@@ -20,8 +20,6 @@ export const useCreateTripRoomMutation = (): UseMutationResult<
   return useMutation({
     mutationFn: (variables: CreateTripRoomVariables): Promise<TripRoom> =>
       appRuntime.runPromise(createTripRoom(variables)),
-    onSuccess: (): void => {
-      queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
 };

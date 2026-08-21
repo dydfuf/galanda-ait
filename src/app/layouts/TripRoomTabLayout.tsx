@@ -88,7 +88,7 @@ export function TripRoomTabLayout() {
 
   const handleTabChange = (value: unknown) => {
     const nextPath = TAB_PATHS.find((path) => path === value) ?? TAB_PATHS[0];
-    navigate(`/trips/${tripId}/${nextPath}`, { replace: true });
+    void navigate(`/trips/${tripId}/${nextPath}`, { replace: true });
   };
 
   // Apps in Toss에서는 shell이 back/title/accessory를 소유하고, 브라우저에서만 bar를 보여줘요.

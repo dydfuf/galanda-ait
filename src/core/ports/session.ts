@@ -1,9 +1,7 @@
 import { Context, Effect, Option } from "effect";
 import type { UserSession } from "../domain/room.ts";
-import {
-  SessionUnavailableError,
-  UnauthorizedError,
-} from "../domain/errors.ts";
+import { UnauthorizedError } from "../domain/errors.ts";
+import type { SessionUnavailableError } from "../domain/errors.ts";
 
 /**
  * 세션 조회 시 발생할 수 있는 오류

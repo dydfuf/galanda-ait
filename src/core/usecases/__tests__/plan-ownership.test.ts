@@ -31,7 +31,7 @@ import {
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
 import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
-import { IdGenerator } from "../../ports/id-generator.ts";
+import type { IdGenerator } from "../../ports/id-generator.ts";
 
 /**
  * 인메모리 테스트 레포지토리

@@ -122,7 +122,7 @@ export function PlanCreatePage(): JSX.Element {
       editor.discardDraft();
       const createdPlan = updatedRoom.plans[updatedRoom.plans.length - 1];
       if (createdPlan) {
-        navigate(`/trips/${tripId}/plans/${createdPlan.id}`, { replace: true });
+        await navigate(`/trips/${tripId}/plans/${createdPlan.id}`, { replace: true });
       }
     } catch (err: unknown) {
       // 비로그인·권한 부족 등 작성 실패 사유를 화면에 그대로 전달한다
@@ -133,15 +133,15 @@ export function PlanCreatePage(): JSX.Element {
 
   const editorBasePath = `/trips/${tripId}/plans/new`;
   const openSection = (nextSection: PlanEditorSection): void => {
-    navigate(`${editorBasePath}/${nextSection}${location.search}`, {
+    void navigate(`${editorBasePath}/${nextSection}${location.search}`, {
       state: { fromEditorSummary: true },
     });
   };
   const completeSection = (): void => {
     if ((location.state as { fromEditorSummary?: boolean } | null)?.fromEditorSummary) {
-      navigate(-1);
+      void navigate(-1);
     } else {
-      navigate(`${editorBasePath}${location.search}`, { replace: true });
+      void navigate(`${editorBasePath}${location.search}`, { replace: true });
     }
   };
 

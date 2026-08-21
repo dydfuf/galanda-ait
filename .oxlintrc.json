@@ -1,9 +1,226 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["repos/**"],
-  "plugins": ["react", "typescript", "oxc", "jsx-a11y"],
+  "ignorePatterns": ["repos/**", "dist/**"],
+  "plugins": [
+    "eslint",
+    "react",
+    "unicorn",
+    "typescript",
+    "oxc",
+    "jsx-a11y",
+    "import",
+    "vitest"
+  ],
+  "jsPlugins": [
+    {
+      "name": "@tanstack/query",
+      "specifier": "@tanstack/eslint-plugin-query"
+    }
+  ],
+  "options": {
+    "typeAware": true
+  },
+  "categories": {
+    "correctness": "error"
+  },
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react/exhaustive-deps": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+
+    "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/consistent-type-imports": "error",
+
+    "import/no-cycle": ["error", { "ignoreExternal": true, "ignoreTypes": true }],
+    "vitest/no-focused-tests": "error",
+
+    "@tanstack/query/exhaustive-deps": "error",
+    "@tanstack/query/stable-query-client": "error",
+    "@tanstack/query/no-unstable-deps": "error",
+    "@tanstack/query/no-void-query-fn": "error",
+
+    "eslint/no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "regex": "(^|/)repos(/|$)",
+            "message": "repos/는 read-only reference입니다. production source에서 import하지 마세요."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/core/domain/**/*.{ts,tsx}"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "importNames": ["ManagedRuntime"],
+                "message": "ManagedRuntime 생성은 src/app composition root에서만 허용합니다."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "(^|/)repos(/|$)",
+                "message": "repos/는 read-only reference입니다."
+              },
+              {
+                "regex": "^(?:@/|(?:\\.\\./)+)(?:app|features|infrastructure|components|hooks|pages|platform|ports|usecases)(?:/|$)",
+                "message": "core/domain은 다른 application/UI/infrastructure layer에 의존할 수 없습니다."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/core/ports/**/*.{ts,tsx}"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "importNames": ["ManagedRuntime"],
+                "message": "ManagedRuntime 생성은 src/app composition root에서만 허용합니다."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "(^|/)repos(/|$)",
+                "message": "repos/는 read-only reference입니다."
+              },
+              {
+                "regex": "^(?:@/|(?:\\.\\./)+)(?:app|features|infrastructure|components|hooks|pages|platform|usecases)(?:/|$)",
+                "message": "core/ports는 domain 계약보다 바깥 layer에 의존할 수 없습니다."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/core/usecases/**/*.{ts,tsx}"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "importNames": ["ManagedRuntime"],
+                "message": "ManagedRuntime 생성은 src/app composition root에서만 허용합니다."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "(^|/)repos(/|$)",
+                "message": "repos/는 read-only reference입니다."
+              },
+              {
+                "regex": "^(?:@/|(?:\\.\\./)+)(?:app|features|infrastructure|components|hooks|pages|platform)(?:/|$)",
+                "message": "core/usecases는 app, infrastructure 또는 UI layer에 의존할 수 없습니다."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/infrastructure/**/*.{ts,tsx}"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "importNames": ["ManagedRuntime"],
+                "message": "ManagedRuntime 생성은 src/app composition root에서만 허용합니다."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "(^|/)repos(/|$)",
+                "message": "repos/는 read-only reference입니다."
+              },
+              {
+                "regex": "^(?:@/|(?:\\.\\./)+)(?:app|features|components|hooks|pages)(?:/|$)",
+                "message": "infrastructure는 app 또는 UI layer에 의존할 수 없습니다."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/App.tsx",
+        "src/main.tsx",
+        "src/features/**/*.{ts,tsx}",
+        "src/hooks/**/*.{ts,tsx}",
+        "src/pages/**/*.{ts,tsx}",
+        "src/components/**/*.{ts,tsx}",
+        "src/platform/**/*.{ts,tsx}",
+        "src/lib/**/*.{ts,tsx}"
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "effect",
+                "importNames": ["ManagedRuntime"],
+                "message": "UI/application adapter에서 ManagedRuntime을 만들지 말고 src/app/runtime.ts의 appRuntime을 사용하세요."
+              }
+            ],
+            "patterns": [
+              {
+                "regex": "(^|/)repos(/|$)",
+                "message": "repos/는 read-only reference입니다."
+              },
+              {
+                "regex": "^(?:@/|(?:\\.\\./)+)infrastructure(?:/|$)",
+                "message": "UI/feature layer에서 infrastructure 구현을 직접 import하지 마세요. core usecase + app runtime 경계를 사용하세요."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/core/usecases/__tests__/**/*.{ts,tsx}"],
+      "rules": {
+        "eslint/no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/infrastructure/__tests__/**/*.{ts,tsx}"],
+      "rules": {
+        "eslint/no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["**/*.{ts,tsx}"],
+      "rules": {
+        "vitest/no-conditional-expect": "warn",
+        "vitest/require-mock-type-parameters": "warn",
+        "react/set-state-in-effect": "warn",
+        "react/preserve-manual-memoization": "warn",
+        "unicorn/no-thenable": "warn",
+        "jsx-a11y/prefer-tag-over-role": "warn",
+        "jsx-a11y/label-has-associated-control": "warn"
+      }
+    }
+  ]
 }

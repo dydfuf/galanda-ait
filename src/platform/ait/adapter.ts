@@ -81,7 +81,7 @@ export const aitAdapter: PlatformAdapter = {
   },
   requestClose: () => {
     try {
-      Screen.close();
+      void Screen.close();
       return true;
     } catch {
       return false;

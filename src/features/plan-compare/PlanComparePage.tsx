@@ -80,7 +80,7 @@ export function PlanComparePage() {
         title="비교할 두 여행안을 선택해주세요"
         description="비교하려는 서로 다른 두 여행안이 지정되지 않았습니다."
         actionText="계획 홈으로 돌아가기"
-        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+        onAction={() => void navigate(`/trips/${tripId}/plans`, { replace: true })}
       />
     );
   }
@@ -96,7 +96,7 @@ export function PlanComparePage() {
         title="여행안을 찾을 수 없습니다"
         description="비교 대상 중 일부 여행안이 존재하지 않거나 삭제되었습니다."
         actionText="계획 홈으로 이동"
-        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+        onAction={() => void navigate(`/trips/${tripId}/plans`, { replace: true })}
       />
     );
   }
@@ -136,7 +136,7 @@ export function PlanComparePage() {
         planId: selectedPlan.id,
         revision: room.revision,
       });
-      navigate(`/trips/${tripId}/itinerary`, { replace: true });
+      await navigate(`/trips/${tripId}/itinerary`, { replace: true });
     } catch (err: unknown) {
       setIsConfirmSheetOpen(false);
       setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
@@ -294,7 +294,7 @@ export function PlanComparePage() {
           <Button
             type="button"
             size="xl"
-            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+            onClick={() => void navigate(`/trips/${tripId}/itinerary`, { replace: true })}
           >
             확정 일정 보기
           </Button>

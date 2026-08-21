@@ -96,7 +96,7 @@ export function PlanEditPage(): JSX.Element {
         title="여행 정보를 찾을 수 없습니다"
         message="요청하신 여행 정보가 없거나 삭제되었습니다."
         actionText="여행 목록으로 이동"
-        onAction={() => navigate("/trips", { replace: true })}
+        onAction={() => void navigate("/trips", { replace: true })}
       />
     );
   }
@@ -108,7 +108,7 @@ export function PlanEditPage(): JSX.Element {
         title="수정할 여행안을 찾을 수 없습니다"
         message="요청하신 여행안이 존재하지 않거나 이미 삭제되었습니다."
         actionText="계획 목록으로 돌아가기"
-        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+        onAction={() => void navigate(`/trips/${tripId}/plans`, { replace: true })}
       />
     );
   }
@@ -120,7 +120,7 @@ export function PlanEditPage(): JSX.Element {
         title="로그인 정보를 확인할 수 없습니다"
         message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
         actionText="여행안 상세로 돌아가기"
-        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+        onAction={() => void navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
       />
     );
   }
@@ -133,7 +133,7 @@ export function PlanEditPage(): JSX.Element {
         title="수정 권한이 없습니다"
         message="여행안 작성자만 해당 여행안을 수정하거나 삭제할 수 있습니다."
         actionText="여행안 상세로 돌아가기"
-        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+        onAction={() => void navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
       />
     );
   }
@@ -145,7 +145,7 @@ export function PlanEditPage(): JSX.Element {
         title="확정된 여행안은 수정할 수 없습니다"
         message="이미 확정된 여행안은 세부 일정을 변경할 수 없습니다."
         actionText="여행안 상세로 돌아가기"
-        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+        onAction={() => void navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
       />
     );
   }
@@ -173,7 +173,7 @@ export function PlanEditPage(): JSX.Element {
       });
 
       editor.discardDraft();
-      navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
+      await navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
     } catch (err: unknown) {
       setIsSubmitting(false);
       setActionError(toUserMessage(err, "여행안 수정에 실패했습니다."));
@@ -192,7 +192,7 @@ export function PlanEditPage(): JSX.Element {
         expectedRevision: room.revision,
       });
       editor.discardDraft();
-      navigate(`/trips/${tripId}/plans`, { replace: true });
+      await navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
       setIsDeleteConfirmOpen(false);
       setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
@@ -201,13 +201,13 @@ export function PlanEditPage(): JSX.Element {
 
   const editorBasePath = `/trips/${tripId}/plans/${planId}/edit`;
   const openSection = (nextSection: PlanEditorSection): void => {
-    navigate(`${editorBasePath}/${nextSection}`, { state: { fromEditorSummary: true } });
+    void navigate(`${editorBasePath}/${nextSection}`, { state: { fromEditorSummary: true } });
   };
   const completeSection = (): void => {
     if ((location.state as { fromEditorSummary?: boolean } | null)?.fromEditorSummary) {
-      navigate(-1);
+      void navigate(-1);
     } else {
-      navigate(editorBasePath, { replace: true });
+      void navigate(editorBasePath, { replace: true });
     }
   };
 
