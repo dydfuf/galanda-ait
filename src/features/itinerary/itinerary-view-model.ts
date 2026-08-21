@@ -1,9 +1,12 @@
-import type {
-  CityStay,
-  TripPlan,
-  TripRoom,
-} from "../../core/domain/room.ts";
+import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
+import { getStayNightCount, getTripRoomDisplayDate } from "../../core/domain/room.ts";
 import { formatCostRangeText } from "../../core/calculations/plan-cost.ts";
+
+/** 화면 표기용 경로 구간. 도메인 CityStay(날짜 기반)에서 박 수를 계산해 만들어요. */
+export interface ItineraryRouteSegment {
+  readonly city: string;
+  readonly nights: number;
+}
 
 export type ItineraryStatus = "AVAILABLE" | "NEED_CHECK" | "FULL" | "SEARCHING";
 
@@ -77,7 +80,7 @@ export interface ItineraryViewModel {
   readonly confirmedPlanTitle?: string;
   readonly nights: number;
   readonly days: number;
-  readonly route: ReadonlyArray<CityStay>;
+  readonly route: ReadonlyArray<ItineraryRouteSegment>;
   readonly differenceSummary?: string;
   readonly needCheckCount: number;
   readonly hasNeedCheckDanger: boolean;
@@ -191,7 +194,8 @@ export function toItineraryViewModel(
     ? room.plans.find((p) => p.id === room.confirmedPlanId)
     : undefined;
 
-  const periodText = formatPeriodText(room.startDate, room.endDate);
+  const displayRange = getTripRoomDisplayDate(room);
+  const periodText = formatPeriodText(displayRange?.startDate, displayRange?.endDate);
 
   if (!isConfirmed || !confirmedPlan) {
     return {
@@ -220,9 +224,12 @@ export function toItineraryViewModel(
   const headcount =
     confirmedPlan.baseHeadcount ?? (room.members.length > 0 ? room.members.length : 1);
 
-  const route: ReadonlyArray<CityStay> =
+  const route: ReadonlyArray<ItineraryRouteSegment> =
     confirmedPlan.routes && confirmedPlan.routes.length > 0
-      ? confirmedPlan.routes
+      ? confirmedPlan.routes.map((stay) => ({
+          city: stay.city,
+          nights: getStayNightCount(stay),
+        }))
       : confirmedPlan.places.length > 0
         ? confirmedPlan.places.slice(0, 3).map((place, pIdx) => ({
             city: place.name.split(" ")[0] || room.destination,
@@ -312,7 +319,7 @@ export function toItineraryViewModel(
   }
 
   // 2. 날짜별 섹션 생성 (Chronological Timeline Scheduling)
-  const startYMD = parseYMD(room.startDate);
+  const startYMD = parseYMD(displayRange?.startDate);
   const normalize = (s?: string) => (s ? s.trim().toLowerCase().replace(/\s+/g, "") : "");
 
   interface ScheduledStay {

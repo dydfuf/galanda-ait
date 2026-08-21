@@ -19,8 +19,6 @@ const baseRoom: TripRoom = {
   id: TripIdSchema.make("trip-1"),
   title: "도쿄 + 하코네 여행",
   destination: "도쿄 + 하코네",
-  startDate: "2026-12-10",
-  endDate: "2026-12-16",
   revision: RevisionSchema.make(1),
   members: [
     { id: UserIdSchema.make("user-1"), name: "호스트", role: "HOST" },
@@ -35,9 +33,9 @@ const baseRoom: TripRoom = {
       authorName: "호스트",
       baseHeadcount: 2,
       routes: [
-        { city: "도쿄", nights: 3 },
-        { city: "하코네", nights: 2 },
-        { city: "도쿄", nights: 1 },
+        { city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-13" },
+        { city: "하코네", arrivalDate: "2026-12-13", departureDate: "2026-12-15" },
+        { city: "도쿄", arrivalDate: "2026-12-15", departureDate: "2026-12-16" },
       ],
       accommodations: [
         {
@@ -317,15 +315,13 @@ describe("toItineraryViewModel (RAON-167)", () => {
   it("3일 일정 (2박 3일, 숙소 연속 및 이동 혼합)을 올바르게 처리한다", () => {
     const threeDaysRoom: TripRoom = {
       ...baseRoom,
-      startDate: "2026-08-10",
-      endDate: "2026-08-13",
       plans: [
         {
           ...baseRoom.plans[0],
           title: "제주 2박 3일 힐링",
           routes: [
-            { city: "제주시", nights: 1 },
-            { city: "서귀포", nights: 1 },
+            { city: "제주시", arrivalDate: "2026-08-10", departureDate: "2026-08-11" },
+            { city: "서귀포", arrivalDate: "2026-08-11", departureDate: "2026-08-12" },
           ],
           accommodations: [
             {
@@ -361,7 +357,7 @@ describe("toItineraryViewModel (RAON-167)", () => {
     };
 
     const vm = toItineraryViewModel(threeDaysRoom);
-    expect(vm.periodText).toBe("8.10 ~ 8.13");
+    expect(vm.periodText).toBe("8.10 ~ 8.12");
     expect(vm.sections).toHaveLength(3);
     expect(vm.sections[0]?.dateHeader).toBe("8월 10일 · 제주시");
     expect(vm.sections[1]?.dateHeader).toBe("8월 11일 · 이동");
@@ -465,12 +461,10 @@ describe("toItineraryViewModel (RAON-167)", () => {
   it("1일 일정 (당일치기 또는 1박 2일)에서도 날짜 헤더를 정상 계산한다", () => {
     const singleDayRoom: TripRoom = {
       ...baseRoom,
-      startDate: "2026-05-01",
-      endDate: "2026-05-02",
       plans: [
         {
           ...baseRoom.plans[0],
-          routes: [{ city: "강릉", nights: 1 }],
+          routes: [{ city: "강릉", arrivalDate: "2026-05-01", departureDate: "2026-05-02" }],
           accommodations: [
             {
               id: "acc-single",
@@ -492,11 +486,15 @@ describe("toItineraryViewModel (RAON-167)", () => {
     expect(vm.sections[0]?.dateHeader).toBe("5월 1일 · 강릉");
   });
 
-  it("startDate가 없는 경우 Day 번호 기반 fallback을 제공한다", () => {
+  it("경로 날짜가 없는 경우 Day 번호 기반 fallback을 제공한다", () => {
     const noDateRoom: TripRoom = {
       ...baseRoom,
-      startDate: "",
-      endDate: "",
+      plans: [
+        {
+          ...baseRoom.plans[0],
+          routes: undefined,
+        },
+      ],
     };
 
     const vm = toItineraryViewModel(noDateRoom);
