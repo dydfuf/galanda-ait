@@ -1,8 +1,17 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
-import { BottomSheet, useBottomSheet } from "@toss/tds-mobile";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
@@ -63,7 +72,7 @@ export function PlanEditPage(): JSX.Element {
   const deletePlanMutation = useDeletePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const { openAsyncTwoButtonSheet } = useBottomSheet();
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const plan = room?.plans.find((p) => p.id === planId);
   const isConfirmed = plan
@@ -171,36 +180,23 @@ export function PlanEditPage(): JSX.Element {
     }
   };
 
-  const handleDelete = async (): Promise<void> => {
+  const handleConfirmDelete = async (): Promise<void> => {
     if (isSubmitting || deletePlanMutation.isPending) {
       return;
     }
 
-    await openAsyncTwoButtonSheet({
-      header: (
-        <>
-          <BottomSheet.Header>여행안을 삭제할까요?</BottomSheet.Header>
-          <BottomSheet.HeaderDescription>
-            '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
-          </BottomSheet.HeaderDescription>
-        </>
-      ),
-      leftButton: "취소",
-      rightButton: "삭제하기",
-      onRightButtonClick: async (): Promise<void> => {
-        try {
-          await deletePlanMutation.mutateAsync({
-            roomId: tripId,
-            planId: plan.id,
-            expectedRevision: room.revision,
-          });
-          editor.discardDraft();
-          navigate(`/trips/${tripId}/plans`, { replace: true });
-        } catch (err: unknown) {
-          setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
-        }
-      },
-    });
+    try {
+      await deletePlanMutation.mutateAsync({
+        roomId: tripId,
+        planId: plan.id,
+        expectedRevision: room.revision,
+      });
+      editor.discardDraft();
+      navigate(`/trips/${tripId}/plans`, { replace: true });
+    } catch (err: unknown) {
+      setIsDeleteConfirmOpen(false);
+      setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+    }
   };
 
   const editorBasePath = `/trips/${tripId}/plans/${planId}/edit`;
@@ -252,7 +248,7 @@ export function PlanEditPage(): JSX.Element {
             size="xl"
             variant="destructive"
             disabled={isSubmitting}
-            onClick={() => void handleDelete()}
+            onClick={() => setIsDeleteConfirmOpen(true)}
           >
             삭제하기
           </Button>
@@ -266,6 +262,28 @@ export function PlanEditPage(): JSX.Element {
           </Button>
         </BottomAction>
       )}
+
+      {/* 여행안 삭제 confirm */}
+      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>여행안을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePlanMutation.isPending}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deletePlanMutation.isPending}
+              onClick={() => void handleConfirmDelete()}
+            >
+              {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

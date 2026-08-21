@@ -71,6 +71,7 @@ const needCheckTitleStyle = css`
 const needCheckListStyle = css`
   margin: 0;
   padding-left: 18px;
+  list-style: disc;
   font-size: 13px;
   color: var(--adaptiveGrey800, #333d4b);
   display: flex;

@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
-import { css } from "@emotion/react";
-import { BottomSheet, TextArea, TextButton } from "@toss/tds-mobile";
-import { visuallyHiddenStyle } from "../../common/a11y.ts";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer.tsx";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { cn } from "@/lib/utils.ts";
 
 export type ReactionType = "LIKE" | "OKAY" | "HARD";
 
@@ -23,53 +32,6 @@ const REACTION_OPTIONS = [
   emoji: string;
   label: string;
 }>;
-
-const contentStyle = css`
-  padding-bottom: 16px;
-`;
-
-const sheetHeaderStyle = css`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-`;
-
-const reactionGroupStyle = css`
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 4px 0 20px;
-`;
-
-const reactionOptionStyle = (isSelected: boolean) => css`
-  display: flex;
-  min-height: 76px;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid ${isSelected ? "var(--adaptiveBlue500, #3182f6)" : "var(--adaptiveGrey200, #e5e8eb)"};
-  border-radius: 12px;
-  background: ${isSelected ? "var(--adaptiveBlue50, #e8f3ff)" : "var(--adaptiveBackground, #ffffff)"};
-  cursor: pointer;
-
-  &:has(:focus-visible) {
-    outline: 2px solid var(--adaptiveBlue500, #3182f6);
-    outline-offset: 2px;
-  }
-`;
-
-const emojiStyle = css`
-  font-size: 24px;
-`;
-
-const labelStyle = (isSelected: boolean) => css`
-  color: ${isSelected ? "var(--adaptiveBlue600, #1b64da)" : "var(--adaptiveGrey800, #333d4b)"};
-  font-size: 13px;
-  font-weight: 700;
-`;
 
 export function OpinionBottomSheet({
   isOpen,
@@ -95,67 +57,86 @@ export function OpinionBottomSheet({
   };
 
   return (
-    <BottomSheet
+    <Drawer
       open={isOpen}
-      onClose={onClose}
-      header={
-        <BottomSheet.Header>
-          <span css={sheetHeaderStyle}>
-            <span>이 여행안은 어때요?</span>
-            <TextButton size="small" variant="clear" onClick={onClose}>
-              닫기
-            </TextButton>
-          </span>
-        </BottomSheet.Header>
-      }
-      headerDescription={
-        <BottomSheet.HeaderDescription>내 의견은 언제든 바꿀 수 있어요.</BottomSheet.HeaderDescription>
-      }
-      cta={
-        <BottomSheet.CTA disabled={!isFormValid || isSubmitting} onClick={handleSubmit}>
-          {isSubmitting ? "저장 중..." : "의견 저장하기"}
-        </BottomSheet.CTA>
-      }
-      maxHeight="70vh"
-      expandedMaxHeight="90vh"
-      expandBottomSheet
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      showSwipeHandle
     >
-      <div css={contentStyle}>
-        <div role="radiogroup" aria-label="이 여행안에 대한 내 의견" css={reactionGroupStyle}>
-          {REACTION_OPTIONS.map((option) => {
-            const isSelected = reaction === option.value;
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="text-left text-[17px] font-bold">이 여행안은 어때요?</DrawerTitle>
+          <DrawerDescription className="text-left">
+            내 의견은 언제든 바꿀 수 있어요.
+          </DrawerDescription>
+        </DrawerHeader>
 
-            return (
-              <label key={option.value} css={reactionOptionStyle(isSelected)}>
-                <input
-                  type="radio"
-                  name="opinion-reaction"
-                  value={option.value}
-                  checked={isSelected}
-                  onChange={() => setReaction(option.value)}
-                  css={visuallyHiddenStyle}
-                />
-                <span css={emojiStyle} aria-hidden="true">{option.emoji}</span>
-                <span css={labelStyle(isSelected)}>{option.label}</span>
-              </label>
-            );
-          })}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <div
+            role="radiogroup"
+            aria-label="이 여행안에 대한 내 의견"
+            className="grid grid-cols-3 gap-2 py-4"
+          >
+            {REACTION_OPTIONS.map((option) => {
+              const isSelected = reaction === option.value;
+
+              return (
+                <label
+                  key={option.value}
+                  className={cn(
+                    // `flex!`: TDS가 주입하는 전역 label 스타일보다 우선해야 해요 (RAON-189에서 무해).
+                    "flex! min-h-19 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
+                    isSelected ? "border-primary bg-info-muted" : "border-border bg-background",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="opinion-reaction"
+                    value={option.value}
+                    checked={isSelected}
+                    onChange={() => setReaction(option.value)}
+                    className="sr-only"
+                  />
+                  <span className="text-2xl" aria-hidden="true">
+                    {option.emoji}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[13px] font-bold",
+                      isSelected ? "text-info" : "text-secondary-foreground",
+                    )}
+                  >
+                    {option.label}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          {reaction === "HARD" && (
+            <Field>
+              <FieldLabel htmlFor="opinion-hard-reason">어려운 이유</FieldLabel>
+              <Textarea
+                id="opinion-hard-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="예: 예산, 숙소 위치, 이동 시간 등"
+                rows={3}
+                required
+                className="rounded-xl px-4 py-3"
+              />
+              <FieldDescription className="text-[13px]">방장과 나에게만 공개돼요.</FieldDescription>
+            </Field>
+          )}
         </div>
 
-        {reaction === "HARD" && (
-          <TextArea
-            variant="box"
-            label="어려운 이유"
-            labelOption="sustain"
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            placeholder="예: 예산, 숙소 위치, 이동 시간 등"
-            help="방장과 나에게만 공개돼요."
-            rows={3}
-            required
-          />
-        )}
-      </div>
-    </BottomSheet>
+        <DrawerFooter>
+          <Button type="button" size="xl" disabled={!isFormValid || isSubmitting} onClick={handleSubmit}>
+            {isSubmitting ? "저장 중..." : "의견 저장하기"}
+          </Button>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   );
 }

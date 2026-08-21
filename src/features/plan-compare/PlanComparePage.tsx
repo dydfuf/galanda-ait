@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { BottomSheet, useBottomSheet } from "@toss/tds-mobile";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, CompareQuerySchema, TripParamsSchema } from "../../app/routes/route-params.ts";
@@ -13,6 +12,13 @@ import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
@@ -46,9 +52,9 @@ export function PlanComparePage() {
 
   const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
-  const { openAsyncTwoButtonSheet } = useBottomSheet();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
 
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -115,28 +121,26 @@ export function PlanComparePage() {
         ? `${differences.length}가지 차이를 먼저 보여드려요. 마음에 드는 안을 선택하세요.`
         : "두 여행안의 핵심 구성이 같아요. 마음에 드는 안을 선택하세요.";
 
-  const handleConfirm = async (): Promise<void> => {
+  const openConfirmSheet = (): void => {
     if (!canSubmitConfirm({ state: confirmState, isPending: confirmPlanMutation.isPending })) return;
+    setIsConfirmSheetOpen(true);
+  };
 
-    await openAsyncTwoButtonSheet({
-      header: <BottomSheet.Header>이 여행안으로 확정할까요?</BottomSheet.Header>,
-      children: <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(selectedPlan)} />,
-      leftButton: "다시 보기",
-      rightButton: "확정하기",
-      onRightButtonClick: async (): Promise<void> => {
-        setConfirmError(null);
-        try {
-          await confirmPlanMutation.mutateAsync({
-            roomId: room.id,
-            planId: selectedPlan.id,
-            revision: room.revision,
-          });
-          navigate(`/trips/${tripId}/itinerary`, { replace: true });
-        } catch (err: unknown) {
-          setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
-        }
-      },
-    });
+  const handleConfirmSubmit = async (): Promise<void> => {
+    if (confirmPlanMutation.isPending) return;
+
+    setConfirmError(null);
+    try {
+      await confirmPlanMutation.mutateAsync({
+        roomId: room.id,
+        planId: selectedPlan.id,
+        revision: room.revision,
+      });
+      navigate(`/trips/${tripId}/itinerary`, { replace: true });
+    } catch (err: unknown) {
+      setIsConfirmSheetOpen(false);
+      setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+    }
   };
 
   return (
@@ -203,7 +207,7 @@ export function PlanComparePage() {
             <label
               key={plan.id}
               className={
-                "flex w-full items-start gap-3 px-(--app-inline-padding) py-3.5 " +
+                "flex! w-full items-start gap-3 px-(--app-inline-padding) py-3.5 " +
                 (isSelectionLocked
                   ? "opacity-70"
                   : "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted")
@@ -311,7 +315,7 @@ export function PlanComparePage() {
             type="button"
             size="xl"
             disabled={confirmPlanMutation.isPending}
-            onClick={() => void handleConfirm()}
+            onClick={openConfirmSheet}
           >
             {confirmPlanMutation.isPending
               ? "일정 확정 중..."
@@ -319,6 +323,46 @@ export function PlanComparePage() {
           </Button>
         </BottomAction>
       )}
+
+      {/* 확정 요약 Drawer: 날짜/경로/비용/주의 항목을 다시 읽고 확정해요. */}
+      <Drawer
+        open={isConfirmSheetOpen}
+        onOpenChange={(open) => {
+          // 확정 요청 중에는 실수로 닫히지 않게 유지해요.
+          if (!open && !confirmPlanMutation.isPending) setIsConfirmSheetOpen(false);
+        }}
+        showSwipeHandle
+      >
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              이 여행안으로 확정할까요?
+            </DrawerTitle>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+            <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(selectedPlan)} />
+          </div>
+          <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
+            <Button
+              type="button"
+              size="xl"
+              variant="secondary"
+              disabled={confirmPlanMutation.isPending}
+              onClick={() => setIsConfirmSheetOpen(false)}
+            >
+              다시 보기
+            </Button>
+            <Button
+              type="button"
+              size="xl"
+              disabled={confirmPlanMutation.isPending}
+              onClick={() => void handleConfirmSubmit()}
+            >
+              {confirmPlanMutation.isPending ? "확정 중..." : "확정하기"}
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </PageBody>
   );
 }

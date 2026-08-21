@@ -1,70 +1,14 @@
-import { css } from "@emotion/react";
-import { BottomSheet, useBottomSheet } from "@toss/tds-mobile";
-
-const headerStyle = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  /* 좁은 화면에서 제목과 자동 저장 상태가 한 줄에 다 들어가지 않으면 줄바꿈해요. */
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-`;
-
-const titleAreaStyle = css`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1 1 200px;
-  min-width: 0;
-`;
-
-const titleStyle = css`
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--adaptiveGrey900, #191f28);
-  margin: 0;
-`;
-
-const subtitleStyle = css`
-  font-size: 13px;
-  color: var(--adaptiveGrey600, #6b7684);
-  margin: 0;
-`;
-
-const autoSaveStatusStyle = css`
-  font-size: 12px;
-  color: var(--adaptiveGrey500, #8b95a1);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background-color: var(--adaptiveGrey100, #f2f4f6);
-  border-radius: 6px;
-  white-space: nowrap;
-`;
-
-const clearButtonStyle = css`
-  background: none;
-  border: none;
-  font-size: 12px;
-  color: var(--adaptiveRed500, #f04452);
-  cursor: pointer;
-  padding: 4px;
-  text-decoration: underline;
-
-  &:hover {
-    opacity: 0.8;
-  }
-`;
-
-const actionAreaStyle = css`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  flex: 0 0 auto;
-`;
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog.tsx";
 
 interface PlanEditorHeaderProps {
   readonly isEditMode: boolean;
@@ -79,36 +23,15 @@ export function PlanEditorHeader({
   lastSavedTime: _lastSavedTime,
   onClearDraft,
 }: PlanEditorHeaderProps) {
-  const { openAsyncTwoButtonSheet } = useBottomSheet();
-
-  const handleClearDraft = async (): Promise<void> => {
-    if (!onClearDraft) return;
-
-    const action = await openAsyncTwoButtonSheet({
-      header: <BottomSheet.Header>작성 내용을 초기화할까요?</BottomSheet.Header>,
-      children: (
-        <BottomSheet.HeaderDescription>
-          {isEditMode
-            ? "임시 수정 내용만 사라지고 공개된 여행안은 바뀌지 않아요."
-            : "지금 입력한 임시 내용이 사라지고 처음 상태로 돌아가요."}
-        </BottomSheet.HeaderDescription>
-      ),
-      leftButton: "취소",
-      rightButton: "초기화하기",
-    });
-
-    if (action === "rightButtonClick") {
-      onClearDraft();
-    }
-  };
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
   return (
-    <header css={headerStyle}>
-      <div css={titleAreaStyle}>
-        <h1 css={titleStyle}>
+    <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-1">
+        <h1 className="text-xl font-bold text-foreground">
           {isEditMode ? "여행안 수정하기" : isCloneMode ? "복제해 새 대안 제안하기" : "새 여행안 제안하기"}
         </h1>
-        <p css={subtitleStyle}>
+        <p className="text-[13px] text-muted-foreground">
           {isEditMode
             ? "작성한 여행안의 세부 조건을 보완합니다."
             : isCloneMode
@@ -117,16 +40,46 @@ export function PlanEditorHeader({
         </p>
       </div>
 
-      <div css={actionAreaStyle}>
-        <span css={autoSaveStatusStyle}>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs whitespace-nowrap text-muted-foreground">
           ✓ 자동 저장됨
         </span>
         {onClearDraft && (
-          <button type="button" onClick={() => void handleClearDraft()} css={clearButtonStyle}>
+          <button
+            type="button"
+            onClick={() => setIsClearConfirmOpen(true)}
+            className="cursor-pointer p-1 text-xs text-destructive underline hover:opacity-80"
+          >
             작성 초기화
           </button>
         )}
       </div>
+
+      {/* 작성 초기화 confirm */}
+      <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>작성 내용을 초기화할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isEditMode
+                ? "임시 수정 내용만 사라지고 공개된 여행안은 바뀌지 않아요."
+                : "지금 입력한 임시 내용이 사라지고 처음 상태로 돌아가요."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setIsClearConfirmOpen(false);
+                onClearDraft?.();
+              }}
+            >
+              초기화하기
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }

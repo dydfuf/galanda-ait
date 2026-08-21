@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { BottomSheet } from "@toss/tds-mobile";
 import { useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
@@ -10,6 +9,15 @@ import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
@@ -195,53 +203,68 @@ export function ItineraryPage(): JSX.Element {
         </MobileList>
       </div>
 
-      {/* 확인 필요 예약 BottomSheet */}
-      <BottomSheet
+      {/* 확인 필요 예약 Drawer */}
+      <Drawer
         open={isNeedCheckSheetOpen}
-        onClose={() => setIsNeedCheckSheetOpen(false)}
-        header={<BottomSheet.Header>확인이 필요한 예약</BottomSheet.Header>}
-        headerDescription={
-          <BottomSheet.HeaderDescription>
-            예약 상태를 확인해야 하는 항목 {viewModel.needCheckCount}건이에요.
-          </BottomSheet.HeaderDescription>
-        }
-        cta={<BottomSheet.CTA onClick={() => setIsNeedCheckSheetOpen(false)}>닫기</BottomSheet.CTA>}
+        onOpenChange={(open) => setIsNeedCheckSheetOpen(Boolean(open))}
+        showSwipeHandle
       >
-        <MobileList aria-label="확인 필요 예약 목록" className="pb-4">
-          {viewModel.needCheckItems.map((item) => (
-            <MobileListItem
-              key={item.id}
-              leading={<Badge variant={statusVariant[item.statusColor]}>{item.statusLabel}</Badge>}
-            >
-              <ItemTitle>{item.message}</ItemTitle>
-              <ItemDescription className="text-muted-foreground/80">
-                {item.snapshotInfo}
-              </ItemDescription>
-            </MobileListItem>
-          ))}
-        </MobileList>
-      </BottomSheet>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              확인이 필요한 예약
+            </DrawerTitle>
+            <DrawerDescription className="text-left">
+              예약 상태를 확인해야 하는 항목 {viewModel.needCheckCount}건이에요.
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <MobileList aria-label="확인 필요 예약 목록" className="pb-2">
+              {viewModel.needCheckItems.map((item) => (
+                <MobileListItem
+                  key={item.id}
+                  leading={
+                    <Badge variant={statusVariant[item.statusColor]}>{item.statusLabel}</Badge>
+                  }
+                >
+                  <ItemTitle className="line-clamp-2 whitespace-normal">{item.message}</ItemTitle>
+                  <ItemDescription className="text-muted-foreground/80">
+                    {item.snapshotInfo}
+                  </ItemDescription>
+                </MobileListItem>
+              ))}
+            </MobileList>
+          </div>
+          <DrawerFooter>
+            <Button type="button" size="xl" onClick={() => setIsNeedCheckSheetOpen(false)}>
+              닫기
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
-      {/* 일정 항목 상세 BottomSheet */}
-      <BottomSheet
+      {/* 일정 항목 상세 Drawer */}
+      <Drawer
         open={selectedItem !== null}
-        onClose={() => setSelectedItem(null)}
-        header={
-          <BottomSheet.Header>
-            {selectedItem?.type === "STAY" ? selectedItem.hotelName : selectedItem?.routeTitle}
-          </BottomSheet.Header>
-        }
-        headerDescription={
-          <BottomSheet.HeaderDescription>
-            {selectedItem?.type === "STAY"
-              ? `${selectedItem.city} · ${selectedItem.periodText} · ${selectedItem.nights}박`
-              : `${selectedItem?.mode} · ${selectedItem?.hasTransfer ? "환승 필요" : "직통"} · ${selectedItem?.durationText}`}
-          </BottomSheet.HeaderDescription>
-        }
-        cta={<BottomSheet.CTA onClick={() => setSelectedItem(null)}>닫기</BottomSheet.CTA>}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null);
+        }}
+        showSwipeHandle
       >
-        {selectedItem && (
-          <MobileList aria-label="일정 상세 정보" className="pb-4">
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              {selectedItem?.type === "STAY" ? selectedItem.hotelName : selectedItem?.routeTitle}
+            </DrawerTitle>
+            <DrawerDescription className="text-left">
+              {selectedItem?.type === "STAY"
+                ? `${selectedItem.city} · ${selectedItem.periodText} · ${selectedItem.nights}박`
+                : `${selectedItem?.mode} · ${selectedItem?.hasTransfer ? "환승 필요" : "직통"} · ${selectedItem?.durationText}`}
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {selectedItem && (
+              <MobileList aria-label="일정 상세 정보" className="pb-2">
             <MobileListItem
               trailing={
                 <Badge variant={selectedItem.type === "STAY" ? "info" : "neutral"}>
@@ -292,9 +315,16 @@ export function ItineraryPage(): JSX.Element {
                 </ItemTitle>
               </MobileListItem>
             )}
-          </MobileList>
-        )}
-      </BottomSheet>
+              </MobileList>
+            )}
+          </div>
+          <DrawerFooter>
+            <Button type="button" size="xl" onClick={() => setSelectedItem(null)}>
+              닫기
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </PageBody>
   );
 }

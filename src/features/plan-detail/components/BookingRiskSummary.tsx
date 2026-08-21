@@ -48,6 +48,7 @@ export function BookingRiskSummary({ items, hasDetails, onClick }: BookingRiskSu
   return (
     <MobileListItem
       chevron
+      className="px-2"
       onClick={onClick}
       aria-label={`숙소·교통, ${state.description}`}
       trailing={<Badge variant={state.variant}>{state.label}</Badge>}
