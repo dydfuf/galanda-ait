@@ -1,6 +1,12 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
-  
+
   /* TDS Adaptive Color Tokens */
   --adaptiveBackground: #ffffff;
   --adaptiveGreyBackground: #f2f4f6;
@@ -14,19 +20,19 @@
   --adaptiveGrey700: #4e5968;
   --adaptiveGrey800: #333d4b;
   --adaptiveGrey900: #191f28;
-  
+
   --adaptiveBlue500: #3182f6;
   --adaptiveBlue600: #1b64da;
   --adaptiveBlue50: #e8f3ff;
-  
+
   --adaptiveGreen500: #2da44e;
   --adaptiveGreen600: #15803d;
   --adaptiveGreen50: #f0fbf4;
-  
+
   --adaptiveRed500: #f04452;
   --adaptiveRed600: #e0383e;
   --adaptiveRed50: #fdf2f3;
-  
+
   --adaptiveYellow500: #ff8f00;
   --adaptiveYellow600: #b78103;
   --adaptiveYellow50: #fff8e1;
@@ -48,6 +54,40 @@
   background-color: var(--adaptiveBackground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /*
+   * Galanda semantic tokens (shadcn 계약).
+   * 기존 화면 팔레트를 그대로 보존하는 값이에요. 신규 코드는 adaptive* 대신 이 토큰을 사용해요.
+   */
+  --background: #ffffff;
+  --foreground: #191f28;
+  --card: #ffffff;
+  --card-foreground: #191f28;
+  --popover: #ffffff;
+  --popover-foreground: #191f28;
+  --primary: #3182f6;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f4f6;
+  --secondary-foreground: #333d4b;
+  --muted: #f2f4f6;
+  --muted-foreground: #6b7684;
+  --accent: #f2f4f6;
+  --accent-foreground: #191f28;
+  --destructive: #f04452;
+  --destructive-strong: #e0383e;
+  --destructive-muted: #fdf2f3;
+  --border: #e5e8eb;
+  --input: #e5e8eb;
+  --ring: #3182f6;
+  --radius: 0.625rem;
+
+  /* 상태 표현용 Galanda 전용 토큰 (확정/확인 필요/안내 배지 등) */
+  --success: #15803d;
+  --success-muted: #f0fbf4;
+  --warning: #b78103;
+  --warning-muted: #fff8e1;
+  --info: #1b64da;
+  --info-muted: #e8f3ff;
 }
 
 * {
@@ -111,5 +151,55 @@ button, input, textarea, select {
   }
   to {
     opacity: 1;
+  }
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--sans);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-strong: var(--destructive-strong);
+  --color-destructive-muted: var(--destructive-muted);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-info: var(--info);
+  --color-info-muted: var(--info-muted);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }
