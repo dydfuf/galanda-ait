@@ -40,7 +40,8 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "w-full bg-background",
+        // 설치형 PWA(viewport-fit=cover)에서 notch/상태 표시줄과 겹치지 않게 상단 safe-area를 확보해요.
+        "w-full bg-background pt-(--safe-top)",
         sticky && "sticky top-0 z-20",
         bordered && "border-b",
         className,

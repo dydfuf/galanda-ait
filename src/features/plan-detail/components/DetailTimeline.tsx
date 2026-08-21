@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import { ExternalLink } from "@/components/galanda/external-link.tsx";
 
 export interface StaySection {
   readonly id: string;
@@ -92,14 +93,9 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
                 {stay.confirmedInfo}
               </ItemDescription>
               {stay.bookingUrl && (
-                <a
-                  href={stay.bookingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 w-fit text-xs font-semibold text-primary no-underline"
-                >
+                <ExternalLink href={stay.bookingUrl} className="mt-1">
                   예약 정보 보기 ↗
-                </a>
+                </ExternalLink>
               )}
             </MobileListItem>
           );
@@ -127,14 +123,9 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
                 {transport.confirmedInfo}
               </ItemDescription>
               {transport.bookingUrl && (
-                <a
-                  href={transport.bookingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-1 w-fit text-xs font-semibold text-primary no-underline"
-                >
+                <ExternalLink href={transport.bookingUrl} className="mt-1">
                   교통 정보 보기 ↗
-                </a>
+                </ExternalLink>
               )}
             </MobileListItem>
           );

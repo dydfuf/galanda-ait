@@ -25,7 +25,7 @@ const rowStyle = css`
 
 const rowLabelStyle = css`
   flex: 0 0 62px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   font-weight: 600;
 `;
 
@@ -51,12 +51,12 @@ const costSubStyle = css`
   display: block;
   margin-top: 2px;
   font-size: 12px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
 `;
 
 const needCheckBoxStyle = css`
   background-color: var(--warning-muted);
-  border: 1px solid #ffe082;
+  border: 1px solid var(--warning-border);
   border-radius: 12px;
   padding: 12px 14px;
 `;

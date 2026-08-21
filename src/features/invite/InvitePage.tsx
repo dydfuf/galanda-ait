@@ -58,13 +58,13 @@ const descriptionStyle = css`
 `;
 
 const summaryBoxStyle = css`
-  background-color: #f9fafb;
+  background-color: var(--surface-subtle);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 24px;
   text-align: left;
   font-size: 13px;
-  color: #4e5968;
+  color: var(--foreground-muted);
   border: 1px solid var(--muted);
 `;
 
@@ -73,7 +73,7 @@ const summaryRowStyle = css`
 `;
 
 const summaryLabelStyle = css`
-  color: #8b95a1;
+  color: var(--foreground-subtle);
 `;
 
 const codeStyle = css`
@@ -97,7 +97,7 @@ const backHomeLinkStyle = css`
   background: none;
   border: none;
   font-size: 13px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   cursor: pointer;
   padding: 6px 10px;
 
@@ -149,7 +149,7 @@ export function InvitePage(): JSX.Element {
   if (isLoading) {
     return (
       <div css={pageContainerStyle}>
-        <p style={{ color: "#8b95a1" }}>초대장 정보를 확인하는 중...</p>
+        <p style={{ color: "var(--foreground-subtle)" }}>초대장 정보를 확인하는 중...</p>
       </div>
     );
   }

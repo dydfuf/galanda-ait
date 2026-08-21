@@ -41,9 +41,10 @@ export function TripRoomTabLayout() {
       toast("초대 링크를 공유했어요.");
     } else if (outcome === "copied") {
       toast("초대 링크를 복사했어요.");
-    } else {
+    } else if (outcome === "unsupported") {
       toast("공유를 지원하지 않는 환경이에요. 토스 앱에서 다시 시도해 주세요.");
     }
+    // outcome === "cancelled": 사용자가 직접 닫은 경우라 알림을 띄우지 않아요.
   }, [tripId]);
 
   useEffect(() => {

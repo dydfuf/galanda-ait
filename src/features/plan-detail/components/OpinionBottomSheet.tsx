@@ -63,6 +63,11 @@ export function OpinionBottomSheet({
         if (!open) onClose();
       }}
       showSwipeHandle
+      // 기존 BottomSheet의 maxHeight 70vh → expandedMaxHeight 90vh 확장 동작을 유지해요.
+      snapPoints={[0.7, 0.9]}
+      defaultSnapPoint={0.7}
+      // 사유 textarea가 모바일 키보드에 가려지지 않게 해요.
+      keyboardAware
     >
       <DrawerContent>
         <DrawerHeader>

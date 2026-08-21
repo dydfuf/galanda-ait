@@ -39,11 +39,22 @@ RAON-181 이후 Galanda의 UI implementation layer 기준입니다. 화면 문�
 | 보조 텍스트/배경 | `--muted`, `--muted-foreground` |
 | 브랜드/주요 행동 | `--primary`, `--primary-foreground` |
 | 경계선/입력 | `--border`, `--input`, `--ring` |
-| 위험/삭제 | `--destructive`, `--destructive-strong`, `--destructive-muted` |
-| 상태 배지 | `--success(-muted)`, `--warning(-muted)`, `--info(-muted)` |
+| 위험/삭제 | `--destructive`, `--destructive-strong`, `--destructive-muted`, `--destructive-border` |
+| 상태 배지 | `--success(-muted)`, `--warning(-muted/-border)`, `--info(-muted)` |
+| 표면/텍스트 단계 | `--surface-subtle`, `--foreground-muted`, `--foreground-subtle` |
+| 경계 단계 | `--border-strong`, `--border-stronger` |
+| primary tint | `--primary-muted`, `--primary-border`, `--primary-border-weak` |
 | 모서리 | `--radius` |
 
+모든 토큰은 `@theme inline`에도 등록돼 있어 Tailwind utility(`text-foreground-subtle`,
+`bg-surface-subtle` 등)로도 쓸 수 있어요.
+
+**raw hex를 새로 도입하지 않습니다.** 필요한 색이 없으면 위 토큰에 역할 기반 이름으로
+추가하고 사용합니다. (앱 로고 등 asset SVG는 예외예요.)
+
 Safe-area와 화면 공통 여백은 `--safe-*`, `--app-*` 토큰을 계속 사용합니다.
+상단 safe-area는 `PageHeader`가, 헤더가 없는 route는 `PageBody safeTop`이,
+하단은 `BottomAction`과 `DrawerFooter`가 소유해요.
 
 ## 컴포넌트 추가 방법
 

@@ -1,19 +1,19 @@
-import type { PlatformAdapter } from "./types.ts";
-import { webAdapter } from "./web/adapter.ts";
-import { aitAdapter } from "./ait/adapter.ts";
+import { platformAdapter, platformRoutes } from "@platform/current";
 
 export type {
   AccessoryButtonOptions,
   PlatformAdapter,
   PlatformNavigation,
+  PlatformRoute,
   ShareMessage,
   ShareOutcome,
 } from "./types.ts";
 
-/** Apps in Toss 앱 내부(WebView)에서 실행 중인지 감지해요. */
-export function isTossAppRuntime(): boolean {
-  return typeof navigator !== "undefined" && navigator.userAgent.includes("TossApp/");
-}
+/**
+ * 현재 빌드 타깃의 플랫폼 어댑터예요.
+ * 구현 선택은 런타임이 아니라 빌드 타임에 이뤄져요 (`@platform/current` alias).
+ */
+export const platform = platformAdapter;
 
-/** 현재 런타임에 맞는 플랫폼 어댑터예요. 기본은 Web/PWA이고 토스 앱 안에서만 AIT예요. */
-export const platform: PlatformAdapter = isTossAppRuntime() ? aitAdapter : webAdapter;
+/** 현재 빌드 타깃에만 존재하는 라우트예요. */
+export const platformOnlyRoutes = platformRoutes;

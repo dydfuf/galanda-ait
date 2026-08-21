@@ -129,8 +129,9 @@ export function TripListPage() {
     </MobileList>
   );
 
+  // 헤더가 없는 최상위 route라 본문이 상단 safe-area를 직접 확보해요(safeTop).
   return (
-    <PageBody withBottomAction className="mx-auto max-w-[600px]">
+    <PageBody safeTop withBottomAction className="mx-auto max-w-[600px]">
       <PageTitle title="내 여행" description="참여 중인 여행을 한눈에 확인해요." />
 
       <div className="mx-6 mt-4 mb-3">

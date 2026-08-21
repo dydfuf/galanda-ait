@@ -21,7 +21,7 @@ const sectionTitleStyle = css`
 `;
 
 const accItemStyle = css`
-  background-color: #f9fafb;
+  background-color: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
@@ -54,7 +54,7 @@ const fieldRowStyle = css`
 const fieldLabelStyle = css`
   font-size: 12px;
   font-weight: 600;
-  color: #4e5968;
+  color: var(--foreground-muted);
   margin-bottom: 4px;
   display: block;
 `;
@@ -63,7 +63,7 @@ const inputStyle = css`
   width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #d1d6db;
+  border: 1px solid var(--border-strong);
   font-size: 13px;
   outline: none;
   background-color: var(--background);
@@ -78,7 +78,7 @@ const inputStyle = css`
 const selectStyle = css`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #d1d6db;
+  border: 1px solid var(--border-strong);
   font-size: 13px;
   outline: none;
   background-color: var(--background);
@@ -90,14 +90,14 @@ const checkboxLabelStyle = css`
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #4e5968;
+  color: var(--foreground-muted);
   cursor: pointer;
 `;
 
 const removeBtnStyle = css`
   background: none;
   border: none;
-  color: #b0b8c1;
+  color: var(--border-stronger);
   font-size: 14px;
   cursor: pointer;
 
@@ -108,7 +108,7 @@ const removeBtnStyle = css`
 
 const addAccButtonStyle = css`
   padding: 10px 14px;
-  border: 1px dashed #82b6ff;
+  border: 1px dashed var(--primary-border);
   background-color: var(--info-muted);
   border-radius: 10px;
   color: var(--info);
@@ -117,7 +117,7 @@ const addAccButtonStyle = css`
   cursor: pointer;
 
   &:hover {
-    background-color: #e0edff;
+    background-color: var(--primary-muted);
   }
 `;
 

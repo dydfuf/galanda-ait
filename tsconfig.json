@@ -6,7 +6,8 @@
   ],
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@platform/current": ["./src/platform/current.web.ts"]
     }
   }
 }

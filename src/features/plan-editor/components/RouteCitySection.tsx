@@ -32,12 +32,12 @@ const nightsStatusBadgeStyle = (isMatch: boolean) => css`
   font-weight: 700;
   padding: 4px 8px;
   border-radius: 6px;
-  background-color: ${isMatch ? "var(--info-muted)" : "#ffeeee"};
+  background-color: ${isMatch ? "var(--info-muted)" : "var(--destructive-muted)"};
   color: ${isMatch ? "var(--info)" : "var(--destructive-strong)"};
 `;
 
 const previewBoxStyle = css`
-  background-color: #f9fafb;
+  background-color: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 14px;
@@ -46,7 +46,7 @@ const previewBoxStyle = css`
 const previewLabelStyle = css`
   font-size: 11px;
   font-weight: 700;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   margin-bottom: 6px;
   display: block;
 `;
@@ -61,7 +61,7 @@ const cityRowStyle = css`
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #f9fafb;
+  background-color: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 12px;
@@ -70,7 +70,7 @@ const cityRowStyle = css`
 const cityIndexStyle = css`
   font-size: 13px;
   font-weight: 700;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   min-width: 18px;
 `;
 
@@ -78,7 +78,7 @@ const cityInputStyle = css`
   flex: 1;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #d1d6db;
+  border: 1px solid var(--border-strong);
   font-size: 14px;
   outline: none;
   background-color: var(--background);
@@ -92,7 +92,7 @@ const cityInputStyle = css`
 const deleteCityBtnStyle = css`
   background: none;
   border: none;
-  color: #b0b8c1;
+  color: var(--border-stronger);
   font-size: 16px;
   cursor: pointer;
   padding: 4px;
@@ -104,7 +104,7 @@ const deleteCityBtnStyle = css`
 
 const addCityButtonStyle = css`
   padding: 10px 14px;
-  border: 1px dashed #82b6ff;
+  border: 1px dashed var(--primary-border);
   background-color: var(--info-muted);
   border-radius: 10px;
   color: var(--info);
@@ -114,7 +114,7 @@ const addCityButtonStyle = css`
   transition: background-color 0.15s ease;
 
   &:hover {
-    background-color: #e0edff;
+    background-color: var(--primary-muted);
   }
 `;
 

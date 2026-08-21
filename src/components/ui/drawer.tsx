@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 
 type DrawerContextProps = {
   hasSnapPoints: boolean
+  keyboardAware: boolean
   modal: DrawerPrimitive.Root.Props["modal"]
   showSwipeHandle: boolean
   swipeDirection: NonNullable<DrawerPrimitive.Root.Props["swipeDirection"]>
@@ -27,16 +28,19 @@ function useDrawer() {
 function Drawer({
   modal = true,
   showSwipeHandle = false,
+  keyboardAware = false,
   snapPoints,
   swipeDirection = "down",
   ...props
 }: DrawerPrimitive.Root.Props & {
   showSwipeHandle?: boolean
+  /** 내부에 입력 필드가 있는 bottom sheet에 켜요. 모바일 가상 키보드에 맞춰 스크롤/여백을 조정해요. */
+  keyboardAware?: boolean
 }) {
   const hasSnapPoints = snapPoints != null && snapPoints.length > 0
   const contextValue = React.useMemo(
-    () => ({ hasSnapPoints, modal, showSwipeHandle, swipeDirection }),
-    [hasSnapPoints, modal, showSwipeHandle, swipeDirection]
+    () => ({ hasSnapPoints, keyboardAware, modal, showSwipeHandle, swipeDirection }),
+    [hasSnapPoints, keyboardAware, modal, showSwipeHandle, swipeDirection]
   )
 
   return (
@@ -102,11 +106,12 @@ function DrawerContent({
   children,
   ...props
 }: DrawerPrimitive.Popup.Props) {
-  const { hasSnapPoints, modal, showSwipeHandle, swipeDirection } = useDrawer()
+  const { hasSnapPoints, keyboardAware, modal, showSwipeHandle, swipeDirection } =
+    useDrawer()
   const swipeAxis =
     swipeDirection === "down" || swipeDirection === "up" ? "y" : "x"
 
-  return (
+  const content = (
     <DrawerPortal data-slot="drawer-portal">
       {modal === true && (
         <DrawerOverlay data-snap-points={hasSnapPoints ? "" : undefined} />
@@ -129,6 +134,9 @@ function DrawerContent({
             "after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--color-popover)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full",
             // Sizing.
             "[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
+            // Snap points: popup이 100dvh라서 아래로 밀린 만큼 padding으로 보정해야
+            // footer/CTA가 화면 밖으로 나가지 않아요.
+            "data-snap-points:[padding-bottom:max(0px,calc(var(--drawer-snap-point-offset)+var(--drawer-swipe-movement-y)))] data-starting-style:data-snap-points:[padding-bottom:0] data-ending-style:data-snap-points:[padding-bottom:0]",
             // Stack.
             "[--bleed:3rem] [--peek:1rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]",
             // Transitions.
@@ -162,6 +170,13 @@ function DrawerContent({
       </DrawerPrimitive.Viewport>
     </DrawerPortal>
   )
+
+  // 입력이 있는 sheet만 키보드 인식 모드로 감싸요 (그 외 drawer 동작은 그대로예요).
+  return keyboardAware ? (
+    <DrawerPrimitive.VirtualKeyboardProvider>{content}</DrawerPrimitive.VirtualKeyboardProvider>
+  ) : (
+    content
+  )
 }
 
 function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -181,7 +196,13 @@ function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="drawer-footer"
-      className={cn("mt-auto flex shrink-0 flex-col gap-2 p-4 pt-0", className)}
+      className={cn(
+        "mt-auto flex shrink-0 flex-col gap-2 p-4 pt-0",
+        // 하단 safe-area와 (키보드 인식 sheet의) 가상 키보드 높이를 함께 반영해요.
+        // `--drawer-keyboard-inset`는 VirtualKeyboardProvider가 있을 때만 설정되므로 0px fallback이 필요해요.
+        "pb-[calc(1rem+var(--safe-bottom,0px)+var(--drawer-keyboard-inset,0px))]",
+        className
+      )}
       {...props}
     />
   )

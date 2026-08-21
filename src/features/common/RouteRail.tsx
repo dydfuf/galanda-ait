@@ -55,13 +55,13 @@ const cityStyle = css`
 
 const nightsStyle = css`
   font-size: 11px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   margin-top: 2px;
   font-weight: 500;
 `;
 
 const arrowStyle = css`
-  color: #b0b8c1;
+  color: var(--border-stronger);
   font-size: 12px;
   font-weight: 700;
 `;

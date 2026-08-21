@@ -2,8 +2,8 @@ import { css } from "@emotion/react";
 import type { PlanDifference } from "../../../core/calculations/plan-diff.ts";
 
 const bannerStyle = css`
-  background-color: #f9fafb;
-  border: 1px solid #b8d7ff;
+  background-color: var(--surface-subtle);
+  border: 1px solid var(--primary-border-weak);
   border-radius: 12px;
   padding: 12px 16px;
   margin-bottom: 16px;

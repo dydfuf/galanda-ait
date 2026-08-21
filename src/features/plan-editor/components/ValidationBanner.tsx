@@ -1,8 +1,8 @@
 import { css } from "@emotion/react";
 
 const bannerStyle = css`
-  background-color: #ffeeee;
-  border: 1px solid #fecdd3;
+  background-color: var(--destructive-muted);
+  border: 1px solid var(--destructive-border);
   border-radius: 12px;
   padding: 12px 16px;
   display: flex;

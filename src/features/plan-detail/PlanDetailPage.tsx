@@ -276,8 +276,15 @@ export function PlanDetailPage(): JSX.Element {
           if (!open) setSheet(null);
         }}
         showSwipeHandle
+        // 숙소·교통 상세만 기존 expand 동작(84vh → 94vh)을 유지해요.
+        snapPoints={sheet === "details" ? [0.84, 0.94] : undefined}
+        defaultSnapPoint={sheet === "details" ? 0.84 : undefined}
       >
-        <DrawerContent>
+        {/*
+          확장이 없던 sheet는 기존 maxHeight 60vh 상한을 유지해요.
+          Drawer 내부의 data-variant sizing 유틸리티보다 우선해야 해서 important를 써요.
+        */}
+        <DrawerContent className={sheet === "details" ? undefined : "max-h-[60vh]!"}>
           <DrawerHeader>
             <DrawerTitle className="text-left text-[17px] font-bold">
               {sheet === "actions" ? "여행안 관리" : sheet === "cost" ? "예상 경비" : "숙소·교통 상세"}

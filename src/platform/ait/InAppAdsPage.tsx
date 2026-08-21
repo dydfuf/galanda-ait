@@ -1,6 +1,6 @@
 import { css } from "@emotion/react";
-import { useInAppAds } from "@/platform/ait/useInAppAds.tsx";
-import { useAppNavigation } from "../hooks/useAppNavigation.ts";
+import { useInAppAds } from "./useInAppAds.tsx";
+import { useAppNavigation } from "../../hooks/useAppNavigation.ts";
 
 // TODO: 서비스를 출시하기 전에 앱인토스 콘솔에서 발급한 광고 그룹 ID로 변경해 주세요.
 const TEST_INTERSTITIAL_ID = "ait-ad-test-interstitial-id";
@@ -50,7 +50,7 @@ const titleStyle = css`
 
 const subtitleStyle = css`
   font-size: 13px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   margin: 0;
 `;
 
@@ -91,7 +91,7 @@ const sectionTitleStyle = css`
 
 const sectionDescStyle = css`
   font-size: 13px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   margin: 0;
 `;
 
@@ -107,7 +107,7 @@ const actionButtonStyle = css`
   transition: background-color 0.15s ease, opacity 0.15s ease;
 
   &:hover:not(:disabled) {
-    background-color: #dbeafe;
+    background-color: var(--primary-muted);
   }
 
   &:active:not(:disabled) {

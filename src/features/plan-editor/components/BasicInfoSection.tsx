@@ -21,7 +21,7 @@ const fieldStyle = css`
 const labelStyle = css`
   font-size: 13px;
   font-weight: 600;
-  color: #4e5968;
+  color: var(--foreground-muted);
 `;
 
 const inputStyle = css`
@@ -55,8 +55,8 @@ const headcountButtonStyle = css`
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  border: 1px solid #d1d6db;
-  background-color: #f9fafb;
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface-subtle);
   color: var(--foreground);
   font-size: 16px;
   font-weight: 700;
@@ -86,7 +86,7 @@ const headcountValueStyle = css`
 
 const headcountHintStyle = css`
   font-size: 12px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   margin-top: 2px;
 `;
 

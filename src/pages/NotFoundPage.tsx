@@ -28,7 +28,7 @@ const titleStyle = css`
 
 const descStyle = css`
   font-size: 14px;
-  color: #8b95a1;
+  color: var(--foreground-subtle);
   margin: 0 0 24px 0;
   line-height: 1.5;
 `;

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/drawer.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { RouteRail } from "../common/RouteRail.tsx";
+import { platform } from "../../platform/index.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import {
@@ -306,7 +307,7 @@ export function ItineraryPage(): JSX.Element {
                 chevron
                 onClick={() => {
                   if (selectedItem.bookingUrl) {
-                    window.open(selectedItem.bookingUrl, "_blank", "noopener,noreferrer");
+                    void platform.openExternalUrl(selectedItem.bookingUrl);
                   }
                 }}
               >
