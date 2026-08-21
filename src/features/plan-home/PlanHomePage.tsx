@@ -7,7 +7,7 @@ import { toUserMessage } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { DecisionStatusBanner } from "../common/DecisionStatusBanner.tsx";
-import { PageState } from "../common/PageState.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { PlanListRow } from "./components/PlanListRow.tsx";
 import { toTripRoomViewModel } from "./plan-home-view-model.ts";
 import {

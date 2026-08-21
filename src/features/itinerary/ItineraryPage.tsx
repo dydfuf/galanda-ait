@@ -14,7 +14,7 @@ import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
-import { PageState } from "../common/PageState.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { tdsPageStyle } from "../common/tds-layout.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";

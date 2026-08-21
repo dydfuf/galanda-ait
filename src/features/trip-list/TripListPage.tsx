@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
 import { toUserMessage } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
-import { PageState } from "../common/PageState.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { fixedCtaContainerStyle, tdsPageWithBottomCtaStyle } from "../common/tds-layout.ts";
 import {
   getTripListStatusText,
