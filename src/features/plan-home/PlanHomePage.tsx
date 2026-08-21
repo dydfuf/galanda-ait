@@ -75,17 +75,17 @@ export function PlanHomePage() {
   const primaryCta = isConfirmed
     ? {
         label: "확정 일정 보기",
-        onClick: () => void navigate(`/trips/${tripId}/itinerary`, { replace: true }),
+        onClick: () => navigate(`/trips/${tripId}/itinerary`, { replace: true }),
       }
     : plans.length >= 2
       ? {
           label: "여행안 비교하기",
           onClick: () =>
-            void navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`),
+            navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`),
         }
       : {
           label: plans.length === 1 ? "새 여행안 제안하기" : "첫 여행안 만들기",
-          onClick: () => void navigate(`/trips/${tripId}/plans/new`),
+          onClick: () => navigate(`/trips/${tripId}/plans/new`),
         };
 
   return (

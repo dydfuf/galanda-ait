@@ -50,7 +50,7 @@ export function NotFoundPage() {
       <Button
         type="button"
         size="lg"
-        onClick={() => void navigate("/trips", { replace: true })}
+        onClick={() => navigate("/trips", { replace: true })}
       >
         여행 목록으로 이동
       </Button>

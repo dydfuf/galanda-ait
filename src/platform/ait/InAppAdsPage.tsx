@@ -138,7 +138,7 @@ export function InAppAdsPage({ onBack }: InAppAdsPageProps) {
     if (onBack) {
       onBack();
     } else {
-      goBack();
+      void goBack();
     }
   };
 

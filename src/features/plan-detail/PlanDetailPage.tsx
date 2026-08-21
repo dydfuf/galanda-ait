@@ -102,7 +102,7 @@ export function PlanDetailPage(): JSX.Element {
         title="여행안을 찾을 수 없습니다"
         message="요청하신 여행안이 삭제되었거나 존재하지 않습니다."
         actionText="계획 목록으로 돌아가기"
-        onAction={() => void navigate(`/trips/${tripId}/plans`, { replace: true })}
+        onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
       />
     );
   }
@@ -147,7 +147,7 @@ export function PlanDetailPage(): JSX.Element {
         expectedRevision: room.revision,
       });
       setIsDeleteConfirmOpen(false);
-      await navigate(`/trips/${tripId}/plans`, { replace: true });
+      navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
       setIsDeleteConfirmOpen(false);
       toast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
@@ -235,7 +235,7 @@ export function PlanDetailPage(): JSX.Element {
             <MobileListItem
               chevron
               className="px-2"
-              onClick={() => void navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)}
+              onClick={() => navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)}
             >
               <ItemTitle className="font-normal text-secondary-foreground">
                 다른 구성으로 제안하기
@@ -251,7 +251,7 @@ export function PlanDetailPage(): JSX.Element {
           <Button
             type="button"
             size="xl"
-            onClick={() => void navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
           >
             확정 일정 보기
           </Button>
@@ -305,7 +305,7 @@ export function PlanDetailPage(): JSX.Element {
                   chevron
                   onClick={() => {
                     setSheet(null);
-                    void navigate(`/trips/${tripId}/plans/${plan.id}/edit`);
+                    navigate(`/trips/${tripId}/plans/${plan.id}/edit`);
                   }}
                 >
                   <ItemTitle>여행안 수정</ItemTitle>

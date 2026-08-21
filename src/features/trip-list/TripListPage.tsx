@@ -111,7 +111,7 @@ export function TripListPage() {
             key={room.id}
             chevron
             aria-label={`${room.title}, ${periodText}, ${statusText}`}
-            onClick={() => void navigate(getTripEntryPath(room))}
+            onClick={() => navigate(getTripEntryPath(room))}
             className="py-4"
           >
             <ItemTitle className="text-[17px]">{room.title}</ItemTitle>
@@ -149,7 +149,7 @@ export function TripListPage() {
       {content}
 
       <BottomAction>
-        <Button type="button" size="xl" onClick={() => void navigate("/trips/new")}>
+        <Button type="button" size="xl" onClick={() => navigate("/trips/new")}>
           새 여행 만들기
         </Button>
       </BottomAction>
