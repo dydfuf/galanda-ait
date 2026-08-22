@@ -13,13 +13,8 @@ import {
   NotFoundError,
   RepositoryError,
 } from "../../core/domain/errors.ts";
-import type {
-  PlanMemberOpinion,
-  TripMember,
-  TripPlan,
-  TripRoom,
-} from "../../core/domain/room.ts";
-import type { PlanId, Revision, TripId } from "../../core/domain/ids.ts";
+import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
+import type { Revision, TripId } from "../../core/domain/ids.ts";
 
 const STORAGE_KEY = "galanda_rooms_v1";
 
@@ -271,104 +266,9 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         };
       }),
 
-    deletePlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-      mutateRoom(roomId, expectedRevision, "deletePlan", (room) => ({
+    saveRoom: (room: TripRoom, expectedRevision: Revision) =>
+      mutateRoom(room.id, expectedRevision, "saveRoom", () => ({
         ...room,
-        revision: RevisionSchema.make(room.revision + 1),
-        plans: room.plans.filter((p) => p.id !== planId),
-        confirmedPlanId:
-          room.confirmedPlanId === planId ? undefined : room.confirmedPlanId,
+        revision: RevisionSchema.make(expectedRevision + 1),
       })),
-
-    confirmPlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-      mutateRoom(roomId, expectedRevision, "confirmPlan", (room) => {
-        const targetPlan = room.plans.find((p) => p.id === planId);
-        if (!targetPlan) {
-          return Effect.fail(
-            new NotFoundError({ entity: "TripPlan", id: planId })
-          );
-        }
-        return {
-          ...room,
-          revision: RevisionSchema.make(room.revision + 1),
-          plans: room.plans.map((p) =>
-            p.id === planId ? { ...p, status: "CONFIRMED" as const } : p
-          ),
-          confirmedPlanId: planId,
-        };
-      }),
-
-    setPlanOpinion: (
-      roomId: TripId,
-      planId: PlanId,
-      opinion: PlanMemberOpinion,
-      expectedRevision: Revision
-    ) =>
-      mutateRoom(roomId, expectedRevision, "setPlanOpinion", (room) => {
-        const planIndex = room.plans.findIndex((p) => p.id === planId);
-        if (planIndex === -1) {
-          return Effect.fail(
-            new NotFoundError({ entity: "TripPlan", id: planId })
-          );
-        }
-
-        const plan = room.plans[planIndex];
-        const existingOpinions = plan.memberOpinions ?? [];
-        // 정상 입력은 이미 한 건이지만, 레거시 중복도 함께 정리해 최신 의견 1건만 남긴다.
-        const nextOpinions = [
-          ...existingOpinions.filter((existing) => existing.userId !== opinion.userId),
-          opinion,
-        ];
-
-        const voteCount = nextOpinions.filter((o) => o.reaction === "LIKE").length;
-
-        const updatedPlan: TripPlan = {
-          ...plan,
-          memberOpinions: nextOpinions,
-          voteCount,
-        };
-
-        return {
-          ...room,
-          revision: RevisionSchema.make(room.revision + 1),
-          plans: [
-            ...room.plans.slice(0, planIndex),
-            updatedPlan,
-            ...room.plans.slice(planIndex + 1),
-          ],
-        };
-      }),
-
-    joinRoom: (roomId: TripId, member: TripMember) =>
-      Effect.gen(function* () {
-        const stored = yield* loadRooms("joinRoom");
-        const rooms = yield* decodeRooms(stored, "joinRoom.decode");
-        const index = rooms.findIndex((r) => r.id === roomId);
-        if (index === -1) {
-          return yield* Effect.fail(
-            new NotFoundError({ entity: "TripRoom", id: roomId })
-          );
-        }
-
-        const room = rooms[index];
-        const alreadyMember = room.members.some((m) => m.id === member.id);
-
-        if (alreadyMember) {
-          return room;
-        }
-
-        const updatedRoom: TripRoom = {
-          ...room,
-          members: [...room.members, member],
-        };
-
-        const nextRooms = [
-          ...rooms.slice(0, index),
-          updatedRoom,
-          ...rooms.slice(index + 1),
-        ];
-        yield* saveRooms(nextRooms, "joinRoom.save");
-
-        return updatedRoom;
-      }),
   });

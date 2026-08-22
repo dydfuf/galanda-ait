@@ -11,13 +11,8 @@ import {
   RepositoryError,
 } from "../../core/domain/errors.ts";
 import { SupabaseClient, type SupabaseJsClient } from "./supabase-client.ts";
-import { RevisionSchema, type PlanId, type Revision, type TripId } from "../../core/domain/ids.ts";
-import type {
-  PlanMemberOpinion,
-  TripMember,
-  TripPlan,
-  TripRoom,
-} from "../../core/domain/room.ts";
+import { RevisionSchema, type Revision, type TripId } from "../../core/domain/ids.ts";
+import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
 
 const fetchActualRevision = (
   client: SupabaseJsClient,
@@ -141,6 +136,66 @@ const callRpcRoomMutation = (
           })
       )
     );
+  });
+
+const saveRoom = (
+  client: SupabaseJsClient,
+  room: TripRoom,
+  expectedRevision: Revision
+): Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError> =>
+  Effect.gen(function* () {
+    const nextRevision = RevisionSchema.make(expectedRevision + 1);
+    const result = yield* Effect.tryPromise({
+      try: async () =>
+        client
+          .from("trip_rooms")
+          .update({
+            title: room.title,
+            destination: room.destination,
+            revision: nextRevision,
+            members: room.members,
+            plans: room.plans,
+            confirmed_plan_id: room.confirmedPlanId ?? null,
+          })
+          .eq("id", room.id)
+          .eq("revision", expectedRevision)
+          .select("id")
+          .maybeSingle(),
+      catch: (cause) =>
+        new RepositoryError({
+          operation: "saveRoom",
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "여행방을 저장하지 못했습니다.",
+        }),
+    });
+
+    if (result.error) {
+      return yield* Effect.fail(
+        new RepositoryError({
+          operation: "saveRoom",
+          message: result.error.message,
+        })
+      );
+    }
+
+    if (!result.data) {
+      const actualRevision = yield* fetchActualRevision(
+        client,
+        room.id,
+        "saveRoom"
+      );
+      return yield* Effect.fail(
+        new ConflictError({
+          message: "다른 사용자가 이미 방 정보를 수정했습니다.",
+          expectedRevision,
+          actualRevision,
+        })
+      );
+    }
+
+    return { ...room, revision: nextRevision };
   });
 
 export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
@@ -324,62 +379,8 @@ export const SupabaseTripRoomRepositoryLayer: Layer.Layer<
           expectedRevision
         ),
 
-      deletePlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-        callRpcRoomMutation(
-          client,
-          "delete_trip_plan",
-          {
-            room_id: roomId,
-            plan_id: planId,
-            expected_revision: expectedRevision,
-          },
-          roomId,
-          expectedRevision
-        ),
-
-      confirmPlan: (roomId: TripId, planId: PlanId, expectedRevision: Revision) =>
-        callRpcRoomMutation(
-          client,
-          "confirm_trip_plan",
-          {
-            room_id: roomId,
-            plan_id: planId,
-            expected_revision: expectedRevision,
-          },
-          roomId,
-          expectedRevision
-        ),
-
-      setPlanOpinion: (
-        roomId: TripId,
-        planId: PlanId,
-        opinion: PlanMemberOpinion,
-        expectedRevision: Revision
-      ) =>
-        callRpcRoomMutation(
-          client,
-          "set_plan_opinion",
-          {
-            room_id: roomId,
-            plan_id: planId,
-            opinion_data: opinion,
-            expected_revision: expectedRevision,
-          },
-          roomId,
-          expectedRevision
-        ),
-
-      joinRoom: (roomId: TripId, member: TripMember) =>
-        callRpcRoomMutation(
-          client,
-          "join_trip_room",
-          {
-            room_id: roomId,
-            member_data: member,
-          },
-          roomId
-        ),
+      saveRoom: (room: TripRoom, expectedRevision: Revision) =>
+        saveRoom(client, room, expectedRevision),
     };
   })
 );
-

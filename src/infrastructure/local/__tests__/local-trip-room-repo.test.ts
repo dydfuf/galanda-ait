@@ -161,7 +161,7 @@ describe("LocalTripRoomRepository", () => {
     }
   });
 
-  it("7. 같은 사용자의 의견을 교체해도 최신 의견 한 건과 새 집계만 유지한다", async () => {
+  it("7. saveRoom은 전달받은 aggregate를 저장하고 revision을 증가시킨다", async () => {
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
       const room = yield* repo.createRoom({
@@ -180,34 +180,15 @@ describe("LocalTripRoomRepository", () => {
         },
         room.revision
       );
-      const liked = yield* repo.setPlanOpinion(
-        room.id,
-        PlanIdSchema.make("plan-1"),
-        {
-          userId: UserIdSchema.make("member-1"),
-          userName: "Member",
-          reaction: "LIKE",
-        },
+      return yield* repo.saveRoom(
+        { ...withPlan, title: "저장된 여행" },
         withPlan.revision
-      );
-      return yield* repo.setPlanOpinion(
-        room.id,
-        PlanIdSchema.make("plan-1"),
-        {
-          userId: UserIdSchema.make("member-1"),
-          userName: "Member",
-          reaction: "HARD",
-          reason: "이동이 길어요",
-        },
-        liked.revision
       );
     }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
 
     const room = await Effect.runPromise(program);
-    const plan = room.plans[0];
-    expect(plan?.memberOpinions).toHaveLength(1);
-    expect(plan?.memberOpinions?.[0].reaction).toBe("HARD");
-    expect(plan?.voteCount).toBe(0);
+    expect(room.title).toBe("저장된 여행");
+    expect(room.revision).toBe(3);
   });
 
   it("legacy Room 날짜와 nights 기반 routes를 adapter 입구에서 날짜 기반 모델로 정상화한다", async () => {

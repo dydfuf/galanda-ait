@@ -8,6 +8,7 @@ import {
   requireRoomHost,
 } from "../domain/auth-guards.ts";
 import { getPlanDateRange } from "../domain/room.ts";
+import { confirmPlanInRoom } from "../domain/room-transitions.ts";
 import { ConflictError, ValidationError } from "../domain/errors.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
@@ -53,6 +54,9 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     }
 
     // 6. 확정 실행 (Revision 낙관적 락 보장)
-    return yield* repo.confirmPlan(roomId, planId, expectedRevision);
+    return yield* repo.saveRoom(
+      confirmPlanInRoom(room, plan),
+      expectedRevision
+    );
   }
 );

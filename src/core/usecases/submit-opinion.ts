@@ -8,6 +8,7 @@ import {
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import type { PlanMemberOpinion } from "../domain/room.ts";
 import { ValidationError } from "../domain/errors.ts";
+import { setPlanOpinionInRoom } from "../domain/room-transitions.ts";
 
 /**
  * 의견 제출 입력
@@ -57,7 +58,7 @@ export const submitOpinion = Effect.fn("submitOpinion")(
     );
 
     // 4. 대상 플랜 존재 여부 검증
-    yield* requirePlanInRoom(room, input.planId);
+    const plan = yield* requirePlanInRoom(room, input.planId);
 
     // 5. 세션 사용자의 정보로 작성자 고정 (위조 방지)
     const sanitizedOpinion: PlanMemberOpinion = {
@@ -67,10 +68,8 @@ export const submitOpinion = Effect.fn("submitOpinion")(
       reason,
     };
 
-    return yield* repo.setPlanOpinion(
-      input.roomId,
-      input.planId,
-      sanitizedOpinion,
+    return yield* repo.saveRoom(
+      setPlanOpinionInRoom(room, plan, sanitizedOpinion),
       input.expectedRevision
     );
   }

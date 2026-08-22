@@ -5,7 +5,6 @@ import {
   RevisionSchema,
   TripIdSchema,
   UserIdSchema,
-  type PlanId,
   type Revision,
   type TripId,
 } from "../../domain/ids.ts";
@@ -91,28 +90,26 @@ const createInMemoryRepo = (
       rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
       return Effect.succeed(updated);
     },
-    deletePlan: (
-      roomId: TripId,
-      planId: PlanId,
+    saveRoom: (
+      nextRoom: TripRoom,
       expectedRevision: Revision
     ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
-      const idx = rooms.findIndex((r) => r.id === roomId);
-      if (idx === -1) return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
+      const idx = rooms.findIndex((room) => room.id === nextRoom.id);
+      if (idx === -1) {
+        return Effect.fail(
+          new NotFoundError({ entity: "TripRoom", id: nextRoom.id })
+        );
+      }
       if (rooms[idx].revision !== expectedRevision) {
         return Effect.fail(new ConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
       }
-      const updatedPlans = rooms[idx].plans.filter((p) => p.id !== planId);
       const updated: TripRoom = {
-        ...rooms[idx],
-        plans: updatedPlans,
-        revision: RevisionSchema.make(rooms[idx].revision + 1),
+        ...nextRoom,
+        revision: RevisionSchema.make(expectedRevision + 1),
       };
       rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
       return Effect.succeed(updated);
     },
-    confirmPlan: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented"),
-    setPlanOpinion: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented"),
-    joinRoom: (): Effect.Effect<TripRoom, never> => Effect.die("not implemented"),
   });
 };
 
