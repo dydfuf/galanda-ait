@@ -1,7 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { appRuntime } from "../../app/runtime.ts";
-import { getTripRooms } from "../../core/usecases/get-room.ts";
 import type { TripRoom } from "../../core/domain/room.ts";
+import { getTrips } from "../../app/api-client.ts";
 import {
   toTripRoomViewModel,
   type TripRoomViewModel,
@@ -25,7 +24,7 @@ export const useTripRoomsQuery = (): UseQueryResult<
   return useQuery<ReadonlyArray<TripRoom>, Error, ReadonlyArray<TripRoomViewModel>>({
     queryKey: [...tripRoomKeys.list(), session?.userId ?? "anonymous"],
     queryFn: ({ signal }): Promise<ReadonlyArray<TripRoom>> =>
-      appRuntime.runPromise(getTripRooms(), { signal }),
+      getTrips(signal),
     select: (rooms: ReadonlyArray<TripRoom>): ReadonlyArray<TripRoomViewModel> =>
       rooms.map((r) => toTripRoomViewModel(r, session?.userId)),
     enabled: isSessionReady,
