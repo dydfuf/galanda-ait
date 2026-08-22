@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
   UserIdSchema,
@@ -7,11 +8,17 @@ import {
 import type { TripRoom } from "../core/domain/room.ts";
 import {
   ApiClientError,
+  confirmTripPlan,
   createTrip,
+  createTripPlan,
+  deleteTripPlan,
   getCurrentSession,
   getTrip,
   getTrips,
+  joinTrip,
+  submitTripPlanOpinion,
   updateTrip,
+  updateTripPlan,
 } from "./api-client.ts";
 
 const originalFetch = globalThis.fetch;
@@ -107,6 +114,70 @@ describe("API client", () => {
       message: "다른 사용자가 이미 수정했습니다.",
       requestId: "req-1",
       details: { expectedRevision: 3, actualRevision: 4 },
+    });
+  });
+
+  it("plan/opinion/confirm/join mutation을 allowlisted HTTP DTO로 전송한다", async () => {
+    const tripId = TripIdSchema.make("trip-1");
+    const planId = PlanIdSchema.make("plan-1");
+    const revision = RevisionSchema.make(3);
+    const room: TripRoom = {
+      id: tripId,
+      title: "오사카 여행",
+      destination: "오사카",
+      revision,
+      members: [
+        { id: UserIdSchema.make("user-1"), name: "User", role: "HOST" },
+      ],
+      plans: [],
+      confirmedPlanId: undefined,
+    };
+    const calls: Array<{ readonly input: RequestInfo | URL; readonly init?: RequestInit }> = [];
+    globalThis.fetch = async (input, init) => {
+      calls.push({ input, init });
+      return jsonResponse(room);
+    };
+    const plan = {
+      id: planId,
+      title: "수정안",
+      status: "CONFIRMED" as const,
+      authorId: UserIdSchema.make("attacker"),
+      authorName: "Attacker",
+      places: [],
+      memberOpinions: [],
+      voteCount: 999,
+      differenceSummary: "위조 diff",
+      clonedFromPlanId: PlanIdSchema.make("forged-source"),
+    };
+
+    await createTripPlan(tripId, {
+      title: "새 여행안",
+      places: [],
+      expectedRevision: revision,
+    });
+    await updateTripPlan(tripId, plan, revision);
+    await deleteTripPlan(tripId, planId, revision);
+    await submitTripPlanOpinion(
+      tripId,
+      planId,
+      { reaction: "HARD", reason: "너무 멀어요" },
+      revision
+    );
+    await confirmTripPlan(tripId, planId, revision);
+    await joinTrip(tripId);
+
+    expect(calls.map(({ input, init }) => [init?.method, input])).toEqual([
+      ["POST", "/api/trips/trip-1/plans"],
+      ["PATCH", "/api/trips/trip-1/plans/plan-1"],
+      ["DELETE", "/api/trips/trip-1/plans/plan-1"],
+      ["PUT", "/api/trips/trip-1/plans/plan-1/opinion"],
+      ["POST", "/api/trips/trip-1/plans/plan-1/confirm"],
+      ["POST", "/api/trips/trip-1/join"],
+    ]);
+    expect(JSON.parse(calls[1].init?.body as string)).toEqual({
+      title: "수정안",
+      places: [],
+      expectedRevision: 3,
     });
   });
 });

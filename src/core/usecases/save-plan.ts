@@ -72,9 +72,7 @@ export interface CreatePlanCommand {
   readonly cloneFromPlanId?: PlanId;
 }
 
-const CreatePlanCommandSchema = Schema.Struct({
-  roomId: TripIdSchema,
-  expectedRevision: RevisionSchema,
+export const PlanEditableFieldsSchema = Schema.Struct({
   title: Schema.String,
   proposalReason: Schema.optional(Schema.String),
   baseHeadcount: Schema.optional(Schema.Number),
@@ -102,6 +100,12 @@ const CreatePlanCommandSchema = Schema.Struct({
     bookingUrl: Schema.optional(Schema.String),
   }))),
   places: Schema.Array(TripPlaceSchema),
+});
+
+const CreatePlanCommandSchema = Schema.Struct({
+  roomId: TripIdSchema,
+  expectedRevision: RevisionSchema,
+  ...PlanEditableFieldsSchema.fields,
   cloneFromPlanId: Schema.optional(PlanIdSchema),
 });
 

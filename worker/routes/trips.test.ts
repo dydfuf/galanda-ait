@@ -1,11 +1,12 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
 import { describe, expect, it } from "vitest";
 import {
+  PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
   UserIdSchema,
 } from "../../src/core/domain/ids.ts";
-import type { TripRoom } from "../../src/core/domain/room.ts";
+import type { TripPlan, TripRoom } from "../../src/core/domain/room.ts";
 import type { DatabaseHandle } from "../../src/infrastructure/persistence/drizzle/database.ts";
 import * as schema from "../../src/infrastructure/persistence/drizzle/schema/index.ts";
 import {
@@ -17,6 +18,23 @@ import {
 const baseUrl = "https://galanda.test";
 const env = {} as AppEnv["Bindings"];
 const hostId = UserIdSchema.make("host-1");
+const plan: TripPlan = {
+  id: PlanIdSchema.make("plan-1"),
+  title: "첫 여행안",
+  status: "DRAFT",
+  authorId: hostId,
+  authorName: "Host",
+  routes: [
+    {
+      city: "오사카",
+      arrivalDate: "2026-09-01",
+      departureDate: "2026-09-04",
+    },
+  ],
+  places: [],
+  memberOpinions: [],
+  voteCount: 0,
+};
 const room: TripRoom = {
   id: TripIdSchema.make("trip-1"),
   title: "오사카 여행",
@@ -26,6 +44,7 @@ const room: TripRoom = {
   plans: [],
   confirmedPlanId: undefined,
 };
+const roomWithPlan: TripRoom = { ...room, plans: [plan] };
 
 const rowValues = (value: TripRoom): Array<unknown> => [
   value.id,
@@ -39,7 +58,13 @@ const rowValues = (value: TripRoom): Array<unknown> => [
   "2026-08-23T00:00:00.000Z",
 ];
 
-const makeApp = (responses: Array<Array<Array<unknown>>>) => {
+const makeApp = (
+  responses: Array<Array<Array<unknown>>>,
+  user: { readonly id: string; readonly name: string } = {
+    id: hostId,
+    name: "Host",
+  }
+) => {
   const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
   const client = {
     query: async (
@@ -55,7 +80,7 @@ const makeApp = (responses: Array<Array<Array<unknown>>>) => {
     handler: () => new Response(),
     api: {
       getSession: async () => ({
-        user: { id: hostId, name: "Host", email: "host@example.com" },
+        user: { ...user, email: `${user.id}@example.com` },
       }),
     },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;
@@ -167,5 +192,155 @@ describe("Trip API vertical slice", () => {
       },
     });
     expect(calls[1].text).toContain('"revision" = "trip_rooms"."revision" + 1');
+  });
+
+  it("plan create가 작성자와 서버 소유 필드를 세션에서 결정한다", async () => {
+    const created = {
+      ...roomWithPlan,
+      revision: RevisionSchema.make(4),
+    };
+    const { app, calls } = makeApp([
+      [rowValues(room)],
+      [rowValues(room)],
+      [rowValues(created)],
+    ]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/plans", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "첫 여행안",
+          routes: plan.routes,
+          places: [],
+          expectedRevision: 3,
+        }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(201);
+    const persistedPlans = JSON.parse(calls[2].params[0] as string) as TripPlan[];
+    expect(persistedPlans[0]).toMatchObject({
+      title: "첫 여행안",
+      authorId: hostId,
+      authorName: "Host",
+      status: "DRAFT",
+      voteCount: 0,
+    });
+  });
+
+  it("plan update DTO의 서버 소유 필드를 거부한다", async () => {
+    const { app, calls } = makeApp([]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/plans/plan-1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "위조 수정",
+          places: [],
+          expectedRevision: 3,
+          status: "CONFIRMED",
+          authorId: "attacker",
+          voteCount: 999,
+        }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("opinion/confirm/delete/join을 domain transition과 CAS 저장으로 연결한다", async () => {
+    const guestId = UserIdSchema.make("guest-1");
+    const cases = [
+      {
+        method: "PUT",
+        path: "/api/trips/trip-1/plans/plan-1/opinion",
+        body: { reaction: "LIKE", expectedRevision: 3 },
+        initial: roomWithPlan,
+        updated: {
+          ...roomWithPlan,
+          revision: RevisionSchema.make(4),
+          plans: [
+            {
+              ...plan,
+              memberOpinions: [
+                { userId: hostId, userName: "Host", reaction: "LIKE" as const },
+              ],
+              voteCount: 1,
+            },
+          ],
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/trips/trip-1/plans/plan-1/confirm",
+        body: { expectedRevision: 3 },
+        initial: roomWithPlan,
+        updated: {
+          ...roomWithPlan,
+          revision: RevisionSchema.make(4),
+          plans: [{ ...plan, status: "CONFIRMED" as const }],
+          confirmedPlanId: plan.id,
+        },
+      },
+      {
+        method: "DELETE",
+        path: "/api/trips/trip-1/plans/plan-1",
+        body: { expectedRevision: 3 },
+        initial: roomWithPlan,
+        updated: {
+          ...roomWithPlan,
+          revision: RevisionSchema.make(4),
+          plans: [],
+        },
+      },
+      {
+        method: "POST",
+        path: "/api/trips/trip-1/join",
+        initial: room,
+        updated: {
+          ...room,
+          revision: RevisionSchema.make(4),
+          members: [
+            ...room.members,
+            { id: guestId, name: "Guest", role: "MEMBER" as const },
+          ],
+        },
+        user: { id: guestId, name: "Guest" },
+      },
+    ] satisfies ReadonlyArray<{
+      readonly method: string;
+      readonly path: string;
+      readonly body?: unknown;
+      readonly initial: TripRoom;
+      readonly updated: TripRoom;
+      readonly user?: { readonly id: string; readonly name: string };
+    }>;
+
+    for (const testCase of cases) {
+      const { app, calls } = makeApp(
+        [[rowValues(testCase.initial)], [rowValues(testCase.updated)]],
+        testCase.user
+      );
+      const response = await app.fetch(
+        request(testCase.path, {
+          method: testCase.method,
+          body:
+            testCase.body === undefined
+              ? undefined
+              : JSON.stringify(testCase.body),
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(testCase.updated);
+      expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
+        "select",
+        "update",
+      ]);
+    }
   });
 });

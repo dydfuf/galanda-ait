@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
-import { appRuntime } from "../../app/runtime.ts";
-import { createPlan, updatePlan, deletePlan, type CreatePlanCommand } from "../../core/usecases/save-plan.ts";
+import {
+  createTripPlan,
+  deleteTripPlan,
+  updateTripPlan,
+} from "../../app/api-client.ts";
+import type { CreatePlanCommand } from "../../core/usecases/save-plan.ts";
 import { TripIdSchema, PlanIdSchema, RevisionSchema } from "../../core/domain/ids.ts";
 import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
@@ -20,12 +24,12 @@ export const useCreatePlanMutation = (): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ roomId, expectedRevision, ...command }: CreatePlanVariables): Promise<TripRoom> =>
-      appRuntime.runPromise(
-        createPlan({
-          roomId: TripIdSchema.make(roomId),
+      createTripPlan(
+        TripIdSchema.make(roomId),
+        {
           expectedRevision: RevisionSchema.make(expectedRevision),
           ...command,
-        })
+        }
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
@@ -47,12 +51,10 @@ export const useUpdatePlanMutation = (): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ roomId, plan, expectedRevision }: UpdatePlanVariables): Promise<TripRoom> =>
-      appRuntime.runPromise(
-        updatePlan({
-          roomId: TripIdSchema.make(roomId),
-          plan,
-          expectedRevision: RevisionSchema.make(expectedRevision),
-        })
+      updateTripPlan(
+        TripIdSchema.make(roomId),
+        plan,
+        RevisionSchema.make(expectedRevision)
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
@@ -74,12 +76,10 @@ export const useDeletePlanMutation = (): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ roomId, planId, expectedRevision }: DeletePlanVariables): Promise<TripRoom> =>
-      appRuntime.runPromise(
-        deletePlan({
-          roomId: TripIdSchema.make(roomId),
-          planId: PlanIdSchema.make(planId),
-          expectedRevision: RevisionSchema.make(expectedRevision),
-        })
+      deleteTripPlan(
+        TripIdSchema.make(roomId),
+        PlanIdSchema.make(planId),
+        RevisionSchema.make(expectedRevision)
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
