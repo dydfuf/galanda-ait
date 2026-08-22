@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import type { BetterAuthEnv } from "./infrastructure/auth/better-auth.ts";
+import { withBetterAuth } from "./infrastructure/auth/better-auth.ts";
+import { authSessionMiddleware } from "./infrastructure/auth/session-middleware.ts";
+import type { BetterAuthSession } from "../src/infrastructure/auth/better-auth/session.ts";
 import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
 
 export interface AppVariables {
   requestId: string;
+  authSession?: BetterAuthSession | null;
+  authSessionError?: unknown;
 }
 
 export interface AppEnv {
-  Bindings: Env;
+  Bindings: Env & BetterAuthEnv;
   Variables: AppVariables;
 }
 
@@ -30,6 +36,11 @@ export function createApp() {
     await next();
     c.header("x-request-id", requestId);
   });
+
+  app.all("/api/auth/*", (c) =>
+    withBetterAuth(c.env, (auth) => auth.handler(c.req.raw))
+  );
+  app.use("/api/*", authSessionMiddleware);
 
   app.route("/api/health", healthRoute);
 
