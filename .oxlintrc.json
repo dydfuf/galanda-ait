@@ -186,7 +186,7 @@
               {
                 "name": "effect",
                 "importNames": ["ManagedRuntime"],
-                "message": "UI/application adapter에서 ManagedRuntime을 만들지 말고 src/app/runtime.ts의 appRuntime을 사용하세요."
+                "message": "UI/application adapter에서 ManagedRuntime을 만들지 말고 서버 HTTP API를 사용하세요."
               }
             ],
             "patterns": [
@@ -196,7 +196,7 @@
               },
               {
                 "regex": "^(?:@/|(?:\\.\\./)+)infrastructure(?:/|$)",
-                "message": "UI/feature layer에서 infrastructure 구현을 직접 import하지 마세요. core usecase + app runtime 경계를 사용하세요."
+                "message": "UI/feature layer에서 infrastructure 구현을 직접 import하지 마세요. 서버 HTTP API 경계를 사용하세요."
               }
             ]
           }

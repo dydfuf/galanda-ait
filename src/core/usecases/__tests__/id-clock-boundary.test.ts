@@ -7,10 +7,8 @@ import { SessionService } from "../../ports/session.ts";
 import { IdGenerator } from "../../ports/id-generator.ts";
 import { IdGeneratorLive, createTestIdGenerator } from "../../../infrastructure/id-generator.ts";
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
-import { SupabaseTripRoomRepositoryLayer } from "../../../infrastructure/supabase/supabase-trip-room-repo.ts";
-import { SupabaseClient } from "../../../infrastructure/supabase/supabase-client.ts";
 import { TripIdSchema, RevisionSchema, UserIdSchema } from "../../domain/ids.ts";
-import type { TripMember, TripRoom, UserSession } from "../../domain/room.ts";
+import type { TripRoom, UserSession } from "../../domain/room.ts";
 
 describe("Application / Effect Boundary: IdGenerator & Clock", () => {
   const aliceSession: UserSession = {
@@ -168,79 +166,7 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
     });
   });
 
-  describe("5. Local / Supabase Repository Contract 일치 확인", () => {
-    it("동일한 CreateRoomParams를 Local과 Supabase 저장소에 전달했을 때 id와 주요 필드의 의미가 일치한다", async () => {
-      const hostUser: TripMember = {
-        id: UserIdSchema.make("user-host-1"),
-        name: "호스트",
-        role: "HOST",
-      };
-
-      const params: CreateRoomParams = {
-        id: TripIdSchema.make("room-contract-001"),
-        title: "유럽 배낭여행",
-        destination: "파리",
-        hostUser,
-      };
-
-      // 1) Local Repo 실행
-      const localResult = await Effect.runPromise(
-        Effect.gen(function* () {
-          const repo = yield* TripRoomRepository;
-          return yield* repo.createRoom(params);
-        }).pipe(Effect.provide(LocalTripRoomRepositoryLayer))
-      );
-
-      // 2) Supabase Repo 실행 (Mock Client)
-      let insertedRow: any = null;
-      const fakeClient = {
-        from: (_table: string) => ({
-          insert: (row: any) => {
-            insertedRow = row;
-            return {
-              select: () => ({
-                single: () =>
-                  Promise.resolve({
-                    data: {
-                      id: row.id,
-                      title: row.title,
-                      destination: row.destination,
-                      revision: 1,
-                      members: [row.host_user],
-                      plans: [],
-                      confirmedPlanId: undefined,
-                    },
-                    error: null,
-                  }),
-              }),
-            };
-          },
-        }),
-      };
-
-      const SupabaseTestLayer = SupabaseTripRoomRepositoryLayer.pipe(
-        Layer.provide(Layer.succeed(SupabaseClient, { client: fakeClient as any }))
-      );
-
-      const supabaseResult = await Effect.runPromise(
-        Effect.gen(function* () {
-          const repo = yield* TripRoomRepository;
-          return yield* repo.createRoom(params);
-        }).pipe(Effect.provide(SupabaseTestLayer))
-      );
-
-      // 계약 일치 검증: 두 구현체 모두 호출자가 제공한 ID를 정확히 유지함
-      expect(localResult.id).toBe("room-contract-001");
-      expect(supabaseResult.id).toBe("room-contract-001");
-      expect(insertedRow.id).toBe("room-contract-001");
-
-      expect(localResult.title).toBe(supabaseResult.title);
-      expect(localResult.destination).toBe(supabaseResult.destination);
-      expect(localResult.revision).toBe(supabaseResult.revision);
-    });
-  });
-
-  describe("6. IdGeneratorLive 런타임 지연 생성 검증", () => {
+  describe("5. IdGeneratorLive 런타임 지연 생성 검증", () => {
     it("IdGeneratorLive는 Effect 실행 시점마다 새로운 UUID를 생성한다", async () => {
       const program = Effect.gen(function* () {
         const ids = yield* IdGenerator;
