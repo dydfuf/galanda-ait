@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Effect, Layer, Option } from "effect";
 import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../domain/ids.ts";
-import type { PlanMemberOpinion, TripMember, TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
+import type { TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
 import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession } from "../../ports/session.ts";
 import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams } from "../../ports/trip-room-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
@@ -146,14 +146,15 @@ const createInMemoryRepositoryLayer = (
       rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
       return Effect.succeed(updated);
     },
-    deletePlan: (
-      roomId: typeof TripIdSchema.Type,
-      planId: typeof PlanIdSchema.Type,
+    saveRoom: (
+      nextRoom: TripRoom,
       expectedRevision: typeof RevisionSchema.Type
     ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
-      const index = rooms.findIndex((r) => r.id === roomId);
+      const index = rooms.findIndex((room) => room.id === nextRoom.id);
       if (index === -1) {
-        return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
+        return Effect.fail(
+          new NotFoundError({ entity: "TripRoom", id: nextRoom.id })
+        );
       }
       const room = rooms[index];
       if (room.revision !== expectedRevision) {
@@ -165,112 +166,16 @@ const createInMemoryRepositoryLayer = (
           })
         );
       }
-      const updatedPlans = room.plans.filter((p) => p.id !== planId);
-      const updated: TripRoom = {
-        ...room,
-        plans: updatedPlans,
-        revision: RevisionSchema.make(room.revision + 1),
+      const savedRoom: TripRoom = {
+        ...nextRoom,
+        revision: RevisionSchema.make(expectedRevision + 1),
       };
-      rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
-      return Effect.succeed(updated);
-    },
-    confirmPlan: (
-      roomId: typeof TripIdSchema.Type,
-      planId: typeof PlanIdSchema.Type,
-      expectedRevision: typeof RevisionSchema.Type
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
-      const index = rooms.findIndex((r) => r.id === roomId);
-      if (index === -1) {
-        return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
-      }
-      const room = rooms[index];
-      if (room.revision !== expectedRevision) {
-        return Effect.fail(
-          new ConflictError({
-            message: "Revision mismatch",
-            expectedRevision,
-            actualRevision: room.revision,
-          })
-        );
-      }
-      const updatedPlans = room.plans.map((p) =>
-        p.id === planId ? { ...p, status: "CONFIRMED" as const } : p
-      );
-      const updated: TripRoom = {
-        ...room,
-        confirmedPlanId: planId,
-        plans: updatedPlans,
-        revision: RevisionSchema.make(room.revision + 1),
-      };
-      rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
-      return Effect.succeed(updated);
-    },
-    setPlanOpinion: (
-      roomId: typeof TripIdSchema.Type,
-      planId: typeof PlanIdSchema.Type,
-      opinion: PlanMemberOpinion,
-      expectedRevision: typeof RevisionSchema.Type
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
-      const index = rooms.findIndex((r) => r.id === roomId);
-      if (index === -1) {
-        return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
-      }
-      const room = rooms[index];
-      if (room.revision !== expectedRevision) {
-        return Effect.fail(
-          new ConflictError({
-            message: "Revision mismatch",
-            expectedRevision,
-            actualRevision: room.revision,
-          })
-        );
-      }
-      const planIndex = room.plans.findIndex((p) => p.id === planId);
-      if (planIndex === -1) {
-        return Effect.fail(new NotFoundError({ entity: "TripPlan", id: planId }));
-      }
-      const targetPlan = room.plans[planIndex];
-      const existingOpinions = targetPlan.memberOpinions ?? [];
-      const nextOpinions = [
-        ...existingOpinions.filter((existing) => existing.userId !== opinion.userId),
-        opinion,
+      rooms = [
+        ...rooms.slice(0, index),
+        savedRoom,
+        ...rooms.slice(index + 1),
       ];
-      const voteCount = nextOpinions.filter((o) => o.reaction === "LIKE").length;
-      const updatedPlan: TripPlan = {
-        ...targetPlan,
-        memberOpinions: nextOpinions,
-        voteCount,
-      };
-      const updatedPlans = [
-        ...room.plans.slice(0, planIndex),
-        updatedPlan,
-        ...room.plans.slice(planIndex + 1),
-      ];
-      const updated: TripRoom = {
-        ...room,
-        plans: updatedPlans,
-        revision: RevisionSchema.make(room.revision + 1),
-      };
-      rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
-      return Effect.succeed(updated);
-    },
-    joinRoom: (
-      roomId: typeof TripIdSchema.Type,
-      member: TripMember
-    ): Effect.Effect<TripRoom, NotFoundError> => {
-      const index = rooms.findIndex((r) => r.id === roomId);
-      if (index === -1) {
-        return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
-      }
-      const room = rooms[index];
-      const alreadyMember = room.members.some((m) => m.id === member.id);
-      if (alreadyMember) return Effect.succeed(room);
-      const updated: TripRoom = {
-        ...room,
-        members: [...room.members, member],
-      };
-      rooms = [...rooms.slice(0, index), updated, ...rooms.slice(index + 1)];
-      return Effect.succeed(updated);
+      return Effect.succeed(savedRoom);
     },
   };
 

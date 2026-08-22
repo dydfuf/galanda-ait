@@ -3,6 +3,7 @@ import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import type { TripId } from "../domain/ids.ts";
 import type { TripMember } from "../domain/room.ts";
+import { joinRoomMember } from "../domain/room-transitions.ts";
 
 /**
  * 방 참여 입력
@@ -21,20 +22,19 @@ export const joinTripRoom = Effect.fn("joinTripRoom")(
 
     const repo = yield* TripRoomRepository;
 
-    // 2. 방 존재 여부 및 기존 참여 여부 확인 (멱등성 보장)
+    // 2. 방 존재 여부 확인
     const room = yield* repo.getRoom(input.roomId);
-    const alreadyMember = room.members.some((m) => m.id === session.userId);
-    if (alreadyMember) {
-      return room;
-    }
 
-    // 3. 참여 등록 실행 (세션 사용자의 userId 및 name 바인딩)
+    // 3. 세션 사용자의 userId 및 name으로 멱등 상태 전이
     const member: TripMember = {
       id: session.userId,
       name: session.name,
       role: "MEMBER",
     };
 
-    return yield* repo.joinRoom(input.roomId, member);
+    const updatedRoom = joinRoomMember(room, member);
+    return updatedRoom === room
+      ? room
+      : yield* repo.saveRoom(updatedRoom, room.revision);
   }
 );

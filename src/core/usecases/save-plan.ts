@@ -31,6 +31,7 @@ import {
   type TripPlan,
 } from "../domain/room.ts";
 import { ValidationError } from "../domain/errors.ts";
+import { deletePlanFromRoom } from "../domain/room-transitions.ts";
 
 export type CreateAccommodationSnapshot = Pick<
   AccommodationSnapshot,
@@ -343,9 +344,8 @@ export const deletePlan = Effect.fn("deletePlan")(
       "확정된 여행안은 삭제할 수 없습니다."
     );
 
-    return yield* repo.deletePlan(
-      input.roomId,
-      input.planId,
+    return yield* repo.saveRoom(
+      deletePlanFromRoom(room, plan),
       input.expectedRevision
     );
   }

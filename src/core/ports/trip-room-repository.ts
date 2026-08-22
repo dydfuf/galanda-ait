@@ -1,11 +1,6 @@
 import { Context } from "effect";
-import type { PlanId, Revision, TripId } from "../domain/ids.ts";
-import type {
-  PlanMemberOpinion,
-  TripMember,
-  TripPlan,
-  TripRoom,
-} from "../domain/room.ts";
+import type { Revision, TripId } from "../domain/ids.ts";
+import type { TripMember, TripPlan, TripRoom } from "../domain/room.ts";
 import type { ConflictError, NotFoundError } from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
 
@@ -47,26 +42,9 @@ export class TripRoomRepository extends Context.Service<
       plan: TripPlan,
       expectedRevision: Revision
     ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
-    readonly deletePlan: (
-      roomId: TripId,
-      planId: PlanId,
+    readonly saveRoom: (
+      room: TripRoom,
       expectedRevision: Revision
-    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
-    readonly confirmPlan: (
-      roomId: TripId,
-      planId: PlanId,
-      expectedRevision: Revision
-    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
-    readonly setPlanOpinion: (
-      roomId: TripId,
-      planId: PlanId,
-      opinion: PlanMemberOpinion,
-      expectedRevision: Revision
-    ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
-    readonly joinRoom: (
-      roomId: TripId,
-      member: TripMember
     ) => RepositoryEffect<TripRoom, NotFoundError | ConflictError>;
   }
 >()("galanda/ports/TripRoomRepository") {}
-

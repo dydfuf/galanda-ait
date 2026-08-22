@@ -58,10 +58,7 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         return Effect.succeed(updated);
       },
       updatePlan: () => Effect.die("not implemented"),
-      deletePlan: () => Effect.die("not implemented"),
-      confirmPlan: () => Effect.die("not implemented"),
-      setPlanOpinion: () => Effect.die("not implemented"),
-      joinRoom: () => Effect.die("not implemented"),
+      saveRoom: () => Effect.die("not implemented"),
     });
   };
 

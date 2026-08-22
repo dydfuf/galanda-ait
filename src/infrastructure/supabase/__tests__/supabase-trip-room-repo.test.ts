@@ -441,4 +441,47 @@ describe("SupabaseTripRoomRepository", () => {
       expect(JSON.stringify(err)).not.toContain("ConflictError");
     }
   });
+
+  it("12. saveRoom은 전체 aggregate를 expected revision으로 비교 저장한다", async () => {
+    const query: Record<string, ReturnType<typeof vi.fn>> = {};
+    query.update = vi.fn(() => query);
+    query.eq = vi.fn(() => query);
+    query.select = vi.fn(() => query);
+    query.maybeSingle = vi.fn().mockResolvedValue({
+      data: { id: "room-1" },
+      error: null,
+    });
+    const mockClient = { from: vi.fn(() => query) };
+    const room = {
+      id: TripIdSchema.make("room-1"),
+      title: "제주 여행",
+      destination: "제주",
+      revision: RevisionSchema.make(1),
+      members: [],
+      plans: [],
+      confirmedPlanId: undefined,
+    };
+
+    const saved = await Effect.runPromise(
+      Effect.gen(function* () {
+        const repo = yield* TripRoomRepository;
+        return yield* repo.saveRoom(room, room.revision);
+      }).pipe(
+        Effect.provide(
+          SupabaseTripRoomRepositoryLayer.pipe(
+            Layer.provide(
+              Layer.succeed(SupabaseClient, { client: mockClient as any })
+            )
+          )
+        )
+      )
+    );
+
+    expect(mockClient.from).toHaveBeenCalledWith("trip_rooms");
+    expect(query.update).toHaveBeenCalledWith(
+      expect.objectContaining({ revision: 2, confirmed_plan_id: null })
+    );
+    expect(query.eq).toHaveBeenNthCalledWith(2, "revision", 1);
+    expect(saved.revision).toBe(2);
+  });
 });
