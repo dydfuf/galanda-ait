@@ -44,6 +44,15 @@ npm run build      # Web/PWA production build (= build:web)
 
 UI는 shadcn/ui(Base UI) + Tailwind CSS 기반이에요. 규칙은 `docs/ui-foundation.md`를 참고해요.
 
+## Cloudflare Worker
+
+```bash
+npm run dev:worker       # Web build 후 Worker + Static Assets 로컬 실행
+npm run deploy:staging  # Web build 후 Cloudflare Workers 배포
+```
+
+`/api/*`는 Worker가 처리하고, 그 외 경로는 `dist/`의 SPA로 서빙해요.
+
 ## Apps in Toss (선택적 target)
 
 ```bash

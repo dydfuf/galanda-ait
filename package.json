@@ -9,16 +9,19 @@
   "scripts": {
     "dev": "vite",
     "dev:ait": "vite --mode ait",
-    "build": "tsc -b && vite build",
+    "build": "npm run typecheck && vite build",
     "build:web": "npm run build",
-    "build:ait": "tsc -b && vite build --mode ait && ait build",
+    "build:ait": "npm run typecheck && vite build --mode ait && ait build",
+    "dev:worker": "npm run build:web && wrangler dev",
     "lint": "oxlint --disable-nested-config",
     "lint:fix": "oxlint --disable-nested-config --fix",
-    "typecheck": "tsc -b --pretty false",
+    "types:worker": "wrangler types",
+    "typecheck": "wrangler types --check && tsc -b --pretty false",
     "test": "vitest run",
     "check": "npm run lint && npm test && npm run build && npm run build:ait",
     "preview": "vite preview",
-    "deploy": "ait deploy"
+    "deploy": "ait deploy",
+    "deploy:staging": "npm run build:web && wrangler deploy --env staging"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "^3.0.3",
@@ -51,6 +54,7 @@
     "oxlint-tsgolint": "~7.0.2001",
     "typescript": "~7.0.2",
     "vite": "^8.2.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.125.0"
   }
 }
