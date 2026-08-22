@@ -1,19 +1,46 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { makeBetterAuth, type BetterAuthEnv } from "./infrastructure/auth/better-auth.ts";
+import {
+  authSessionMiddleware,
+  createAuthSessionMiddleware,
+} from "./infrastructure/auth/session-middleware.ts";
+import {
+  createRequestDatabaseMiddleware,
+  requestDatabaseMiddleware,
+  type WithDatabase,
+} from "./infrastructure/database/request-database.ts";
+import type { DatabaseHandle } from "../src/infrastructure/persistence/drizzle/database.ts";
+import type { UserSession } from "../src/core/domain/room.ts";
 import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
 
 export interface AppVariables {
   requestId: string;
+  database?: DatabaseHandle;
+  databaseError?: unknown;
+  authSession?: UserSession | null;
+  authSessionError?: unknown;
 }
 
 export interface AppEnv {
-  Bindings: Env;
+  Bindings: Env & BetterAuthEnv;
   Variables: AppVariables;
 }
 
-export function createApp() {
+export interface AppDependencies {
+  readonly makeAuth?: typeof makeBetterAuth;
+  readonly withDatabase?: WithDatabase;
+}
+
+export function createApp(dependencies: AppDependencies = {}) {
   const app = new Hono<AppEnv>();
+  const databaseMiddleware = dependencies.withDatabase
+    ? createRequestDatabaseMiddleware(dependencies.withDatabase)
+    : requestDatabaseMiddleware;
+  const sessionMiddleware = dependencies.makeAuth
+    ? createAuthSessionMiddleware(dependencies.makeAuth)
+    : authSessionMiddleware;
 
   app.use("*", async (c, next) => {
     const upstreamId =
@@ -30,6 +57,20 @@ export function createApp() {
     await next();
     c.header("x-request-id", requestId);
   });
+
+  app.use("/api/*", databaseMiddleware);
+  app.all("/api/auth/*", (c) => {
+    if (!c.var.database) {
+      throw c.var.databaseError ?? new Error("Database is unavailable");
+    }
+    return (dependencies.makeAuth ?? makeBetterAuth)(
+      c.var.database,
+      c.env as BetterAuthEnv
+    ).handler(
+      c.req.raw
+    );
+  });
+  app.use("/api/*", sessionMiddleware);
 
   app.route("/api/health", healthRoute);
 

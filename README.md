@@ -53,6 +53,24 @@ npm run deploy:staging  # Web build 후 Cloudflare Workers 배포
 
 `/api/*`는 Worker가 처리하고, 그 외 경로는 `dist/`의 SPA로 서빙해요.
 
+### Better Auth runtime configuration
+
+Better Auth와 application repository는 같은 request-scoped Drizzle handle을
+사용해요. Worker 환경에는 다음 값을 주입해요.
+
+```text
+BETTER_AUTH_SECRET  Wrangler secret로 관리하는 32자 이상 high-entropy secret
+BETTER_AUTH_URL     환경별 canonical public origin (예: https://galanda.example)
+DATABASE_URL        local/staging에서 사용하는 PostgreSQL URL
+HYPERDRIVE          production Worker의 Cloudflare Hyperdrive binding
+```
+
+Auth schema도 Drizzle migration에 포함되므로 DB 반영은 기존 명령을 사용해요.
+
+```bash
+npm run db:migrate
+```
+
 ## Apps in Toss (선택적 target)
 
 ```bash

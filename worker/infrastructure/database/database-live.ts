@@ -31,7 +31,7 @@ export const DatabaseLive = (
         );
       }
 
-      // Hyperdrive owns the origin pool; keep one lazy client pool per Worker scope.
+      // Keep the pool scoped to this Worker invocation and close it with the Effect scope.
       const pool = new Pool({ connectionString, max: 1 });
       yield* Effect.addFinalizer(() => Effect.promise(() => pool.end()));
 
