@@ -18,7 +18,7 @@ export const effectValidator = <
     const result = decode(value);
     return Result.match(result, {
       onSuccess: (decoded) => decoded as S["Type"],
-      onFailure: (schemaError) => {
+      onFailure: () => {
         const requestId =
           (c.var as { requestId?: string } | undefined)?.requestId ??
           crypto.randomUUID();
@@ -28,7 +28,6 @@ export const effectValidator = <
             code: "INVALID_REQUEST",
             message: "요청 형식이 올바르지 않습니다.",
             requestId,
-            details: schemaError.message,
           }),
           400
         );

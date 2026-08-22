@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
 
@@ -46,6 +47,17 @@ export function createApp() {
 
   app.onError((err, c) => {
     const requestId = c.var.requestId ?? crypto.randomUUID();
+    if (err instanceof HTTPException && err.status === 400) {
+      return c.json(
+        formatApiError({
+          code: "INVALID_REQUEST",
+          message: "요청 형식이 올바르지 않습니다.",
+          requestId,
+        }),
+        400
+      );
+    }
+
     console.error(`[UnhandledError] requestId=${requestId}:`, err);
     return c.json(
       formatApiError({

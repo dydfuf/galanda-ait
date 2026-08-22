@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
+import { createApp } from "../app.ts";
 import { effectValidator } from "./effect-validator.ts";
 import type { AppEnv } from "../app.ts";
 
@@ -30,17 +31,12 @@ describe("effectValidator", () => {
     expect(body.received).toEqual({ name: "Alice", age: 30 });
   });
 
-  it("returns 400 INVALID_REQUEST on invalid JSON shape", async () => {
+  it("returns 400 INVALID_REQUEST without reflecting invalid input", async () => {
     const TestSchema = Schema.Struct({
-      name: Schema.String,
-      age: Schema.Number,
+      password: Schema.Number,
     });
 
-    const app = new Hono<AppEnv>();
-    app.use("*", async (c, next) => {
-      c.set("requestId", "req-val-1");
-      await next();
-    });
+    const app = createApp();
     app.post("/test", effectValidator("json", TestSchema), (c) => {
       const data = c.req.valid("json");
       return c.json({ received: data });
@@ -49,19 +45,51 @@ describe("effectValidator", () => {
     const res = await app.fetch(
       new Request("https://example.com/test", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Alice", age: "not-a-number" }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-request-id": "req-val-1",
+        },
+        body: JSON.stringify({ password: "secret-value" }),
       })
     );
 
     expect(res.status).toBe(400);
     const body = (await res.json()) as {
-      error: { code: string; message: string; requestId: string; details?: string };
+      error: { code: string; message: string; requestId: string; details?: unknown };
     };
     expect(body.error.code).toBe("INVALID_REQUEST");
     expect(body.error.message).toBe("요청 형식이 올바르지 않습니다.");
     expect(body.error.requestId).toBe("req-val-1");
-    expect(body.error.details).toBeDefined();
+    expect(body.error.details).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain("secret-value");
+  });
+
+  it("returns 400 INVALID_REQUEST for malformed JSON", async () => {
+    const app = createApp();
+    app.post(
+      "/test",
+      effectValidator("json", Schema.Struct({ name: Schema.String })),
+      (c) => c.json(c.req.valid("json"))
+    );
+
+    const res = await app.fetch(
+      new Request("https://example.com/test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-request-id": "req-malformed-1",
+        },
+        body: "{broken",
+      })
+    );
+
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as {
+      error: { code: string; message: string; requestId: string };
+    };
+    expect(body.error.code).toBe("INVALID_REQUEST");
+    expect(body.error.requestId).toBe("req-malformed-1");
+    expect(res.headers.get("x-request-id")).toBe(body.error.requestId);
   });
 
   it("validates and parses valid param input", async () => {

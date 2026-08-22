@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { Effect } from "effect";
+import { Context, Effect } from "effect";
 import { runEffect } from "./effect-handler.ts";
 import { RequestScopeService } from "./request-scope.ts";
 import {
@@ -12,6 +12,11 @@ import {
   ValidationError,
 } from "../../src/core/domain/errors.ts";
 import type { AppEnv } from "../app.ts";
+
+class MissingService extends Context.Service<
+  MissingService,
+  { readonly value: string }
+>()("galanda/worker/test/MissingService") {}
 
 describe("runEffect", () => {
   const createTestApp = () => {
@@ -26,6 +31,14 @@ describe("runEffect", () => {
   it("handles successful effects with default 200 JSON", async () => {
     const app = createTestApp();
     app.get("/success", (c) => runEffect(c, Effect.succeed({ data: "ok" })));
+    app.get("/missing", (c) => {
+      const effect = Effect.gen(function* () {
+        return (yield* MissingService).value;
+      });
+
+      // @ts-expect-error runEffect only provides RequestScopeService
+      return runEffect(c, effect);
+    });
 
     const res = await app.fetch(new Request("https://example.com/success"));
     expect(res.status).toBe(200);
