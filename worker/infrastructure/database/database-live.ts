@@ -31,7 +31,7 @@ export const DatabaseLive = (
         );
       }
 
-      // ponytail: one pool per request scope; move to isolate-scoped memoization when throughput requires it.
+      // Keep the pool scoped to this Worker invocation and close it with the Effect scope.
       const pool = new Pool({ connectionString, max: 1 });
       yield* Effect.addFinalizer(() => Effect.promise(() => pool.end()));
 
