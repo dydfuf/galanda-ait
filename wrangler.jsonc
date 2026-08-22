@@ -12,7 +12,10 @@
   },
   "env": {
     "staging": {
-      "workers_dev": true
+      "workers_dev": true,
+      "vars": {
+        "BETTER_AUTH_URL": "https://galanda-staging.88dydfuf.workers.dev"
+      }
     }
   }
 }
