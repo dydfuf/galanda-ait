@@ -1,10 +1,8 @@
-import { Context, Effect, Layer } from "effect";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth/minimal";
-import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Database } from "../../../src/infrastructure/persistence/drizzle/database.ts";
+import type { DatabaseHandle } from "../../../src/infrastructure/persistence/drizzle/database.ts";
 import * as schema from "../../../src/infrastructure/persistence/drizzle/schema/index.ts";
-import { DatabaseLive, type DatabaseEnv } from "../database/database-live.ts";
+import type { DatabaseEnv } from "../database/database-live.ts";
 
 export interface BetterAuthEnv extends DatabaseEnv {
   readonly BETTER_AUTH_SECRET?: string;
@@ -14,7 +12,7 @@ export interface BetterAuthEnv extends DatabaseEnv {
 export type BetterAuth = ReturnType<typeof makeBetterAuth>;
 
 export const makeBetterAuth = (
-  db: NodePgDatabase<typeof schema>,
+  db: DatabaseHandle,
   env: BetterAuthEnv
 ) => {
   const secret = env.BETTER_AUTH_SECRET?.trim();
@@ -37,17 +35,3 @@ export const makeBetterAuth = (
     emailAndPassword: { enabled: true },
   });
 };
-
-export const withBetterAuth = <A>(
-  env: BetterAuthEnv,
-  use: (auth: ReturnType<typeof makeBetterAuth>) => Promise<A>
-): Promise<A> =>
-  Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const context = yield* Layer.build(DatabaseLive(env));
-        const { db } = Context.get(context, Database);
-        return yield* Effect.tryPromise(() => use(makeBetterAuth(db, env)));
-      })
-    )
-  );

@@ -5,10 +5,13 @@ import type { AppEnv } from "../app.ts";
 import { type RequestScope, RequestScopeService } from "./request-scope.ts";
 import { mapErrorToResponse } from "./api-error.ts";
 import type { UserSession } from "../../src/core/domain/room.ts";
+import type { SessionService } from "../../src/core/ports/session.ts";
+import { SessionServiceLiveFromUserSession } from "../../src/infrastructure/auth/better-auth/session.ts";
 
 export interface RunEffectOptions<A> {
   readonly status?: ContentfulStatusCode;
   readonly session?: UserSession | null;
+  readonly sessionError?: unknown;
   readonly mapSuccess?: (
     value: A,
     c: HonoContext<AppEnv>
@@ -17,17 +20,23 @@ export interface RunEffectOptions<A> {
 
 export async function runEffect<A, E>(
   c: HonoContext<AppEnv>,
-  effect: Effect.Effect<A, E, RequestScopeService>,
+  effect: Effect.Effect<A, E, RequestScopeService | SessionService>,
   options?: RunEffectOptions<A>
 ): Promise<Response> {
   const requestId = c.var.requestId ?? crypto.randomUUID();
   const requestScope: RequestScope = {
     requestId,
-    session: options?.session,
+    session: options?.session ?? c.var.authSession,
   };
 
   const program = effect.pipe(
-    Effect.provideService(RequestScopeService, requestScope)
+    Effect.provideService(RequestScopeService, requestScope),
+    Effect.provide(
+      SessionServiceLiveFromUserSession(
+        options?.session ?? c.var.authSession ?? null,
+        options?.sessionError ?? c.var.authSessionError
+      )
+    )
   );
 
   const exit = await Effect.runPromiseExit(program);

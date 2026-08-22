@@ -24,7 +24,7 @@ export const normalizeBetterAuthSession = (
 });
 
 const sessionLookup = (
-  session: BetterAuthSession | null,
+  session: UserSession | null,
   lookupError?: unknown
 ): Effect.Effect<UserSession, SessionLookupError> => {
   if (lookupError !== undefined) {
@@ -39,16 +39,25 @@ const sessionLookup = (
   }
 
   return session
-    ? Effect.succeed(normalizeBetterAuthSession(session))
+    ? Effect.succeed(session)
     : Effect.fail(new UnauthorizedError({ reason: "로그인이 필요합니다." }));
 };
 
-/** Request-scoped adapter: the Hono middleware resolves Better Auth once. */
-export const SessionServiceLive = (
-  session: BetterAuthSession | null,
+export const SessionServiceLiveFromUserSession = (
+  session: UserSession | null,
   lookupError?: unknown
 ): Layer.Layer<SessionService> =>
   Layer.succeed(SessionService, {
     getCurrentSession: () => sessionLookup(session, lookupError),
     getCurrentUser: () => sessionLookup(session, lookupError),
   });
+
+/** Request-scoped adapter: the Hono middleware resolves Better Auth once. */
+export const SessionServiceLive = (
+  session: BetterAuthSession | null,
+  lookupError?: unknown
+): Layer.Layer<SessionService> =>
+  SessionServiceLiveFromUserSession(
+    session ? normalizeBetterAuthSession(session) : null,
+    lookupError
+  );

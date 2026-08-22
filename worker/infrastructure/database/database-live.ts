@@ -31,7 +31,7 @@ export const DatabaseLive = (
         );
       }
 
-      // Hyperdrive owns the origin pool; keep one lazy client pool per Worker scope.
+      // ponytail: one pool per request scope; move to isolate-scoped memoization when throughput requires it.
       const pool = new Pool({ connectionString, max: 1 });
       yield* Effect.addFinalizer(() => Effect.promise(() => pool.end()));
 
