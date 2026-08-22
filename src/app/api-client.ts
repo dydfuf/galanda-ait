@@ -1,8 +1,14 @@
 import { Schema } from "effect";
-import type { Revision, TripId } from "../core/domain/ids.ts";
-import { TripRoomSchema, type UserSession } from "../core/domain/room.ts";
+import type { PlanId, Revision, TripId } from "../core/domain/ids.ts";
+import {
+  TripRoomSchema,
+  type TripPlan,
+  type UserSession,
+} from "../core/domain/room.ts";
 import type { UpdateRoomParams } from "../core/ports/trip-room-repository.ts";
 import type { CreateRoomInput } from "../core/usecases/create-room.ts";
+import type { CreatePlanCommand } from "../core/usecases/save-plan.ts";
+import type { SubmitPlanOpinionInput } from "../core/usecases/submit-opinion.ts";
 import { normalizeBetterAuthSession } from "../infrastructure/auth/better-auth/session.ts";
 
 const BetterAuthSessionSchema = Schema.NullOr(
@@ -74,6 +80,12 @@ const requestJson = async <S extends Schema.Decoder<any, never>>(
   }
 };
 
+const tripPath = (tripId: TripId): string =>
+  `/api/trips/${encodeURIComponent(tripId)}`;
+
+const planPath = (tripId: TripId, planId: PlanId): string =>
+  `${tripPath(tripId)}/plans/${encodeURIComponent(planId)}`;
+
 export const getCurrentSession = async (
   signal?: AbortSignal
 ): Promise<UserSession | null> => {
@@ -89,7 +101,7 @@ export const getTrips = (signal?: AbortSignal) =>
   requestJson("/api/trips", Schema.Array(TripRoomSchema), { signal });
 
 export const getTrip = (tripId: TripId, signal?: AbortSignal) =>
-  requestJson(`/api/trips/${encodeURIComponent(tripId)}`, TripRoomSchema, {
+  requestJson(tripPath(tripId), TripRoomSchema, {
     signal,
   });
 
@@ -103,7 +115,69 @@ export const updateTrip = (
   tripId: TripId,
   input: UpdateRoomParams & { readonly expectedRevision: Revision }
 ) =>
-  requestJson(`/api/trips/${encodeURIComponent(tripId)}`, TripRoomSchema, {
+  requestJson(tripPath(tripId), TripRoomSchema, {
     method: "PATCH",
     body: JSON.stringify(input),
   });
+
+export const createTripPlan = (
+  tripId: TripId,
+  input: Omit<CreatePlanCommand, "roomId">
+) =>
+  requestJson(`${tripPath(tripId)}/plans`, TripRoomSchema, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+
+export const updateTripPlan = (
+  tripId: TripId,
+  plan: TripPlan,
+  expectedRevision: Revision
+) =>
+  requestJson(planPath(tripId, plan.id), TripRoomSchema, {
+    method: "PATCH",
+    body: JSON.stringify({
+      title: plan.title,
+      proposalReason: plan.proposalReason,
+      baseHeadcount: plan.baseHeadcount,
+      routes: plan.routes,
+      accommodations: plan.accommodations,
+      transports: plan.transports,
+      places: plan.places,
+      expectedRevision,
+    }),
+  });
+
+export const deleteTripPlan = (
+  tripId: TripId,
+  planId: PlanId,
+  expectedRevision: Revision
+) =>
+  requestJson(planPath(tripId, planId), TripRoomSchema, {
+    method: "DELETE",
+    body: JSON.stringify({ expectedRevision }),
+  });
+
+export const submitTripPlanOpinion = (
+  tripId: TripId,
+  planId: PlanId,
+  opinion: SubmitPlanOpinionInput["opinion"],
+  expectedRevision: Revision
+) =>
+  requestJson(`${planPath(tripId, planId)}/opinion`, TripRoomSchema, {
+    method: "PUT",
+    body: JSON.stringify({ ...opinion, expectedRevision }),
+  });
+
+export const confirmTripPlan = (
+  tripId: TripId,
+  planId: PlanId,
+  expectedRevision: Revision
+) =>
+  requestJson(`${planPath(tripId, planId)}/confirm`, TripRoomSchema, {
+    method: "POST",
+    body: JSON.stringify({ expectedRevision }),
+  });
+
+export const joinTrip = (tripId: TripId) =>
+  requestJson(`${tripPath(tripId)}/join`, TripRoomSchema, { method: "POST" });

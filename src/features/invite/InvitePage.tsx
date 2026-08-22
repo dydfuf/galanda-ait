@@ -6,8 +6,7 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { Result } from "effect";
 import { useState } from "react";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
-import { appRuntime } from "../../app/runtime.ts";
-import { joinTripRoom } from "../../core/usecases/join-room.ts";
+import { joinTrip } from "../../app/api-client.ts";
 import { getTripRoomDisplayDate } from "../../core/domain/room.ts";
 import { TripIdSchema } from "../../core/domain/ids.ts";
 import { useQueryClient } from "@tanstack/react-query";
@@ -132,11 +131,7 @@ export function InvitePage(): JSX.Element {
     setIsAccepting(true);
     setErrorMsg(null);
     try {
-      await appRuntime.runPromise(
-        joinTripRoom({
-          roomId: TripIdSchema.make(room.id),
-        })
-      );
+      await joinTrip(TripIdSchema.make(room.id));
       await queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
       navigate(`/trips/${room.id}/plans`, { replace: true });
     } catch (err: unknown) {

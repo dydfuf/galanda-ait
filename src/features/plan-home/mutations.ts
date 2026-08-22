@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
-import { appRuntime } from "../../app/runtime.ts";
-import { confirmTripPlan } from "../../core/usecases/confirm-plan.ts";
+import { confirmTripPlan } from "../../app/api-client.ts";
 import {
   TripIdSchema,
   PlanIdSchema,
@@ -25,12 +24,10 @@ export const useConfirmPlanMutation = (): UseMutationResult<
 
   return useMutation({
     mutationFn: ({ roomId, planId, revision }: ConfirmPlanVariables): Promise<TripRoom> =>
-      appRuntime.runPromise(
-        confirmTripPlan(
-          TripIdSchema.make(roomId),
-          PlanIdSchema.make(planId),
-          RevisionSchema.make(revision)
-        )
+      confirmTripPlan(
+        TripIdSchema.make(roomId),
+        PlanIdSchema.make(planId),
+        RevisionSchema.make(revision)
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });

@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
-import { appRuntime } from "../../app/runtime.ts";
-import { submitOpinion } from "../../core/usecases/submit-opinion.ts";
+import { submitTripPlanOpinion } from "../../app/api-client.ts";
 import {
   TripIdSchema,
   PlanIdSchema,
@@ -34,16 +33,14 @@ export const useSubmitOpinionMutation = (): UseMutationResult<
       reason,
       expectedRevision,
     }: SubmitOpinionVariables): Promise<TripRoom> =>
-      appRuntime.runPromise(
-        submitOpinion({
-          roomId: TripIdSchema.make(roomId),
-          planId: PlanIdSchema.make(planId),
-          opinion: {
-            reaction,
-            reason: reason?.trim() ? reason.trim() : undefined,
-          },
-          expectedRevision: RevisionSchema.make(expectedRevision),
-        })
+      submitTripPlanOpinion(
+        TripIdSchema.make(roomId),
+        PlanIdSchema.make(planId),
+        {
+          reaction,
+          reason: reason?.trim() ? reason.trim() : undefined,
+        },
+        RevisionSchema.make(expectedRevision)
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: tripRoomKeys.all }),
   });
