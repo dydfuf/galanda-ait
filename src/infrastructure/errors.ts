@@ -14,3 +14,10 @@ export class InvalidDataBackendError extends Schema.TaggedError<InvalidDataBacke
     message: Schema.String,
   }
 ) {}
+
+export class DatabaseConfigurationError extends Schema.TaggedError<DatabaseConfigurationError>()(
+  "DatabaseConfigurationError",
+  {
+    message: Schema.String,
+  }
+) {}
