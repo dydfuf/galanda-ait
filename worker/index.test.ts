@@ -9,4 +9,10 @@ describe("Worker API", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
   });
+
+  it("does not fall through unknown API routes to the SPA", () => {
+    const response = worker.fetch(new Request("https://galanda.app/api/missing"));
+
+    expect(response.status).toBe(404);
+  });
 });
