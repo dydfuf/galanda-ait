@@ -1,8 +1,6 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { Option } from "effect";
-import { appRuntime } from "../app/runtime.ts";
-import { getOptionalSession } from "../core/ports/session.ts";
 import type { UserSession } from "../core/domain/room.ts";
+import { getCurrentSession } from "../app/api-client.ts";
 
 export const sessionKeys = {
   all: ["session"] as const,
@@ -18,10 +16,7 @@ export const sessionKeys = {
 export const useSessionQuery = (): UseQueryResult<UserSession | null, Error> =>
   useQuery<UserSession | null, Error>({
     queryKey: sessionKeys.current(),
-    queryFn: async ({ signal }): Promise<UserSession | null> => {
-      const opt = await appRuntime.runPromise(getOptionalSession, { signal });
-      return Option.isSome(opt) ? opt.value : null;
-    },
+    queryFn: ({ signal }): Promise<UserSession | null> =>
+      getCurrentSession(signal),
     staleTime: 1000 * 60 * 5,
   });
-

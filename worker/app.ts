@@ -14,6 +14,7 @@ import type { DatabaseHandle } from "../src/infrastructure/persistence/drizzle/d
 import type { UserSession } from "../src/core/domain/room.ts";
 import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
+import { tripsRoute } from "./routes/trips.ts";
 
 export interface AppVariables {
   requestId: string;
@@ -73,6 +74,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   app.use("/api/*", sessionMiddleware);
 
   app.route("/api/health", healthRoute);
+  app.route("/api/trips", tripsRoute);
 
   app.notFound((c) => {
     const requestId = c.var.requestId ?? crypto.randomUUID();
