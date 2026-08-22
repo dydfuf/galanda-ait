@@ -15,7 +15,13 @@
       "workers_dev": true,
       "vars": {
         "BETTER_AUTH_URL": "https://galanda-staging.88dydfuf.workers.dev"
-      }
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "36428926fddb413e82914434280e3ffc"
+        }
+      ]
     }
   }
 }
