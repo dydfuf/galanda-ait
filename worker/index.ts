@@ -1,9 +1,3 @@
-export default {
-  fetch(request: Request): Response {
-    if (request.method === "GET" && new URL(request.url).pathname === "/api/health") {
-      return Response.json({ ok: true });
-    }
+import { app } from "./app.ts";
 
-    return new Response(null, { status: 404 });
-  },
-} satisfies ExportedHandler<Env>;
+export default app;
