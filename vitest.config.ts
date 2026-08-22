@@ -10,7 +10,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.{test,spec}.ts"],
+    include: ["src/**/*.{test,spec}.ts", "worker/**/*.{test,spec}.ts"],
     exclude: ["repos/**", "node_modules/**", "dist/**"],
   },
 });
