@@ -1,6 +1,6 @@
 import { integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-/** One PostgreSQL row stores one TripRoom aggregate until RAON-170/196 settle its persistence split. */
+/** One PostgreSQL row stores one TripRoom aggregate for atomic revision compare-and-set updates. */
 export const tripRooms = pgTable("trip_rooms", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
