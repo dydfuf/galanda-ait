@@ -41,7 +41,7 @@ describe("LocalTripRoomRepository", () => {
   it("1. 정상적인 빈 목록: LocalStorage에 아무것도 없을 때 getRooms()는 Effect.succeed([])를 반환한다", async () => {
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
-      return yield* repo.getRooms();
+      return yield* repo.getRooms([UserIdSchema.make("viewer")]);
     }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
 
     const exit = await Effect.runPromiseExit(program);
@@ -57,7 +57,7 @@ describe("LocalTripRoomRepository", () => {
 
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
-      return yield* repo.getRooms();
+      return yield* repo.getRooms([UserIdSchema.make("viewer")]);
     }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
 
     const exit = await Effect.runPromiseExit(program);
@@ -74,7 +74,7 @@ describe("LocalTripRoomRepository", () => {
 
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
-      return yield* repo.getRooms();
+      return yield* repo.getRooms([UserIdSchema.make("viewer")]);
     }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
 
     const exit = await Effect.runPromiseExit(program);
@@ -84,6 +84,28 @@ describe("LocalTripRoomRepository", () => {
       const err = exit.cause;
       expect(JSON.stringify(err)).toContain("RepositoryError");
     }
+  });
+
+  it("참여 중인 방만 반환한다", async () => {
+    const aliceId = UserIdSchema.make("alice");
+    const bobId = UserIdSchema.make("bob");
+    const program = Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      yield* repo.createRoom({
+        id: TripIdSchema.make("alice-room"),
+        title: "앨리스 여행",
+        hostUser: { id: aliceId, name: "Alice", role: "HOST" },
+      });
+      yield* repo.createRoom({
+        id: TripIdSchema.make("bob-room"),
+        title: "밥 여행",
+        hostUser: { id: bobId, name: "Bob", role: "HOST" },
+      });
+      return yield* repo.getRooms([aliceId]);
+    }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
+
+    const rooms = await Effect.runPromise(program);
+    expect(rooms.map(({ id }) => id)).toEqual(["alice-room"]);
   });
 
   it("4. 특정 방이 존재하지 않을 때 getRoom()은 NotFoundError로 실패한다", async () => {

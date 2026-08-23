@@ -81,13 +81,15 @@ describe("UseCases Error Propagation", () => {
     }
   });
 
-  it("공개 방 조회는 현재 사용자의 HARD 사유만 남긴다", async () => {
+  it("멤버 전용 방 조회는 현재 사용자의 HARD 사유만 남긴다", async () => {
     const room: TripRoom = {
       id: TripIdSchema.make("room-1"),
       title: "제주 여행",
       destination: "제주",
       revision: RevisionSchema.make(1),
-      members: [],
+      members: [
+        { id: UserIdSchema.make("user-me"), name: "나", role: "MEMBER" },
+      ],
       plans: [
         {
           id: PlanIdSchema.make("plan-1"),
@@ -133,7 +135,7 @@ describe("UseCases Error Propagation", () => {
     expect(visibleOpinions[0]?.reason).toBe("내 사유");
     expect("reason" in (visibleOpinions[1] ?? {})).toBe(false);
 
-    const anonymousRooms = await Effect.runPromise(
+    const anonymousExit = await Effect.runPromiseExit(
       getTripRooms().pipe(
         Effect.provide(
           Layer.merge(
@@ -149,7 +151,31 @@ describe("UseCases Error Propagation", () => {
         )
       )
     );
-    expect("reason" in (anonymousRooms[0]?.plans[0]?.memberOpinions?.[0] ?? {})).toBe(false);
+    expect(Exit.isFailure(anonymousExit)).toBe(true);
+    if (Exit.isFailure(anonymousExit)) {
+      expect(JSON.stringify(anonymousExit.cause)).toContain("UnauthorizedError");
+    }
+
+    const nonMemberExit = await Effect.runPromiseExit(
+      getTripRoom(room.id).pipe(
+        Effect.provide(
+          Layer.merge(
+            RepoLayer,
+            createLocalSessionLayer({
+              participantId: UserIdSchema.make("user-bob"),
+              participantIds: [UserIdSchema.make("user-bob")],
+              accountType: "REGISTERED",
+              name: "밥",
+              isAuthenticated: true,
+            })
+          )
+        )
+      )
+    );
+    expect(Exit.isFailure(nonMemberExit)).toBe(true);
+    if (Exit.isFailure(nonMemberExit)) {
+      expect(JSON.stringify(nonMemberExit.cause)).toContain("NotFoundError");
+    }
   });
 
   it("createTripRoom()는 스키마 유효성 실패 시 ValidationError, 저장소 실패 시 RepositoryError를 전파한다", async () => {

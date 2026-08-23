@@ -185,10 +185,13 @@ const mutateRoom = (
 
 export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
   Layer.succeed(TripRoomRepository, {
-    getRooms: () =>
+    getRooms: (participantIds) =>
       Effect.gen(function* () {
         const stored = yield* loadRooms("getRooms");
-        return yield* decodeRooms(stored, "getRooms.decode");
+        const rooms = yield* decodeRooms(stored, "getRooms.decode");
+        return rooms.filter((room) =>
+          room.members.some(({ id }) => participantIds.includes(id))
+        );
       }),
 
     getRoom: (roomId: TripId) =>
