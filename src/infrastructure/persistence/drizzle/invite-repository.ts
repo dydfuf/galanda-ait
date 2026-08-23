@@ -1,13 +1,19 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { RepositoryError } from "../../../core/domain/errors.ts";
 import { TripIdSchema } from "../../../core/domain/ids.ts";
+import { TripRoomSchema, type TripRoom } from "../../../core/domain/room.ts";
+import {
+  joinRoomMember,
+  mergeParticipantIdentityInRoom,
+} from "../../../core/domain/room-transitions.ts";
 import {
   InviteRepository,
   type InviteRecord,
 } from "../../../core/ports/invite-repository.ts";
 import { Database } from "./database.ts";
 import { tripInvites } from "./schema/invite.ts";
+import { tripRooms } from "./schema/trip-room.ts";
 
 const repositoryEffect = <A>(
   operation: string,
@@ -38,6 +44,9 @@ const toRecord = (row: {
   tripId: TripIdSchema.make(row.tripId),
   inviterName: row.inviterName,
 });
+
+const decodeRoom = (row: unknown): Promise<TripRoom> =>
+  Schema.decodeUnknownPromise(TripRoomSchema)(row);
 
 export const InviteRepositoryLive: Layer.Layer<
   InviteRepository,
@@ -100,6 +109,64 @@ export const InviteRepositoryLive: Layer.Layer<
               .limit(1)
           );
           return row ? toRecord(row) : undefined;
+        }),
+
+      join: (params) =>
+        Effect.gen(function* () {
+          const tokenHash = yield* repositoryEffect("joinInvite.hash", () =>
+            hashToken(params.token)
+          );
+          return yield* repositoryEffect("joinInvite", () =>
+            db.transaction(async (tx) => {
+              const [row] = await tx
+                .select({ room: tripRooms })
+                .from(tripInvites)
+                .innerJoin(tripRooms, eq(tripRooms.id, tripInvites.tripId))
+                .where(
+                  and(
+                    eq(tripInvites.tokenHash, tokenHash),
+                    isNull(tripInvites.revokedAt),
+                    gt(tripInvites.expiresAt, params.now)
+                  )
+                )
+                .limit(1)
+                .for("update", { of: [tripInvites, tripRooms] });
+              if (!row) return undefined;
+
+              const storedRoom = await decodeRoom({
+                ...row.room,
+                confirmedPlanId: row.room.confirmedPlanId ?? undefined,
+              });
+              const room = mergeParticipantIdentityInRoom(
+                storedRoom,
+                params.member.id,
+                params.participantIds
+              );
+              const joinedRoom = joinRoomMember(room, params.member);
+              if (joinedRoom === storedRoom) return storedRoom;
+
+              const [saved] = await tx
+                .update(tripRooms)
+                .set({
+                  members: joinedRoom.members,
+                  plans: joinedRoom.plans,
+                  revision: sql`${tripRooms.revision} + 1`,
+                  updatedAt: sql`now()`,
+                })
+                .where(
+                  and(
+                    eq(tripRooms.id, storedRoom.id),
+                    eq(tripRooms.revision, storedRoom.revision)
+                  )
+                )
+                .returning();
+              if (!saved) throw new Error("invite join CAS failed");
+              return decodeRoom({
+                ...saved,
+                confirmedPlanId: saved.confirmedPlanId ?? undefined,
+              });
+            })
+          );
         }),
 
       revoke: (tripId) =>

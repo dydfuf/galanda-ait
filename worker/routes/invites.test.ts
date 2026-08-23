@@ -65,20 +65,38 @@ const request = (path: string, init?: RequestInit) =>
 const makeApp = (options?: {
   readonly inviteExists?: boolean;
   readonly failInviteLookup?: boolean;
+  readonly joinResult?: TripRoom;
   readonly user?: { readonly id: string; readonly name: string } | null;
 }) => {
   const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+  let joined = false;
   const client = {
     query: async (
-      config: { readonly text: string },
+      config: { readonly text: string } | string,
       params: unknown[] = []
     ) => {
-      calls.push({ text: config.text, params });
-      if (config.text.includes('from "participant_alias"')) return { rows: [] };
-      if (config.text.startsWith("insert") && config.text.includes('"trip_invite"')) {
+      const text = typeof config === "string" ? config : config.text;
+      calls.push({ text, params });
+      if (text === "begin" || text === "commit" || text === "rollback") {
         return { rows: [] };
       }
-      if (config.text.includes('from "trip_invite"')) {
+      if (text.includes('from "participant_alias"')) return { rows: [] };
+      if (text.startsWith("insert") && text.includes('"trip_invite"')) {
+        return { rows: [] };
+      }
+      if (text.includes('inner join "trip_rooms"')) {
+        if (options?.failInviteLookup) throw new Error("database unavailable");
+        return {
+          rows: options?.inviteExists
+            ? [rowValues(joined && options.joinResult ? options.joinResult : room)]
+            : [],
+        };
+      }
+      if (text.startsWith("update") && text.includes('"trip_rooms"')) {
+        joined = true;
+        return { rows: options?.joinResult ? [rowValues(options.joinResult)] : [] };
+      }
+      if (text.includes('from "trip_invite"')) {
         if (options?.failInviteLookup) throw new Error("database unavailable");
         return {
           rows: options?.inviteExists
@@ -86,7 +104,7 @@ const makeApp = (options?: {
             : [],
         };
       }
-      if (config.text.includes('from "trip_rooms"')) {
+      if (text.includes('from "trip_rooms"')) {
         return { rows: [rowValues(room)] };
       }
       return { rows: [] };
@@ -192,5 +210,124 @@ describe("Invite API", () => {
     expect(inviteWrites[0].params).toContainEqual(
       expect.stringMatching(/^[a-f0-9]{64}$/)
     );
+  });
+
+  it("session 신원과 nickname으로 한 번만 참여하고 같은 요청 재시도는 멱등이다", async () => {
+    const token = "00000000-0000-4000-8000-000000000004";
+    const guestId = ParticipantIdSchema.make("guest-1");
+    const joinedRoom: TripRoom = {
+      ...room,
+      revision: RevisionSchema.make(3),
+      members: [
+        ...room.members,
+        { id: guestId, name: "Host", role: "MEMBER" },
+      ],
+    };
+    const { app, calls } = makeApp({
+      inviteExists: true,
+      joinResult: joinedRoom,
+      user: { id: guestId, name: "Anonymous" },
+    });
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await app.fetch(
+        request(`/api/invites/${token}/join`, {
+          method: "POST",
+          body: JSON.stringify({ nickname: "  Host  " }),
+        }),
+        env
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(joinedRoom);
+    }
+
+    const roomWrites = calls.filter(
+      ({ text }) => text.startsWith("update") && text.includes('"trip_rooms"')
+    );
+    expect(roomWrites).toHaveLength(1);
+    expect(calls.some(({ text }) => text.includes("for update of"))).toBe(true);
+    expect(JSON.stringify(calls)).not.toContain(token);
+    expect(roomWrites[0].params).toContain(
+      JSON.stringify(joinedRoom.members)
+    );
+  });
+
+  it("비로그인·잘못된 nickname·직접 roomId join을 membership write 전에 거부한다", async () => {
+    const token = "00000000-0000-4000-8000-000000000005";
+    const unauthenticated = makeApp({ inviteExists: true, user: null });
+    const noSession = await unauthenticated.app.fetch(
+      request(`/api/invites/${token}/join`, {
+        method: "POST",
+        body: JSON.stringify({ nickname: "Guest" }),
+      }),
+      env
+    );
+    expect(noSession.status).toBe(401);
+    expect(unauthenticated.calls).toEqual([]);
+
+    const authenticated = makeApp({
+      inviteExists: true,
+      user: { id: "guest-1", name: "Anonymous" },
+    });
+    for (const nickname of ["   ", "가".repeat(21)]) {
+      const response = await authenticated.app.fetch(
+        request(`/api/invites/${token}/join`, {
+          method: "POST",
+          body: JSON.stringify({ nickname }),
+        }),
+        env
+      );
+      expect(response.status).toBe(422);
+    }
+    const spoofed = await authenticated.app.fetch(
+      request(`/api/invites/${token}/join`, {
+        method: "POST",
+        body: JSON.stringify({
+          nickname: "Guest",
+          id: "attacker",
+          role: "HOST",
+          tripId: room.id,
+        }),
+      }),
+      env
+    );
+    expect(spoofed.status).toBe(400);
+    const bypass = await authenticated.app.fetch(
+      request(`/api/trips/${room.id}/join`, {
+        method: "POST",
+        body: JSON.stringify({ nickname: "Guest" }),
+      }),
+      env
+    );
+    expect(bypass.status).toBe(404);
+    expect(
+      authenticated.calls.some(
+        ({ text }) => text.startsWith("update") && text.includes('"trip_rooms"')
+      )
+    ).toBe(false);
+  });
+
+  it("join 저장 실패는 membership 없이 재시도 가능한 503으로 남긴다", async () => {
+    const token = "00000000-0000-4000-8000-000000000006";
+    const { app, calls } = makeApp({
+      inviteExists: true,
+      failInviteLookup: true,
+      user: { id: "guest-1", name: "Anonymous" },
+    });
+    const response = await app.fetch(
+      request(`/api/invites/${token}/join`, {
+        method: "POST",
+        body: JSON.stringify({ nickname: "Guest" }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    expect(calls.some(({ text }) => text === "rollback")).toBe(true);
+    expect(
+      calls.some(
+        ({ text }) => text.startsWith("update") && text.includes('"trip_rooms"')
+      )
+    ).toBe(false);
   });
 });

@@ -1,120 +1,62 @@
-import { css } from "@emotion/react";
-import { Button } from "@/components/ui/button.tsx";
-import { useParams, useNavigate } from "react-router-dom";
-import { decodeRouteParams, InviteParamsSchema } from "../../app/routes/route-params.ts";
-import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Result } from "effect";
-import { useState } from "react";
-import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
-import { joinTrip } from "../../app/api-client.ts";
-import { getTripRoomDisplayDate } from "../../core/domain/room.ts";
-import { TripIdSchema } from "../../core/domain/ids.ts";
-import { useQueryClient } from "@tanstack/react-query";
-import { tripRoomKeys } from "../plan-home/queries.ts";
+import { useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  ApiClientError,
+  getInviteSummary,
+  joinInvite,
+  signInAnonymously,
+} from "../../app/api-client.ts";
+import {
+  decodeRouteParams,
+  InviteParamsSchema,
+} from "../../app/routes/route-params.ts";
+import { Button } from "../../components/ui/button.tsx";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "../../components/ui/field.tsx";
+import { Input } from "../../components/ui/input.tsx";
+import { MAX_NICKNAME_LENGTH } from "../../core/domain/invite.ts";
+import { useSessionQuery, sessionKeys } from "../../hooks/useSession.ts";
+import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
+import { tripRoomKeys } from "../plan-home/queries.ts";
 
-const pageContainerStyle = css`
-  padding: max(24px, env(safe-area-inset-top, 24px)) 20px calc(32px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 80vh;
-  min-height: 80dvh;
-  flex: 1;
-`;
-
-const cardStyle = css`
-  background-color: var(--background);
-  border-radius: 20px;
-  padding: 32px 24px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  border: 1px solid var(--border);
-  max-width: 400px;
-  width: 100%;
-  text-align: center;
-  box-sizing: border-box;
-`;
-
-const iconStyle = css`
-  display: inline-block;
-  font-size: 36px;
-  margin-bottom: 16px;
-`;
-
-const titleStyle = css`
-  font-size: 20px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  color: var(--foreground);
-`;
-
-const descriptionStyle = css`
-  font-size: 14px;
-  color: var(--muted-foreground);
-  margin: 0 0 24px 0;
-  line-height: 1.5;
-`;
-
-const summaryBoxStyle = css`
-  background-color: var(--surface-subtle);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 24px;
-  text-align: left;
-  font-size: 13px;
-  color: var(--foreground-muted);
-  border: 1px solid var(--muted);
-`;
-
-const summaryRowStyle = css`
-  margin-bottom: 6px;
-`;
-
-const summaryLabelStyle = css`
-  color: var(--foreground-subtle);
-`;
-
-const codeStyle = css`
-  font-size: 12px;
-  background-color: var(--muted);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: inherit;
-  font-weight: 600;
-`;
-
-const errorMessageStyle = css`
-  font-size: 13px;
-  color: var(--destructive-strong);
-  margin: 12px 0 0 0;
-  line-height: 1.5;
-`;
-
-const backHomeLinkStyle = css`
-  margin-top: 16px;
-  background: none;
-  border: none;
-  font-size: 13px;
-  color: var(--foreground-subtle);
-  cursor: pointer;
-  padding: 6px 10px;
-
-  &:hover {
-    color: var(--secondary-foreground);
-  }
-`;
+const inviteKeys = {
+  detail: (token: string) => ["invite", token] as const,
+};
 
 export function InvitePage(): JSX.Element {
-  const params = useParams();
+  const validated = decodeRouteParams(InviteParamsSchema, useParams());
+  const inviteToken = Result.isSuccess(validated)
+    ? validated.success.inviteToken
+    : undefined;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isAccepting, setIsAccepting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const sessionQuery = useSessionQuery();
+  const submittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const storageKey = `galanda:invite-nickname:${inviteToken ?? "invalid"}`;
+  const [nickname, setNickname] = useState(() =>
+    typeof sessionStorage === "undefined"
+      ? ""
+      : (sessionStorage.getItem(storageKey) ?? "")
+  );
+  const [errorMessage, setErrorMessage] = useState<string>();
 
-  const validated = decodeRouteParams(InviteParamsSchema, params);
-  const inviteToken = Result.isSuccess(validated) ? validated.success.inviteToken : "";
-  const { data: room, isLoading, isError } = useTripRoomRawQuery(inviteToken);
+  const inviteQuery = useQuery({
+    queryKey: inviteKeys.detail(inviteToken ?? "invalid"),
+    queryFn: ({ signal }) => {
+      if (!inviteToken) throw new Error("invalid invite token");
+      return getInviteSummary(inviteToken, signal);
+    },
+    enabled: Boolean(inviteToken),
+    retry: false,
+  });
 
   if (Result.isFailure(validated)) {
     return (
@@ -125,107 +67,186 @@ export function InvitePage(): JSX.Element {
     );
   }
 
+  if (inviteQuery.isLoading) {
+    return (
+      <main className="flex min-h-dvh flex-1 items-center justify-center px-5">
+        <p className="text-sm text-muted-foreground">초대장 정보를 확인하는 중...</p>
+      </main>
+    );
+  }
 
-  const handleAccept = async (): Promise<void> => {
-    if (!room) return;
-    setIsAccepting(true);
-    setErrorMsg(null);
+  if (inviteQuery.isError || !inviteQuery.data) {
+    const invalid =
+      inviteQuery.error instanceof ApiClientError &&
+      inviteQuery.error.code === "INVITE_INVALID";
+    return (
+      <main className="flex min-h-dvh flex-1 items-center justify-center px-5">
+        <section className="w-full max-w-sm rounded-2xl border bg-background p-6 text-center shadow-sm">
+          <div className="mb-3 text-4xl" aria-hidden="true">⚠️</div>
+          <h1 className="text-xl font-bold">
+            {invalid ? "유효하지 않은 초대장이에요" : "초대장을 확인하지 못했어요"}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {invalid
+              ? "링크가 만료되었거나 폐기되었을 수 있어요."
+              : toUserMessage(inviteQuery.error, "잠시 후 다시 시도해주세요.")}
+          </p>
+          {!invalid && (
+            <Button className="mt-6 w-full" size="lg" onClick={() => void inviteQuery.refetch()}>
+              다시 확인하기
+            </Button>
+          )}
+          <Button className="mt-2 w-full" variant="ghost" onClick={() => navigate("/trips", { replace: true })}>
+            내 여행 목록으로 가기
+          </Button>
+        </section>
+      </main>
+    );
+  }
+
+  const summary = inviteQuery.data;
+  const trimmedNickname = nickname.trim();
+  const nicknameIsValid =
+    trimmedNickname.length > 0 &&
+    trimmedNickname.length <= MAX_NICKNAME_LENGTH;
+
+  const handleJoin = async () => {
+    if (
+      !inviteToken ||
+      (!summary.alreadyJoined && !nicknameIsValid) ||
+      sessionQuery.isLoading ||
+      sessionQuery.isError ||
+      submittingRef.current
+    ) {
+      return;
+    }
+
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    setErrorMessage(undefined);
     try {
-      await joinTrip(TripIdSchema.make(room.id));
+      let session = sessionQuery.data;
+      if (!session) {
+        await signInAnonymously();
+        await queryClient.invalidateQueries({ queryKey: sessionKeys.all });
+        session = queryClient.getQueryData(sessionKeys.current());
+      }
+      const room = await joinInvite(
+        inviteToken,
+        summary.alreadyJoined ? (session?.name ?? trimmedNickname) : trimmedNickname
+      );
+      sessionStorage.removeItem(storageKey);
       await queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-      navigate(`/trips/${room.id}/plans`, { replace: true });
-    } catch (err: unknown) {
-      // 비로그인·세션 조회 실패 등 참여 실패 사유를 화면에 그대로 전달한다
-      setIsAccepting(false);
-      setErrorMsg(toUserMessage(err, "여행방에 참여하지 못했어요. 다시 시도해주세요."));
+      navigate(`/trips/${room.id}`, { replace: true });
+    } catch (error: unknown) {
+      setErrorMessage(
+        toUserMessage(error, "여행에 참여하지 못했어요. 다시 시도해주세요.")
+      );
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div css={pageContainerStyle}>
-        <p style={{ color: "var(--foreground-subtle)" }}>초대장 정보를 확인하는 중...</p>
-      </div>
-    );
-  }
-
-  if (isError || !room) {
-    return (
-      <div css={pageContainerStyle}>
-        <div css={cardStyle}>
-          <span css={iconStyle}>⚠️</span>
-          <h1 css={titleStyle}>여행방을 찾을 수 없어요</h1>
-          <p css={descriptionStyle}>
-            초대 링크의 여행방이 이미 삭제되었거나 존재하지 않습니다.
-          </p>
-          <Button
-            type="button"
-            size="lg"
-            className="w-full"
-            onClick={() => navigate("/trips", { replace: true })}
-          >
-            내 여행 목록으로 가기
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const hostName = room.members[0]?.name ?? "호스트";
-
   return (
-    <div css={pageContainerStyle}>
-      <div css={cardStyle}>
-        <span css={iconStyle}>
-          💌
-        </span>
-        <h1 css={titleStyle}>
-          여행에 초대받았어요!
-        </h1>
-        <p css={descriptionStyle}>
-          <strong>{hostName}</strong>님이 <strong>{room.title}</strong>에<br />
-          함께하자고 초대장을 보냈습니다.
-        </p>
-
-        <div css={summaryBoxStyle}>
-          <div css={summaryRowStyle}>
-            <span css={summaryLabelStyle}>목적지: </span>{room.destination}
-          </div>
-          <div css={summaryRowStyle}>
-            <span css={summaryLabelStyle}>일정: </span>{(() => { const range = getTripRoomDisplayDate(room); return range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정"; })()}
-          </div>
-          <div>
-            <span css={summaryLabelStyle}>참여 인원: </span>
-            <code css={codeStyle}>
-              {room.members.length}명 참여 중
-            </code>
-          </div>
+    <main className="flex min-h-dvh flex-1 items-center justify-center px-5 py-8">
+      <section className="w-full max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
+        <div className="text-center">
+          <div className="mb-3 text-4xl" aria-hidden="true">💌</div>
+          <h1 className="text-xl font-bold">{summary.title}에 초대받았어요</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {summary.inviterName}님이 함께 여행하자고 초대했어요.
+          </p>
         </div>
+
+        <dl className="my-6 space-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
+          {summary.destination && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">목적지</dt>
+              <dd>{summary.destination}</dd>
+            </div>
+          )}
+          {summary.startDate && summary.endDate && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">일정</dt>
+              <dd>{summary.startDate} ~ {summary.endDate}</dd>
+            </div>
+          )}
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">참여 인원</dt>
+            <dd>{summary.participantCount}명</dd>
+          </div>
+        </dl>
+
+        {!summary.alreadyJoined && (
+          <Field data-invalid={Boolean(errorMessage) || undefined}>
+            <FieldLabel htmlFor="invite-nickname">어떤 이름으로 참여할까요?</FieldLabel>
+            <Input
+              id="invite-nickname"
+              autoComplete="nickname"
+              maxLength={MAX_NICKNAME_LENGTH}
+              placeholder="여행에서 사용할 닉네임"
+              value={nickname}
+              onChange={(event) => {
+                setNickname(event.target.value);
+                sessionStorage.setItem(storageKey, event.target.value);
+                setErrorMessage(undefined);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void handleJoin();
+              }}
+              aria-invalid={Boolean(errorMessage) || undefined}
+              className="h-12 px-4"
+            />
+            {errorMessage ? (
+              <FieldError role="alert">{errorMessage}</FieldError>
+            ) : (
+              <FieldDescription>가입 폼 없이 이 여행에만 사용할 이름이에요.</FieldDescription>
+            )}
+          </Field>
+        )}
+
+        {summary.alreadyJoined && errorMessage && (
+          <p className="text-sm text-destructive" role="alert">{errorMessage}</p>
+        )}
+        {sessionQuery.isError && (
+          <div className="text-center">
+            <p className="text-sm text-destructive" role="alert">
+              인증 서비스를 확인하지 못했어요.
+            </p>
+            <Button variant="link" onClick={() => void sessionQuery.refetch()}>
+              다시 시도
+            </Button>
+          </div>
+        )}
 
         <Button
           type="button"
           size="xl"
-          className="w-full"
-          disabled={isAccepting}
-          onClick={() => void handleAccept()}
+          className="mt-6 w-full"
+          disabled={
+            (!summary.alreadyJoined && !nicknameIsValid) ||
+            sessionQuery.isLoading ||
+            sessionQuery.isError ||
+            isSubmitting
+          }
+          onClick={() => void handleJoin()}
         >
-          {isAccepting ? "참여하는 중..." : "초대 수락하고 참여하기"}
+          {isSubmitting
+            ? "참여하는 중..."
+            : summary.alreadyJoined
+              ? "여행방으로 돌아가기"
+              : "이 이름으로 참여하기"}
         </Button>
-
-        {errorMsg && (
-          <p css={errorMessageStyle} role="alert">
-            {errorMsg}
-          </p>
-        )}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => navigate("/trips", { replace: true })}
-        css={backHomeLinkStyle}
-      >
-        ← 내 여행 목록으로 돌아가기
-      </button>
-    </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="mt-2 w-full"
+          onClick={() => navigate("/trips", { replace: true })}
+        >
+          취소
+        </Button>
+      </section>
+    </main>
   );
 }

@@ -21,7 +21,6 @@ import {
   getTripRooms,
 } from "../../src/core/usecases/get-room.ts";
 import { confirmTripPlan } from "../../src/core/usecases/confirm-plan.ts";
-import { joinTripRoom } from "../../src/core/usecases/join-room.ts";
 import {
   PlanEditableFieldsSchema,
   createPlan,
@@ -41,11 +40,13 @@ import type { RequestScopeService } from "../http/request-scope.ts";
 import {
   getPublicInviteSummary,
   issueTripInvite,
+  joinTripByInvite,
   revokeTripInvite,
 } from "../../src/core/usecases/invite.ts";
 
 const TripParamsSchema = Schema.Struct({ tripId: TripIdSchema });
 const PublicInviteParamsSchema = Schema.Struct({ inviteToken: Schema.String });
+const JoinInviteRequestSchema = Schema.Struct({ nickname: Schema.String });
 const PlanParamsSchema = Schema.Struct({
   tripId: TripIdSchema,
   planId: PlanIdSchema,
@@ -122,6 +123,20 @@ invitesRoute.get(
     runTripEffect(
       c,
       getPublicInviteSummary(c.req.valid("param").inviteToken)
+    )
+);
+
+invitesRoute.post(
+  "/:inviteToken/join",
+  effectValidator("param", PublicInviteParamsSchema),
+  effectValidator("json", JoinInviteRequestSchema, strictInput),
+  (c) =>
+    runTripEffect(
+      c,
+      joinTripByInvite(
+        c.req.valid("param").inviteToken,
+        c.req.valid("json").nickname
+      )
     )
 );
 
@@ -239,16 +254,6 @@ tripsRoute.post(
         c.req.valid("param").planId,
         c.req.valid("json").expectedRevision
       )
-    )
-);
-
-tripsRoute.post(
-  "/:tripId/join",
-  effectValidator("param", TripParamsSchema),
-  (c) =>
-    runTripEffect(
-      c,
-      joinTripRoom({ roomId: c.req.valid("param").tripId })
     )
 );
 

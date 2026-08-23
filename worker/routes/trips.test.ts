@@ -296,8 +296,7 @@ describe("Trip API vertical slice", () => {
     expect(calls).toEqual([]);
   });
 
-  it("opinion/confirm/delete/join을 domain transition과 CAS 저장으로 연결한다", async () => {
-    const guestId = UserIdSchema.make("guest-1");
+  it("opinion/confirm/delete를 domain transition과 CAS 저장으로 연결한다", async () => {
     const cases = [
       {
         method: "PUT",
@@ -341,34 +340,19 @@ describe("Trip API vertical slice", () => {
           plans: [],
         },
       },
-      {
-        method: "POST",
-        path: "/api/trips/trip-1/join",
-        initial: room,
-        updated: {
-          ...room,
-          revision: RevisionSchema.make(4),
-          members: [
-            ...room.members,
-            { id: guestId, name: "Guest", role: "MEMBER" as const },
-          ],
-        },
-        user: { id: guestId, name: "Guest" },
-      },
     ] satisfies ReadonlyArray<{
       readonly method: string;
       readonly path: string;
       readonly body?: unknown;
       readonly initial: TripRoom;
       readonly updated: TripRoom;
-      readonly user?: { readonly id: string; readonly name: string };
     }>;
 
     for (const testCase of cases) {
-      const { app, calls } = makeApp(
-        [[rowValues(testCase.initial)], [rowValues(testCase.updated)]],
-        testCase.user
-      );
+      const { app, calls } = makeApp([
+        [rowValues(testCase.initial)],
+        [rowValues(testCase.updated)],
+      ]);
       const response = await app.fetch(
         request(testCase.path, {
           method: testCase.method,

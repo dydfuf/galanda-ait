@@ -6,7 +6,6 @@ import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession 
 import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams } from "../../ports/trip-room-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
 import { createTripRoom, type CreateRoomInput } from "../create-room.ts";
-import { joinTripRoom, type JoinRoomInput } from "../join-room.ts";
 import { createPlan, updatePlan, deletePlan } from "../save-plan.ts";
 import {
   submitOpinion,
@@ -355,72 +354,6 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       await expect(Effect.runPromise(program)).rejects.toBeInstanceOf(
         AccountUpgradeRequiredError
       );
-    });
-  });
-
-  describe("2. joinTripRoom", (): void => {
-    it("인증된 세션 사용자의 신원(userId 및 name)으로 방에 참여한다", async (): Promise<void> => {
-      const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
-        createTestSessionLayer(strangerUser)
-      );
-
-      const program = joinTripRoom({
-        roomId: sampleRoom.id,
-      }).pipe(Effect.provide(testEnv));
-
-      const room = await Effect.runPromise(program);
-      const joined = room.members.find((m) => m.id === "user-stranger");
-      expect(joined).toBeDefined();
-      expect(joined?.name).toBe("이방인");
-      expect(joined?.role).toBe("MEMBER");
-    });
-
-    it("요청에 다른 userId나 name이 포함되어 있어도 세션 사용자의 정보로 참여한다 (가장 방지)", async (): Promise<void> => {
-      const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
-        createTestSessionLayer(strangerUser)
-      );
-
-      // 타입에서는 member를 받지 않지만(컴파일 타임 차단),
-      // 런타임에서 주입되더라도 무시되는지 확인한다 (다층 방어)
-      const spoofedInput = {
-        roomId: sampleRoom.id,
-        member: {
-          id: UserIdSchema.make("user-spoofed"),
-          name: "가짜 사용자",
-          role: "HOST",
-        },
-      } as unknown as JoinRoomInput;
-
-      const program = joinTripRoom(spoofedInput).pipe(
-        Effect.provide(testEnv)
-      );
-
-      const room = await Effect.runPromise(program);
-      expect(room.members.some((m) => m.id === "user-spoofed")).toBe(false);
-      const joined = room.members.find((m) => m.id === "user-stranger");
-      expect(joined).toBeDefined();
-      expect(joined?.name).toBe("이방인"); // 가짜 사용자가 아닌 세션의 name('이방인')이어야 함
-      expect(joined?.role).toBe("MEMBER");
-    });
-
-    it("비로그인 상태에서는 방 참여가 UnauthorizedError로 실패한다", async (): Promise<void> => {
-      const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
-        createTestSessionLayer(unauthenticatedSession)
-      );
-
-      const program = joinTripRoom({
-        roomId: sampleRoom.id,
-      }).pipe(Effect.provide(testEnv));
-
-      try {
-        await Effect.runPromise(program);
-        expect.unreachable("should fail");
-      } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
-      }
     });
   });
 

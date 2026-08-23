@@ -1,7 +1,7 @@
 import { Clock, Effect, Option, Schema } from "effect";
 import { getRoomActor, requireRoomHost } from "../domain/auth-guards.ts";
-import { InvalidInviteError } from "../domain/errors.ts";
-import { INVITE_TTL_MS } from "../domain/invite.ts";
+import { InvalidInviteError, ValidationError } from "../domain/errors.ts";
+import { INVITE_TTL_MS, MAX_NICKNAME_LENGTH } from "../domain/invite.ts";
 import {
   InviteTokenSchema,
   type TripId,
@@ -56,6 +56,39 @@ export const revokeTripInvite = Effect.fn("revokeTripInvite")(function* (
 });
 
 const invalidInvite = () => Effect.fail(new InvalidInviteError());
+
+export const joinTripByInvite = Effect.fn("joinTripByInvite")(function* (
+  rawToken: string,
+  rawNickname: string
+) {
+  const session = yield* requireAuthSession(
+    "여행에 참여하려면 Guest 세션이 필요합니다."
+  );
+  if (!Schema.is(InviteTokenSchema)(rawToken)) return yield* invalidInvite();
+
+  const nickname = rawNickname.trim();
+  if (nickname.length === 0 || nickname.length > MAX_NICKNAME_LENGTH) {
+    return yield* Effect.fail(
+      new ValidationError({
+        message: `닉네임은 1자 이상 ${MAX_NICKNAME_LENGTH}자 이하로 입력해주세요.`,
+      })
+    );
+  }
+
+  const invites = yield* InviteRepository;
+  const now = yield* Clock.currentTimeMillis;
+  const room = yield* invites.join({
+    token: rawToken,
+    now: new Date(now),
+    member: {
+      id: session.participantId,
+      name: nickname,
+      role: "MEMBER",
+    },
+    participantIds: session.participantIds,
+  });
+  return room ?? (yield* invalidInvite());
+});
 
 export const getPublicInviteSummary = Effect.fn("getPublicInviteSummary")(
   function* (rawToken: string) {

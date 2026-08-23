@@ -3,6 +3,7 @@ import { InviteTokenSchema } from "./ids.ts";
 import { TravelDateSchema } from "./room.ts";
 
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+export const MAX_NICKNAME_LENGTH = 20;
 
 export const IssuedInviteSchema = Schema.Struct({
   token: InviteTokenSchema,
