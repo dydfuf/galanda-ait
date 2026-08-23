@@ -15,6 +15,66 @@ import * as schema from "./schema/index.ts";
 import { TripRoomRepositoryLive } from "./trip-room-repository.ts";
 
 describe("TripRoomRepositoryLive", () => {
+  it("participant alias 중 하나가 members에 포함된 방만 조회한다", async () => {
+    const guestId = UserIdSchema.make("guest-1");
+    const registeredId = UserIdSchema.make("registered-1");
+    const room: TripRoom = {
+      id: TripIdSchema.make("room-member"),
+      title: "제주 여행",
+      destination: "제주",
+      revision: RevisionSchema.make(1),
+      members: [{ id: guestId, name: "용열", role: "MEMBER" }],
+      plans: [],
+      confirmedPlanId: undefined,
+    };
+    const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+    const client = {
+      query: async (
+        config: { readonly text: string },
+        params: unknown[] = []
+      ) => {
+        calls.push({ text: config.text, params });
+        return {
+          rows: config.text.includes('from "participant_alias"')
+            ? []
+            : [[
+                room.id,
+                room.title,
+                room.destination,
+                room.revision,
+                room.members,
+                room.plans,
+                null,
+                "2026-08-23T00:00:00.000Z",
+                "2026-08-23T00:00:00.000Z",
+              ]],
+        };
+      },
+    };
+    const db = drizzle(client as unknown as NodePgClient, { schema });
+
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const repository = yield* TripRoomRepository;
+        return yield* repository.getRooms([registeredId, guestId]);
+      }).pipe(
+        Effect.provide(
+          TripRoomRepositoryLive.pipe(
+            Layer.provide(Layer.succeed(Database, { db }))
+          )
+        )
+      )
+    );
+
+    expect(result).toEqual([room]);
+    expect(calls[0].text).toContain('"trip_rooms"."members" @>');
+    expect(calls[0].text).toContain(" or ");
+    expect(calls[0].params).toEqual([
+      JSON.stringify([{ id: registeredId }]),
+      JSON.stringify([{ id: guestId }]),
+    ]);
+  });
+
   it("resolves participant aliases before exposing a room", async () => {
     const guestId = UserIdSchema.make("guest-1");
     const registeredId = UserIdSchema.make("registered-1");

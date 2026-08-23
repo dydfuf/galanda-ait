@@ -1,5 +1,5 @@
 import { Context } from "effect";
-import type { Revision, TripId } from "../domain/ids.ts";
+import type { ParticipantId, Revision, TripId } from "../domain/ids.ts";
 import type { TripMember, TripPlan, TripRoom } from "../domain/room.ts";
 import type { ConflictError, NotFoundError } from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
@@ -23,7 +23,9 @@ export class TripRoomRepository extends Context.Service<
     readonly getRoom: (
       roomId: TripId
     ) => RepositoryEffect<TripRoom, NotFoundError>;
-    readonly getRooms: () => RepositoryEffect<ReadonlyArray<TripRoom>>;
+    readonly getRooms: (
+      participantIds: ReadonlyArray<ParticipantId>
+    ) => RepositoryEffect<ReadonlyArray<TripRoom>>;
     readonly createRoom: (
       params: CreateRoomParams
     ) => RepositoryEffect<TripRoom, ConflictError>;

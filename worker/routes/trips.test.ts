@@ -61,7 +61,7 @@ const rowValues = (value: TripRoom): Array<unknown> => [
 
 const makeApp = (
   responses: Array<Array<Array<unknown>>>,
-  user: { readonly id: string; readonly name: string } = {
+  user: { readonly id: string; readonly name: string } | null | Error = {
     id: hostId,
     name: "Host",
   }
@@ -81,9 +81,12 @@ const makeApp = (
   const makeAuth = (() => ({
     handler: () => new Response(),
     api: {
-      getSession: async () => ({
-        user: { ...user, email: `${user.id}@example.com` },
-      }),
+      getSession: async () => {
+        if (user instanceof Error) throw user;
+        return user
+          ? { user: { ...user, email: `${user.id}@example.com` } }
+          : null;
+      },
     },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;
   const withDatabase: NonNullable<AppDependencies["withDatabase"]> = async (
@@ -160,7 +163,40 @@ describe("Trip API vertical slice", () => {
     expect(calls[2].params).toContain(
       JSON.stringify([{ id: hostId, name: "Host", role: "HOST" }])
     );
+    expect(calls[0].text).toContain('"trip_rooms"."members" @>');
+    expect(calls[0].params).toEqual([JSON.stringify([{ id: hostId }])]);
     expect(calls[4].params.slice(-2)).toEqual([room.id, room.revision]);
+  });
+
+  it("목록은 인증을 요구하고 세션 장애를 구분하며 비멤버 상세를 숨긴다", async () => {
+    const unauthenticated = makeApp([], null);
+    const unauthenticatedResponse = await unauthenticated.app.fetch(
+      request("/api/trips"),
+      env
+    );
+    expect(unauthenticatedResponse.status).toBe(401);
+    expect(unauthenticated.calls).toEqual([]);
+
+    const unavailable = makeApp([], new Error("auth unavailable"));
+    const unavailableResponse = await unavailable.app.fetch(
+      request("/api/trips"),
+      env
+    );
+    expect(unavailableResponse.status).toBe(503);
+    await expect(unavailableResponse.json()).resolves.toMatchObject({
+      error: { code: "AUTH_SERVICE_UNAVAILABLE" },
+    });
+    expect(unavailable.calls).toEqual([]);
+
+    const outsider = makeApp([[rowValues(room)]], {
+      id: "outsider",
+      name: "Outsider",
+    });
+    const outsiderResponse = await outsider.app.fetch(
+      request("/api/trips/trip-1"),
+      env
+    );
+    expect(outsiderResponse.status).toBe(404);
   });
 
   it("create DTO의 서버 소유 필드를 거부한다", async () => {

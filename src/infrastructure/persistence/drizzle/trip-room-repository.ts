@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import {
   ConflictError,
@@ -210,10 +210,22 @@ export const TripRoomRepositoryLive: Layer.Layer<
     const { db } = yield* Database;
 
     return {
-      getRooms: () =>
+      getRooms: (participantIds) =>
         Effect.gen(function* () {
+          if (participantIds.length === 0) return [];
           const rows = yield* databaseEffect("getRooms", () =>
-            db.select().from(tripRooms).orderBy(desc(tripRooms.createdAt))
+            db
+              .select()
+              .from(tripRooms)
+              .where(
+                or(
+                  ...participantIds.map(
+                    (id) =>
+                      sql`${tripRooms.members} @> ${JSON.stringify([{ id }])}::jsonb`
+                  )
+                )
+              )
+              .orderBy(desc(tripRooms.createdAt))
           );
           const rooms = yield* Effect.all(
             rows.map((row) => decodeRoom(row, "getRooms"))
