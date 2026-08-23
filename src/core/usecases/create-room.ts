@@ -1,6 +1,6 @@
 import { Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
-import { requireAuthSession } from "../ports/session.ts";
+import { requireRegisteredSession } from "../ports/session.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
 import { ValidationError } from "../domain/errors.ts";
 import type { TripMember } from "../domain/room.ts";
@@ -23,8 +23,8 @@ export const createTripRoom = Effect.fn("createTripRoom")(
   function* (input: CreateRoomInput) {
     // 1. 인증 세션 확인 및 호스트 사용자 바인딩 (세션 사용자 단일 주체 강제)
     //    입력 검증보다 먼저 수행해 비로그인 사용자가 ValidationError를 먼저 받지 않도록 한다
-    const session = yield* requireAuthSession(
-      "방을 생성하려면 로그인이 필요합니다."
+    const session = yield* requireRegisteredSession(
+      "새 여행을 만들려면 소셜 계정 연결이 필요합니다."
     );
 
     // 2. 입력 스키마 검증

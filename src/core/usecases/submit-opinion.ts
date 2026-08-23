@@ -8,7 +8,10 @@ import {
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import type { PlanMemberOpinion } from "../domain/room.ts";
 import { ValidationError } from "../domain/errors.ts";
-import { setPlanOpinionInRoom } from "../domain/room-transitions.ts";
+import {
+  mergeParticipantIdentityInRoom,
+  setPlanOpinionInRoom,
+} from "../domain/room-transitions.ts";
 
 /**
  * 의견 제출 입력
@@ -49,8 +52,13 @@ export const submitOpinion = Effect.fn("submitOpinion")(
     const repo = yield* TripRoomRepository;
 
     // 3. 방 조회 및 RBAC: 세션 사용자의 'opinion:submit' 권한 검증 (GUEST 차단)
-    const room = yield* repo.getRoom(input.roomId);
-    yield* requireRoomPermission(
+    const storedRoom = yield* repo.getRoom(input.roomId);
+    const room = mergeParticipantIdentityInRoom(
+      storedRoom,
+      session.participantId,
+      session.participantIds
+    );
+    const actor = yield* requireRoomPermission(
       room,
       session.participantIds,
       "opinion:submit",
@@ -63,7 +71,7 @@ export const submitOpinion = Effect.fn("submitOpinion")(
     // 5. 세션 사용자의 정보로 작성자 고정 (위조 방지)
     const sanitizedOpinion: PlanMemberOpinion = {
       userId: session.participantId,
-      userName: session.name,
+      userName: actor.member?.name ?? session.name,
       reaction,
       reason,
     };

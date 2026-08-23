@@ -46,6 +46,19 @@ export function mapDomainError(
           }),
         };
 
+      case "AccountUpgradeRequiredError":
+        return {
+          status: 403,
+          body: formatApiError({
+            code: "ACCOUNT_UPGRADE_REQUIRED",
+            message:
+              typeof tagged.reason === "string" && tagged.reason.length > 0
+                ? tagged.reason
+                : "계정 연결이 필요합니다.",
+            requestId,
+          }),
+        };
+
       case "NotFoundError":
         return {
           status: 404,

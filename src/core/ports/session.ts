@@ -1,6 +1,9 @@
 import { Context, Effect, Option } from "effect";
 import type { UserSession } from "../domain/room.ts";
-import { UnauthorizedError } from "../domain/errors.ts";
+import {
+  AccountUpgradeRequiredError,
+  UnauthorizedError,
+} from "../domain/errors.ts";
 import type { SessionUnavailableError } from "../domain/errors.ts";
 
 /**
@@ -57,6 +60,17 @@ export const getCurrentUser = (
   reason = "로그인이 필요합니다."
 ): Effect.Effect<UserSession, SessionLookupError, SessionService> =>
   requireAuthSession(reason);
+
+export const requireRegisteredSession = (
+  reason = "계정 연결이 필요합니다."
+) =>
+  Effect.gen(function* () {
+    const session = yield* requireAuthSession();
+    if (session.accountType !== "REGISTERED") {
+      return yield* Effect.fail(new AccountUpgradeRequiredError({ reason }));
+    }
+    return session;
+  });
 
 /**
  * 현재 세션을 Option 형태로 획득하는 Effect

@@ -58,7 +58,15 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         return Effect.succeed(updated);
       },
       updatePlan: () => Effect.die("not implemented"),
-      saveRoom: () => Effect.die("not implemented"),
+      saveRoom: (nextRoom, expectedRevision) => {
+        const idx = rooms.findIndex((room) => room.id === nextRoom.id);
+        const updated: TripRoom = {
+          ...nextRoom,
+          revision: RevisionSchema.make(expectedRevision + 1),
+        };
+        rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
+        return Effect.succeed(updated);
+      },
     });
   };
 

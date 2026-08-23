@@ -130,20 +130,24 @@ export const tossLogin = ({ db, fetcher }: TossLoginOptions): BetterAuthPlugin =
         const previousSession = await getSessionFromCtx(ctx, {
           disableRefresh: true,
         });
-        if (
-          previousSession?.user.isAnonymous &&
-          previousSession.user.id !== registeredUser.id
-        ) {
-          await linkAnonymousParticipant(
-            db,
-            previousSession.user.id,
-            registeredUser.id
-          );
-        }
-
         const session = await ctx.context.internalAdapter.createSession(
           registeredUser.id
         );
+        try {
+          if (
+            previousSession?.user.isAnonymous &&
+            previousSession.user.id !== registeredUser.id
+          ) {
+            await linkAnonymousParticipant(
+              db,
+              previousSession.user.id,
+              registeredUser.id
+            );
+          }
+        } catch (error) {
+          await ctx.context.internalAdapter.deleteSession(session.token);
+          throw error;
+        }
         await setSessionCookie(ctx, { session, user: registeredUser });
 
         if (

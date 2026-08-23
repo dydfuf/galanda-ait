@@ -159,6 +159,12 @@ describe("Better Auth Worker integration", () => {
       env
     );
     expect(unauthenticatedResponse.status).toBe(401);
+    const optionalSession = await unauthenticated.app.fetch(
+      request("/api/session"),
+      env
+    );
+    expect(optionalSession.status).toBe(200);
+    await expect(optionalSession.json()).resolves.toBeNull();
 
     const auth = createAuthFixture();
     const failingAuth = {
@@ -190,5 +196,13 @@ describe("Better Auth Worker integration", () => {
       env
     );
     expect(failureResponse.status).toBe(503);
+    const failedOptionalSession = await failingApp.fetch(
+      request("/api/session"),
+      env
+    );
+    expect(failedOptionalSession.status).toBe(503);
+    await expect(failedOptionalSession.json()).resolves.toMatchObject({
+      error: { code: "AUTH_SERVICE_UNAVAILABLE" },
+    });
   });
 });

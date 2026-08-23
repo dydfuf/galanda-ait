@@ -80,7 +80,18 @@ export function createApp(dependencies: AppDependencies = {}) {
   app.use("/api/*", sessionMiddleware);
 
   app.route("/api/health", healthRoute);
-  app.get("/api/session", (c) => c.json(c.var.authSession ?? null));
+  app.get("/api/session", (c) =>
+    c.var.authSessionError
+      ? c.json(
+          formatApiError({
+            code: "AUTH_SERVICE_UNAVAILABLE",
+            message: "인증 서비스를 일시적으로 사용할 수 없습니다.",
+            requestId: c.var.requestId,
+          }),
+          503
+        )
+      : c.json(c.var.authSession ?? null)
+  );
   app.route("/api/trips", tripsRoute);
 
   app.notFound((c) => {

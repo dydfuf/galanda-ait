@@ -31,7 +31,10 @@ import {
   type TripPlan,
 } from "../domain/room.ts";
 import { ValidationError } from "../domain/errors.ts";
-import { deletePlanFromRoom } from "../domain/room-transitions.ts";
+import {
+  deletePlanFromRoom,
+  mergeParticipantIdentityInRoom,
+} from "../domain/room-transitions.ts";
 
 export type CreateAccommodationSnapshot = Pick<
   AccommodationSnapshot,
@@ -125,10 +128,14 @@ export const createPlan = Effect.fn("createPlan")(
     const command = decodeResult.success;
 
     const repo = yield* TripRoomRepository;
-    const room = yield* repo.getRoom(command.roomId);
+    const room = mergeParticipantIdentityInRoom(
+      yield* repo.getRoom(command.roomId),
+      session.participantId,
+      session.participantIds
+    );
 
     // 2. RBAC: 세션 사용자의 'plan:create' 권한 검증
-    yield* requireRoomPermission(
+    const actor = yield* requireRoomPermission(
       room,
       session.participantIds,
       "plan:create",
@@ -170,7 +177,7 @@ export const createPlan = Effect.fn("createPlan")(
       transports: command.transports,
       places: command.places,
       authorId: session.participantId,
-      authorName: session.name,
+      authorName: actor.member?.name ?? session.name,
       status: "DRAFT",
       memberOpinions: [],
       voteCount: 0,
@@ -186,9 +193,8 @@ export const createPlan = Effect.fn("createPlan")(
       return yield* Effect.fail(new ValidationError({ message: "여행안 날짜 형식이 올바르지 않습니다." }));
     }
 
-    return yield* repo.createPlan(
-      command.roomId,
-      finalPlan,
+    return yield* repo.saveRoom(
+      { ...room, plans: [...room.plans, finalPlan] },
       command.expectedRevision
     );
   }
@@ -227,7 +233,11 @@ export const updatePlan = Effect.fn("updatePlan")(
     }
 
     const repo = yield* TripRoomRepository;
-    const room = yield* repo.getRoom(input.roomId);
+    const room = mergeParticipantIdentityInRoom(
+      yield* repo.getRoom(input.roomId),
+      session.participantId,
+      session.participantIds
+    );
     const existingPlan = yield* requirePlanInRoom(room, input.plan.id);
 
     // 4. RBAC: 세션 사용자의 'plan:update' 권한 검증
@@ -300,9 +310,13 @@ export const updatePlan = Effect.fn("updatePlan")(
       return yield* Effect.fail(new ValidationError({ message: "여행안 날짜 형식이 올바르지 않습니다." }));
     }
 
-    return yield* repo.updatePlan(
-      input.roomId,
-      finalPlan,
+    return yield* repo.saveRoom(
+      {
+        ...room,
+        plans: room.plans.map((plan) =>
+          plan.id === finalPlan.id ? finalPlan : plan
+        ),
+      },
       input.expectedRevision
     );
   }
@@ -322,7 +336,11 @@ export const deletePlan = Effect.fn("deletePlan")(
     );
 
     const repo = yield* TripRoomRepository;
-    const room = yield* repo.getRoom(input.roomId);
+    const room = mergeParticipantIdentityInRoom(
+      yield* repo.getRoom(input.roomId),
+      session.participantId,
+      session.participantIds
+    );
     const plan = yield* requirePlanInRoom(room, input.planId);
 
     // 2. RBAC: 세션 사용자의 'plan:delete' 권한 검증

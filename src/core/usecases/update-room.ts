@@ -7,6 +7,7 @@ import { requireAuthSession } from "../ports/session.ts";
 import { requireRoomPermission } from "../domain/auth-guards.ts";
 import type { Revision, TripId } from "../domain/ids.ts";
 import { ValidationError } from "../domain/errors.ts";
+import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
 
 export interface UpdateRoomInput {
   readonly roomId: TripId;
@@ -29,7 +30,11 @@ export const updateTripRoom = Effect.fn("updateTripRoom")(
     }
 
     const repo = yield* TripRoomRepository;
-    const currentRoom = yield* repo.getRoom(input.roomId);
+    const currentRoom = mergeParticipantIdentityInRoom(
+      yield* repo.getRoom(input.roomId),
+      session.participantId,
+      session.participantIds
+    );
 
     // 3. RBAC: 방장 권한('room:update') 검증
     yield* requireRoomPermission(
@@ -51,9 +56,13 @@ export const updateTripRoom = Effect.fn("updateTripRoom")(
           : undefined,
     };
 
-    return yield* repo.updateRoom(
-      input.roomId,
-      sanitizedParams,
+    return yield* repo.saveRoom(
+      {
+        ...currentRoom,
+        title: sanitizedParams.title ?? currentRoom.title,
+        destination:
+          sanitizedParams.destination ?? currentRoom.destination,
+      },
       input.expectedRevision
     );
   }
