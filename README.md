@@ -48,6 +48,7 @@ UI는 shadcn/ui(Base UI) + Tailwind CSS 기반이에요. 규칙은 `docs/ui-foun
 
 ```bash
 npm run dev:worker       # Web build 후 Worker + Static Assets 로컬 실행
+npm run dev:staging      # staging Hyperdrive를 사용하는 Cloudflare 원격 개발
 npm run deploy:staging  # Web build 후 Cloudflare Workers 배포
 ```
 
@@ -66,7 +67,8 @@ BETTER_AUTH_URL     환경별 canonical public origin (예: https://galanda.exam
 KAKAO_CLIENT_ID     Web/PWA Kakao Login REST API key
 KAKAO_CLIENT_SECRET Kakao Login client secret (사용 시 Wrangler secret)
 TOSS_MTLS           Apps-in-Toss 로그인용 Cloudflare mTLS certificate binding
-DATABASE_URL        local runtime fallback과 migration에서만 사용하는 PostgreSQL URL
+DATABASE_URL        local runtime fallback용 PostgreSQL URL
+MIGRATION_DATABASE_URL Drizzle migration 전용 관리자 PostgreSQL URL
 HYPERDRIVE          staging/production Worker의 Cloudflare Hyperdrive binding
 ```
 
