@@ -21,7 +21,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
-    "check": "npm run lint && npm test && npm run build && npm run build:ait",
+    "check:db": "npm run db:check && bash scripts/check-drizzle-drift.sh",
+    "check": "npm run lint && npm test && npm run check:db && npm run build && npm run build:ait",
     "preview": "vite preview",
     "deploy": "ait deploy",
     "deploy:staging": "npm run build:web && wrangler deploy --env staging"

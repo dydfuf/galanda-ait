@@ -91,9 +91,13 @@ PR은 최신 `main`과 동기화된 상태에서 아래 명령을 모두 통과�
 npm ci
 npm run lint
 npm test
+npm run db:check
+bash scripts/check-drizzle-drift.sh # Drizzle migration drift check (no DB required)
 npm run build
 npm run build:ait
 ```
+
+`npm run check:db`는 `db:check`와 drift check를 함께 실행해요. CI는 `db:migrate`를 실행하지 않으며 `DATABASE_URL`/`BETTER_AUTH_SECRET` 등 DB credential이 필요 없어요.
 
 ## Effect with AI agents
 
