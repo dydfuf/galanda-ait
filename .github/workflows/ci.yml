@@ -25,5 +25,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - run: npm run db:check
+      - name: Verify Drizzle migrations are in sync (no DB required)
+        run: bash scripts/check-drizzle-drift.sh
       - run: npm run build
       - run: npm run build:ait
