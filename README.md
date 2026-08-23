@@ -53,6 +53,8 @@ npm run deploy:staging  # Web build 후 Cloudflare Workers 배포
 
 `/api/*`는 Worker가 처리하고, 그 외 경로는 `dist/`의 SPA로 서빙해요.
 
+staging bootstrap, migration, deploy, smoke, rollback 절차는 [Cloudflare + Supabase staging 운영 Runbook](docs/staging-operations-runbook.md)을 참고해요.
+
 ### Better Auth runtime configuration
 
 Better Auth와 application repository는 같은 request-scoped Drizzle handle을
@@ -61,8 +63,8 @@ Better Auth와 application repository는 같은 request-scoped Drizzle handle을
 ```text
 BETTER_AUTH_SECRET  Wrangler secret로 관리하는 32자 이상 high-entropy secret
 BETTER_AUTH_URL     환경별 canonical public origin (예: https://galanda.example)
-DATABASE_URL        local/staging에서 사용하는 PostgreSQL URL
-HYPERDRIVE          production Worker의 Cloudflare Hyperdrive binding
+DATABASE_URL        local runtime fallback과 migration에서만 사용하는 PostgreSQL URL
+HYPERDRIVE          staging/production Worker의 Cloudflare Hyperdrive binding
 ```
 
 Auth schema도 Drizzle migration에 포함되므로 DB 반영은 기존 명령을 사용해요.
