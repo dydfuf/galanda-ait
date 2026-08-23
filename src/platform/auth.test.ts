@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { safeReturnTo } from "./auth.ts";
+import { getLoginPath, getSessionRedirect, safeReturnTo } from "./auth.ts";
+import type { UserSession } from "@/core/domain/room.ts";
+
+const session = (accountType: UserSession["accountType"]): UserSession => ({
+  participantId: "participant-1" as UserSession["participantId"],
+  participantIds: ["participant-1" as UserSession["participantId"]],
+  accountType,
+  name: "여행자",
+  isAuthenticated: true,
+});
 
 describe("safeReturnTo", () => {
   it("keeps internal paths and rejects external redirects", () => {
@@ -7,5 +16,27 @@ describe("safeReturnTo", () => {
     expect(safeReturnTo("https://evil.example")).toBe("/trips");
     expect(safeReturnTo("//evil.example")).toBe("/trips");
     expect(safeReturnTo("/\\evil.example")).toBe("/trips");
+  });
+});
+
+describe("getLoginPath", () => {
+  it("preserves the internal destination and marks account upgrades", () => {
+    expect(getLoginPath("/trips/room-1?tab=plans#members")).toBe(
+      "/login?returnTo=%2Ftrips%2Froom-1%3Ftab%3Dplans%23members"
+    );
+    expect(getLoginPath("/trips/new", true)).toBe(
+      "/login?returnTo=%2Ftrips%2Fnew&reason=upgrade"
+    );
+  });
+});
+
+describe("getSessionRedirect", () => {
+  it("redirects only missing sessions and guests on registered routes", () => {
+    expect(getSessionRedirect(null, "/trips")).toBe("/login?returnTo=%2Ftrips");
+    expect(getSessionRedirect(session("GUEST"), "/trips")).toBeNull();
+    expect(getSessionRedirect(session("GUEST"), "/trips/new", true)).toBe(
+      "/login?returnTo=%2Ftrips%2Fnew&reason=upgrade"
+    );
+    expect(getSessionRedirect(session("REGISTERED"), "/trips/new", true)).toBeNull();
   });
 });

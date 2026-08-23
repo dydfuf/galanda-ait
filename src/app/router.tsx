@@ -15,6 +15,7 @@ import { PlanComparePage } from "../features/plan-compare/PlanComparePage.tsx";
 import { ItineraryPage } from "../features/itinerary/ItineraryPage.tsx";
 import { NotFoundPage } from "../pages/NotFoundPage.tsx";
 import { LoginPage } from "../features/auth/LoginPage.tsx";
+import { SessionRoute } from "../features/auth/SessionRoute.tsx";
 import { platformOnlyRoutes } from "../platform/index.ts";
 
 export function AppRouter() {
@@ -25,10 +26,6 @@ export function AppRouter() {
         <Route path="/" element={<Navigate to="/trips" replace />} />
         <Route path="/login" element={<LoginPage />} />
 
-        {/* 여행 목록 및 생성 */}
-        <Route path="/trips" element={<TripListPage />} />
-        <Route path="/trips/new" element={<TripCreatePage />} />
-
         {/* 초대장 */}
         <Route path="/invites/:inviteToken" element={<InvitePage />} />
 
@@ -37,23 +34,30 @@ export function AppRouter() {
           <Route key={path} path={path} element={<Component />} />
         ))}
 
-        {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
-        <Route path="/trips/:tripId" element={<TripRoomEntry />} />
+        <Route element={<SessionRoute />}>
+          <Route path="/trips" element={<TripListPage />} />
+          <Route element={<SessionRoute registered />}>
+            <Route path="/trips/new" element={<TripCreatePage />} />
+          </Route>
 
-        {/* 여행방 탭 레이아웃: 계획 탭 홈 및 일정 탭 홈 */}
-        <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
-          <Route path="plans" element={<PlanHomePage />} />
-          <Route path="itinerary" element={<ItineraryPage />} />
-        </Route>
+          {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
+          <Route path="/trips/:tripId" element={<TripRoomEntry />} />
 
-        {/* 여행방 서브페이지 레이아웃 (뒤로가기 헤더): 계획 생성, 상세, 편집, 비교 */}
-        <Route path="/trips/:tripId/plans" element={<TripRoomChildLayout />}>
-          <Route path="new" element={<PlanCreatePage />} />
-          <Route path="new/:section" element={<PlanCreatePage />} />
-          <Route path="compare" element={<PlanComparePage />} />
-          <Route path=":planId" element={<PlanDetailPage />} />
-          <Route path=":planId/edit" element={<PlanEditPage />} />
-          <Route path=":planId/edit/:section" element={<PlanEditPage />} />
+          {/* 여행방 탭 레이아웃: 계획 탭 홈 및 일정 탭 홈 */}
+          <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
+            <Route path="plans" element={<PlanHomePage />} />
+            <Route path="itinerary" element={<ItineraryPage />} />
+          </Route>
+
+          {/* 여행방 서브페이지 레이아웃 (뒤로가기 헤더): 계획 생성, 상세, 편집, 비교 */}
+          <Route path="/trips/:tripId/plans" element={<TripRoomChildLayout />}>
+            <Route path="new" element={<PlanCreatePage />} />
+            <Route path="new/:section" element={<PlanCreatePage />} />
+            <Route path="compare" element={<PlanComparePage />} />
+            <Route path=":planId" element={<PlanDetailPage />} />
+            <Route path=":planId/edit" element={<PlanEditPage />} />
+            <Route path=":planId/edit/:section" element={<PlanEditPage />} />
+          </Route>
         </Route>
 
         {/* 404 Not Found */}
