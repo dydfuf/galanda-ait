@@ -182,17 +182,21 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         const ids = yield* IdGenerator;
         const id1 = yield* ids.tripId;
         const id2 = yield* ids.tripId;
-        const plan1 = yield* ids.planId;
-        const plan2 = yield* ids.planId;
-        return { id1, id2, plan1, plan2 };
+      const plan1 = yield* ids.planId;
+      const plan2 = yield* ids.planId;
+      const invite1 = yield* ids.inviteToken;
+      const invite2 = yield* ids.inviteToken;
+      return { id1, id2, plan1, plan2, invite1, invite2 };
       }).pipe(Effect.provide(IdGeneratorLive));
 
       const result = await Effect.runPromise(program);
 
       expect(result.id1).not.toBe(result.id2);
       expect(result.plan1).not.toBe(result.plan2);
+      expect(result.invite1).not.toBe(result.invite2);
       expect(result.id1.length).toBeGreaterThan(10);
       expect(result.plan1.length).toBeGreaterThan(10);
+      expect(result.invite1).toMatch(/^[0-9a-f-]{36}$/);
     });
   });
 });

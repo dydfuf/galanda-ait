@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AccountUpgradeRequiredError,
+  InvalidInviteError,
   ConflictError,
   NotFoundError,
   RepositoryError,
@@ -58,6 +59,17 @@ describe("api-error", () => {
     );
     expect(result.status).toBe(403);
     expect(result.body.error.code).toBe("ACCOUNT_UPGRADE_REQUIRED");
+  });
+
+  it("maps InvalidInviteError without capability details", () => {
+    const result = mapDomainError(new InvalidInviteError(), reqId);
+
+    expect(result.status).toBe(404);
+    expect(result.body.error).toEqual({
+      code: "INVITE_INVALID",
+      message: "초대 링크가 만료되었거나 유효하지 않습니다.",
+      requestId: reqId,
+    });
   });
 
   it("maps NotFoundError", () => {

@@ -19,5 +19,7 @@ export type UserId = ParticipantId;
 export const RevisionSchema = Schema.Number.pipe(Schema.brand("Revision"));
 export type Revision = typeof RevisionSchema.Type;
 
-export const InviteTokenSchema = Schema.String.pipe(Schema.brand("InviteToken"));
+export const InviteTokenSchema = Schema.String.check(Schema.isUUID(4)).pipe(
+  Schema.brand("InviteToken")
+);
 export type InviteToken = typeof InviteTokenSchema.Type;

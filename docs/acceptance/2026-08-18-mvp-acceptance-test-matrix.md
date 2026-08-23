@@ -129,6 +129,15 @@ location.href = "/trips";
 | `IN01-P` | 권한 오류 | M | 로그인 전 `G`가 초대장을 연다 | 수락을 선택한다 | 먼저 인증을 요구하고, 인증하지 않으면 멤버 등록을 실행하지 않는다 | `B` |
 | `IN01-S` | 저장 실패 | A/M | 참여 등록이 실패한다 | 같은 초대를 다시 수락한다 | 오류를 표시하고 재시도할 수 있으며 같은 사용자 또는 같은 참여 요청이 중복 등록되지 않는다 | `B` |
 
+#### 초대 capability 계약 (2026-08-24)
+
+- Trip마다 활성 초대는 하나이며 발급 후 7일 동안 여러 참여자가 재사용할 수 있다.
+- 재발급은 같은 Trip의 이전 토큰을 즉시 무효화하고, 폐기는 여러 번 호출해도 같은 결과다.
+- 원문 token은 발급 응답과 공유 URL에만 존재한다. DB에는 SHA-256 hash만 저장한다.
+- `GET /api/invites/:inviteToken`은 `title`, `inviterName`, `participantCount`, `alreadyJoined`만 기본 반환한다. 확정 여행안이 있을 때만 `destination`, `startDate`, `endDate`를 추가한다.
+- malformed, missing, expired, revoked token은 모두 `404 INVITE_INVALID`로 응답하고 token이나 Trip 정보를 오류에 포함하지 않는다. 저장소·인증 장애는 재시도 가능한 `503`이다.
+- 이미 참여한 사용자는 summary의 `alreadyJoined: true`를 보고 join을 반복하지 않고 Trip Room으로 복귀한다. 실제 nickname Guest join은 RAON-139가 이 계약을 사용한다.
+
 ### `PL-01` 계획 탭 홈
 
 | ID | 유형 | 방식 | Given | When | Then | 상태 |
@@ -250,7 +259,7 @@ agent-browser snapshot -c
 | ID | 충돌 | 현재 증거 | 결정 필요 |
 |---|---|---|---|
 | `D-01` | `IN-01`은 화면 문서에서 `예정`인데 RAON-141 범위와 라우터에는 포함됨 | 화면 문서 표, `src/app/router.tsx` | IN-01을 이번 MVP acceptance의 필수 출시 범위로 확정할지 결정 |
-| `D-02` | 설계는 추측하기 어려운 만료·폐기 가능한 opaque token을 요구하지만 구현 링크는 `invite-<tripId>`이고 InvitePage가 token을 room id로 직접 조회함 | `src/app/layouts/TripRoomTabLayout.tsx`, `src/features/invite/InvitePage.tsx` | 토큰 발급·해석·만료 계약을 먼저 정하고 `IN01-N`을 통과시킬 것 |
+| `D-02` | RAON-130에서 opaque token의 발급·해석·만료·폐기 API 계약을 확정했지만 기존 화면 연결은 아직 `invite-<tripId>`를 사용함 | invite capability 계약, `src/app/layouts/TripRoomTabLayout.tsx`, `src/features/invite/InvitePage.tsx` | RAON-139에서 화면을 token API와 Guest join에 연결하고 `IN01-N`을 통과시킬 것 |
 | `D-03` | 화면 문서는 H만 최종 확정·타인 plan 수정 불가라고 하지만 현재 `MEMBER` 권한 집합과 일부 use case가 이를 허용함 | `src/core/domain/auth-guards.ts`, `src/core/usecases/save-plan.ts` | H/M/G 권한 표를 단일 기준으로 확정하고 UI와 use case를 일치시킬 것 |
 | `D-04` | 공개된 plan이 현재 로컬 데이터에서 `DRAFT` 상태로 보이고 `VOTING` 전이가 없음 | `src/infrastructure/local/local-trip-room-repo.ts`, smoke `S-03` | `DRAFT`를 임시안과 공개안에 재사용할지, 공개 상태를 별도로 둘지 결정 |
 | `D-05` | IT-01 문서는 확정 일정의 방장 편집·변경 이력을 요구하지만 현재 `TripPlan`과 화면은 조회 중심임 | `src/features/itinerary/ItineraryPage.tsx` | 일정 편집·메모·변경 이력을 이번 MVP에 포함할지 후속 범위로 분리할지 결정 |

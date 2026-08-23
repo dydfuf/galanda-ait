@@ -29,6 +29,12 @@ export class AccountUpgradeRequiredError extends Schema.TaggedError<AccountUpgra
   { reason: Schema.String }
 ) {}
 
+/** Public invite failures intentionally collapse malformed, expired, revoked, and missing tokens. */
+export class InvalidInviteError extends Schema.TaggedError<InvalidInviteError>()(
+  "InvalidInviteError",
+  {}
+) {}
+
 export class ValidationError extends Schema.TaggedError<ValidationError>()(
   "ValidationError",
   {
