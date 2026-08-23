@@ -9,6 +9,8 @@ import { platform } from "../../platform/index.ts";
 import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { issueTripInvite } from "../api-client.ts";
+import { TripIdSchema } from "../../core/domain/ids.ts";
 
 /** 탭 값은 라우트 세그먼트와 같아요. */
 const TAB_PATHS = ["plans", "itinerary"] as const;
@@ -31,18 +33,23 @@ export function TripRoomTabLayout() {
   const selectedTab: TabPath = location.pathname.endsWith("/itinerary") ? "itinerary" : "plans";
 
   const handleShareInvite = useCallback(async () => {
-    const outcome = await platform.share({
-      title: "Galanda 여행 초대",
-      text: "여행방에 참여해 주세요.",
-      url: `${window.location.origin}/invites/invite-${tripId}`,
-    });
+    try {
+      const { token } = await issueTripInvite(TripIdSchema.make(tripId));
+      const outcome = await platform.share({
+        title: "Galanda 여행 초대",
+        text: "여행방에 참여해 주세요.",
+        url: `${window.location.origin}/invites/${encodeURIComponent(token)}`,
+      });
 
-    if (outcome === "shared") {
-      toast("초대 링크를 공유했어요.");
-    } else if (outcome === "copied") {
-      toast("초대 링크를 복사했어요.");
-    } else if (outcome === "unsupported") {
-      toast("공유를 지원하지 않는 환경이에요. 토스 앱에서 다시 시도해 주세요.");
+      if (outcome === "shared") {
+        toast("초대 링크를 공유했어요.");
+      } else if (outcome === "copied") {
+        toast("초대 링크를 복사했어요.");
+      } else if (outcome === "unsupported") {
+        toast("공유를 지원하지 않는 환경이에요. 토스 앱에서 다시 시도해 주세요.");
+      }
+    } catch {
+      toast.error("초대 링크를 만들지 못했어요. 다시 시도해주세요.");
     }
     // outcome === "cancelled": 사용자가 직접 닫은 경우라 알림을 띄우지 않아요.
   }, [tripId]);

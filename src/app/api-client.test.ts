@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  InviteTokenSchema,
   PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
@@ -13,9 +14,11 @@ import {
   createTripPlan,
   deleteTripPlan,
   getCurrentSession,
+  getInviteSummary,
   getTrip,
   getTrips,
-  joinTrip,
+  issueTripInvite,
+  joinInvite,
   submitTripPlanOpinion,
   updateTrip,
   updateTripPlan,
@@ -120,7 +123,7 @@ describe("API client", () => {
     });
   });
 
-  it("plan/opinion/confirm/join mutation을 allowlisted HTTP DTO로 전송한다", async () => {
+  it("plan/opinion/confirm mutation을 allowlisted HTTP DTO로 전송한다", async () => {
     const tripId = TripIdSchema.make("trip-1");
     const planId = PlanIdSchema.make("plan-1");
     const revision = RevisionSchema.make(3);
@@ -167,7 +170,6 @@ describe("API client", () => {
       revision
     );
     await confirmTripPlan(tripId, planId, revision);
-    await joinTrip(tripId);
 
     expect(calls.map(({ input, init }) => [init?.method, input])).toEqual([
       ["POST", "/api/trips/trip-1/plans"],
@@ -175,12 +177,55 @@ describe("API client", () => {
       ["DELETE", "/api/trips/trip-1/plans/plan-1"],
       ["PUT", "/api/trips/trip-1/plans/plan-1/opinion"],
       ["POST", "/api/trips/trip-1/plans/plan-1/confirm"],
-      ["POST", "/api/trips/trip-1/join"],
     ]);
     expect(JSON.parse(calls[1].init?.body as string)).toEqual({
       title: "수정안",
       places: [],
       expectedRevision: 3,
     });
+  });
+
+  it("opaque invite summary·발급·nickname join 계약만 전송한다", async () => {
+    const tripId = TripIdSchema.make("trip-1");
+    const token = InviteTokenSchema.make(
+      "00000000-0000-4000-8000-000000000001"
+    );
+    const room: TripRoom = {
+      id: tripId,
+      title: "오사카 여행",
+      destination: "오사카",
+      revision: RevisionSchema.make(2),
+      members: [
+        { id: UserIdSchema.make("guest-1"), name: "라온", role: "MEMBER" },
+      ],
+      plans: [],
+      confirmedPlanId: undefined,
+    };
+    const responses = [
+      jsonResponse({
+        title: room.title,
+        inviterName: "Host",
+        participantCount: 1,
+        alreadyJoined: false,
+      }),
+      jsonResponse({ token, expiresAt: "2026-09-01T00:00:00.000Z" }, 201),
+      jsonResponse(room),
+    ];
+    const calls: Array<{ readonly input: RequestInfo | URL; readonly init?: RequestInit }> = [];
+    globalThis.fetch = async (input, init) => {
+      calls.push({ input, init });
+      return responses.shift() ?? jsonResponse(null, 500);
+    };
+
+    await getInviteSummary(token);
+    await issueTripInvite(tripId);
+    await joinInvite(token, "라온");
+
+    expect(calls.map(({ input, init }) => [init?.method, input])).toEqual([
+      [undefined, `/api/invites/${token}`],
+      ["POST", "/api/trips/trip-1/invites"],
+      ["POST", `/api/invites/${token}/join`],
+    ]);
+    expect(JSON.parse(calls[2].init?.body as string)).toEqual({ nickname: "라온" });
   });
 });

@@ -1,5 +1,14 @@
 import { Schema } from "effect";
-import type { PlanId, Revision, TripId } from "../core/domain/ids.ts";
+import type {
+  InviteToken,
+  PlanId,
+  Revision,
+  TripId,
+} from "../core/domain/ids.ts";
+import {
+  IssuedInviteSchema,
+  PublicInviteSummarySchema,
+} from "../core/domain/invite.ts";
 import {
   TripRoomSchema,
   UserSessionSchema,
@@ -102,6 +111,28 @@ export const getTrip = (tripId: TripId, signal?: AbortSignal) =>
     signal,
   });
 
+export const getInviteSummary = (
+  inviteToken: InviteToken,
+  signal?: AbortSignal
+) =>
+  requestJson(
+    `/api/invites/${encodeURIComponent(inviteToken)}`,
+    PublicInviteSummarySchema,
+    { signal }
+  );
+
+export const issueTripInvite = (tripId: TripId) =>
+  requestJson(`${tripPath(tripId)}/invites`, IssuedInviteSchema, {
+    method: "POST",
+  });
+
+export const joinInvite = (inviteToken: InviteToken, nickname: string) =>
+  requestJson(
+    `/api/invites/${encodeURIComponent(inviteToken)}/join`,
+    TripRoomSchema,
+    { method: "POST", body: JSON.stringify({ nickname }) }
+  );
+
 export const createTrip = (input: CreateRoomInput) =>
   requestJson("/api/trips", TripRoomSchema, {
     method: "POST",
@@ -175,6 +206,3 @@ export const confirmTripPlan = (
     method: "POST",
     body: JSON.stringify({ expectedRevision }),
   });
-
-export const joinTrip = (tripId: TripId) =>
-  requestJson(`${tripPath(tripId)}/join`, TripRoomSchema, { method: "POST" });

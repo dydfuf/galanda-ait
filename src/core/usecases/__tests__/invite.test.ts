@@ -14,6 +14,7 @@ import {
   InviteRepository,
   type InviteRecord,
   type IssueInviteParams,
+  type JoinInviteParams,
 } from "../../ports/invite-repository.ts";
 import { SessionService } from "../../ports/session.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
@@ -21,6 +22,7 @@ import { createTestIdGenerator } from "../../../infrastructure/id-generator.ts";
 import {
   getPublicInviteSummary,
   issueTripInvite,
+  joinTripByInvite,
   revokeTripInvite,
 } from "../invite.ts";
 
@@ -104,6 +106,7 @@ describe("invite use cases", () => {
         return Effect.void;
       },
       findValid: () => Effect.succeed(undefined),
+      join: () => Effect.die("not used"),
       revoke: () => Effect.sync(() => { revokeCount += 1; }),
     });
     const fixedToken = "00000000-0000-4000-8000-000000000001";
@@ -143,6 +146,7 @@ describe("invite use cases", () => {
     const inviteLayer = Layer.succeed(InviteRepository, {
       issue: () => Effect.die("must not issue"),
       findValid: () => Effect.succeed(undefined),
+      join: () => Effect.die("not used"),
       revoke: () => Effect.void,
     });
 
@@ -165,6 +169,7 @@ describe("invite use cases", () => {
     const inviteLayer = Layer.succeed(InviteRepository, {
       issue: () => Effect.die("not used"),
       findValid: () => Effect.succeed(record),
+      join: () => Effect.die("not used"),
       revoke: () => Effect.void,
     });
     const token = InviteTokenSchema.make("00000000-0000-4000-8000-000000000001");
@@ -220,6 +225,7 @@ describe("invite use cases", () => {
     const inviteLayer = Layer.succeed(InviteRepository, {
       issue: () => Effect.die("not used"),
       findValid: () => Effect.sync(() => { lookups += 1; return undefined; }),
+      join: () => Effect.die("not used"),
       revoke: () => Effect.void,
     });
     const malformed = "invite-trip-1";
@@ -240,5 +246,71 @@ describe("invite use cases", () => {
     }
     expect(lookups).toBe(1);
     expect(new InvalidInviteError()).toMatchObject({ _tag: "InvalidInviteError" });
+  });
+
+  it("token과 세션 신원으로 닉네임 membership을 만들고 입력 신원 위조를 허용하지 않는다", async () => {
+    const guestId = ParticipantIdSchema.make("guest-1");
+    let joined: JoinInviteParams | undefined;
+    const joinedRoom: TripRoom = {
+      ...room,
+      members: [
+        ...room.members,
+        { id: guestId, name: "Member", role: "MEMBER" },
+      ],
+    };
+    const inviteLayer = Layer.succeed(InviteRepository, {
+      issue: () => Effect.die("not used"),
+      findValid: () => Effect.die("not used"),
+      join: (params) => {
+        joined = params;
+        return Effect.succeed(joinedRoom);
+      },
+      revoke: () => Effect.die("not used"),
+    });
+    const token = "00000000-0000-4000-8000-000000000003";
+    const guestSession: UserSession = {
+      participantId: guestId,
+      participantIds: [guestId],
+      accountType: "GUEST",
+      name: "Anonymous",
+      isAuthenticated: true,
+    };
+
+    const result = await Effect.runPromise(
+      joinTripByInvite(token, "  Member  ").pipe(
+        Effect.provide(environment(inviteLayer, guestSession))
+      )
+    );
+
+    expect(result).toEqual(joinedRoom);
+    expect(joined).toMatchObject({
+      token,
+      member: { id: guestId, name: "Member", role: "MEMBER" },
+      participantIds: [guestId],
+    });
+  });
+
+  it("잘못된 token과 공백·과도하게 긴 닉네임은 저장소 호출 전에 거부한다", async () => {
+    let joins = 0;
+    const inviteLayer = Layer.succeed(InviteRepository, {
+      issue: () => Effect.die("not used"),
+      findValid: () => Effect.die("not used"),
+      join: () => Effect.sync(() => { joins += 1; return undefined; }),
+      revoke: () => Effect.die("not used"),
+    });
+
+    for (const [token, nickname] of [
+      ["invite-trip-1", "Guest"],
+      ["00000000-0000-4000-8000-000000000004", "   "],
+      ["00000000-0000-4000-8000-000000000004", "가".repeat(21)],
+    ]) {
+      const exit = await Effect.runPromiseExit(
+        joinTripByInvite(token, nickname).pipe(
+          Effect.provide(environment(inviteLayer))
+        )
+      );
+      expect(Exit.isFailure(exit)).toBe(true);
+    }
+    expect(joins).toBe(0);
   });
 });
