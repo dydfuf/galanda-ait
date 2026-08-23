@@ -176,25 +176,33 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
   };
 
   const hostSession: UserSession = {
-    userId: hostUser.id,
+    participantId: hostUser.id,
+    participantIds: [hostUser.id],
+    accountType: "REGISTERED",
     name: hostUser.name,
     isAuthenticated: true,
   };
 
   const authorSession: UserSession = {
-    userId: authorUser.id,
+    participantId: authorUser.id,
+    participantIds: [authorUser.id],
+    accountType: "REGISTERED",
     name: authorUser.name,
     isAuthenticated: true,
   };
 
   const strangerSession: UserSession = {
-    userId: strangerUser.id,
+    participantId: strangerUser.id,
+    participantIds: [strangerUser.id],
+    accountType: "REGISTERED",
     name: strangerUser.name,
     isAuthenticated: true,
   };
 
   const unauthenticatedSession: UserSession = {
-    userId: UserIdSchema.make("user-anonymous"),
+    participantId: UserIdSchema.make("user-anonymous"),
+    participantIds: [UserIdSchema.make("user-anonymous")],
+    accountType: "GUEST",
     name: "비로그인",
     isAuthenticated: false,
   };
@@ -696,7 +704,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       const localEnv = Layer.merge(
         LocalTripRoomRepositoryLayer,
         createLocalSessionLayer({
-          userId: authorUser.id,
+          participantId: authorUser.id,
+          participantIds: [authorUser.id],
+          accountType: "REGISTERED",
           name: authorUser.name,
           isAuthenticated: true,
         })
@@ -723,7 +733,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       const strangerEnv = Layer.merge(
         LocalTripRoomRepositoryLayer,
         createLocalSessionLayer({
-          userId: strangerUser.id,
+          participantId: strangerUser.id,
+          participantIds: [strangerUser.id],
+          accountType: "REGISTERED",
           name: strangerUser.name,
           isAuthenticated: true,
         })
@@ -758,7 +770,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       const localEnv = Layer.merge(
         LocalTripRoomRepositoryLayer,
         createLocalSessionLayer({
-          userId: authorUser.id,
+          participantId: authorUser.id,
+          participantIds: [authorUser.id],
+          accountType: "REGISTERED",
           name: authorUser.name,
           isAuthenticated: true,
         })
@@ -791,7 +805,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         Layer.merge(
           LocalTripRoomRepositoryLayer,
           createLocalSessionLayer({
-            userId: hostUser.id,
+            participantId: hostUser.id,
+            participantIds: [hostUser.id],
+            accountType: "REGISTERED",
             name: hostUser.name,
             isAuthenticated: true,
           })
@@ -1121,7 +1137,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         const localEnv = Layer.merge(
           LocalTripRoomRepositoryLayer,
           createLocalSessionLayer({
-            userId: authorUser.id,
+            participantId: authorUser.id,
+            participantIds: [authorUser.id],
+            accountType: "REGISTERED",
             name: authorUser.name,
             isAuthenticated: true,
           })
@@ -1166,7 +1184,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         const localEnv = Layer.merge(
           LocalTripRoomRepositoryLayer,
           createLocalSessionLayer({
-            userId: authorUser.id,
+            participantId: authorUser.id,
+            participantIds: [authorUser.id],
+            accountType: "REGISTERED",
             name: authorUser.name,
             isAuthenticated: true,
           })

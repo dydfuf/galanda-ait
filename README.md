@@ -63,6 +63,9 @@ Better Auth와 application repository는 같은 request-scoped Drizzle handle을
 ```text
 BETTER_AUTH_SECRET  Wrangler secret로 관리하는 32자 이상 high-entropy secret
 BETTER_AUTH_URL     환경별 canonical public origin (예: https://galanda.example)
+KAKAO_CLIENT_ID     Web/PWA Kakao Login REST API key
+KAKAO_CLIENT_SECRET Kakao Login client secret (사용 시 Wrangler secret)
+TOSS_MTLS           Apps-in-Toss 로그인용 Cloudflare mTLS certificate binding
 DATABASE_URL        local runtime fallback과 migration에서만 사용하는 PostgreSQL URL
 HYPERDRIVE          staging/production Worker의 Cloudflare Hyperdrive binding
 ```

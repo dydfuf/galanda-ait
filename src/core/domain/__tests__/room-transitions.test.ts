@@ -10,6 +10,7 @@ import {
   confirmPlanInRoom,
   deletePlanFromRoom,
   joinRoomMember,
+  mergeParticipantIdentityInRoom,
   setPlanOpinionInRoom,
 } from "../room-transitions.ts";
 
@@ -84,5 +85,46 @@ describe("TripRoom domain transitions", () => {
 
     expect(joined.members).toContainEqual(member);
     expect(joinRoomMember(joined, member)).toBe(joined);
+  });
+
+  it("merges member roles and opinions across participant aliases", () => {
+    const guestId = UserIdSchema.make("guest-1");
+    const registeredId = UserIdSchema.make("registered-1");
+    const duplicated: TripRoom = {
+      ...room,
+      members: [
+        { id: guestId, name: "용열", role: "MEMBER" },
+        { id: registeredId, name: "계정 이름", role: "HOST" },
+      ],
+      plans: [
+        {
+          ...room.plans[0],
+          authorId: registeredId,
+          authorName: "계정 이름",
+          memberOpinions: [
+            { userId: registeredId, userName: "계정 이름", reaction: "LIKE" },
+            { userId: guestId, userName: "용열", reaction: "HARD", reason: "멀어요" },
+          ],
+          voteCount: 1,
+        },
+      ],
+    };
+
+    const merged = mergeParticipantIdentityInRoom(duplicated, guestId, [
+      guestId,
+      registeredId,
+    ]);
+
+    expect(merged.members).toEqual([
+      { id: guestId, name: "용열", role: "HOST" },
+    ]);
+    expect(merged.plans[0]).toMatchObject({
+      authorId: guestId,
+      authorName: "용열",
+      voteCount: 0,
+      memberOpinions: [
+        { userId: guestId, userName: "용열", reaction: "HARD", reason: "멀어요" },
+      ],
+    });
   });
 });

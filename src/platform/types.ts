@@ -39,6 +39,8 @@ export interface PlatformNavigation {
 
 export interface PlatformAdapter {
   readonly name: "web" | "ait";
+  /** 현재 플랫폼의 등록 계정 로그인(Web: Kakao, AIT: Toss Login). */
+  readonly signIn: (returnTo: string) => Promise<void>;
   /** 링크 공유. 플랫폼별 공유 시트 → 클립보드 순서로 시도해요. */
   readonly share: (message: ShareMessage) => Promise<ShareOutcome>;
   /** 예약/교통 링크 등 앱 밖 URL 열기. */

@@ -17,6 +17,7 @@ import { updateTripRoom } from "../update-room.ts";
 import { ROLE_PERMISSIONS } from "../../domain/auth-guards.ts";
 import {
   NotFoundError,
+  AccountUpgradeRequiredError,
   ConflictError,
   SessionUnavailableError,
   UnauthorizedError,
@@ -209,31 +210,41 @@ const createUnavailableSessionLayer = (
 
 describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): void => {
   const aliceUser: UserSession = {
-    userId: UserIdSchema.make("user-alice"),
+    participantId: UserIdSchema.make("user-alice"),
+    participantIds: [UserIdSchema.make("user-alice")],
+    accountType: "REGISTERED",
     name: "앨리스",
     isAuthenticated: true,
   };
 
   const bobUser: UserSession = {
-    userId: UserIdSchema.make("user-bob"),
+    participantId: UserIdSchema.make("user-bob"),
+    participantIds: [UserIdSchema.make("user-bob")],
+    accountType: "REGISTERED",
     name: "밥",
     isAuthenticated: true,
   };
 
   const strangerUser: UserSession = {
-    userId: UserIdSchema.make("user-stranger"),
+    participantId: UserIdSchema.make("user-stranger"),
+    participantIds: [UserIdSchema.make("user-stranger")],
+    accountType: "REGISTERED",
     name: "이방인",
     isAuthenticated: true,
   };
 
   const bob2User: UserSession = {
-    userId: UserIdSchema.make("user-bob-2"),
+    participantId: UserIdSchema.make("user-bob-2"),
+    participantIds: [UserIdSchema.make("user-bob-2")],
+    accountType: "REGISTERED",
     name: "밥",
     isAuthenticated: true,
   };
 
   const unauthenticatedSession: UserSession = {
-    userId: UserIdSchema.make("anonymous"),
+    participantId: UserIdSchema.make("anonymous"),
+    participantIds: [UserIdSchema.make("anonymous")],
+    accountType: "GUEST",
     name: "게스트",
     isAuthenticated: false,
   };
@@ -326,6 +337,25 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         expect(err).toBeInstanceOf(UnauthorizedError);
       }
     });
+
+    it("Guest 세션은 새 여행방을 만들 수 없다", async (): Promise<void> => {
+      const guestSession: UserSession = {
+        ...aliceUser,
+        accountType: "GUEST",
+      };
+      const program = createTripRoom({ title: "Guest 여행" }).pipe(
+        Effect.provide(
+          Layer.merge(
+            createInMemoryRepositoryLayer(),
+            createTestSessionLayer(guestSession)
+          )
+        )
+      );
+
+      await expect(Effect.runPromise(program)).rejects.toBeInstanceOf(
+        AccountUpgradeRequiredError
+      );
+    });
   });
 
   describe("2. joinTripRoom", (): void => {
@@ -412,6 +442,60 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const createdPlan = room.plans.find((p) => p.title === "밥의 대안");
       expect(createdPlan?.authorId).toBe("user-bob");
       expect(createdPlan?.authorName).toBe("밥");
+    });
+
+    it("계정 승격 후 alias를 합치고 여행별 닉네임으로 작성한다", async (): Promise<void> => {
+      const guestId = UserIdSchema.make("guest-linked");
+      const registeredId = UserIdSchema.make("registered-linked");
+      const linkedRoom: TripRoom = {
+        ...sampleRoom,
+        members: [
+          { id: guestId, name: "용열", role: "MEMBER" },
+          { id: registeredId, name: "카카오 사용자", role: "HOST" },
+        ],
+        plans: [
+          {
+            ...sampleRoom.plans[0],
+            memberOpinions: [
+              { userId: registeredId, userName: "카카오 사용자", reaction: "LIKE" },
+              { userId: guestId, userName: "용열", reaction: "HARD", reason: "멀어요" },
+            ],
+            voteCount: 1,
+          },
+        ],
+      };
+      const linkedSession: UserSession = {
+        participantId: guestId,
+        participantIds: [guestId, registeredId],
+        accountType: "REGISTERED",
+        name: "카카오 사용자",
+        isAuthenticated: true,
+      };
+      const room = await Effect.runPromise(
+        createPlan({
+          roomId: linkedRoom.id,
+          title: "승격 후 여행안",
+          places: [],
+          expectedRevision: linkedRoom.revision,
+        }).pipe(
+          Effect.provide(
+            Layer.merge(
+              createInMemoryRepositoryLayer([linkedRoom]),
+              createTestSessionLayer(linkedSession)
+            )
+          )
+        )
+      );
+
+      expect(room.members).toEqual([
+        { id: guestId, name: "용열", role: "HOST" },
+      ]);
+      expect(room.plans[0].memberOpinions).toHaveLength(1);
+      expect(room.plans[0].voteCount).toBe(0);
+      expect(room.plans.at(-1)).toMatchObject({
+        authorId: guestId,
+        authorName: "용열",
+      });
     });
 
     it("클라이언트가 다른 authorId/authorName을 넘겨도 세션 사용자로 덮어쓴다 (가장 방지)", async (): Promise<void> => {
@@ -1039,6 +1123,57 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(plan?.voteCount).toBe(1);
     });
 
+    it("승격된 계정의 alias 의견을 canonical 의견 하나로 교체하고 여행 닉네임을 유지한다", async (): Promise<void> => {
+      const guestId = UserIdSchema.make("guest-opinion");
+      const registeredId = UserIdSchema.make("registered-opinion");
+      const linkedRoom: TripRoom = {
+        ...sampleRoom,
+        members: [
+          { id: guestId, name: "용열", role: "MEMBER" },
+          { id: registeredId, name: "카카오 사용자", role: "MEMBER" },
+        ],
+        plans: [
+          {
+            ...sampleRoom.plans[0],
+            memberOpinions: [
+              { userId: registeredId, userName: "카카오 사용자", reaction: "LIKE" },
+            ],
+            voteCount: 1,
+          },
+        ],
+      };
+      const linkedSession: UserSession = {
+        participantId: guestId,
+        participantIds: [guestId, registeredId],
+        accountType: "REGISTERED",
+        name: "카카오 사용자",
+        isAuthenticated: true,
+      };
+      const updated = await Effect.runPromise(
+        submitOpinion({
+          roomId: linkedRoom.id,
+          planId: linkedRoom.plans[0].id,
+          opinion: { reaction: "HARD", reason: "멀어요" },
+          expectedRevision: linkedRoom.revision,
+        }).pipe(
+          Effect.provide(
+            Layer.merge(
+              createInMemoryRepositoryLayer([linkedRoom]),
+              createTestSessionLayer(linkedSession)
+            )
+          )
+        )
+      );
+
+      expect(updated.members).toEqual([
+        { id: guestId, name: "용열", role: "MEMBER" },
+      ]);
+      expect(updated.plans[0].memberOpinions).toEqual([
+        { userId: guestId, userName: "용열", reaction: "HARD", reason: "멀어요" },
+      ]);
+      expect(updated.plans[0].voteCount).toBe(0);
+    });
+
     it("같은 사용자의 의견을 바꾸면 한 건을 교체하고 집계를 다시 계산한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
@@ -1066,7 +1201,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const plan = secondRoom.plans.find((candidate) => candidate.id === "plan-1");
       expect(plan?.memberOpinions).toEqual([
         {
-          userId: bobUser.userId,
+          userId: bobUser.participantId,
           userName: bobUser.name,
           reaction: "HARD",
           reason: "이동 시간이 길어요",
@@ -1317,7 +1452,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const session = await Effect.runPromise(
         requireAuthSession().pipe(Effect.provide(createLocalSessionLayer()))
       );
-      expect(session.userId).toBe(DEFAULT_LOCAL_USER.userId);
+      expect(session.participantId).toBe(DEFAULT_LOCAL_USER.participantId);
       expect(session.isAuthenticated).toBe(true);
     });
 

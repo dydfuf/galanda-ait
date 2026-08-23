@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { PlanId, UserId } from "./ids.ts";
+import type { ParticipantId, PlanId } from "./ids.ts";
 import type { TripMember, TripPlan, TripRoom } from "./room.ts";
 import { NotFoundError, UnauthorizedError } from "./errors.ts";
 
@@ -69,15 +69,34 @@ export interface RoomActor {
   readonly can: (action: RoomAction) => boolean;
 }
 
+export type ParticipantIdentity =
+  | ParticipantId
+  | ReadonlyArray<ParticipantId>
+  | undefined;
+
+const toParticipantIds = (
+  identity: ParticipantIdentity
+): ReadonlyArray<ParticipantId> =>
+  identity === undefined
+    ? []
+    : typeof identity === "string"
+      ? [identity]
+      : identity;
+
 /**
  * 사용자의 역할 및 권한 정보를 담은 RoomActor 획득
  * - 멤버 목록에 존재하지 않거나 userId가 없으면 GUEST(열람자) 역할 부여
  */
 export const getRoomActor = (
   room: TripRoom,
-  userId?: UserId
+  identity?: ParticipantIdentity
 ): RoomActor => {
-  const member = userId ? room.members.find((m) => m.id === userId) : undefined;
+  const participantIds = toParticipantIds(identity);
+  const matchingMembers = room.members.filter((member) =>
+    participantIds.includes(member.id)
+  );
+  const member =
+    matchingMembers.find(({ role }) => role === "HOST") ?? matchingMembers[0];
   let role: RoomRole = "GUEST";
 
   if (member) {
@@ -101,12 +120,12 @@ export const getRoomActor = (
  */
 export const requireRoomPermission = (
   room: TripRoom,
-  userId: UserId | undefined,
+  identity: ParticipantIdentity,
   action: RoomAction,
   customReason?: string
 ): Effect.Effect<RoomActor, UnauthorizedError> =>
   Effect.gen(function* () {
-    const actor = getRoomActor(room, userId);
+    const actor = getRoomActor(room, identity);
 
     if (!actor.can(action)) {
       let defaultReason = "해당 작업을 수행할 권한이 없습니다.";
@@ -129,12 +148,12 @@ export const requireRoomPermission = (
  */
 export const requireRoomRole = (
   room: TripRoom,
-  userId: UserId,
+  identity: ParticipantIdentity,
   allowedRoles: ReadonlyArray<RoomRole>,
   reason = "해당 작업을 수행할 수 있는 권한이 없습니다."
 ): Effect.Effect<RoomActor, UnauthorizedError> =>
   Effect.gen(function* () {
-    const actor = getRoomActor(room, userId);
+    const actor = getRoomActor(room, identity);
     if (!allowedRoles.includes(actor.role)) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));
     }
@@ -146,11 +165,16 @@ export const requireRoomRole = (
  */
 export const requireRoomMember = (
   room: TripRoom,
-  userId: UserId,
+  identity: ParticipantIdentity,
   reason = "여행방 참여자만 접근할 수 있습니다."
 ): Effect.Effect<TripMember, UnauthorizedError> =>
   Effect.gen(function* () {
-    const actor = yield* requireRoomPermission(room, userId, "opinion:submit", reason);
+    const actor = yield* requireRoomPermission(
+      room,
+      identity,
+      "opinion:submit",
+      reason
+    );
     if (!actor.member) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));
     }
@@ -162,11 +186,11 @@ export const requireRoomMember = (
  */
 export const requireRoomHost = (
   room: TripRoom,
-  userId: UserId,
+  identity: ParticipantIdentity,
   reason = "방장만 이 작업을 수행할 수 있습니다."
 ): Effect.Effect<TripMember, UnauthorizedError> =>
   Effect.gen(function* () {
-    const actor = yield* requireRoomRole(room, userId, ["HOST"], reason);
+    const actor = yield* requireRoomRole(room, identity, ["HOST"], reason);
     if (!actor.member) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));
     }
@@ -197,21 +221,25 @@ export const requirePlanInRoom = (
 export const isPlanAuthor = (
   room: TripRoom,
   plan: TripPlan,
-  userId?: UserId
+  identity?: ParticipantIdentity
 ): boolean => {
-  if (!userId) {
+  const participantIds = toParticipantIds(identity);
+  if (participantIds.length === 0) {
     return false;
   }
 
   if (plan.authorId !== undefined) {
-    return plan.authorId === userId;
+    return participantIds.includes(plan.authorId);
   }
 
   if (plan.authorName) {
     const matchingMembers = room.members.filter(
       (m) => m.name === plan.authorName
     );
-    if (matchingMembers.length === 1 && matchingMembers[0].id === userId) {
+    if (
+      matchingMembers.length === 1 &&
+      participantIds.includes(matchingMembers[0].id)
+    ) {
       return true;
     }
   }
@@ -252,17 +280,17 @@ export const hasResolvablePlanAuthor = (
 export const canManagePlan = (
   room: TripRoom,
   plan: TripPlan,
-  userId?: UserId
+  identity?: ParticipantIdentity
 ): boolean => {
-  if (!userId) {
+  if (toParticipantIds(identity).length === 0) {
     return false;
   }
 
-  if (isPlanAuthor(room, plan, userId)) {
+  if (isPlanAuthor(room, plan, identity)) {
     return true;
   }
 
-  const actor = getRoomActor(room, userId);
+  const actor = getRoomActor(room, identity);
   if (actor.isHost && !hasResolvablePlanAuthor(room, plan)) {
     return true;
   }
@@ -279,13 +307,13 @@ export const canManagePlan = (
 export const requirePlanAuthor = (
   room: TripRoom,
   plan: TripPlan,
-  userId: UserId,
+  identity: ParticipantIdentity,
   reason = "여행안 작성자만 수정하거나 삭제할 수 있습니다."
 ): Effect.Effect<RoomActor, UnauthorizedError> =>
   Effect.gen(function* () {
-    const actor = getRoomActor(room, userId);
+    const actor = getRoomActor(room, identity);
 
-    if (!canManagePlan(room, plan, userId)) {
+    if (!canManagePlan(room, plan, identity)) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));
     }
 
@@ -320,12 +348,12 @@ export const requireMutablePlan = (
 export const requirePlanAuthorOrHost = (
   room: TripRoom,
   plan: TripPlan,
-  userId: UserId,
+  identity: ParticipantIdentity,
   reason = "여행안 작성자 또는 방장만 수행할 수 있습니다."
 ): Effect.Effect<RoomActor, UnauthorizedError> =>
   Effect.gen(function* () {
-    const actor = getRoomActor(room, userId);
-    const isAuthor = isPlanAuthor(room, plan, userId);
+    const actor = getRoomActor(room, identity);
+    const isAuthor = isPlanAuthor(room, plan, identity);
 
     if (!isAuthor && !actor.isHost) {
       return yield* Effect.fail(new UnauthorizedError({ reason }));

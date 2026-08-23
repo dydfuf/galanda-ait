@@ -8,11 +8,11 @@ import {
   type PublicPlanMemberOpinion,
   type TripRoom,
 } from "../../core/domain/room.ts";
-import type { UserId } from "../../core/domain/ids.ts";
 import {
   isPlanAuthor,
   canManagePlan,
   getRoomActor,
+  type ParticipantIdentity,
   type RoomRole,
 } from "../../core/domain/auth-guards.ts";
 import type { BookingRiskItem } from "./components/BookingRiskSummary.tsx";
@@ -65,11 +65,11 @@ export interface PlanDetailViewModel {
 
 export const toPlanDetailViewModel = (
   room: TripRoom,
-  currentUserId?: UserId | string
+  currentUserIds?: ParticipantIdentity
 ): PlanDetailViewModel => {
   const confirmed = getConfirmedPlan(room);
   const isConfirmed = Boolean(room.confirmedPlanId);
-  const viewer = getRoomActor(room, currentUserId as UserId | undefined);
+  const viewer = getRoomActor(room, currentUserIds);
 
   let decisionStatusText = "여행안을 고르고 있어요";
   let decisionSubText = "후보 여행안을 살펴보고 의견을 남겨보세요.";
@@ -250,13 +250,17 @@ export const toPlanDetailViewModel = (
     const okayCount = privateOpinions.filter((m) => m.reaction === "OKAY").length;
     const hardCount = privateOpinions.filter((m) => m.reaction === "HARD").length;
 
-    const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
-    const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
+    const isAuthor = isPlanAuthor(room, p, currentUserIds);
+    const canManage = canManagePlan(room, p, currentUserIds);
 
     // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
     // (하드코딩된 로컬 사용자 폴백은 남의 의견을 내 것으로 표시하므로 사용하지 않는다)
-    const myOpinion = currentUserId
-      ? privateOpinions.find((m) => m.userId === currentUserId)
+    const myOpinion = currentUserIds
+      ? privateOpinions.find((opinion) =>
+          typeof currentUserIds === "string"
+            ? opinion.userId === currentUserIds
+            : currentUserIds.includes(opinion.userId)
+        )
       : undefined;
 
     return {

@@ -91,7 +91,7 @@ export function ItineraryPage(): JSX.Element {
     );
   }
 
-  const viewModel = toItineraryViewModel(rawRoom, session?.userId);
+  const viewModel = toItineraryViewModel(rawRoom, session?.participantId);
 
   if (!viewModel.isConfirmed || !viewModel.confirmedPlanId) {
     return (

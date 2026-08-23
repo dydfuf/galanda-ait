@@ -4,6 +4,7 @@ import { makeBetterAuth, type BetterAuthEnv } from "./infrastructure/auth/better
 import {
   authSessionMiddleware,
   createAuthSessionMiddleware,
+  type ResolveParticipantIdentity,
 } from "./infrastructure/auth/session-middleware.ts";
 import {
   createRequestDatabaseMiddleware,
@@ -31,6 +32,7 @@ export interface AppEnv {
 
 export interface AppDependencies {
   readonly makeAuth?: typeof makeBetterAuth;
+  readonly resolveParticipantIdentity?: ResolveParticipantIdentity;
   readonly withDatabase?: WithDatabase;
 }
 
@@ -39,9 +41,13 @@ export function createApp(dependencies: AppDependencies = {}) {
   const databaseMiddleware = dependencies.withDatabase
     ? createRequestDatabaseMiddleware(dependencies.withDatabase)
     : requestDatabaseMiddleware;
-  const sessionMiddleware = dependencies.makeAuth
-    ? createAuthSessionMiddleware(dependencies.makeAuth)
-    : authSessionMiddleware;
+  const sessionMiddleware =
+    dependencies.makeAuth || dependencies.resolveParticipantIdentity
+      ? createAuthSessionMiddleware(
+          dependencies.makeAuth,
+          dependencies.resolveParticipantIdentity
+        )
+      : authSessionMiddleware;
 
   app.use("*", async (c, next) => {
     const upstreamId =
@@ -74,6 +80,18 @@ export function createApp(dependencies: AppDependencies = {}) {
   app.use("/api/*", sessionMiddleware);
 
   app.route("/api/health", healthRoute);
+  app.get("/api/session", (c) =>
+    c.var.authSessionError
+      ? c.json(
+          formatApiError({
+            code: "AUTH_SERVICE_UNAVAILABLE",
+            message: "인증 서비스를 일시적으로 사용할 수 없습니다.",
+            requestId: c.var.requestId,
+          }),
+          503
+        )
+      : c.json(c.var.authSession ?? null)
+  );
   app.route("/api/trips", tripsRoute);
 
   app.notFound((c) => {

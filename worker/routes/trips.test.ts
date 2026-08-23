@@ -1,6 +1,7 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
 import { describe, expect, it } from "vitest";
 import {
+  ParticipantIdSchema,
   PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
@@ -71,6 +72,7 @@ const makeApp = (
       config: { readonly text: string },
       params: unknown[] = []
     ) => {
+      if (config.text.includes('from "participant_alias"')) return { rows: [] };
       calls.push({ text: config.text, params });
       return { rows: responses.shift() ?? [] };
     },
@@ -89,7 +91,17 @@ const makeApp = (
     run
   ) => run(db as DatabaseHandle);
 
-  return { app: createApp({ makeAuth, withDatabase }), calls };
+  return {
+    app: createApp({
+      makeAuth,
+      withDatabase,
+      resolveParticipantIdentity: async (_db, authUserId) => {
+        const participantId = ParticipantIdSchema.make(authUserId);
+        return { participantId, participantIds: [participantId] };
+      },
+    }),
+    calls,
+  };
 };
 
 const request = (path: string, init?: RequestInit) =>
@@ -148,9 +160,7 @@ describe("Trip API vertical slice", () => {
     expect(calls[2].params).toContain(
       JSON.stringify([{ id: hostId, name: "Host", role: "HOST" }])
     );
-    expect(calls[4].text).toContain(
-      'where ("trip_rooms"."id" = $2 and "trip_rooms"."revision" = $3)'
-    );
+    expect(calls[4].params.slice(-2)).toEqual([room.id, room.revision]);
   });
 
   it("create DTO의 서버 소유 필드를 거부한다", async () => {
@@ -201,7 +211,6 @@ describe("Trip API vertical slice", () => {
     };
     const { app, calls } = makeApp([
       [rowValues(room)],
-      [rowValues(room)],
       [rowValues(created)],
     ]);
 
@@ -219,7 +228,7 @@ describe("Trip API vertical slice", () => {
     );
 
     expect(response.status).toBe(201);
-    const persistedPlans = JSON.parse(calls[2].params[0] as string) as TripPlan[];
+    const persistedPlans = JSON.parse(calls[1].params[3] as string) as TripPlan[];
     expect(persistedPlans[0]).toMatchObject({
       title: "첫 여행안",
       authorId: hostId,

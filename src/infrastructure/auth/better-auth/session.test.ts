@@ -27,7 +27,9 @@ describe("Better Auth SessionService adapter", () => {
     );
 
     expect(session).toEqual({
-      userId: "user-better-auth",
+      participantId: "user-better-auth",
+      participantIds: ["user-better-auth"],
+      accountType: "REGISTERED",
       name: "user@example.com",
       isAuthenticated: true,
     });
@@ -58,9 +60,22 @@ describe("Better Auth SessionService adapter", () => {
     expect(
       normalizeBetterAuthSession({ user: { id: "user-1", name: "사용자" } })
     ).toEqual({
-      userId: "user-1",
+      participantId: "user-1",
+      participantIds: ["user-1"],
+      accountType: "REGISTERED",
       name: "사용자",
       isAuthenticated: true,
+    });
+  });
+
+  it("marks Better Auth anonymous users as Guest accounts", () => {
+    expect(
+      normalizeBetterAuthSession({
+        user: { id: "guest-1", name: "Anonymous", isAnonymous: true },
+      })
+    ).toMatchObject({
+      participantId: "guest-1",
+      accountType: "GUEST",
     });
   });
 });

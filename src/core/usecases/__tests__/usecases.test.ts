@@ -117,7 +117,9 @@ describe("UseCases Error Propagation", () => {
       getRooms: () => Effect.succeed([room]),
     } as any);
     const MemberSessionLayer = createLocalSessionLayer({
-      userId: UserIdSchema.make("user-me"),
+      participantId: UserIdSchema.make("user-me"),
+      participantIds: [UserIdSchema.make("user-me")],
+      accountType: "REGISTERED",
       name: "나",
       isAuthenticated: true,
     });
@@ -137,7 +139,9 @@ describe("UseCases Error Propagation", () => {
           Layer.merge(
             RepoLayer,
             createLocalSessionLayer({
-              userId: UserIdSchema.make("anonymous"),
+              participantId: UserIdSchema.make("anonymous"),
+              participantIds: [UserIdSchema.make("anonymous")],
+              accountType: "GUEST",
               name: "게스트",
               isAuthenticated: false,
             })

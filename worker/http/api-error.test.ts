@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AccountUpgradeRequiredError,
   ConflictError,
   NotFoundError,
   RepositoryError,
@@ -48,6 +49,15 @@ describe("api-error", () => {
     expect(result.status).toBe(401);
     expect(result.body.error.code).toBe("UNAUTHORIZED");
     expect(result.body.error.message).toBe("Custom reason");
+  });
+
+  it("maps AccountUpgradeRequiredError", () => {
+    const result = mapDomainError(
+      new AccountUpgradeRequiredError({ reason: "소셜 계정을 연결해 주세요." }),
+      reqId
+    );
+    expect(result.status).toBe(403);
+    expect(result.body.error.code).toBe("ACCOUNT_UPGRADE_REQUIRED");
   });
 
   it("maps NotFoundError", () => {

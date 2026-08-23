@@ -24,6 +24,11 @@ export class UnauthorizedError extends Schema.TaggedError<UnauthorizedError>()(
   }
 ) {}
 
+export class AccountUpgradeRequiredError extends Schema.TaggedError<AccountUpgradeRequiredError>()(
+  "AccountUpgradeRequiredError",
+  { reason: Schema.String }
+) {}
+
 export class ValidationError extends Schema.TaggedError<ValidationError>()(
   "ValidationError",
   {
@@ -50,4 +55,3 @@ export class RepositoryError extends Schema.TaggedError<RepositoryError>()(
     message: Schema.String,
   }
 ) {}
-

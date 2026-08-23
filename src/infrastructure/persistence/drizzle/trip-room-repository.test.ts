@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ConflictError } from "../../../core/domain/errors.ts";
 import {
   RevisionSchema,
+  PlanIdSchema,
   TripIdSchema,
   UserIdSchema,
 } from "../../../core/domain/ids.ts";
@@ -14,6 +15,79 @@ import * as schema from "./schema/index.ts";
 import { TripRoomRepositoryLive } from "./trip-room-repository.ts";
 
 describe("TripRoomRepositoryLive", () => {
+  it("resolves participant aliases before exposing a room", async () => {
+    const guestId = UserIdSchema.make("guest-1");
+    const registeredId = UserIdSchema.make("registered-1");
+    const room: TripRoom = {
+      id: TripIdSchema.make("room-alias"),
+      title: "제주 여행",
+      destination: "제주",
+      revision: RevisionSchema.make(1),
+      members: [
+        { id: guestId, name: "용열", role: "MEMBER" },
+        { id: registeredId, name: "계정 이름", role: "HOST" },
+      ],
+      plans: [
+        {
+          id: PlanIdSchema.make("plan-1"),
+          title: "기본안",
+          status: "DRAFT",
+          authorId: registeredId,
+          authorName: "계정 이름",
+          places: [],
+          memberOpinions: [
+            { userId: registeredId, userName: "계정 이름", reaction: "LIKE" },
+            { userId: guestId, userName: "용열", reaction: "HARD", reason: "멀어요" },
+          ],
+          voteCount: 1,
+        },
+      ],
+      confirmedPlanId: undefined,
+    };
+    const client = {
+      query: async (config: { readonly text: string }) => ({
+        rows: config.text.includes('from "participant_alias"')
+          ? [[registeredId, guestId]]
+          : [[
+              room.id,
+              room.title,
+              room.destination,
+              room.revision,
+              room.members,
+              room.plans,
+              null,
+              "2026-08-23T00:00:00.000Z",
+              "2026-08-23T00:00:00.000Z",
+            ]],
+      }),
+    };
+    const db = drizzle(client as unknown as NodePgClient, { schema });
+    const result = await Effect.runPromise(
+      Effect.gen(function* () {
+        const repository = yield* TripRoomRepository;
+        return yield* repository.getRoom(room.id);
+      }).pipe(
+        Effect.provide(
+          TripRoomRepositoryLive.pipe(
+            Layer.provide(Layer.succeed(Database, { db }))
+          )
+        )
+      )
+    );
+
+    expect(result.members).toEqual([
+      { id: guestId, name: "용열", role: "HOST" },
+    ]);
+    expect(result.plans[0]).toMatchObject({
+      authorId: guestId,
+      authorName: "용열",
+      voteCount: 0,
+      memberOpinions: [
+        { userId: guestId, userName: "용열", reaction: "HARD", reason: "멀어요" },
+      ],
+    });
+  });
+
   it("revision 조건을 포함한 단일 UPDATE로 CAS하고 stale 쓰기를 ConflictError로 거부한다", async () => {
     const room: TripRoom = {
       id: TripIdSchema.make("room-1"),
@@ -53,6 +127,7 @@ describe("TripRoomRepositoryLive", () => {
         config: { readonly text: string },
         params: unknown[] = []
       ) => {
+        if (config.text.includes('from "participant_alias"')) return { rows: [] };
         calls.push({ text: config.text, params });
         return { rows: responses.shift() ?? [] };
       },

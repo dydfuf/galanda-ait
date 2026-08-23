@@ -1,7 +1,9 @@
 import { memoryAdapter } from "@better-auth/memory-adapter";
 import { betterAuth } from "better-auth/minimal";
+import { anonymous } from "better-auth/plugins";
 import { describe, expect, it } from "vitest";
 import { requireAuthSession } from "../src/core/ports/session.ts";
+import { ParticipantIdSchema } from "../src/core/domain/ids.ts";
 import type { DatabaseHandle } from "../src/infrastructure/persistence/drizzle/database.ts";
 import { runEffect } from "./http/effect-handler.ts";
 import {
@@ -23,7 +25,8 @@ const createAuthFixture = () =>
     }),
     baseURL,
     secret: "test-secret-that-is-long-enough-for-better-auth",
-    emailAndPassword: { enabled: true },
+    emailAndPassword: { enabled: false },
+    plugins: [anonymous()],
   });
 
 const createTestApp = () => {
@@ -54,7 +57,14 @@ const createTestApp = () => {
     _requestEnv,
     run
   ) => run(databaseHandle);
-  const app = createApp({ makeAuth, withDatabase });
+  const app = createApp({
+    makeAuth,
+    withDatabase,
+    resolveParticipantIdentity: async (_db, authUserId) => {
+      const participantId = ParticipantIdSchema.make(authUserId);
+      return { participantId, participantIds: [participantId] };
+    },
+  });
 
   app.get("/api/protected", (c) =>
     runEffect(c, requireAuthSession())
@@ -80,22 +90,15 @@ const request = (
 };
 
 describe("Better Auth Worker integration", () => {
-  it("mounts auth, preserves its cookie, and signs out", async () => {
+  it("creates an anonymous Guest session, preserves its cookie, and signs out", async () => {
     const { app } = createTestApp();
-    const signup = await app.fetch(
-      request("/api/auth/sign-up/email", {
-        method: "POST",
-        body: JSON.stringify({
-          name: "테스트 사용자",
-          email: "test@example.com",
-          password: "correct-horse-battery-staple",
-        }),
-      }),
+    const signIn = await app.fetch(
+      request("/api/auth/sign-in/anonymous", { method: "POST" }),
       env
     );
 
-    expect(signup.status).toBe(200);
-    const setCookie = signup.headers.get("set-cookie");
+    expect(signIn.status).toBe(200);
+    const setCookie = signIn.headers.get("set-cookie");
     expect(setCookie).toContain("better-auth");
     const cookie = setCookie?.split(";")[0];
     expect(cookie).toBeTruthy();
@@ -103,10 +106,9 @@ describe("Better Auth Worker integration", () => {
     const session = await app.fetch(request("/api/auth/get-session", {}, cookie), env);
     expect(session.status).toBe(200);
     expect(
-      ((await session.json()) as { user?: { email?: string } }).user?.email
-    ).toBe(
-      "test@example.com"
-    );
+      ((await session.json()) as { user?: { isAnonymous?: boolean } }).user
+        ?.isAnonymous
+    ).toBe(true);
 
     const signout = await app.fetch(
       request("/api/auth/sign-out", { method: "POST" }, cookie),
@@ -124,18 +126,11 @@ describe("Better Auth Worker integration", () => {
   it("resolves the application session once and provides SessionService to Effect", async () => {
     const { app, databaseHandle, getAuthDatabaseHandles, getSessionLookups } =
       createTestApp();
-    const signup = await app.fetch(
-      request("/api/auth/sign-up/email", {
-        method: "POST",
-        body: JSON.stringify({
-          name: "Effect 사용자",
-          email: "effect@example.com",
-          password: "correct-horse-battery-staple",
-        }),
-      }),
+    const signIn = await app.fetch(
+      request("/api/auth/sign-in/anonymous", { method: "POST" }),
       env
     );
-    const cookie = signup.headers.get("set-cookie")?.split(";")[0];
+    const cookie = signIn.headers.get("set-cookie")?.split(";")[0];
     expect(cookie).toBeTruthy();
 
     const protectedResponse = await app.fetch(
@@ -145,7 +140,9 @@ describe("Better Auth Worker integration", () => {
 
     expect(protectedResponse.status).toBe(200);
     await expect(protectedResponse.json()).resolves.toMatchObject({
-      name: "Effect 사용자",
+      participantId: expect.any(String),
+      accountType: "GUEST",
+      name: "Anonymous",
       isAuthenticated: true,
     });
     expect(getSessionLookups()).toBe(1);
@@ -162,6 +159,12 @@ describe("Better Auth Worker integration", () => {
       env
     );
     expect(unauthenticatedResponse.status).toBe(401);
+    const optionalSession = await unauthenticated.app.fetch(
+      request("/api/session"),
+      env
+    );
+    expect(optionalSession.status).toBe(200);
+    await expect(optionalSession.json()).resolves.toBeNull();
 
     const auth = createAuthFixture();
     const failingAuth = {
@@ -179,6 +182,10 @@ describe("Better Auth Worker integration", () => {
     const failingApp = createApp({
       makeAuth: makeFailingAuth,
       withDatabase: async (_requestEnv, run) => run({} as DatabaseHandle),
+      resolveParticipantIdentity: async (_db, authUserId) => {
+        const participantId = ParticipantIdSchema.make(authUserId);
+        return { participantId, participantIds: [participantId] };
+      },
     });
     failingApp.get("/api/protected", (c) =>
       runEffect(c, requireAuthSession())
@@ -189,5 +196,13 @@ describe("Better Auth Worker integration", () => {
       env
     );
     expect(failureResponse.status).toBe(503);
+    const failedOptionalSession = await failingApp.fetch(
+      request("/api/session"),
+      env
+    );
+    expect(failedOptionalSession.status).toBe(503);
+    await expect(failedOptionalSession.json()).resolves.toMatchObject({
+      error: { code: "AUTH_SERVICE_UNAVAILABLE" },
+    });
   });
 });

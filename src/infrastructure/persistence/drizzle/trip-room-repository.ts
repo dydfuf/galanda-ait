@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import {
   ConflictError,
@@ -7,6 +7,7 @@ import {
 } from "../../../core/domain/errors.ts";
 import {
   RevisionSchema,
+  ParticipantIdSchema,
   type Revision,
   type TripId,
 } from "../../../core/domain/ids.ts";
@@ -15,6 +16,7 @@ import {
   type TripPlan,
   type TripRoom,
 } from "../../../core/domain/room.ts";
+import { mergeParticipantIdentityInRoom } from "../../../core/domain/room-transitions.ts";
 import {
   TripRoomRepository,
   type CreateRoomParams,
@@ -26,6 +28,7 @@ import {
   type NewTripRoomRow,
   type TripRoomRow,
 } from "./schema/trip-room.ts";
+import { participantAliases } from "./schema/participant.ts";
 
 type RoomChanges = Partial<
   Pick<
@@ -67,6 +70,55 @@ const decodeRoom = (
     )
   );
 
+const resolveParticipantAliases = (
+  db: DatabaseHandle,
+  rooms: ReadonlyArray<TripRoom>,
+  operation: string
+): Effect.Effect<ReadonlyArray<TripRoom>, RepositoryError> =>
+  Effect.gen(function* () {
+    const ids = [
+      ...new Set(
+        rooms.flatMap((room) => [
+          ...room.members.map(({ id }) => id),
+          ...room.plans.flatMap((plan) => [
+            ...(plan.authorId ? [plan.authorId] : []),
+            ...(plan.memberOpinions ?? []).map(({ userId }) => userId),
+          ]),
+        ])
+      ),
+    ];
+    if (ids.length === 0) return rooms;
+
+    const aliases = yield* databaseEffect(`${operation}.aliases`, () =>
+      db
+        .select({
+          aliasParticipantId: participantAliases.aliasParticipantId,
+          canonicalParticipantId: participantAliases.canonicalParticipantId,
+        })
+        .from(participantAliases)
+        .where(inArray(participantAliases.aliasParticipantId, ids))
+    );
+    const groups = new Map<string, Array<typeof ParticipantIdSchema.Type>>();
+    for (const alias of aliases) {
+      const canonical = ParticipantIdSchema.make(alias.canonicalParticipantId);
+      const group = groups.get(canonical) ?? [canonical];
+      group.push(ParticipantIdSchema.make(alias.aliasParticipantId));
+      groups.set(canonical, group);
+    }
+
+    return rooms.map((room) =>
+      [...groups.entries()].reduce(
+        (current, [canonical, participantIds]) =>
+          mergeParticipantIdentityInRoom(
+            current,
+            ParticipantIdSchema.make(canonical),
+            participantIds
+          ),
+        room
+      )
+    );
+  });
+
 const findRoom = (
   db: DatabaseHandle,
   roomId: TripId,
@@ -81,7 +133,8 @@ const findRoom = (
         new NotFoundError({ entity: "TripRoom", id: roomId })
       );
     }
-    return yield* decodeRoom(row, operation);
+    const room = yield* decodeRoom(row, operation);
+    return (yield* resolveParticipantAliases(db, [room], operation))[0];
   });
 
 const findRevision = (
@@ -123,7 +176,10 @@ const compareAndSet = (
         .returning()
     );
 
-    if (row) return yield* decodeRoom(row, operation);
+    if (row) {
+      const room = yield* decodeRoom(row, operation);
+      return (yield* resolveParticipantAliases(db, [room], operation))[0];
+    }
 
     const actualRevision = yield* findRevision(
       db,
@@ -159,9 +215,10 @@ export const TripRoomRepositoryLive: Layer.Layer<
           const rows = yield* databaseEffect("getRooms", () =>
             db.select().from(tripRooms).orderBy(desc(tripRooms.createdAt))
           );
-          return yield* Effect.all(
+          const rooms = yield* Effect.all(
             rows.map((row) => decodeRoom(row, "getRooms"))
           );
+          return yield* resolveParticipantAliases(db, rooms, "getRooms");
         }),
 
       getRoom: (roomId: TripId) => findRoom(db, roomId, "getRoom"),

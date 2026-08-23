@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import { SessionService, type SessionLookupError } from "../../../core/ports/session.ts";
-import { UserIdSchema } from "../../../core/domain/ids.ts";
+import { ParticipantIdSchema } from "../../../core/domain/ids.ts";
+import type { ParticipantIdentity } from "./participant-identity.ts";
 import {
   SessionUnavailableError,
   UnauthorizedError,
@@ -12,13 +13,19 @@ export interface BetterAuthSession {
     readonly id: string;
     readonly name?: string | null;
     readonly email?: string | null;
+    readonly isAnonymous?: boolean | null;
   };
 }
 
 export const normalizeBetterAuthSession = (
-  session: BetterAuthSession
+  session: BetterAuthSession,
+  identity: ParticipantIdentity = {
+    participantId: ParticipantIdSchema.make(session.user.id),
+    participantIds: [ParticipantIdSchema.make(session.user.id)],
+  }
 ): UserSession => ({
-  userId: UserIdSchema.make(session.user.id),
+  ...identity,
+  accountType: session.user.isAnonymous ? "GUEST" : "REGISTERED",
   name: session.user.name ?? session.user.email ?? "사용자",
   isAuthenticated: true,
 });

@@ -12,7 +12,9 @@ import type { TripRoom, UserSession } from "../../domain/room.ts";
 
 describe("Application / Effect Boundary: IdGenerator & Clock", () => {
   const aliceSession: UserSession = {
-    userId: UserIdSchema.make("user-alice"),
+    participantId: UserIdSchema.make("user-alice"),
+    participantIds: [UserIdSchema.make("user-alice")],
+    accountType: "REGISTERED",
     name: "앨리스",
     isAuthenticated: true,
   };
@@ -56,7 +58,15 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         return Effect.succeed(updated);
       },
       updatePlan: () => Effect.die("not implemented"),
-      saveRoom: () => Effect.die("not implemented"),
+      saveRoom: (nextRoom, expectedRevision) => {
+        const idx = rooms.findIndex((room) => room.id === nextRoom.id);
+        const updated: TripRoom = {
+          ...nextRoom,
+          revision: RevisionSchema.make(expectedRevision + 1),
+        };
+        rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
+        return Effect.succeed(updated);
+      },
     });
   };
 
@@ -139,7 +149,7 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         title: "플랜 테스트 방",
         destination: "서울",
         revision: RevisionSchema.make(1),
-        members: [{ id: aliceSession.userId, name: aliceSession.name, role: "HOST" }],
+        members: [{ id: aliceSession.participantId, name: aliceSession.name, role: "HOST" }],
         plans: [],
         confirmedPlanId: undefined,
       };
@@ -162,7 +172,7 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
       expect(updatedRoom.plans).toHaveLength(1);
       expect(updatedRoom.plans[0].id).toBe("plan-test-001");
       expect(updatedRoom.plans[0].title).toBe("알찬 3박 4일 코스");
-      expect(updatedRoom.plans[0].authorId).toBe(aliceSession.userId);
+      expect(updatedRoom.plans[0].authorId).toBe(aliceSession.participantId);
     });
   });
 

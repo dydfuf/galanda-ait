@@ -8,7 +8,10 @@ import {
   requireRoomHost,
 } from "../domain/auth-guards.ts";
 import { getPlanDateRange } from "../domain/room.ts";
-import { confirmPlanInRoom } from "../domain/room-transitions.ts";
+import {
+  confirmPlanInRoom,
+  mergeParticipantIdentityInRoom,
+} from "../domain/room-transitions.ts";
 import { ConflictError, ValidationError } from "../domain/errors.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
@@ -24,12 +27,16 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
 
     // 2. 방 조회
     const repo = yield* TripRoomRepository;
-    const room = yield* repo.getRoom(roomId);
+    const room = mergeParticipantIdentityInRoom(
+      yield* repo.getRoom(roomId),
+      session.participantId,
+      session.participantIds
+    );
 
     // 3. RBAC: 확정은 방장만 수행할 수 있다.
     yield* requireRoomHost(
       room,
-      session.userId,
+      session.participantIds,
       "방장만 여행안을 확정할 수 있습니다."
     );
 
