@@ -59,6 +59,16 @@ export function mapDomainError(
           }),
         };
 
+      case "InvalidInviteError":
+        return {
+          status: 404,
+          body: formatApiError({
+            code: "INVITE_INVALID",
+            message: "초대 링크가 만료되었거나 유효하지 않습니다.",
+            requestId,
+          }),
+        };
+
       case "NotFoundError":
         return {
           status: 404,

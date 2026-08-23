@@ -1,18 +1,24 @@
 import { Effect, Layer } from "effect";
 import { IdGenerator } from "../core/ports/id-generator.ts";
-import { PlanIdSchema, TripIdSchema } from "../core/domain/ids.ts";
+import {
+  InviteTokenSchema,
+  PlanIdSchema,
+  TripIdSchema,
+} from "../core/domain/ids.ts";
 
 export const IdGeneratorLive: Layer.Layer<IdGenerator> = Layer.succeed(
   IdGenerator,
   IdGenerator.of({
     tripId: Effect.sync(() => TripIdSchema.make(crypto.randomUUID())),
     planId: Effect.sync(() => PlanIdSchema.make(crypto.randomUUID())),
+    inviteToken: Effect.sync(() => InviteTokenSchema.make(crypto.randomUUID())),
   })
 );
 
 export const createTestIdGenerator = (overrides?: {
   readonly tripId?: string;
   readonly planId?: string;
+  readonly inviteToken?: string;
 }): Layer.Layer<IdGenerator> =>
   Layer.succeed(
     IdGenerator,
@@ -22,6 +28,11 @@ export const createTestIdGenerator = (overrides?: {
       ),
       planId: Effect.succeed(
         PlanIdSchema.make(overrides?.planId ?? "plan-test-001")
+      ),
+      inviteToken: Effect.succeed(
+        InviteTokenSchema.make(
+          overrides?.inviteToken ?? "00000000-0000-4000-8000-000000000001"
+        )
       ),
     })
   );

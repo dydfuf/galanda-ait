@@ -9,6 +9,7 @@ import {
 } from "../../src/core/domain/ids.ts";
 import type { TripPlan } from "../../src/core/domain/room.ts";
 import type { IdGenerator } from "../../src/core/ports/id-generator.ts";
+import type { InviteRepository } from "../../src/core/ports/invite-repository.ts";
 import type { SessionService } from "../../src/core/ports/session.ts";
 import type { TripRoomRepository } from "../../src/core/ports/trip-room-repository.ts";
 import {
@@ -30,14 +31,21 @@ import {
 import { submitOpinion } from "../../src/core/usecases/submit-opinion.ts";
 import { updateTripRoom } from "../../src/core/usecases/update-room.ts";
 import { IdGeneratorLive } from "../../src/infrastructure/id-generator.ts";
+import { InviteRepositoryLive } from "../../src/infrastructure/persistence/drizzle/invite-repository.ts";
 import { Database } from "../../src/infrastructure/persistence/drizzle/database.ts";
 import { TripRoomRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-room-repository.ts";
 import type { AppEnv } from "../app.ts";
 import { runEffect } from "../http/effect-handler.ts";
 import { effectValidator } from "../http/effect-validator.ts";
 import type { RequestScopeService } from "../http/request-scope.ts";
+import {
+  getPublicInviteSummary,
+  issueTripInvite,
+  revokeTripInvite,
+} from "../../src/core/usecases/invite.ts";
 
 const TripParamsSchema = Schema.Struct({ tripId: TripIdSchema });
+const PublicInviteParamsSchema = Schema.Struct({ inviteToken: Schema.String });
 const PlanParamsSchema = Schema.Struct({
   tripId: TripIdSchema,
   planId: PlanIdSchema,
@@ -74,6 +82,7 @@ type TripRequirements =
   | RequestScopeService
   | SessionService
   | TripRoomRepository
+  | InviteRepository
   | IdGenerator;
 
 const runTripEffect = <A, E>(
@@ -95,7 +104,7 @@ const runTripEffect = <A, E>(
   }
 
   const services = Layer.merge(
-    TripRoomRepositoryLive.pipe(
+    Layer.merge(TripRoomRepositoryLive, InviteRepositoryLive).pipe(
       Layer.provide(Layer.succeed(Database, { db }))
     ),
     IdGeneratorLive
@@ -104,6 +113,17 @@ const runTripEffect = <A, E>(
 };
 
 export const tripsRoute = new Hono<AppEnv>();
+export const invitesRoute = new Hono<AppEnv>();
+
+invitesRoute.get(
+  "/:inviteToken",
+  effectValidator("param", PublicInviteParamsSchema),
+  (c) =>
+    runTripEffect(
+      c,
+      getPublicInviteSummary(c.req.valid("param").inviteToken)
+    )
+);
 
 tripsRoute.get("/", (c) => runTripEffect(c, getTripRooms()));
 
@@ -230,4 +250,16 @@ tripsRoute.post(
       c,
       joinTripRoom({ roomId: c.req.valid("param").tripId })
     )
+);
+
+tripsRoute.post(
+  "/:tripId/invites",
+  effectValidator("param", TripParamsSchema),
+  (c) => runTripEffect(c, issueTripInvite(c.req.valid("param").tripId), 201)
+);
+
+tripsRoute.delete(
+  "/:tripId/invites",
+  effectValidator("param", TripParamsSchema),
+  (c) => runTripEffect(c, revokeTripInvite(c.req.valid("param").tripId))
 );
