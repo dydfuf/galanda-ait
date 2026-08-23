@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import type { PlanId, Revision, TripId } from "../core/domain/ids.ts";
 import {
   TripRoomSchema,
+  UserSessionSchema,
   type TripPlan,
   type UserSession,
 } from "../core/domain/room.ts";
@@ -9,17 +10,6 @@ import type { UpdateRoomParams } from "../core/ports/trip-room-repository.ts";
 import type { CreateRoomInput } from "../core/usecases/create-room.ts";
 import type { CreatePlanCommand } from "../core/usecases/save-plan.ts";
 import type { SubmitPlanOpinionInput } from "../core/usecases/submit-opinion.ts";
-import { normalizeBetterAuthSession } from "../infrastructure/auth/better-auth/session.ts";
-
-const BetterAuthSessionSchema = Schema.NullOr(
-  Schema.Struct({
-    user: Schema.Struct({
-      id: Schema.String,
-      name: Schema.optional(Schema.NullOr(Schema.String)),
-      email: Schema.optional(Schema.NullOr(Schema.String)),
-    }),
-  })
-);
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -89,13 +79,20 @@ const planPath = (tripId: TripId, planId: PlanId): string =>
 export const getCurrentSession = async (
   signal?: AbortSignal
 ): Promise<UserSession | null> => {
-  const session = await requestJson(
-    "/api/auth/get-session",
-    BetterAuthSessionSchema,
-    { signal }
-  );
-  return session ? normalizeBetterAuthSession(session) : null;
+  return requestJson("/api/session", Schema.NullOr(UserSessionSchema), {
+    signal,
+  });
 };
+
+export const signInAnonymously = () =>
+  requestJson(
+    "/api/auth/sign-in/anonymous",
+    Schema.Struct({
+      token: Schema.String,
+      user: Schema.Struct({ id: Schema.String }),
+    }),
+    { method: "POST" }
+  );
 
 export const getTrips = (signal?: AbortSignal) =>
   requestJson("/api/trips", Schema.Array(TripRoomSchema), { signal });

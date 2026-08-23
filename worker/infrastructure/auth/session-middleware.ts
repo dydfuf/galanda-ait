@@ -5,9 +5,14 @@ import {
   normalizeBetterAuthSession,
   type BetterAuthSession,
 } from "../../../src/infrastructure/auth/better-auth/session.ts";
+import { ensureParticipantIdentity } from "../../../src/infrastructure/auth/better-auth/participant-identity.ts";
+
+export type ResolveParticipantIdentity = typeof ensureParticipantIdentity;
 
 export const createAuthSessionMiddleware = (
-  createAuth: typeof makeBetterAuth = makeBetterAuth
+  createAuth: typeof makeBetterAuth = makeBetterAuth,
+  resolveParticipantIdentity: ResolveParticipantIdentity =
+    ensureParticipantIdentity
 ) =>
   createMiddleware<AppEnv>(async (c, next) => {
     if (
@@ -33,7 +38,12 @@ export const createAuthSessionMiddleware = (
       ).api.getSession({ headers: c.req.raw.headers });
       c.set(
         "authSession",
-        session ? normalizeBetterAuthSession(session as BetterAuthSession) : null
+        session
+          ? normalizeBetterAuthSession(
+              session as BetterAuthSession,
+              await resolveParticipantIdentity(c.var.database, session.user.id)
+            )
+          : null
       );
     } catch (error) {
       c.set("authSession", null);

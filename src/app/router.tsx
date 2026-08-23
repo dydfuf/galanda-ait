@@ -14,6 +14,7 @@ import { PlanEditPage } from "../features/plan-editor/PlanEditPage.tsx";
 import { PlanComparePage } from "../features/plan-compare/PlanComparePage.tsx";
 import { ItineraryPage } from "../features/itinerary/ItineraryPage.tsx";
 import { NotFoundPage } from "../pages/NotFoundPage.tsx";
+import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { platformOnlyRoutes } from "../platform/index.ts";
 
 export function AppRouter() {
@@ -22,6 +23,7 @@ export function AppRouter() {
       <Route element={<AppRootLayout />}>
         {/* 루트 -> 여행 목록 리다이렉트 */}
         <Route path="/" element={<Navigate to="/trips" replace />} />
+        <Route path="/login" element={<LoginPage />} />
 
         {/* 여행 목록 및 생성 */}
         <Route path="/trips" element={<TripListPage />} />

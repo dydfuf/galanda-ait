@@ -27,7 +27,7 @@ export const joinTripRoom = Effect.fn("joinTripRoom")(
 
     // 3. 세션 사용자의 userId 및 name으로 멱등 상태 전이
     const member: TripMember = {
-      id: session.userId,
+      id: session.participantId,
       name: session.name,
       role: "MEMBER",
     };

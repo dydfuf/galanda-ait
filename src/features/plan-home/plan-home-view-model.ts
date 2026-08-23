@@ -1,6 +1,9 @@
 import { getConfirmedPlan, getPlanDateRange, getPlanNightCount, getTripRoomDisplayDate, type TripRoom } from "../../core/domain/room.ts";
-import type { UserId } from "../../core/domain/ids.ts";
-import { isPlanAuthor, canManagePlan } from "../../core/domain/auth-guards.ts";
+import {
+  isPlanAuthor,
+  canManagePlan,
+  type ParticipantIdentity,
+} from "../../core/domain/auth-guards.ts";
 
 export interface PlanOpinionCounts {
   readonly likeCount: number;
@@ -58,7 +61,7 @@ export const getTripListStatusText = (
 
 export const toTripRoomViewModel = (
   room: TripRoom,
-  currentUserId?: UserId | string
+  currentUserIds?: ParticipantIdentity
 ): TripRoomViewModel => {
   const confirmed = getConfirmedPlan(room);
   const isConfirmed = Boolean(room.confirmedPlanId);
@@ -102,12 +105,16 @@ export const toTripRoomViewModel = (
       ? p.memberOpinions.filter((m) => m.reaction === "HARD").length
       : 0;
 
-    const isAuthor = isPlanAuthor(room, p, currentUserId as UserId | undefined);
-    const canManage = canManagePlan(room, p, currentUserId as UserId | undefined);
+    const isAuthor = isPlanAuthor(room, p, currentUserIds);
+    const canManage = canManagePlan(room, p, currentUserIds);
 
     // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
-    const myOpinion = currentUserId
-      ? p.memberOpinions?.find((m) => m.userId === currentUserId)
+    const myOpinion = currentUserIds
+      ? p.memberOpinions?.find((opinion) =>
+          typeof currentUserIds === "string"
+            ? opinion.userId === currentUserIds
+            : currentUserIds.includes(opinion.userId)
+        )
       : undefined;
 
     return {

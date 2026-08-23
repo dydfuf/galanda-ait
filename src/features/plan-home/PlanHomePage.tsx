@@ -67,7 +67,7 @@ export function PlanHomePage() {
     );
   }
 
-  const room = toTripRoomViewModel(rawRoom, session?.userId);
+  const room = toTripRoomViewModel(rawRoom, session?.participantIds);
 
   const isConfirmed = Boolean(room.confirmedPlanId);
   const plans = room.plans;

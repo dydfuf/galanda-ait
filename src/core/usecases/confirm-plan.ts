@@ -29,7 +29,7 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     // 3. RBAC: 확정은 방장만 수행할 수 있다.
     yield* requireRoomHost(
       room,
-      session.userId,
+      session.participantIds,
       "방장만 여행안을 확정할 수 있습니다."
     );
 

@@ -4,6 +4,7 @@ import { makeBetterAuth, type BetterAuthEnv } from "./infrastructure/auth/better
 import {
   authSessionMiddleware,
   createAuthSessionMiddleware,
+  type ResolveParticipantIdentity,
 } from "./infrastructure/auth/session-middleware.ts";
 import {
   createRequestDatabaseMiddleware,
@@ -31,6 +32,7 @@ export interface AppEnv {
 
 export interface AppDependencies {
   readonly makeAuth?: typeof makeBetterAuth;
+  readonly resolveParticipantIdentity?: ResolveParticipantIdentity;
   readonly withDatabase?: WithDatabase;
 }
 
@@ -39,9 +41,13 @@ export function createApp(dependencies: AppDependencies = {}) {
   const databaseMiddleware = dependencies.withDatabase
     ? createRequestDatabaseMiddleware(dependencies.withDatabase)
     : requestDatabaseMiddleware;
-  const sessionMiddleware = dependencies.makeAuth
-    ? createAuthSessionMiddleware(dependencies.makeAuth)
-    : authSessionMiddleware;
+  const sessionMiddleware =
+    dependencies.makeAuth || dependencies.resolveParticipantIdentity
+      ? createAuthSessionMiddleware(
+          dependencies.makeAuth,
+          dependencies.resolveParticipantIdentity
+        )
+      : authSessionMiddleware;
 
   app.use("*", async (c, next) => {
     const upstreamId =
@@ -74,6 +80,7 @@ export function createApp(dependencies: AppDependencies = {}) {
   app.use("/api/*", sessionMiddleware);
 
   app.route("/api/health", healthRoute);
+  app.get("/api/session", (c) => c.json(c.var.authSession ?? null));
   app.route("/api/trips", tripsRoute);
 
   app.notFound((c) => {

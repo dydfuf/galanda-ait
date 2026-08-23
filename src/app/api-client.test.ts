@@ -48,8 +48,11 @@ describe("API client", () => {
     };
     const responses = [
       jsonResponse({
-        session: { id: "session-1" },
-        user: { id: "user-1", name: "User", email: "user@example.com" },
+        participantId: "user-1",
+        participantIds: ["user-1"],
+        accountType: "REGISTERED",
+        name: "User",
+        isAuthenticated: true,
       }),
       jsonResponse([room]),
       jsonResponse(room, 201),
@@ -62,7 +65,7 @@ describe("API client", () => {
     };
 
     await expect(getCurrentSession()).resolves.toMatchObject({
-      userId: "user-1",
+      participantId: "user-1",
       name: "User",
       isAuthenticated: true,
     });
@@ -75,7 +78,7 @@ describe("API client", () => {
       })
     ).resolves.toMatchObject({ revision: 2 });
     expect(calls.map(({ input }) => input)).toEqual([
-      "/api/auth/get-session",
+      "/api/session",
       "/api/trips",
       "/api/trips",
       "/api/trips/trip-1",

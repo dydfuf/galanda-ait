@@ -1,6 +1,7 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
 import { describe, expect, it } from "vitest";
 import {
+  ParticipantIdSchema,
   PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
@@ -89,7 +90,17 @@ const makeApp = (
     run
   ) => run(db as DatabaseHandle);
 
-  return { app: createApp({ makeAuth, withDatabase }), calls };
+  return {
+    app: createApp({
+      makeAuth,
+      withDatabase,
+      resolveParticipantIdentity: async (_db, authUserId) => {
+        const participantId = ParticipantIdSchema.make(authUserId);
+        return { participantId, participantIds: [participantId] };
+      },
+    }),
+    calls,
+  };
 };
 
 const request = (path: string, init?: RequestInit) =>

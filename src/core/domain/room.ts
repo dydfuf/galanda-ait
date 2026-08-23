@@ -1,5 +1,10 @@
 import { Schema } from "effect";
-import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "./ids.ts";
+import {
+  ParticipantIdSchema,
+  PlanIdSchema,
+  RevisionSchema,
+  TripIdSchema,
+} from "./ids.ts";
 
 export const PlanStatusSchema = Schema.Literals(["DRAFT", "VOTING", "CONFIRMED"]);
 export type PlanStatus = typeof PlanStatusSchema.Type;
@@ -112,7 +117,7 @@ export const TransportSnapshotSchema = Schema.Struct({
 export type TransportSnapshot = typeof TransportSnapshotSchema.Type;
 
 export const PlanMemberOpinionSchema = Schema.Struct({
-  userId: UserIdSchema,
+  userId: ParticipantIdSchema,
   userName: Schema.String,
   reaction: Schema.Literals(["LIKE", "OKAY", "HARD"]),
   reason: Schema.optional(Schema.String),
@@ -136,7 +141,7 @@ export const TripPlanSchema = Schema.Struct({
   title: Schema.String,
   status: PlanStatusSchema,
   proposalReason: Schema.optional(Schema.String),
-  authorId: Schema.optional(UserIdSchema),
+  authorId: Schema.optional(ParticipantIdSchema),
   authorName: Schema.optional(Schema.String),
   baseHeadcount: Schema.optional(Schema.Number),
   routes: Schema.optional(Schema.Array(CityStaySchema)),
@@ -151,7 +156,7 @@ export const TripPlanSchema = Schema.Struct({
 export type TripPlan = typeof TripPlanSchema.Type;
 
 export const TripMemberSchema = Schema.Struct({
-  id: UserIdSchema,
+  id: ParticipantIdSchema,
   name: Schema.String,
   role: Schema.Literals(["HOST", "MEMBER"]),
 });
@@ -179,7 +184,9 @@ export const getTripRoomDisplayDate = (
 };
 
 export const UserSessionSchema = Schema.Struct({
-  userId: UserIdSchema,
+  participantId: ParticipantIdSchema,
+  participantIds: Schema.Array(ParticipantIdSchema),
+  accountType: Schema.Literals(["GUEST", "REGISTERED"]),
   name: Schema.String,
   isAuthenticated: Schema.Boolean,
 });

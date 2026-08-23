@@ -209,31 +209,41 @@ const createUnavailableSessionLayer = (
 
 describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): void => {
   const aliceUser: UserSession = {
-    userId: UserIdSchema.make("user-alice"),
+    participantId: UserIdSchema.make("user-alice"),
+    participantIds: [UserIdSchema.make("user-alice")],
+    accountType: "REGISTERED",
     name: "앨리스",
     isAuthenticated: true,
   };
 
   const bobUser: UserSession = {
-    userId: UserIdSchema.make("user-bob"),
+    participantId: UserIdSchema.make("user-bob"),
+    participantIds: [UserIdSchema.make("user-bob")],
+    accountType: "REGISTERED",
     name: "밥",
     isAuthenticated: true,
   };
 
   const strangerUser: UserSession = {
-    userId: UserIdSchema.make("user-stranger"),
+    participantId: UserIdSchema.make("user-stranger"),
+    participantIds: [UserIdSchema.make("user-stranger")],
+    accountType: "REGISTERED",
     name: "이방인",
     isAuthenticated: true,
   };
 
   const bob2User: UserSession = {
-    userId: UserIdSchema.make("user-bob-2"),
+    participantId: UserIdSchema.make("user-bob-2"),
+    participantIds: [UserIdSchema.make("user-bob-2")],
+    accountType: "REGISTERED",
     name: "밥",
     isAuthenticated: true,
   };
 
   const unauthenticatedSession: UserSession = {
-    userId: UserIdSchema.make("anonymous"),
+    participantId: UserIdSchema.make("anonymous"),
+    participantIds: [UserIdSchema.make("anonymous")],
+    accountType: "GUEST",
     name: "게스트",
     isAuthenticated: false,
   };
@@ -1066,7 +1076,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const plan = secondRoom.plans.find((candidate) => candidate.id === "plan-1");
       expect(plan?.memberOpinions).toEqual([
         {
-          userId: bobUser.userId,
+          userId: bobUser.participantId,
           userName: bobUser.name,
           reaction: "HARD",
           reason: "이동 시간이 길어요",
@@ -1317,7 +1327,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const session = await Effect.runPromise(
         requireAuthSession().pipe(Effect.provide(createLocalSessionLayer()))
       );
-      expect(session.userId).toBe(DEFAULT_LOCAL_USER.userId);
+      expect(session.participantId).toBe(DEFAULT_LOCAL_USER.participantId);
       expect(session.isAuthenticated).toBe(true);
     });
 

@@ -48,7 +48,7 @@ export const createTripRoom = Effect.fn("createTripRoom")(
     const id = yield* ids.tripId;
 
     const hostUser: TripMember = {
-      id: session.userId,
+      id: session.participantId,
       name: session.name,
       role: "HOST",
     };

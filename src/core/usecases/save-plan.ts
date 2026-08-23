@@ -130,7 +130,7 @@ export const createPlan = Effect.fn("createPlan")(
     // 2. RBAC: 세션 사용자의 'plan:create' 권한 검증
     yield* requireRoomPermission(
       room,
-      session.userId,
+      session.participantIds,
       "plan:create",
       "여행방 참여자만 여행안을 작성할 수 있습니다."
     );
@@ -169,7 +169,7 @@ export const createPlan = Effect.fn("createPlan")(
       accommodations: command.accommodations,
       transports: command.transports,
       places: command.places,
-      authorId: session.userId,
+      authorId: session.participantId,
       authorName: session.name,
       status: "DRAFT",
       memberOpinions: [],
@@ -233,7 +233,7 @@ export const updatePlan = Effect.fn("updatePlan")(
     // 4. RBAC: 세션 사용자의 'plan:update' 권한 검증
     yield* requireRoomPermission(
       room,
-      session.userId,
+      session.participantIds,
       "plan:update",
       "여행방 참여자만 여행안을 수정할 수 있습니다."
     );
@@ -242,7 +242,7 @@ export const updatePlan = Effect.fn("updatePlan")(
     yield* requirePlanAuthor(
       room,
       existingPlan,
-      session.userId,
+      session.participantIds,
       "여행안 작성자만 여행안을 수정할 수 있습니다."
     );
 
@@ -328,7 +328,7 @@ export const deletePlan = Effect.fn("deletePlan")(
     // 2. RBAC: 세션 사용자의 'plan:delete' 권한 검증
     yield* requireRoomPermission(
       room,
-      session.userId,
+      session.participantIds,
       "plan:delete",
       "여행방 참여자만 여행안을 삭제할 수 있습니다."
     );
@@ -337,7 +337,7 @@ export const deletePlan = Effect.fn("deletePlan")(
     yield* requirePlanAuthor(
       room,
       plan,
-      session.userId,
+      session.participantIds,
       "여행안 작성자만 여행안을 삭제할 수 있습니다."
     );
 

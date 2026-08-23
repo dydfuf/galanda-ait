@@ -34,7 +34,7 @@ export const updateTripRoom = Effect.fn("updateTripRoom")(
     // 3. RBAC: 방장 권한('room:update') 검증
     yield* requireRoomPermission(
       currentRoom,
-      session.userId,
+      session.participantIds,
       "room:update",
       "방장만 방 정보를 수정할 수 있습니다."
     );

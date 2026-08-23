@@ -31,6 +31,8 @@ production application path는 Supabase Auth, `supabase-js`, PostgREST를 사용
 | 항목 | 보관 위치 |
 | --- | --- |
 | `BETTER_AUTH_SECRET` | Cloudflare Worker staging secret |
+| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | Cloudflare Worker staging secret |
+| `TOSS_MTLS` certificate와 private key | Cloudflare mTLS certificate binding |
 | PostgreSQL password와 전체 origin connection URL | Cloudflare Hyperdrive / secret manager |
 | 관리자용 `DATABASE_URL` | migration 실행 환경에만 일시 주입 |
 
@@ -126,7 +128,20 @@ npx wrangler secret put BETTER_AUTH_SECRET --env staging
 npx wrangler secret list --env staging
 ```
 
-secret rotation은 기존 session을 무효화할 수 있으므로 배포 직후 sign-up/session/sign-out을 다시 확인한다.
+secret rotation은 기존 session을 무효화할 수 있으므로 배포 직후 login/session/sign-out을 다시 확인한다.
+
+Web/PWA는 Kakao Login만 사용한다. Kakao Developers에 callback URL
+`<BETTER_AUTH_URL>/api/auth/callback/kakao`를 등록하고 값을 대화형으로 넣는다.
+
+```bash
+npx wrangler secret put KAKAO_CLIENT_ID --env staging
+npx wrangler secret put KAKAO_CLIENT_SECRET --env staging
+```
+
+Apps-in-Toss는 Toss Login mTLS 인증서를 Cloudflare에 업로드하고 `TOSS_MTLS`
+binding으로 연결한다. 인증서 ID는 환경별 값이므로 실제 ID가 발급된 뒤
+`wrangler.jsonc`의 staging `mtls_certificates`에 기록한다. 토스 access token과 사용자
+프로필은 저장하지 않고 `userKey`만 Better Auth account 식별자로 사용한다.
 
 ### 5. Types, deploy, remote smoke
 
@@ -145,7 +160,7 @@ npm run deploy:staging
 - SPA deep-link와 emitted asset → `200`
 - 존재하지 않는 `/api/*` → JSON `404`이며 SPA fallback이 아님
 - anonymous `GET /api/auth/get-session` → 정상적인 null session
-- Better Auth sign-up → session → sign-out
+- anonymous Guest → Kakao 또는 Toss 계정 연결 → 동일 Participant 유지 → sign-out
 - auth cookie → `HttpOnly`, `Secure`, `SameSite=Lax`
 - Trip create → 즉시 list/detail에서 최신 값 확인 → update
 - Plan create → update → opinion → confirm

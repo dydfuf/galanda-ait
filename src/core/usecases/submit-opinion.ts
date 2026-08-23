@@ -52,7 +52,7 @@ export const submitOpinion = Effect.fn("submitOpinion")(
     const room = yield* repo.getRoom(input.roomId);
     yield* requireRoomPermission(
       room,
-      session.userId,
+      session.participantIds,
       "opinion:submit",
       "여행방 참여자만 의견 및 투표를 남길 수 있습니다."
     );
@@ -62,7 +62,7 @@ export const submitOpinion = Effect.fn("submitOpinion")(
 
     // 5. 세션 사용자의 정보로 작성자 고정 (위조 방지)
     const sanitizedOpinion: PlanMemberOpinion = {
-      userId: session.userId,
+      userId: session.participantId,
       userName: session.name,
       reaction,
       reason,

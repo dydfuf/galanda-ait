@@ -1,4 +1,5 @@
 import type { PlatformAdapter, ShareMessage, ShareOutcome } from "../types.ts";
+import { postAuthJson, safeReturnTo } from "../auth.ts";
 
 /** 사용자가 공유 시트를 직접 닫으면 Web Share API가 AbortError로 reject해요. */
 export function isShareAbortError(error: unknown): boolean {
@@ -35,6 +36,14 @@ async function shareWithBrowser(message: ShareMessage): Promise<ShareOutcome> {
 
 export const webAdapter: PlatformAdapter = {
   name: "web",
+  signIn: async (returnTo) => {
+    const result = await postAuthJson<{ url?: unknown }>("/api/auth/sign-in/social", {
+      provider: "kakao",
+      callbackURL: safeReturnTo(returnTo),
+    });
+    if (typeof result.url !== "string") throw new Error("로그인 주소가 올바르지 않습니다.");
+    window.location.assign(result.url);
+  },
   share: shareWithBrowser,
   openExternalUrl: async (url: string) => {
     window.open(url, "_blank", "noopener,noreferrer");

@@ -1,11 +1,13 @@
 import { Effect, Layer } from "effect";
 import { SessionService } from "../../core/ports/session.ts";
-import { UserIdSchema } from "../../core/domain/ids.ts";
+import { ParticipantIdSchema } from "../../core/domain/ids.ts";
 import { UnauthorizedError } from "../../core/domain/errors.ts";
 import type { UserSession } from "../../core/domain/room.ts";
 
 export const DEFAULT_LOCAL_USER: UserSession = {
-  userId: UserIdSchema.make("user-local-me"),
+  participantId: ParticipantIdSchema.make("user-local-me"),
+  participantIds: [ParticipantIdSchema.make("user-local-me")],
+  accountType: "REGISTERED",
   name: "나",
   isAuthenticated: true,
 };
@@ -30,4 +32,3 @@ export const createLocalSessionLayer = (
   Layer.succeed(SessionService, makeLocalSessionService(session));
 
 export const LocalSessionLayer: Layer.Layer<SessionService> = createLocalSessionLayer();
-

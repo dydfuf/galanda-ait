@@ -66,7 +66,12 @@ export function PlanCreatePage(): JSX.Element {
   // 복제 원본 플랜 찾기
   const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
 
-  const editor = usePlanEditorState(room, undefined, cloneFromPlan, session?.userId);
+  const editor = usePlanEditorState(
+    room,
+    undefined,
+    cloneFromPlan,
+    session?.participantId
+  );
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;

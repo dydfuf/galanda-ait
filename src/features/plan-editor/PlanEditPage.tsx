@@ -78,9 +78,20 @@ export function PlanEditPage(): JSX.Element {
   const isConfirmed = plan
     ? plan.id === room?.confirmedPlanId || plan.status === "CONFIRMED"
     : false;
-  const canEdit = Boolean(room && plan && session && canManagePlan(room, plan, session.userId) && !isConfirmed);
+  const canEdit = Boolean(
+    room &&
+    plan &&
+    session &&
+    canManagePlan(room, plan, session.participantIds) &&
+    !isConfirmed
+  );
 
-  const editor = usePlanEditorState(room, plan, undefined, canEdit ? session?.userId : undefined);
+  const editor = usePlanEditorState(
+    room,
+    plan,
+    undefined,
+    canEdit ? session?.participantId : undefined
+  );
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -126,7 +137,7 @@ export function PlanEditPage(): JSX.Element {
   }
 
   // 3. 작성자 소유권 또는 방장 관리 권한 확인 (UnauthorizedError 대응)
-  const canManage = canManagePlan(room, plan, session?.userId);
+  const canManage = canManagePlan(room, plan, session?.participantIds);
   if (!session || !canManage) {
     return (
       <RouteErrorFallback

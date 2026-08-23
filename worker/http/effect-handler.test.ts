@@ -82,7 +82,9 @@ describe("runEffect", () => {
         }),
         {
           session: {
-            userId: "user-1" as any,
+            participantId: "user-1" as any,
+            participantIds: ["user-1" as any],
+            accountType: "REGISTERED",
             name: "Tester",
             isAuthenticated: true,
           },

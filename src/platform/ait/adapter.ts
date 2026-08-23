@@ -1,4 +1,4 @@
-import { Clipboard, Device, partner, Screen, Share, tdsEvent } from "@apps-in-toss/web-framework";
+import { appLogin, Clipboard, Device, partner, Screen, Share, tdsEvent } from "@apps-in-toss/web-framework";
 import type {
   AccessoryButtonOptions,
   PlatformAdapter,
@@ -7,6 +7,7 @@ import type {
   ShareOutcome,
 } from "../types.ts";
 import { copyToClipboard, webAdapter } from "../web/adapter.ts";
+import { postAuthJson, safeReturnTo } from "../auth.ts";
 
 /** 실제 토스 앱 WebView 안에서 실행 중인지 확인해요 (AIT 빌드를 브라우저로 열어볼 수도 있어요). */
 export function isTossAppRuntime(): boolean {
@@ -71,6 +72,11 @@ function createTossNavigation(): PlatformNavigation {
 
 export const aitAdapter: PlatformAdapter = {
   name: "ait",
+  signIn: async (returnTo) => {
+    const login = await appLogin();
+    await postAuthJson("/api/auth/sign-in/toss", login);
+    window.location.assign(safeReturnTo(returnTo));
+  },
   share: shareWithToss,
   openExternalUrl: async (url: string) => {
     try {
