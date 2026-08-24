@@ -33,6 +33,9 @@ export interface AccessoryButtonOptions {
 
 /** 네이티브 shell이 소유한 상단 내비게이션(액세서리 버튼) 제어. */
 export interface PlatformNavigation {
+  /** 네이티브 navigation bar가 차지하는 WebView 상단 inset(px). */
+  readonly contentTopInset: number;
+  readonly subscribeContentTopInset: (onChange: (inset: number) => void) => VoidFunction;
   readonly addAccessoryButton: (options: AccessoryButtonOptions) => Promise<void>;
   readonly removeAccessoryButton: VoidFunction;
 }

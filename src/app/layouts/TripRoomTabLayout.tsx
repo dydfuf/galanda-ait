@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Share2 } from "lucide-react";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
 import { Result } from "effect";
@@ -11,17 +12,20 @@ import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { issueTripInvite } from "../api-client.ts";
 import { TripIdSchema } from "../../core/domain/ids.ts";
-
-/** 탭 값은 라우트 세그먼트와 같아요. */
-const TAB_PATHS = ["plans", "itinerary"] as const;
-type TabPath = (typeof TAB_PATHS)[number];
+import {
+  getTripRoomSection,
+  getTripRoomSectionPath,
+} from "./trip-room-navigation.ts";
 
 export function TripRoomTabLayout() {
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { goBack, platformNavigation } = useAppNavigation();
-  const [isShareAccessoryReady, setIsShareAccessoryReady] = useState(false);
+  const [failedAccessoryTripId, setFailedAccessoryTripId] = useState<string>();
+  const [platformTopInset, setPlatformTopInset] = useState(
+    platformNavigation?.contentTopInset ?? 0,
+  );
   const accessoryRegistrationId = useRef(0);
   const isCurrentAccessoryRegistration = useCallback(
     (registrationId: number) => registrationId === accessoryRegistrationId.current,
@@ -30,7 +34,7 @@ export function TripRoomTabLayout() {
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
-  const selectedTab: TabPath = location.pathname.endsWith("/itinerary") ? "itinerary" : "plans";
+  const selectedTab = getTripRoomSection(location.pathname);
 
   const handleShareInvite = useCallback(async () => {
     try {
@@ -54,10 +58,14 @@ export function TripRoomTabLayout() {
     // outcome === "cancelled": 사용자가 직접 닫은 경우라 알림을 띄우지 않아요.
   }, [tripId]);
 
+  useEffect(
+    () => platformNavigation?.subscribeContentTopInset(setPlatformTopInset),
+    [platformNavigation],
+  );
+
   useEffect(() => {
     if (!platformNavigation || !tripId) return;
 
-    setIsShareAccessoryReady(false);
     const registrationId = ++accessoryRegistrationId.current;
     let isActive = true;
 
@@ -70,10 +78,10 @@ export function TripRoomTabLayout() {
 
     void registration.then(
       () => {
-        if (isActive) setIsShareAccessoryReady(true);
+        if (isActive) setFailedAccessoryTripId(undefined);
       },
       () => {
-        if (isActive) setIsShareAccessoryReady(false);
+        if (isActive) setFailedAccessoryTripId(tripId);
       },
     );
 
@@ -94,40 +102,46 @@ export function TripRoomTabLayout() {
   }
 
   const handleTabChange = (value: unknown) => {
-    const nextPath = TAB_PATHS.find((path) => path === value) ?? TAB_PATHS[0];
-    navigate(`/trips/${tripId}/${nextPath}`, { replace: true });
+    navigate(getTripRoomSectionPath(tripId, value), { replace: true });
   };
 
-  // Apps in Toss에서는 shell이 back/title/accessory를 소유하고, 브라우저에서만 bar를 보여줘요.
-  const showHeaderBar = !platformNavigation || !isShareAccessoryReady;
+  const showWebNavigation = !platformNavigation;
+  const showShareAction = showWebNavigation || failedAccessoryTripId === tripId;
+
+  const modeSwitcher = (
+    <Tabs value={selectedTab} onValueChange={handleTabChange}>
+      <TabsList aria-label="여행방 화면" className="h-9 w-40">
+        <TabsTrigger value="plans">계획</TabsTrigger>
+        <TabsTrigger value="itinerary">일정</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
       <PageHeader
         sticky
         bordered
-        title={showHeaderBar ? "여행방" : undefined}
-        back={showHeaderBar ? { onClick: () => void goBack() } : undefined}
+        safeTop={showWebNavigation}
+        topInset={platformNavigation ? platformTopInset : undefined}
+        className={platformNavigation ? "z-[5]" : undefined}
+        center={modeSwitcher}
+        back={showWebNavigation ? { onClick: () => void goBack() } : undefined}
         action={
-          showHeaderBar ? (
-            <Button type="button" variant="ghost" className="text-primary" onClick={() => void handleShareInvite()}>
-              초대하기
+          showShareAction ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-lg"
+              aria-label="여행 초대 링크 공유"
+              className="text-primary"
+              onClick={() => void handleShareInvite()}
+            >
+              <Share2 className="size-5" />
             </Button>
           ) : undefined
         }
-      >
-        {/* 탭 내비게이션 (계획 | 일정) — 선택 상태는 URL과 동기화돼요. */}
-        <Tabs value={selectedTab} onValueChange={handleTabChange} className="px-2">
-          <TabsList variant="line" aria-label="여행방 화면" className="h-11 w-full gap-0">
-            <TabsTrigger value="plans" className="text-[15px] after:bg-primary data-active:text-primary">
-              계획
-            </TabsTrigger>
-            <TabsTrigger value="itinerary" className="text-[15px] after:bg-primary data-active:text-primary">
-              일정
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </PageHeader>
+      />
 
       {/* 탭 내부 페이지 렌더링 */}
       <main className="flex flex-1 flex-col">
