@@ -9,18 +9,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
+import {
+  getDraftSaveStatusLabel,
+  type DraftSaveStatus,
+} from "../hooks/usePlanEditorState.ts";
 
 interface PlanEditorHeaderProps {
   readonly isEditMode: boolean;
   readonly isCloneMode: boolean;
-  readonly lastSavedTime: Date;
+  readonly draftSaveStatus: DraftSaveStatus;
   readonly onClearDraft?: () => void;
 }
 
 export function PlanEditorHeader({
   isEditMode,
   isCloneMode,
-  lastSavedTime: _lastSavedTime,
+  draftSaveStatus,
   onClearDraft,
 }: PlanEditorHeaderProps) {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
@@ -41,9 +45,15 @@ export function PlanEditorHeader({
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1.5">
-        <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs whitespace-nowrap text-muted-foreground">
-          ✓ 자동 저장됨
-        </span>
+        <output
+          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs whitespace-nowrap ${
+            draftSaveStatus === "ERROR"
+              ? "bg-destructive-muted text-destructive-strong"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {getDraftSaveStatusLabel(draftSaveStatus)}
+        </output>
         {onClearDraft && (
           <button
             type="button"

@@ -13,6 +13,15 @@ export interface PlanEditorFormData {
   readonly clonedFromPlanId?: string;
 }
 
+export type DraftSaveStatus = "IDLE" | "SAVING" | "SAVED" | "ERROR";
+
+export const getDraftSaveStatusLabel = (status: DraftSaveStatus): string => ({
+  IDLE: "아직 저장되지 않음",
+  SAVING: "자동 저장 중…",
+  SAVED: "자동 저장됨",
+  ERROR: "임시 저장하지 못했어요",
+})[status];
+
 export const syncAccommodationNights = (
   routes: ReadonlyArray<CityStay>,
   accommodations: ReadonlyArray<AccommodationSnapshot>
@@ -27,10 +36,41 @@ export const syncAccommodationNights = (
       : accommodation;
   });
 
-interface StoredPlanEditorDraft extends PlanEditorFormData {
+export interface StoredPlanEditorDraft extends PlanEditorFormData {
   readonly ownerId: string;
   readonly basePlanFingerprint?: string;
   readonly updatedAt: string;
+}
+
+export function getPlanEditorInitialData(
+  room: TripRoom | undefined,
+  initialPlan?: TripPlan,
+  cloneFromPlan?: TripPlan
+): PlanEditorFormData {
+  const source = initialPlan ?? cloneFromPlan;
+
+  return {
+    title: initialPlan?.title ?? (cloneFromPlan ? `${cloneFromPlan.title} 대안` : ""),
+    proposalReason: source?.proposalReason ?? "",
+    baseHeadcount: source?.baseHeadcount ?? Math.max(1, room?.members.length ?? 1),
+    routes: structuredClone(source?.routes ?? []),
+    accommodations: structuredClone(source?.accommodations ?? []),
+    transports: structuredClone(source?.transports ?? []),
+    ...(cloneFromPlan ? { clonedFromPlanId: cloneFromPlan.id } : {}),
+  };
+}
+
+export function savePlanEditorDraft(
+  storage: Pick<Storage, "setItem">,
+  key: string,
+  draft: StoredPlanEditorDraft
+): Extract<DraftSaveStatus, "SAVED" | "ERROR"> {
+  try {
+    storage.setItem(key, JSON.stringify(draft));
+    return "SAVED";
+  } catch {
+    return "ERROR";
+  }
 }
 
 export function getPlanEditorDraftKey(
@@ -142,73 +182,17 @@ export function usePlanEditorState(
   cloneFromPlan?: TripPlan,
   userId?: string
 ) {
-  const defaultRoutes: ReadonlyArray<CityStay> = useMemo(() => {
-    if (cloneFromPlan?.routes && cloneFromPlan.routes.length > 0) {
-      return cloneFromPlan.routes;
-    }
-    if (initialPlan?.routes && initialPlan.routes.length > 0) {
-      return initialPlan.routes;
-    }
-    const dest = room?.destination || "제주도";
-    return [{ city: dest, arrivalDate: "", departureDate: "" }];
-  }, [cloneFromPlan, initialPlan, room]);
-
-  const defaultAccommodations: ReadonlyArray<AccommodationSnapshot> = useMemo(() => {
-    if (cloneFromPlan?.accommodations && cloneFromPlan.accommodations.length > 0) {
-      return cloneFromPlan.accommodations;
-    }
-    if (initialPlan?.accommodations && initialPlan.accommodations.length > 0) {
-      return initialPlan.accommodations;
-    }
-    return [
-      {
-        id: `stay-temp-1`,
-        city: defaultRoutes[0]?.city ?? (room?.destination || "제주도"),
-        period: "전체 일정",
-        nights: defaultRoutes[0] ? Math.max(0, getStayNightCount(defaultRoutes[0])) : 0,
-        hotelName: "숙소 찾는 중",
-        isSearching: true,
-        bookingStatus: "NEED_CHECK",
-        priceRange: { min: 0, max: 0 },
-      },
-    ];
-  }, [cloneFromPlan, initialPlan, defaultRoutes, room]);
-
-  const defaultTransports: ReadonlyArray<TransportSnapshot> = useMemo(() => {
-    if (cloneFromPlan?.transports && cloneFromPlan.transports.length > 0) {
-      return cloneFromPlan.transports;
-    }
-    if (initialPlan?.transports && initialPlan.transports.length > 0) {
-      return initialPlan.transports;
-    }
-    return [
-      {
-        id: `trans-temp-1`,
-        fromCity: "출발지",
-        toCity: room?.destination || "도착지",
-        mode: "항공 / KTX",
-        hasTransfer: false,
-        durationText: "약 1시간",
-        bookingStatus: "AVAILABLE",
-        priceRange: { min: 0, max: 0 },
-      },
-    ];
-  }, [cloneFromPlan, initialPlan, room]);
-
-  const [title, setTitle] = useState(
-    initialPlan?.title ||
-      (cloneFromPlan ? `${cloneFromPlan.title} 대안` : "")
+  const initialData = useMemo(
+    () => getPlanEditorInitialData(room, initialPlan, cloneFromPlan),
+    [room, initialPlan, cloneFromPlan]
   );
-  const [proposalReason, setProposalReason] = useState(
-    initialPlan?.proposalReason || cloneFromPlan?.proposalReason || ""
-  );
-  const [baseHeadcount, setBaseHeadcount] = useState(
-    initialPlan?.baseHeadcount || cloneFromPlan?.baseHeadcount || (room?.members.length || 4)
-  );
-  const [routes, setRoutes] = useState<ReadonlyArray<CityStay>>(defaultRoutes);
-  const [accommodations, setAccommodations] = useState<ReadonlyArray<AccommodationSnapshot>>(defaultAccommodations);
-  const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(defaultTransports);
-  const [lastSavedTime, setLastSavedTime] = useState<Date>(new Date());
+  const [title, setTitle] = useState(initialData.title);
+  const [proposalReason, setProposalReason] = useState(initialData.proposalReason);
+  const [baseHeadcount, setBaseHeadcount] = useState(initialData.baseHeadcount);
+  const [routes, setRoutes] = useState<ReadonlyArray<CityStay>>(initialData.routes);
+  const [accommodations, setAccommodations] = useState<ReadonlyArray<AccommodationSnapshot>>(initialData.accommodations);
+  const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(initialData.transports);
+  const [draftSaveStatus, setDraftSaveStatus] = useState<DraftSaveStatus>("IDLE");
   const [hydratedEditorId, setHydratedEditorId] = useState<string>();
   const [draftConflict, setDraftConflict] = useState<StoredPlanEditorDraft>();
 
@@ -220,16 +204,18 @@ export function usePlanEditorState(
   const basePlanFingerprint = getPlanFingerprint(initialPlan ?? cloneFromPlan);
 
   const resetToInitialData = useCallback(() => {
-    setTitle(initialPlan?.title || (cloneFromPlan ? `${cloneFromPlan.title} 대안` : ""));
-    setProposalReason(initialPlan?.proposalReason || cloneFromPlan?.proposalReason || "");
-    setBaseHeadcount(
-      initialPlan?.baseHeadcount || cloneFromPlan?.baseHeadcount || (room?.members.length || 4)
-    );
-    setRoutes(defaultRoutes);
-    setAccommodations(defaultAccommodations);
-    setTransports(defaultTransports);
-    setLastSavedTime(new Date());
-  }, [initialPlan, cloneFromPlan, room, defaultRoutes, defaultAccommodations, defaultTransports]);
+    setTitle(initialData.title);
+    setProposalReason(initialData.proposalReason);
+    setBaseHeadcount(initialData.baseHeadcount);
+    setRoutes(initialData.routes);
+    setAccommodations(initialData.accommodations);
+    setTransports(initialData.transports);
+    setDraftSaveStatus("IDLE");
+  }, [initialData]);
+
+  const markDraftSaving = useCallback(() => {
+    setDraftSaveStatus("SAVING");
+  }, []);
 
   useEffect(() => {
     if (!draftKey || !editorId || hydratedEditorId === editorId) return;
@@ -240,6 +226,7 @@ export function usePlanEditorState(
       draft = parsePlanEditorDraft(localStorage.getItem(draftKey));
     } catch {
       // 저장소 접근이 차단된 경우 공개본/초기값으로 계속 편집해요.
+      setDraftSaveStatus("ERROR");
     }
     if (
       draft &&
@@ -256,7 +243,7 @@ export function usePlanEditorState(
       setRoutes(draft.routes);
       setAccommodations(draft.accommodations);
       setTransports(draft.transports);
-      setLastSavedTime(new Date(draft.updatedAt));
+      setDraftSaveStatus("SAVED");
     } else {
       resetToInitialData();
     }
@@ -320,8 +307,8 @@ export function usePlanEditorState(
   // 도시 관리 핸들러
   const handleAddCity = useCallback((city: string = "") => {
     setRoutes((prev) => [...prev, { city, arrivalDate: "", departureDate: "" }]);
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   const handleUpdateCity = useCallback((index: number, updated: Partial<CityStay>) => {
     setRoutes((prev) => {
@@ -331,53 +318,55 @@ export function usePlanEditorState(
       }
       return next;
     });
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   const handleRemoveCity = useCallback((index: number) => {
     setRoutes((prev) => prev.filter((_, i) => i !== index));
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   // 숙소 관리 핸들러
   const handleAddAccommodation = useCallback((acc: AccommodationSnapshot) => {
     setAccommodations((prev) => [...prev, acc]);
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   const handleUpdateAccommodation = useCallback((id: string, updated: Partial<AccommodationSnapshot>) => {
     setAccommodations((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
     );
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   const handleRemoveAccommodation = useCallback((id: string) => {
     setAccommodations((prev) => prev.filter((item) => item.id !== id));
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   // 교통 관리 핸들러
   const handleAddTransport = useCallback((trans: TransportSnapshot) => {
     setTransports((prev) => [...prev, trans]);
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   const handleUpdateTransport = useCallback((id: string, updated: Partial<TransportSnapshot>) => {
     setTransports((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
     );
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   const handleRemoveTransport = useCallback((id: string) => {
     setTransports((prev) => prev.filter((item) => item.id !== id));
-    setLastSavedTime(new Date());
-  }, []);
+    markDraftSaving();
+  }, [markDraftSaving]);
 
   // 자동 임시 저장 (로컬스토리지 Draft)
   useEffect(() => {
     if (!draftKey || !userId || hydratedEditorId !== editorId || draftConflict) return;
+    setDraftSaveStatus("SAVING");
+    const updatedAt = new Date().toISOString();
     const draftData = {
       ownerId: userId,
       basePlanFingerprint,
@@ -388,13 +377,10 @@ export function usePlanEditorState(
       accommodations,
       transports,
       clonedFromPlanId: cloneFromPlan?.id,
-      updatedAt: new Date().toISOString(),
+      updatedAt,
     };
-    try {
-      localStorage.setItem(draftKey, JSON.stringify(draftData));
-    } catch {
-      // ignore
-    }
+    const status = savePlanEditorDraft(localStorage, draftKey, draftData);
+    setDraftSaveStatus(status);
   }, [draftKey, editorId, hydratedEditorId, draftConflict, userId, basePlanFingerprint, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
 
   const discardDraft = useCallback(() => {
@@ -419,9 +405,9 @@ export function usePlanEditorState(
     setRoutes(draftConflict.routes);
     setAccommodations(draftConflict.accommodations);
     setTransports(draftConflict.transports);
-    setLastSavedTime(new Date(draftConflict.updatedAt));
+    markDraftSaving();
     setDraftConflict(undefined);
-  }, [draftConflict]);
+  }, [draftConflict, markDraftSaving]);
 
   const useLatestPublishedPlan = useCallback(() => {
     discardDraft();
@@ -431,13 +417,12 @@ export function usePlanEditorState(
 
   return {
     title,
-    setTitle: (val: string) => { setTitle(val); setLastSavedTime(new Date()); },
+    setTitle: (val: string) => { setTitle(val); markDraftSaving(); },
     proposalReason,
-    setProposalReason: (val: string) => { setProposalReason(val); setLastSavedTime(new Date()); },
+    setProposalReason: (val: string) => { setProposalReason(val); markDraftSaving(); },
     baseHeadcount,
-    setBaseHeadcount: (val: number) => { setBaseHeadcount(val); setLastSavedTime(new Date()); },
+    setBaseHeadcount: (val: number) => { setBaseHeadcount(val); markDraftSaving(); },
     routes,
-    setRoutes,
     totalTripNights: currentTotalNights,
     currentTotalNights,
     handleAddCity,
@@ -454,7 +439,7 @@ export function usePlanEditorState(
     costSummary,
     diffFromOriginal,
     validation,
-    lastSavedTime,
+    draftSaveStatus,
     clearDraft,
     discardDraft,
     draftConflict: Boolean(draftConflict),

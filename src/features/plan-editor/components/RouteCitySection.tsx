@@ -137,14 +137,16 @@ export function RouteCitySection({
   onUpdateCity,
   onRemoveCity,
 }: RouteCitySectionProps) {
-  const isNightMatched = currentTotalNights === totalTripNights;
+  const isNightMatched = routes.length > 0 && currentTotalNights === totalTripNights;
 
   return (
     <section css={cardStyle}>
       <div css={sectionHeaderStyle}>
         <h2 css={sectionTitleStyle}>날짜와 도시 체류 배분</h2>
         <span css={nightsStatusBadgeStyle(isNightMatched)}>
-          {isNightMatched
+          {routes.length === 0
+            ? "도시 입력 필요"
+            : isNightMatched
             ? `총 ${totalTripNights}박 배분 완료`
             : `${currentTotalNights}박 / ${totalTripNights}박 (${totalTripNights - currentTotalNights > 0 ? `${totalTripNights - currentTotalNights}박 부족` : `${currentTotalNights - totalTripNights}박 초과`})`}
         </span>
@@ -191,7 +193,7 @@ export function RouteCitySection({
           onClick={() => onAddCity("")}
           css={addCityButtonStyle}
         >
-          + 경유 도시 추가
+          {routes.length === 0 ? "+ 방문 도시 추가" : "+ 경유 도시 추가"}
         </button>
       </div>
     </section>
