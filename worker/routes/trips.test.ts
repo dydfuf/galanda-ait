@@ -270,6 +270,55 @@ describe("Trip API vertical slice", () => {
     expect(calls[1].text).toContain('"revision" = "trip_rooms"."revision" + 1');
   });
 
+  it("확정 권한 실패와 이미 확정된 상태를 서로 다른 contract로 반환한다", async () => {
+    const memberId = UserIdSchema.make("member-1");
+    const memberRoom = {
+      ...roomWithPlan,
+      members: [
+        ...roomWithPlan.members,
+        { id: memberId, name: "Member", role: "MEMBER" as const },
+      ],
+    };
+    const member = makeApp([[rowValues(memberRoom)]], {
+      id: memberId,
+      name: "Member",
+    });
+    const forbidden = await member.app.fetch(
+      request("/api/trips/trip-1/plans/plan-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ expectedRevision: 3 }),
+      }),
+      env
+    );
+
+    const confirmedRoom = {
+      ...roomWithPlan,
+      plans: [{ ...plan, status: "CONFIRMED" as const }],
+      confirmedPlanId: plan.id,
+    };
+    const confirmed = makeApp([[rowValues(confirmedRoom)]]);
+    const stateConflict = await confirmed.app.fetch(
+      request("/api/trips/trip-1/plans/plan-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ expectedRevision: 3 }),
+      }),
+      env
+    );
+
+    expect(forbidden.status).toBe(403);
+    await expect(forbidden.json()).resolves.toMatchObject({
+      error: { code: "FORBIDDEN" },
+    });
+    expect(stateConflict.status).toBe(409);
+    const stateConflictBody = (await stateConflict.json()) as {
+      error: { code: string; details?: unknown };
+    };
+    expect(stateConflictBody).toMatchObject({
+      error: { code: "STATE_CONFLICT" },
+    });
+    expect(stateConflictBody.error.details).toBeUndefined();
+  });
+
   it("plan create가 작성자와 서버 소유 필드를 세션에서 결정한다", async () => {
     const created = {
       ...roomWithPlan,

@@ -9,9 +9,9 @@ import {
   RevisionSchema,
 } from "../../core/domain/ids.ts";
 import {
-  ConflictError,
   NotFoundError,
   RepositoryError,
+  RevisionConflictError,
 } from "../../core/domain/errors.ts";
 import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
 import type { Revision, TripId } from "../../core/domain/ids.ts";
@@ -146,7 +146,7 @@ const mutateRoom = (
   expectedRevision: Revision | undefined,
   operation: string,
   updater: (room: TripRoom) => TripRoom | Effect.Effect<TripRoom, NotFoundError>
-): Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError> =>
+): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError | RepositoryError> =>
   Effect.gen(function* () {
     const stored = yield* loadRooms(operation);
     const rooms = yield* decodeRooms(stored, `${operation}.decode`);
@@ -160,7 +160,7 @@ const mutateRoom = (
     const room = rooms[index];
     if (expectedRevision !== undefined && room.revision !== expectedRevision) {
       return yield* Effect.fail(
-        new ConflictError({
+        new RevisionConflictError({
           message: "다른 사용자가 이미 방 정보를 수정했습니다.",
           expectedRevision,
           actualRevision: room.revision,

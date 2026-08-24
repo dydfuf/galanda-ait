@@ -1,7 +1,10 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
-import { ConflictError } from "../../../core/domain/errors.ts";
+import {
+  RepositoryError,
+  RevisionConflictError,
+} from "../../../core/domain/errors.ts";
 import {
   RevisionSchema,
   PlanIdSchema,
@@ -148,7 +151,42 @@ describe("TripRoomRepositoryLive", () => {
     });
   });
 
-  it("revision 조건을 포함한 단일 UPDATE로 CAS하고 stale 쓰기를 ConflictError로 거부한다", async () => {
+  it("server-generated room ID collision을 domain state conflict로 노출하지 않는다", async () => {
+    const roomId = TripIdSchema.make("room-collision");
+    const client = {
+      query: async (config: { readonly text: string }) => ({
+        rows: config.text.startsWith("insert") ? [] : [[1]],
+      }),
+    };
+    const db = drizzle(client as unknown as NodePgClient, { schema });
+    const collision = await Effect.runPromise(
+      Effect.flip(
+        Effect.gen(function* () {
+          const repository = yield* TripRoomRepository;
+          return yield* repository.createRoom({
+            id: roomId,
+            title: "충돌 여행",
+            hostUser: {
+              id: UserIdSchema.make("host-1"),
+              name: "Host",
+              role: "HOST",
+            },
+          });
+        }).pipe(
+          Effect.provide(
+            TripRoomRepositoryLive.pipe(
+              Layer.provide(Layer.succeed(Database, { db }))
+            )
+          )
+        )
+      )
+    );
+
+    expect(collision).toBeInstanceOf(RepositoryError);
+    expect(collision).toMatchObject({ operation: "createRoom" });
+  });
+
+  it("revision 조건을 포함한 단일 UPDATE로 CAS하고 stale 쓰기를 RevisionConflictError로 거부한다", async () => {
     const room: TripRoom = {
       id: TripIdSchema.make("room-1"),
       title: "오사카 여행",
@@ -209,7 +247,7 @@ describe("TripRoomRepositoryLive", () => {
     const conflict = await Effect.runPromise(Effect.flip(save(3)));
 
     expect(saved.revision).toBe(4);
-    expect(conflict).toBeInstanceOf(ConflictError);
+    expect(conflict).toBeInstanceOf(RevisionConflictError);
     expect(conflict).toMatchObject({ expectedRevision: 3, actualRevision: 4 });
     expect(calls[0].text).toContain('update "trip_rooms"');
     expect(calls[0].text).toContain('"revision" = "trip_rooms"."revision" + 1');

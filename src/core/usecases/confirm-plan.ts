@@ -12,7 +12,7 @@ import {
   confirmPlanInRoom,
   mergeParticipantIdentityInRoom,
 } from "../domain/room-transitions.ts";
-import { ConflictError, ValidationError } from "../domain/errors.ts";
+import { StateConflictError, ValidationError } from "../domain/errors.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
   function* (
@@ -46,10 +46,8 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     // 5. 확정은 한 번만 가능하며, 실패 시 저장소를 호출하지 않는다.
     if (room.confirmedPlanId !== undefined || isPlanConfirmed(room, plan)) {
       return yield* Effect.fail(
-        new ConflictError({
+        new StateConflictError({
           message: "이미 확정된 여행안이 있어 다시 확정할 수 없습니다.",
-          expectedRevision,
-          actualRevision: room.revision,
         })
       );
     }

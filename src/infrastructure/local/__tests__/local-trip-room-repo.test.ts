@@ -123,7 +123,7 @@ describe("LocalTripRoomRepository", () => {
     }
   });
 
-  it("5. 방 수정 시 revision 불일치는 ConflictError로 실패한다", async () => {
+  it("5. 방 수정 시 revision 불일치는 RevisionConflictError로 실패한다", async () => {
     const program = Effect.gen(function* () {
       const repo = yield* TripRoomRepository;
       const room = yield* repo.createRoom({
@@ -143,7 +143,7 @@ describe("LocalTripRoomRepository", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
       const err = exit.cause;
-      expect(JSON.stringify(err)).toContain("ConflictError");
+      expect(JSON.stringify(err)).toContain("RevisionConflictError");
     }
   });
 

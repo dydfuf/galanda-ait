@@ -8,8 +8,8 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()(
   }
 ) {}
 
-export class ConflictError extends Schema.TaggedError<ConflictError>()(
-  "ConflictError",
+export class RevisionConflictError extends Schema.TaggedError<RevisionConflictError>()(
+  "RevisionConflictError",
   {
     message: Schema.String,
     expectedRevision: Schema.Number,
@@ -17,8 +17,22 @@ export class ConflictError extends Schema.TaggedError<ConflictError>()(
   }
 ) {}
 
+export class StateConflictError extends Schema.TaggedError<StateConflictError>()(
+  "StateConflictError",
+  {
+    message: Schema.String,
+  }
+) {}
+
 export class UnauthorizedError extends Schema.TaggedError<UnauthorizedError>()(
   "UnauthorizedError",
+  {
+    reason: Schema.String,
+  }
+) {}
+
+export class ForbiddenError extends Schema.TaggedError<ForbiddenError>()(
+  "ForbiddenError",
   {
     reason: Schema.String,
   }

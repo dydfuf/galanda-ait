@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AccountUpgradeRequiredError,
+  ForbiddenError,
   InvalidInviteError,
-  ConflictError,
   NotFoundError,
   RepositoryError,
+  RevisionConflictError,
   SessionUnavailableError,
+  StateConflictError,
   UnauthorizedError,
   ValidationError,
 } from "../../src/core/domain/errors.ts";
@@ -52,6 +54,16 @@ describe("api-error", () => {
     expect(result.body.error.message).toBe("Custom reason");
   });
 
+  it("maps ForbiddenError", () => {
+    const result = mapDomainError(
+      new ForbiddenError({ reason: "방장만 확정할 수 있습니다." }),
+      reqId
+    );
+    expect(result.status).toBe(403);
+    expect(result.body.error.code).toBe("FORBIDDEN");
+    expect(result.body.error.message).toBe("방장만 확정할 수 있습니다.");
+  });
+
   it("maps AccountUpgradeRequiredError", () => {
     const result = mapDomainError(
       new AccountUpgradeRequiredError({ reason: "소셜 계정을 연결해 주세요." }),
@@ -80,8 +92,8 @@ describe("api-error", () => {
     expect(result.body.error.details).toEqual({ entity: "Trip", id: "trip-1" });
   });
 
-  it("maps ConflictError", () => {
-    const err = new ConflictError({
+  it("maps RevisionConflictError with revision details", () => {
+    const err = new RevisionConflictError({
       message: "Conflict detected",
       expectedRevision: 1,
       actualRevision: 2,
@@ -94,6 +106,17 @@ describe("api-error", () => {
       expectedRevision: 1,
       actualRevision: 2,
     });
+  });
+
+  it("maps StateConflictError without revision details", () => {
+    const result = mapDomainError(
+      new StateConflictError({ message: "이미 확정된 여행안입니다." }),
+      reqId
+    );
+    expect(result.status).toBe(409);
+    expect(result.body.error.code).toBe("STATE_CONFLICT");
+    expect(result.body.error.message).toBe("이미 확정된 여행안입니다.");
+    expect(result.body.error.details).toBeUndefined();
   });
 
   it("maps ValidationError", () => {

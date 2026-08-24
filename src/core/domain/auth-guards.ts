@@ -1,7 +1,11 @@
 import { Effect } from "effect";
 import type { ParticipantId, PlanId } from "./ids.ts";
 import type { TripMember, TripPlan, TripRoom } from "./room.ts";
-import { NotFoundError, UnauthorizedError } from "./errors.ts";
+import {
+  ForbiddenError,
+  NotFoundError,
+  StateConflictError,
+} from "./errors.ts";
 
 /**
  * 여행방에서의 사용자 역할
@@ -123,7 +127,7 @@ export const requireRoomPermission = (
   identity: ParticipantIdentity,
   action: RoomAction,
   customReason?: string
-): Effect.Effect<RoomActor, UnauthorizedError> =>
+): Effect.Effect<RoomActor, ForbiddenError> =>
   Effect.gen(function* () {
     const actor = getRoomActor(room, identity);
 
@@ -136,7 +140,7 @@ export const requireRoomPermission = (
       }
 
       return yield* Effect.fail(
-        new UnauthorizedError({ reason: customReason ?? defaultReason })
+        new ForbiddenError({ reason: customReason ?? defaultReason })
       );
     }
 
@@ -151,11 +155,11 @@ export const requireRoomRole = (
   identity: ParticipantIdentity,
   allowedRoles: ReadonlyArray<RoomRole>,
   reason = "해당 작업을 수행할 수 있는 권한이 없습니다."
-): Effect.Effect<RoomActor, UnauthorizedError> =>
+): Effect.Effect<RoomActor, ForbiddenError> =>
   Effect.gen(function* () {
     const actor = getRoomActor(room, identity);
     if (!allowedRoles.includes(actor.role)) {
-      return yield* Effect.fail(new UnauthorizedError({ reason }));
+      return yield* Effect.fail(new ForbiddenError({ reason }));
     }
     return actor;
   });
@@ -167,7 +171,7 @@ export const requireRoomMember = (
   room: TripRoom,
   identity: ParticipantIdentity,
   reason = "여행방 참여자만 접근할 수 있습니다."
-): Effect.Effect<TripMember, UnauthorizedError> =>
+): Effect.Effect<TripMember, ForbiddenError> =>
   Effect.gen(function* () {
     const actor = yield* requireRoomPermission(
       room,
@@ -176,7 +180,7 @@ export const requireRoomMember = (
       reason
     );
     if (!actor.member) {
-      return yield* Effect.fail(new UnauthorizedError({ reason }));
+      return yield* Effect.fail(new ForbiddenError({ reason }));
     }
     return actor.member;
   });
@@ -188,11 +192,11 @@ export const requireRoomHost = (
   room: TripRoom,
   identity: ParticipantIdentity,
   reason = "방장만 이 작업을 수행할 수 있습니다."
-): Effect.Effect<TripMember, UnauthorizedError> =>
+): Effect.Effect<TripMember, ForbiddenError> =>
   Effect.gen(function* () {
     const actor = yield* requireRoomRole(room, identity, ["HOST"], reason);
     if (!actor.member) {
-      return yield* Effect.fail(new UnauthorizedError({ reason }));
+      return yield* Effect.fail(new ForbiddenError({ reason }));
     }
     return actor.member;
   });
@@ -309,12 +313,12 @@ export const requirePlanAuthor = (
   plan: TripPlan,
   identity: ParticipantIdentity,
   reason = "여행안 작성자만 수정하거나 삭제할 수 있습니다."
-): Effect.Effect<RoomActor, UnauthorizedError> =>
+): Effect.Effect<RoomActor, ForbiddenError> =>
   Effect.gen(function* () {
     const actor = getRoomActor(room, identity);
 
     if (!canManagePlan(room, plan, identity)) {
-      return yield* Effect.fail(new UnauthorizedError({ reason }));
+      return yield* Effect.fail(new ForbiddenError({ reason }));
     }
 
     return actor;
@@ -337,9 +341,9 @@ export const requireMutablePlan = (
   room: TripRoom,
   plan: TripPlan,
   reason = "확정된 여행안은 변경할 수 없습니다."
-): Effect.Effect<void, UnauthorizedError> =>
+): Effect.Effect<void, StateConflictError> =>
   isPlanConfirmed(room, plan)
-    ? Effect.fail(new UnauthorizedError({ reason }))
+    ? Effect.fail(new StateConflictError({ message: reason }))
     : Effect.void;
 
 /**
@@ -350,13 +354,13 @@ export const requirePlanAuthorOrHost = (
   plan: TripPlan,
   identity: ParticipantIdentity,
   reason = "여행안 작성자 또는 방장만 수행할 수 있습니다."
-): Effect.Effect<RoomActor, UnauthorizedError> =>
+): Effect.Effect<RoomActor, ForbiddenError> =>
   Effect.gen(function* () {
     const actor = getRoomActor(room, identity);
     const isAuthor = isPlanAuthor(room, plan, identity);
 
     if (!isAuthor && !actor.isHost) {
-      return yield* Effect.fail(new UnauthorizedError({ reason }));
+      return yield* Effect.fail(new ForbiddenError({ reason }));
     }
 
     return actor;

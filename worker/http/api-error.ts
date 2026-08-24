@@ -46,6 +46,19 @@ export function mapDomainError(
           }),
         };
 
+      case "ForbiddenError":
+        return {
+          status: 403,
+          body: formatApiError({
+            code: "FORBIDDEN",
+            message:
+              typeof tagged.reason === "string" && tagged.reason.length > 0
+                ? tagged.reason
+                : "해당 작업을 수행할 권한이 없습니다.",
+            requestId,
+          }),
+        };
+
       case "AccountUpgradeRequiredError":
         return {
           status: 403,
@@ -83,7 +96,7 @@ export function mapDomainError(
           }),
         };
 
-      case "ConflictError":
+      case "RevisionConflictError":
         return {
           status: 409,
           body: formatApiError({
@@ -97,6 +110,19 @@ export function mapDomainError(
               expectedRevision: tagged.expectedRevision,
               actualRevision: tagged.actualRevision,
             },
+          }),
+        };
+
+      case "StateConflictError":
+        return {
+          status: 409,
+          body: formatApiError({
+            code: "STATE_CONFLICT",
+            message:
+              typeof tagged.message === "string" && tagged.message.length > 0
+                ? tagged.message
+                : "현재 상태에서는 요청한 작업을 수행할 수 없습니다.",
+            requestId,
           }),
         };
 

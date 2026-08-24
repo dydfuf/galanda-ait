@@ -4,10 +4,12 @@ import { Context, Effect } from "effect";
 import { runEffect } from "./effect-handler.ts";
 import { RequestScopeService } from "./request-scope.ts";
 import {
-  ConflictError,
+  ForbiddenError,
   NotFoundError,
   RepositoryError,
+  RevisionConflictError,
   SessionUnavailableError,
+  StateConflictError,
   UnauthorizedError,
   ValidationError,
 } from "../../src/core/domain/errors.ts";
@@ -146,13 +148,13 @@ describe("runEffect", () => {
     expect(body.error.requestId).toBe("test-request-id-999");
   });
 
-  it("maps ConflictError to 409 REVISION_CONFLICT with revision details", async () => {
+  it("maps RevisionConflictError to 409 REVISION_CONFLICT with revision details", async () => {
     const app = createTestApp();
     app.get("/err", (c) =>
       runEffect(
         c,
         Effect.fail(
-          new ConflictError({
+          new RevisionConflictError({
             message: "버전이 충돌했습니다.",
             expectedRevision: 1,
             actualRevision: 2,
@@ -176,6 +178,33 @@ describe("runEffect", () => {
     expect(body.error.details).toEqual({
       expectedRevision: 1,
       actualRevision: 2,
+    });
+  });
+
+  it("keeps authorization and state conflicts distinct", async () => {
+    const app = createTestApp();
+    app.get("/forbidden", (c) =>
+      runEffect(c, Effect.fail(new ForbiddenError({ reason: "권한이 없습니다." })))
+    );
+    app.get("/state-conflict", (c) =>
+      runEffect(
+        c,
+        Effect.fail(new StateConflictError({ message: "이미 확정되었습니다." }))
+      )
+    );
+
+    const forbidden = await app.fetch(new Request("https://example.com/forbidden"));
+    const stateConflict = await app.fetch(
+      new Request("https://example.com/state-conflict")
+    );
+
+    expect(forbidden.status).toBe(403);
+    await expect(forbidden.json()).resolves.toMatchObject({
+      error: { code: "FORBIDDEN" },
+    });
+    expect(stateConflict.status).toBe(409);
+    await expect(stateConflict.json()).resolves.toMatchObject({
+      error: { code: "STATE_CONFLICT" },
     });
   });
 

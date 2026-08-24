@@ -280,8 +280,9 @@ export const buildConfirmPlanSummary = (
 /**
  * 확정 요청을 실제로 보낼지 판단해요.
  *
- * 확정은 revision 낙관적 락을 사용하므로, 빠른 중복 탭으로 두 요청이 나가면
- * 뒤이은 요청이 ConflictError로 실패해요. 진행 중이거나 이미 확정된 경우 요청을 막아요.
+ * 확정 요청은 revision 낙관적 락을 사용해요. 중복 요청은 읽기/저장 타이밍에 따라
+ * RevisionConflictError 또는 이미 확정된 상태를 나타내는 StateConflictError로 실패할 수 있어요.
+ * UI에서는 진행 중이거나 이미 확정된 경우 요청 자체를 막아요.
  */
 export const canSubmitConfirm = ({
   state,
