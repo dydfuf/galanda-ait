@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect";
+import { Clock, Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
@@ -112,6 +112,23 @@ const CreatePlanCommandSchema = Schema.Struct({
   cloneFromPlanId: Schema.optional(PlanIdSchema),
 });
 
+const hasDecisionInputChanges = (
+  before: TripPlan,
+  after: TripPlan
+): boolean => JSON.stringify([
+  before.baseHeadcount,
+  before.routes,
+  before.accommodations,
+  before.transports,
+  before.places,
+]) !== JSON.stringify([
+  after.baseHeadcount,
+  after.routes,
+  after.accommodations,
+  after.transports,
+  after.places,
+]);
+
 export const createPlan = Effect.fn("createPlan")(
   function* (input: CreatePlanCommand) {
     // 1. 인증 세션 확인 (단일 권한 주체, 입력 검증보다 먼저 수행)
@@ -167,6 +184,7 @@ export const createPlan = Effect.fn("createPlan")(
     // 4. 비결정적 값과 서버 소유 필드 결정 (Application 경계)
     const ids = yield* IdGenerator;
     const generatedPlanId = yield* ids.planId;
+    const publishedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
     let finalPlan: TripPlan = {
       id: generatedPlanId,
       title: command.title.trim(),
@@ -178,7 +196,9 @@ export const createPlan = Effect.fn("createPlan")(
       places: command.places,
       authorId: session.participantId,
       authorName: actor.member?.name ?? session.name,
-      status: "DRAFT",
+      status: "VOTING",
+      revision: RevisionSchema.make(1),
+      publishedAt,
       memberOpinions: [],
       voteCount: 0,
       clonedFromPlanId: sourcePlan?.id,
@@ -276,21 +296,28 @@ export const updatePlan = Effect.fn("updatePlan")(
       existingPlan.authorName ?? uniqueAuthorMember?.name;
 
     // 7. 서버가 소유하는 필드는 입력값을 신뢰하지 않고 기존 여행안에서 이어받는다
-    //    - status: 확정 Use Case만 변경할 수 있다
-    //    - memberOpinions/voteCount: 의견 제출 Use Case만 변경할 수 있다 (타인의 의견·투표 보호)
+    //    - status/revision/publishedAt: 공개 반영 시 서버가 결정한다
+    //    - memberOpinions/voteCount: 입력으로 덮어쓰지 않고, 의사결정 필드 변경 때만 초기화한다
     //    - clonedFromPlanId: 생성 시점에 정해지는 복제 계보이므로 수정 대상이 아니다
     //    입력에서 받는 값은 작성자가 편집하는 내용(제목, 제안 이유, 인원, 경로, 숙소, 교통, 장소)뿐이다
+    const publishedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
     let finalPlan: TripPlan = {
       ...input.plan,
       id: existingPlan.id,
       title: input.plan.title.trim(),
-      status: existingPlan.status,
+      status: "VOTING",
+      revision: RevisionSchema.make((existingPlan.revision ?? 1) + 1),
+      publishedAt,
       authorId: resolvedAuthorId,
       authorName: resolvedAuthorName,
       clonedFromPlanId: existingPlan.clonedFromPlanId,
       memberOpinions: existingPlan.memberOpinions,
       voteCount: existingPlan.voteCount,
     };
+
+    if (hasDecisionInputChanges(existingPlan, finalPlan)) {
+      finalPlan = { ...finalPlan, memberOpinions: [], voteCount: 0 };
+    }
 
     // 8. 복제된 여행안인 경우, 변경사항 재계산하여 동기화
     if (finalPlan.clonedFromPlanId) {

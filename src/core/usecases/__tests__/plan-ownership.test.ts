@@ -337,7 +337,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       const created = res.plans.find((p) => p.title === "신규 제안");
       expect(created?.authorId).toBe(authorUser.id);
       expect(created?.authorName).toBe(authorUser.name);
-      expect(created?.status).toBe("DRAFT");
+      expect(created?.status).toBe("VOTING");
+      expect(created?.revision).toBe(1);
+      expect(Date.parse(created?.publishedAt ?? "")).not.toBeNaN();
       expect(created?.memberOpinions).toEqual([]);
       expect(created?.voteCount).toBe(0);
     });
@@ -372,7 +374,8 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       const clone = res.plans.find((p) => p.title === "복제한 대안");
       expect(clone?.id).not.toBe(sourcePlan.id);
       expect(clone?.authorId).toBe(authorUser.id);
-      expect(clone?.status).toBe("DRAFT");
+      expect(clone?.status).toBe("VOTING");
+      expect(clone?.revision).toBe(1);
       expect(clone?.memberOpinions).toEqual([]);
       expect(clone?.voteCount).toBe(0);
       expect(clone?.clonedFromPlanId).toBe(sourcePlan.id);
@@ -397,6 +400,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       const target = res.plans.find((p) => p.id === authorPlan.id);
       expect(target?.title).toBe("작성자가 수정한 제목");
       expect(target?.authorId).toBe(authorUser.id);
+      expect(target?.status).toBe("VOTING");
+      expect(target?.revision).toBe(2);
+      expect(Date.parse(target?.publishedAt ?? "")).not.toBeNaN();
     });
 
     it("방장(HOST)이라도 타인의 여행안 수정을 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
@@ -970,6 +976,8 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(target?.proposalReason).toBe("숙소를 바꿨어요");
       expect(target?.baseHeadcount).toBe(5);
       expect(target?.routes).toEqual([{ city: "서귀포", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }]);
+      expect(target?.memberOpinions).toEqual([]);
+      expect(target?.voteCount).toBe(0);
     });
 
     it("확정된 여행안은 작성자도 수정할 수 없고 원본이 보존된다", async () => {

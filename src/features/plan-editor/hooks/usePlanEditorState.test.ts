@@ -9,6 +9,7 @@ import {
   type StoredPlanEditorDraft,
 } from "./usePlanEditorState.ts";
 import type { TripPlan, TripRoom } from "../../../core/domain/room.ts";
+import { RevisionSchema } from "../../../core/domain/ids.ts";
 
 const validDraft = {
   ownerId: "user-a",
@@ -59,6 +60,13 @@ describe("parsePlanEditorDraft", () => {
 
     expect(hasDraftBaseChanged(before, current)).toBe(true);
     expect(hasDraftBaseChanged(current, current)).toBe(false);
+  });
+
+  it("공개본 내용이 같아도 revision이 바뀌면 기존 draft를 stale로 판정한다", () => {
+    const before = getPlanFingerprint({ title: "기존 여행안", revision: RevisionSchema.make(1) });
+    const current = getPlanFingerprint({ title: "기존 여행안", revision: RevisionSchema.make(2) });
+
+    expect(hasDraftBaseChanged(before, current)).toBe(true);
   });
 });
 

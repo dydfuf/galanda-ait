@@ -165,6 +165,8 @@ describe("API client", () => {
       id: planId,
       title: "수정안",
       status: "CONFIRMED" as const,
+      revision: RevisionSchema.make(99),
+      publishedAt: "2026-08-24T00:00:00.000Z",
       authorId: UserIdSchema.make("attacker"),
       authorName: "Attacker",
       places: [],
