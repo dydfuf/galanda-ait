@@ -5,7 +5,10 @@ import {
   getDraftSaveStatusLabel,
   type usePlanEditorState,
 } from "../hooks/usePlanEditorState.ts";
-import { PlanEditorSections } from "./PlanEditorSections.tsx";
+import {
+  PlanEditorSections,
+  RevisionConflictChoice,
+} from "./PlanEditorSections.tsx";
 
 describe("PlanEditorSections", () => {
   it("draft 저장 상태별 문구를 구분한다", () => {
@@ -43,5 +46,17 @@ describe("PlanEditorSections", () => {
     expect(html).toContain("가격 미정");
     expect(html).not.toContain("숙소 찾는 중");
     expect(html).not.toContain("항공 / KTX");
+  });
+
+  it("revision 충돌에서 내 변경 재적용과 최신 공개본 사용을 명시적으로 선택한다", () => {
+    const html = renderToStaticMarkup(createElement(RevisionConflictChoice, {
+      message: "v3에서 v4로 변경됐어요.",
+      onReapply: () => undefined,
+      onUseLatest: () => undefined,
+    }));
+
+    expect(html).toContain("내 변경 다시 적용");
+    expect(html).toContain("최신 공개본 사용");
+    expect(html).toContain("v3에서 v4로 변경됐어요.");
   });
 });

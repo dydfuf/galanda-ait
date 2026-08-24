@@ -108,6 +108,9 @@ export function calculatePlanDifference(
   }
 
   const parts: string[] = [...routeChanges];
+  if (current.title !== originalPlan.title) {
+    parts.push("제목 변경");
+  }
   if (isAccommodationChanged && routeChanges.length === 0) {
     parts.push("숙소 변경");
   }

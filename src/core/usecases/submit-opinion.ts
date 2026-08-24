@@ -4,6 +4,7 @@ import { requireAuthSession } from "../ports/session.ts";
 import {
   requirePlanInRoom,
   requireRoomPermission,
+  requireRoomUnconfirmed,
 } from "../domain/auth-guards.ts";
 import type { PlanId, Revision, TripId } from "../domain/ids.ts";
 import type { PlanMemberOpinion } from "../domain/room.ts";
@@ -63,6 +64,11 @@ export const submitOpinion = Effect.fn("submitOpinion")(
       session.participantIds,
       "opinion:submit",
       "여행방 참여자만 의견 및 투표를 남길 수 있습니다."
+    );
+
+    yield* requireRoomUnconfirmed(
+      room,
+      "확정된 여행에서는 의견을 변경할 수 없습니다."
     );
 
     // 4. 대상 플랜 존재 여부 검증

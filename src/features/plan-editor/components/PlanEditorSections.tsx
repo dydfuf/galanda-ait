@@ -28,6 +28,34 @@ interface PlanEditorSectionsProps {
   readonly onCompleteSection: () => void;
 }
 
+export function RevisionConflictChoice({
+  message,
+  onReapply,
+  onUseLatest,
+}: {
+  readonly message: string;
+  readonly onReapply: () => void;
+  readonly onUseLatest: () => void;
+}): JSX.Element {
+  return (
+    <div role="alert">
+      <PageTitle
+        className="px-0"
+        title="다른 변경이 먼저 반영됐어요"
+        description={message}
+      />
+      <div className="flex flex-col gap-2 pt-2">
+        <Button type="button" size="xl" variant="secondary" onClick={onReapply}>
+          내 변경 다시 적용
+        </Button>
+        <Button type="button" size="xl" onClick={onUseLatest}>
+          최신 공개본 사용
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function SummaryRow({
   title,
   summary,

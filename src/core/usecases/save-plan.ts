@@ -4,10 +4,10 @@ import { requireAuthSession } from "../ports/session.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
 import { calculatePlanDifference } from "../calculations/plan-diff.ts";
 import {
-  requireMutablePlan,
   requirePlanAuthor,
   requirePlanInRoom,
   requireRoomPermission,
+  requireRoomUnconfirmed,
 } from "../domain/auth-guards.ts";
 import {
   PlanIdSchema,
@@ -151,6 +151,11 @@ export const createPlan = Effect.fn("createPlan")(
       session.participantIds
     );
 
+    yield* requireRoomUnconfirmed(
+      room,
+      "확정된 여행에서는 새 여행안을 만들 수 없습니다."
+    );
+
     // 2. RBAC: 세션 사용자의 'plan:create' 권한 검증
     const actor = yield* requireRoomPermission(
       room,
@@ -245,10 +250,9 @@ export const updatePlan = Effect.fn("updatePlan")(
       "여행안 작성자만 여행안을 수정할 수 있습니다."
     );
 
-    // 6. 확정본 불변성 검증: 방 전체가 공유하는 공개본은 작성자도 수정할 수 없다
-    yield* requireMutablePlan(
+    // 6. 확정 이후에는 Plan 기록 전체를 잠그고 확정 일정에서만 변경한다.
+    yield* requireRoomUnconfirmed(
       room,
-      existingPlan,
       "확정된 여행안은 수정할 수 없습니다."
     );
 
@@ -361,10 +365,9 @@ export const deletePlan = Effect.fn("deletePlan")(
       "여행안 작성자만 여행안을 삭제할 수 있습니다."
     );
 
-    // 4. 확정본 불변성 검증: 확정된 여행안을 지우면 방의 공개된 결정이 사라지므로 거부한다
-    yield* requireMutablePlan(
+    // 4. 확정 이후에는 Plan 기록 전체를 잠그고 확정 일정에서만 변경한다.
+    yield* requireRoomUnconfirmed(
       room,
-      plan,
       "확정된 여행안은 삭제할 수 없습니다."
     );
 

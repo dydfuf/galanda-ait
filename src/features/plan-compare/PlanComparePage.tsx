@@ -3,7 +3,12 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, CompareQuerySchema, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { toUserMessage } from "../common/error-message.ts";
+import {
+  isRevisionConflict,
+  isStateConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
@@ -50,11 +55,12 @@ export function PlanComparePage() {
     right: rightParam,
   });
 
-  const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
+  const { data: room, isLoading, isError, error, refetch } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -101,7 +107,7 @@ export function PlanComparePage() {
     );
   }
 
-  const isRoomConfirmed = Boolean(room.confirmedPlanId);
+  const isRoomConfirmed = room.isConfirmed;
   const confirmState = getCompareConfirmState({
     isViewerHost: room.isViewerHost,
     isRoomConfirmed,
@@ -122,12 +128,12 @@ export function PlanComparePage() {
         : "두 여행안의 핵심 구성이 같아요. 마음에 드는 안을 선택하세요.";
 
   const openConfirmSheet = (): void => {
-    if (!canSubmitConfirm({ state: confirmState, isPending: confirmPlanMutation.isPending })) return;
+    if (!canSubmitConfirm({ state: confirmState, isPending: confirmPlanMutation.isPending || isResolvingConflict })) return;
     setIsConfirmSheetOpen(true);
   };
 
   const handleConfirmSubmit = async (): Promise<void> => {
-    if (confirmPlanMutation.isPending) return;
+    if (confirmPlanMutation.isPending || isResolvingConflict) return;
 
     setConfirmError(null);
     try {
@@ -139,7 +145,18 @@ export function PlanComparePage() {
       navigate(`/trips/${tripId}/itinerary`, { replace: true });
     } catch (err: unknown) {
       setIsConfirmSheetOpen(false);
-      setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        setIsResolvingConflict(true);
+        const refreshed = await refetch();
+        if (refreshed.isError || !refreshed.data) {
+          setConfirmError("최신 여행 상태를 불러오지 못했어요. 다시 시도해주세요.");
+        } else if (isRevisionConflict(err)) {
+          setConfirmError(toRevisionConflictMessage(err));
+        }
+        setIsResolvingConflict(false);
+      } else {
+        setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+      }
     }
   };
 
@@ -314,7 +331,7 @@ export function PlanComparePage() {
           <Button
             type="button"
             size="xl"
-            disabled={confirmPlanMutation.isPending}
+            disabled={confirmPlanMutation.isPending || isResolvingConflict}
             onClick={openConfirmSheet}
           >
             {confirmPlanMutation.isPending
@@ -329,7 +346,7 @@ export function PlanComparePage() {
         open={isConfirmSheetOpen}
         onOpenChange={(open) => {
           // 확정 요청 중에는 실수로 닫히지 않게 유지해요.
-          if (!open && !confirmPlanMutation.isPending) setIsConfirmSheetOpen(false);
+          if (!open && !confirmPlanMutation.isPending && !isResolvingConflict) setIsConfirmSheetOpen(false);
         }}
         showSwipeHandle
       >
@@ -347,7 +364,7 @@ export function PlanComparePage() {
               type="button"
               size="xl"
               variant="secondary"
-              disabled={confirmPlanMutation.isPending}
+              disabled={confirmPlanMutation.isPending || isResolvingConflict}
               onClick={() => setIsConfirmSheetOpen(false)}
             >
               다시 보기
@@ -355,7 +372,7 @@ export function PlanComparePage() {
             <Button
               type="button"
               size="xl"
-              disabled={confirmPlanMutation.isPending}
+              disabled={confirmPlanMutation.isPending || isResolvingConflict}
               onClick={() => void handleConfirmSubmit()}
             >
               {confirmPlanMutation.isPending ? "확정 중..." : "확정하기"}

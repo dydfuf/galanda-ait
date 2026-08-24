@@ -12,6 +12,7 @@ import type { TripMember, TripPlan, TripRoom, UserSession } from "../../domain/r
 import { SessionService } from "../../ports/session.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import { createPlan, updatePlan, deletePlan } from "../save-plan.ts";
+import { submitOpinion } from "../submit-opinion.ts";
 import { createTripRoom } from "../create-room.ts";
 import {
   isPlanAuthor,
@@ -20,6 +21,7 @@ import {
   requirePlanAuthor,
   hasResolvablePlanAuthor,
   canManagePlan,
+  canMutatePlan,
 } from "../../domain/auth-guards.ts";
 import {
   ForbiddenError,
@@ -387,7 +389,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
     it("clone은 현재 세션 작성자와 새 서버 소유 상태로 생성된다", async () => {
       const sourcePlan: TripPlan = {
         ...hostPlan,
-        status: "CONFIRMED",
+        status: "VOTING",
         memberOpinions: [{
           userId: authorUser.id,
           userName: authorUser.name,
@@ -1086,6 +1088,53 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(check.plans.some((p) => p.id === confirmedPlan.id)).toBe(true);
       expect(check.confirmedPlanId).toBe(confirmedPlan.id);
       expect(check.revision).toBe(1);
+    });
+
+    it("방이 확정되면 다른 미확정 Plan의 생성·수정·삭제·의견 변경도 모두 잠근다", async () => {
+      const lockedRoom = {
+        ...roomWithConfirmed,
+        plans: [opinionsPlan, confirmedPlan],
+      };
+      const env = Layer.merge(
+        createInMemoryRepo([lockedRoom]),
+        createSessionLayer(authorSession)
+      );
+
+      expect(canMutatePlan(lockedRoom, opinionsPlan, authorSession.participantIds)).toBe(false);
+      const programs = [
+        createPlan({
+          roomId: lockedRoom.id,
+          expectedRevision: lockedRoom.revision,
+          title: "새 대안",
+          ...publishablePlanFields,
+          places: [],
+        }),
+        updatePlan({
+          roomId: lockedRoom.id,
+          plan: { ...opinionsPlan, title: "확정 후 수정" },
+          expectedRevision: lockedRoom.revision,
+        }),
+        deletePlan({
+          roomId: lockedRoom.id,
+          planId: opinionsPlan.id,
+          expectedRevision: lockedRoom.revision,
+        }),
+        submitOpinion({
+          roomId: lockedRoom.id,
+          planId: opinionsPlan.id,
+          opinion: { reaction: "LIKE" },
+          expectedRevision: lockedRoom.revision,
+        }),
+      ];
+
+      const errors = await Promise.all(
+        programs.map((program) =>
+          Effect.runPromise(program.pipe(Effect.provide(env))).catch((error: unknown) => error)
+        )
+      );
+
+      expect(errors.every((error) => error instanceof StateConflictError)).toBe(true);
+      expect((await readRoom(env, lockedRoom.id)).revision).toBe(lockedRoom.revision);
     });
 
     it("status가 확정이 아니어도 방의 confirmedPlanId가 가리키는 여행안은 변경할 수 없다", async () => {

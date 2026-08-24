@@ -5,7 +5,9 @@ import {
   getPlanFingerprint,
   hasDraftBaseChanged,
   parsePlanEditorDraft,
+  rebasePlanEditorData,
   savePlanEditorDraft,
+  type PlanEditorFormData,
   type StoredPlanEditorDraft,
 } from "./usePlanEditorState.ts";
 import type { TripPlan, TripRoom } from "../../../core/domain/room.ts";
@@ -134,6 +136,29 @@ describe("plan editor initial data", () => {
     };
 
     expect(getPlanEditorInitialData(room, legacyPlan).accommodations[0]?.hotelName).toBe("");
+  });
+});
+
+describe("plan conflict rebase (RAON-158)", () => {
+  it("내가 바꾼 제목과 다른 사용자가 바꾼 숙소를 함께 보존한다", () => {
+    const base = {
+      title: "오사카 여행",
+      proposalReason: "",
+      baseHeadcount: 4,
+      routes: validDraft.routes,
+      accommodations: [{ ...validDraft.accommodations[0], hotelName: "A 호텔" }],
+      transports: validDraft.transports,
+    } as PlanEditorFormData;
+    const local = { ...base, title: "오사카 맛집 여행" };
+    const latest = {
+      ...base,
+      accommodations: [{ ...base.accommodations[0], hotelName: "B 호텔" }],
+    };
+
+    const rebased = rebasePlanEditorData(base, local, latest);
+
+    expect(rebased.title).toBe("오사카 맛집 여행");
+    expect(rebased.accommodations[0]?.hotelName).toBe("B 호텔");
   });
 });
 

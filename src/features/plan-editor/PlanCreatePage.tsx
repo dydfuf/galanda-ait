@@ -13,7 +13,13 @@ import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
 import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
-import { toUserMessage } from "../common/error-message.ts";
+import {
+  isRevisionConflict,
+  isStateConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
+import { isRoomConfirmed } from "../../core/domain/auth-guards.ts";
 
 const pageContainerStyle = css`
   padding: 16px 20px var(--app-cta-space, 112px);
@@ -52,7 +58,7 @@ export function PlanCreatePage(): JSX.Element {
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
-  const { data: room, isLoading, isError } = useTripRoomRawQuery(tripId);
+  const { data: room, isLoading, isError, refetch } = useTripRoomRawQuery(tripId);
   const {
     data: session,
     isLoading: isSessionLoading,
@@ -101,6 +107,17 @@ export function PlanCreatePage(): JSX.Element {
     );
   }
 
+  if (isRoomConfirmed(room)) {
+    return (
+      <RouteErrorFallback
+        title="확정된 여행에서는 여행안을 만들 수 없습니다"
+        message="확정 이후 변경은 확정 일정에서 진행해주세요."
+        actionText="확정 일정 보기"
+        onAction={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+      />
+    );
+  }
+
   const handleSubmit = async (): Promise<void> => {
     if (!editor.validation.isValid || isSubmitting) return;
 
@@ -131,8 +148,20 @@ export function PlanCreatePage(): JSX.Element {
       }
     } catch (err: unknown) {
       // 비로그인·권한 부족 등 작성 실패 사유를 화면에 그대로 전달한다
-      setIsSubmitting(false);
-      setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        const refreshed = await refetch();
+        setIsSubmitting(false);
+        if (refreshed.isError || !refreshed.data) {
+          setErrorMsg("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
+        } else if (isRevisionConflict(err)) {
+          setErrorMsg(toRevisionConflictMessage(err));
+        } else if (!isRoomConfirmed(refreshed.data)) {
+          setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
+        }
+      } else {
+        setIsSubmitting(false);
+        setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
+      }
     }
   };
 

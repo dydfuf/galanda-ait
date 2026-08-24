@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { toUserMessage } from "../error-message.ts";
+import { ApiClientError } from "../../../app/api-client.ts";
+import {
+  isRevisionConflict,
+  isStateConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../error-message.ts";
 import {
   SessionUnavailableError,
   UnauthorizedError,
@@ -53,5 +59,21 @@ describe("toUserMessage (RAON-149)", (): void => {
     expect(toUserMessage(undefined, FALLBACK)).toBe(FALLBACK);
     expect(toUserMessage(null, FALLBACK)).toBe(FALLBACK);
     expect(toUserMessage({}, FALLBACK)).toBe(FALLBACK);
+  });
+});
+
+describe("revision conflict recovery (RAON-210)", (): void => {
+  const conflict = new ApiClientError({
+    status: 409,
+    code: "REVISION_CONFLICT",
+    message: "conflict",
+    details: { expectedRevision: 3, actualRevision: 4 },
+  });
+
+  it("revision conflict만 복구 대상으로 분류하고 revision 변화를 안내한다", (): void => {
+    expect(isRevisionConflict(conflict)).toBe(true);
+    expect(isRevisionConflict(new ApiClientError({ status: 409, code: "STATE_CONFLICT", message: "conflict" }))).toBe(false);
+    expect(isStateConflict(new ApiClientError({ status: 409, code: "STATE_CONFLICT", message: "conflict" }))).toBe(true);
+    expect(toRevisionConflictMessage(conflict)).toContain("v3 → v4");
   });
 });

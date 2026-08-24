@@ -13,6 +13,43 @@ export interface PlanEditorFormData {
   readonly clonedFromPlanId?: string;
 }
 
+const sameValue = (left: unknown, right: unknown): boolean =>
+  JSON.stringify(left) === JSON.stringify(right);
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const rebaseValue = <T,>(base: T, local: T, latest: T): T => {
+  if (sameValue(local, base)) return structuredClone(latest);
+  if (sameValue(latest, base)) return structuredClone(local);
+  if (
+    Array.isArray(base) &&
+    Array.isArray(local) &&
+    Array.isArray(latest) &&
+    base.length === local.length &&
+    base.length === latest.length
+  ) {
+    return base.map((value, index) =>
+      rebaseValue(value, local[index], latest[index])
+    ) as T;
+  }
+  if (isPlainRecord(base) && isPlainRecord(local) && isPlainRecord(latest)) {
+    return Object.fromEntries(
+      Object.keys({ ...base, ...local, ...latest }).map((key) => [
+        key,
+        rebaseValue(base[key], local[key], latest[key]),
+      ])
+    ) as T;
+  }
+  return structuredClone(local);
+};
+
+export const rebasePlanEditorData = (
+  base: PlanEditorFormData,
+  local: PlanEditorFormData,
+  latest: PlanEditorFormData
+): PlanEditorFormData => rebaseValue(base, local, latest);
+
 export type DraftSaveStatus = "IDLE" | "SAVING" | "SAVED" | "ERROR";
 
 export const getDraftSaveStatusLabel = (status: DraftSaveStatus): string => ({
@@ -188,7 +225,8 @@ export function usePlanEditorState(
   room: TripRoom | undefined,
   initialPlan?: TripPlan,
   cloneFromPlan?: TripPlan,
-  userId?: string
+  userId?: string,
+  pauseDraftSave = false
 ) {
   const initialData = useMemo(
     () => getPlanEditorInitialData(room, initialPlan, cloneFromPlan),
@@ -362,7 +400,7 @@ export function usePlanEditorState(
 
   // 자동 임시 저장 (로컬스토리지 Draft)
   useEffect(() => {
-    if (!draftKey || !userId || hydratedEditorId !== editorId || draftConflict) return;
+    if (!draftKey || !userId || hydratedEditorId !== editorId || draftConflict || pauseDraftSave) return;
     setDraftSaveStatus("SAVING");
     const updatedAt = new Date().toISOString();
     const draftData = {
@@ -379,7 +417,7 @@ export function usePlanEditorState(
     };
     const status = savePlanEditorDraft(localStorage, draftKey, draftData);
     setDraftSaveStatus(status);
-  }, [draftKey, editorId, hydratedEditorId, draftConflict, userId, basePlanFingerprint, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
+  }, [draftKey, editorId, hydratedEditorId, draftConflict, pauseDraftSave, userId, basePlanFingerprint, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
 
   const discardDraft = useCallback(() => {
     if (!draftKey) return;
@@ -413,6 +451,16 @@ export function usePlanEditorState(
     setDraftConflict(undefined);
   }, [discardDraft, resetToInitialData]);
 
+  const replaceFormData = useCallback((data: PlanEditorFormData) => {
+    setTitle(data.title);
+    setProposalReason(data.proposalReason);
+    setBaseHeadcount(data.baseHeadcount);
+    setRoutes(data.routes);
+    setAccommodations(data.accommodations);
+    setTransports(data.transports);
+    markDraftSaving();
+  }, [markDraftSaving]);
+
   return {
     title,
     setTitle: (val: string) => { setTitle(val); markDraftSaving(); },
@@ -443,5 +491,6 @@ export function usePlanEditorState(
     draftConflict: Boolean(draftConflict),
     restoreConflictingDraft,
     useLatestPublishedPlan,
+    replaceFormData,
   };
 }
