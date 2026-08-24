@@ -1,5 +1,9 @@
 import type { TripPlan, TripRoom } from "../../core/domain/room.ts";
-import { getStayNightCount, getTripRoomDisplayDate } from "../../core/domain/room.ts";
+import {
+  getPlanNightCount,
+  getStayNightCount,
+  getTripRoomDisplayDate,
+} from "../../core/domain/room.ts";
 import { formatCostRangeText } from "../../core/calculations/plan-cost.ts";
 
 /** 화면 표기용 경로 구간. 도메인 CityStay(날짜 기반)에서 박 수를 계산해 만들어요. */
@@ -115,16 +119,6 @@ export function parseYMD(dateStr?: string): YMD | null {
   return { year, month, day };
 }
 
-export function addDaysToYMD(ymd: YMD, days: number): YMD {
-  const d = new Date(ymd.year, ymd.month - 1, ymd.day);
-  d.setDate(d.getDate() + days);
-  return {
-    year: d.getFullYear(),
-    month: d.getMonth() + 1,
-    day: d.getDate(),
-  };
-}
-
 export function formatKoreanDate(ymd: YMD): string {
   return `${ymd.month}월 ${ymd.day}일`;
 }
@@ -225,20 +219,13 @@ export function toItineraryViewModel(
     confirmedPlan.baseHeadcount ?? (room.members.length > 0 ? room.members.length : 1);
 
   const route: ReadonlyArray<ItineraryRouteSegment> =
-    confirmedPlan.routes && confirmedPlan.routes.length > 0
-      ? confirmedPlan.routes.map((stay) => ({
-          city: stay.city,
-          nights: getStayNightCount(stay),
-        }))
-      : confirmedPlan.places.length > 0
-        ? confirmedPlan.places.slice(0, 3).map((place, pIdx) => ({
-            city: place.name.split(" ")[0] || room.destination,
-            nights: pIdx === 0 ? 1 : 2,
-          }))
-        : [{ city: room.destination, nights: 1 }];
+    confirmedPlan.routes?.map((stay) => ({
+      city: stay.city,
+      nights: getStayNightCount(stay),
+    })) ?? [];
 
-  const nights = route.reduce((acc, curr) => acc + curr.nights, 0) || 1;
-  const days = nights + 1;
+  const nights = getPlanNightCount(confirmedPlan);
+  const days = nights > 0 ? nights + 1 : 0;
 
   const accommodations = confirmedPlan.accommodations ?? [];
   const transports = confirmedPlan.transports ?? [];
@@ -319,7 +306,6 @@ export function toItineraryViewModel(
   }
 
   // 2. 날짜별 섹션 생성 (Chronological Timeline Scheduling)
-  const startYMD = parseYMD(displayRange?.startDate);
   const normalize = (s?: string) => (s ? s.trim().toLowerCase().replace(/\s+/g, "") : "");
 
   interface ScheduledStay {
@@ -327,22 +313,16 @@ export function toItineraryViewModel(
     readonly index: number;
     readonly startYMD?: YMD;
     readonly endYMD?: YMD;
-    readonly startDay: number;
-    readonly endDay: number;
     readonly orderKey: number;
   }
 
   const scheduledStays: ScheduledStay[] = [];
-  let currentStayYMD: YMD | undefined = startYMD ?? undefined;
-  let currentDay = 1;
-
   for (let i = 0; i < accommodations.length; i++) {
     const acc = accommodations[i];
-    const stayNights = acc.nights || 1;
-    const stayStartYMD = currentStayYMD;
-    const stayEndYMD = currentStayYMD ? addDaysToYMD(currentStayYMD, stayNights) : undefined;
-    const startDay = currentDay;
-    const endDay = currentDay + stayNights;
+    const routeStay = confirmedPlan.routes?.[i];
+    const hasMatchingRoute = routeStay && normalize(routeStay.city) === normalize(acc.city);
+    const stayStartYMD = hasMatchingRoute ? (parseYMD(routeStay.arrivalDate) ?? undefined) : undefined;
+    const stayEndYMD = hasMatchingRoute ? (parseYMD(routeStay.departureDate) ?? undefined) : undefined;
     const orderKey = i * 10 + 5; // e.g., 5, 15, 25...
 
     scheduledStays.push({
@@ -350,13 +330,8 @@ export function toItineraryViewModel(
       index: i,
       startYMD: stayStartYMD,
       endYMD: stayEndYMD,
-      startDay,
-      endDay,
       orderKey,
     });
-
-    currentStayYMD = stayEndYMD;
-    currentDay = endDay;
   }
 
   interface TimelineEvent {
@@ -389,7 +364,7 @@ export function toItineraryViewModel(
         : acc.period;
     const dateHeader = stay.startYMD
       ? `${formatKoreanDate(stay.startYMD)} · ${acc.city}`
-      : `Day ${stay.startDay} · ${acc.city}`;
+      : acc.city;
 
     const stayItem: ItineraryStayItem = {
       type: "STAY",
@@ -423,90 +398,7 @@ export function toItineraryViewModel(
   // 교통편 이벤트 등록 (독립적 시간순 배치)
   for (let j = 0; j < transports.length; j++) {
     const trans = transports[j];
-    const fromCity = normalize(trans.fromCity);
-    const toCity = normalize(trans.toCity);
-
-    let transOrderKey: number;
-    let transYMD: YMD | undefined;
-    let transDay: number | undefined;
-
-    if (scheduledStays.length === 0) {
-      transYMD = startYMD ? (j === 0 ? startYMD : addDaysToYMD(startYMD, j)) : undefined;
-      transDay = j + 1;
-      transOrderKey = j * 10;
-    } else {
-      const firstStay = scheduledStays[0];
-      const lastStay = scheduledStays[scheduledStays.length - 1];
-
-      // 1) 인바운드 이동 (첫 숙소 도착 전)
-      const isInbound =
-        j === 0 &&
-        toCity === normalize(firstStay.acc.city) &&
-        fromCity !== normalize(firstStay.acc.city);
-
-      // 2) 도시 간 이동 (숙소 k -> 숙소 k+1)
-      let transferMatchIndex = -1;
-      for (let k = 0; k < scheduledStays.length - 1; k++) {
-        const currentStayCity = normalize(scheduledStays[k].acc.city);
-        const nextStayCity = normalize(scheduledStays[k + 1].acc.city);
-        if (fromCity === currentStayCity && toCity === nextStayCity) {
-          transferMatchIndex = k;
-          break;
-        }
-      }
-
-      if (isInbound) {
-        transYMD = firstStay.startYMD;
-        transDay = firstStay.startDay;
-        transOrderKey = firstStay.orderKey - 2 + j * 0.01;
-      } else if (transferMatchIndex !== -1) {
-        const stayK = scheduledStays[transferMatchIndex];
-        transYMD = stayK.endYMD;
-        transDay = stayK.endDay;
-        transOrderKey = stayK.orderKey + 2 + j * 0.01;
-      } else if (
-        fromCity === normalize(lastStay.acc.city) &&
-        toCity !== normalize(lastStay.acc.city)
-      ) {
-        // 3) 아웃바운드 이동 (마지막 숙소 체크아웃 후)
-        transYMD = lastStay.endYMD;
-        transDay = lastStay.endDay;
-        transOrderKey = lastStay.orderKey + 2 + j * 0.01;
-      } else {
-        // 4) 도시 매칭 폴백
-        const fromStayIdx = scheduledStays.findIndex(
-          (s) => normalize(s.acc.city) === fromCity
-        );
-        const toStayIdx = scheduledStays.findIndex(
-          (s) => normalize(s.acc.city) === toCity
-        );
-
-        if (fromStayIdx !== -1) {
-          const stayFrom = scheduledStays[fromStayIdx];
-          transYMD = stayFrom.endYMD;
-          transDay = stayFrom.endDay;
-          transOrderKey = stayFrom.orderKey + 2 + j * 0.01;
-        } else if (toStayIdx !== -1) {
-          const stayTo = scheduledStays[toStayIdx];
-          transYMD = stayTo.startYMD;
-          transDay = stayTo.startDay;
-          transOrderKey = stayTo.orderKey - 2 + j * 0.01;
-        } else {
-          // 5) 순서 기반 fallback
-          if (j === 0 && transports.length > scheduledStays.length) {
-            transYMD = firstStay.startYMD;
-            transDay = firstStay.startDay;
-            transOrderKey = firstStay.orderKey - 2 + j * 0.01;
-          } else {
-            const targetIdx = Math.min(j, scheduledStays.length - 1);
-            const targetStay = scheduledStays[targetIdx];
-            transYMD = targetStay.endYMD;
-            transDay = targetStay.endDay;
-            transOrderKey = targetStay.orderKey + 2 + j * 0.01;
-          }
-        }
-      }
-    }
+    const transOrderKey = accommodations.length * 10 + 10 + j;
 
     const transStatus: ItineraryStatus =
       trans.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : trans.bookingStatus;
@@ -516,11 +408,7 @@ export function toItineraryViewModel(
       : "가격 미정";
     const subText = `${trans.mode} · ${statusBadge.label}`;
     const routeTitle = `${trans.fromCity} → ${trans.toCity}`;
-    const dateHeader = transYMD
-      ? `${formatKoreanDate(transYMD)} · 이동`
-      : transDay
-        ? `Day ${transDay} · 이동`
-        : "이동";
+    const dateHeader = "이동";
 
     const transItem: ItineraryTransportItem = {
       type: "TRANSPORT",
@@ -545,9 +433,7 @@ export function toItineraryViewModel(
       type: "TRANSPORT",
       transItem,
       dateHeader,
-      dateStr: transYMD
-        ? `${transYMD.year}-${String(transYMD.month).padStart(2, "0")}-${String(transYMD.day).padStart(2, "0")}`
-        : undefined,
+      dateStr: undefined,
       id: `section-trans-${trans.id || j}`,
     });
   }
