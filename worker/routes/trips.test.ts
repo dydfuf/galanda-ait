@@ -78,6 +78,34 @@ const room: TripRoom = {
   confirmedPlanId: undefined,
 };
 const roomWithPlan: TripRoom = { ...room, plans: [plan] };
+const confirmedRoom: TripRoom = {
+  ...roomWithPlan,
+  plans: [{ ...plan, status: "CONFIRMED" }],
+  confirmedPlanId: plan.id,
+};
+const itinerarySnapshot = {
+  planTitle: plan.title,
+  destination: room.destination,
+  routes: plan.routes!,
+  items: [
+    { type: "TRANSPORT" as const, date: "2026-09-01", transport: plan.transports![0]! },
+    { type: "STAY" as const, date: "2026-09-01", endDate: "2026-09-04", accommodation: plan.accommodations![0]! },
+    { type: "TRANSPORT" as const, date: "2026-09-04", transport: plan.transports![1]! },
+  ],
+};
+const itineraryRowValues = (revision = 1, changes: unknown[] = []): Array<unknown> => [
+  "itinerary-1",
+  room.id,
+  plan.id,
+  1,
+  revision,
+  hostId,
+  "2026-08-24T00:00:00.000Z",
+  itinerarySnapshot,
+  changes,
+  hostId,
+  "2026-08-24T00:00:00.000Z",
+];
 
 const rowValues = (value: TripRoom): Array<unknown> => [
   value.id,
@@ -92,22 +120,28 @@ const rowValues = (value: TripRoom): Array<unknown> => [
 ];
 
 const makeApp = (
-  responses: Array<Array<Array<unknown>>>,
+  responses: Array<Array<Array<unknown>> | Error>,
   user: { readonly id: string; readonly name: string } | null | Error = {
     id: hostId,
     name: "Host",
   }
 ) => {
   const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+  const transactionCommands: string[] = [];
   const client = {
     query: async (
       config: { readonly text: string },
       params: unknown[] = []
     ) => {
       if (config.text.includes('from "participant_alias"')) return { rows: [] };
-      if (/^(begin|commit|rollback)/i.test(config.text)) return { rows: [] };
+      if (/^(begin|commit|rollback)/i.test(config.text)) {
+        transactionCommands.push(config.text.toLowerCase());
+        return { rows: [] };
+      }
       calls.push({ text: config.text, params });
-      return { rows: responses.shift() ?? [] };
+      const response = responses.shift() ?? [];
+      if (response instanceof Error) throw response;
+      return { rows: response };
     },
   };
   const db = drizzle(client as unknown as NodePgClient, { schema });
@@ -137,6 +171,7 @@ const makeApp = (
       },
     }),
     calls,
+    transactionCommands,
   };
 };
 
@@ -498,5 +533,136 @@ describe("Trip API vertical slice", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ status });
     }
+  });
+
+  it("일정 수정과 참여자 확인을 독립 revision transaction으로 저장한다", async () => {
+    const revised = makeApp([
+      [rowValues(confirmedRoom)],
+      [itineraryRowValues()],
+      [[2]],
+      [],
+    ]);
+    const reviseResponse = await revised.app.fetch(
+      request("/api/trips/trip-1/itinerary", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedRevision: 1,
+          patches: [
+            {
+              type: "STAY",
+              itemId: "stay-osaka",
+              date: "2026-09-01",
+              endDate: "2026-09-05",
+              hotelName: "새 오사카 호텔",
+              memo: "체크인 15시",
+            },
+            {
+              type: "TRANSPORT",
+              itemId: "return-osaka",
+              date: "2026-09-05",
+              fromCity: "오사카",
+              toCity: "인천",
+              mode: "항공",
+            },
+          ],
+        }),
+      }),
+      env
+    );
+
+    expect(reviseResponse.status).toBe(200);
+    await expect(reviseResponse.json()).resolves.toMatchObject({
+      currentRevision: 2,
+      changes: [
+        { itemId: "stay-osaka" },
+        { itemId: "return-osaka" },
+      ],
+    });
+    expect(revised.calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
+      "select",
+      "select",
+      "update",
+      "insert",
+    ]);
+    expect(revised.transactionCommands).toEqual(["begin", "commit"]);
+
+    const memberId = UserIdSchema.make("member-1");
+    const memberRoom = {
+      ...confirmedRoom,
+      members: [...confirmedRoom.members, { id: memberId, name: "Member", role: "MEMBER" as const }],
+    };
+    const acknowledged = makeApp([
+      [rowValues(memberRoom)],
+      [itineraryRowValues(2)],
+      [[2]],
+      [["itinerary-1", memberId, 2, "2026-08-25T00:00:00.000Z"]],
+    ], { id: memberId, name: "Member" });
+    const ackResponse = await acknowledged.app.fetch(
+      request("/api/trips/trip-1/itinerary/acknowledgements", {
+        method: "POST",
+        body: JSON.stringify({ expectedRevision: 2 }),
+      }),
+      env
+    );
+    expect(ackResponse.status).toBe(200);
+    await expect(ackResponse.json()).resolves.toMatchObject({
+      participantId: memberId,
+      acknowledgedRevision: 2,
+    });
+  });
+
+  it("일정 수정 DTO의 서버 소유 revision과 변경자를 거부한다", async () => {
+    const { app, calls } = makeApp([]);
+    const response = await app.fetch(
+      request("/api/trips/trip-1/itinerary", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedRevision: 1,
+          changedBy: "attacker",
+          currentRevision: 99,
+          patches: [{
+            type: "TRANSPORT",
+            itemId: "outbound-osaka",
+            date: "2026-09-01",
+            fromCity: "인천",
+            toCity: "오사카",
+            mode: "항공",
+          }],
+        }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("revision insert 실패 시 itinerary CAS를 rollback한다", async () => {
+    const failed = makeApp([
+      [rowValues(confirmedRoom)],
+      [itineraryRowValues()],
+      [[2]],
+      new Error("revision insert failed"),
+    ]);
+    const response = await failed.app.fetch(
+      request("/api/trips/trip-1/itinerary", {
+        method: "PATCH",
+        body: JSON.stringify({
+          expectedRevision: 1,
+          patches: [{
+            type: "TRANSPORT",
+            itemId: "outbound-osaka",
+            date: "2026-09-01",
+            fromCity: "인천",
+            toCity: "오사카",
+            mode: "항공",
+          }],
+        }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    expect(failed.transactionCommands).toEqual(["begin", "rollback"]);
   });
 });

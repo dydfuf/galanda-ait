@@ -22,6 +22,7 @@ import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { platform } from "../../platform/index.ts";
 import { useItineraryQuery } from "./queries.ts";
+import { useAcknowledgeItineraryMutation } from "./mutations.ts";
 import {
   toItineraryViewModel,
   type ItineraryItem,
@@ -52,6 +53,7 @@ export function ItineraryPage(): JSX.Element {
 
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
+  const acknowledgeMutation = useAcknowledgeItineraryMutation();
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -101,6 +103,12 @@ export function ItineraryPage(): JSX.Element {
   }
 
   const viewModel = toItineraryViewModel(itineraryState.itinerary);
+  const changedItemIds = new Set(
+    (itineraryState.itinerary.changes ?? []).map(({ itemId }) => itemId)
+  );
+  const isAcknowledged =
+    itineraryState.viewerAcknowledgedRevision ===
+    itineraryState.itinerary.currentRevision;
 
   return (
     <PageBody className="mx-auto box-border max-w-[640px]">
@@ -121,6 +129,55 @@ export function ItineraryPage(): JSX.Element {
         <div className="px-(--app-inline-padding) pb-4">
           <RouteRail route={viewModel.route} differenceSummary={viewModel.differenceSummary} />
         </div>
+      )}
+
+      {(itineraryState.itinerary.currentRevision > 1 || itineraryState.canEdit) && (
+        <section className="mb-4 px-(--app-inline-padding)" aria-label="일정 변경 확인">
+          <div className="rounded-xl bg-muted p-4">
+            <p className="text-[15px] font-bold text-foreground">
+              {itineraryState.itinerary.currentRevision > 1
+                ? `일정이 v${itineraryState.itinerary.currentRevision}로 변경됐어요`
+                : "확정 일정 v1"}
+            </p>
+            {itineraryState.itinerary.currentRevision > 1 && (
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                아직 확인하지 않은 참여자 {itineraryState.unacknowledgedCount}명
+              </p>
+            )}
+            <div className="mt-3 flex gap-2">
+              {itineraryState.itinerary.currentRevision > 1 && !isAcknowledged && (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={acknowledgeMutation.isPending}
+                  onClick={() =>
+                    acknowledgeMutation.mutate({
+                      tripId,
+                      expectedRevision: itineraryState.itinerary.currentRevision,
+                    })
+                  }
+                >
+                  변경 내용 확인
+                </Button>
+              )}
+              {itineraryState.canEdit && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => navigate(`/trips/${tripId}/itinerary/edit`)}
+                >
+                  일정 수정
+                </Button>
+              )}
+            </div>
+            {acknowledgeMutation.isError && (
+              <p className="mt-2 text-[13px] text-destructive">
+                {toUserMessage(acknowledgeMutation.error, "확인 상태를 저장하지 못했습니다.")}
+              </p>
+            )}
+          </div>
+        </section>
       )}
 
       {/* 2. 확인 필요 예약 Summary Row (Need-Check) */}
@@ -177,7 +234,12 @@ export function ItineraryPage(): JSX.Element {
                       <Badge variant={statusVariant[item.statusColor]}>{item.statusLabel}</Badge>
                     }
                   >
-                    <ItemTitle>{item.type === "STAY" ? item.hotelName : item.routeTitle}</ItemTitle>
+                    <ItemTitle className="flex items-center gap-2">
+                      {item.type === "STAY" ? item.hotelName : item.routeTitle}
+                      {changedItemIds.has(item.id) && (
+                        <Badge variant="warning">변경됨</Badge>
+                      )}
+                    </ItemTitle>
                     <ItemDescription className="line-clamp-1">{item.subText}</ItemDescription>
                   </MobileListItem>
                 ))}
@@ -297,6 +359,14 @@ export function ItineraryPage(): JSX.Element {
             >
               <p className="text-[15px] text-foreground">확인 정보</p>
             </MobileListItem>
+            {selectedItem.memo && (
+              <MobileListItem>
+                <ItemTitle>메모</ItemTitle>
+                <ItemDescription className="whitespace-pre-wrap">
+                  {selectedItem.memo}
+                </ItemDescription>
+              </MobileListItem>
+            )}
             {selectedItem.bookingUrl && (
               <MobileListItem
                 chevron

@@ -14,6 +14,11 @@ import {
   type SubmitPlanOpinionInput,
 } from "../submit-opinion.ts";
 import { confirmTripPlan } from "../confirm-plan.ts";
+import {
+  acknowledgeTripItinerary,
+  reviseTripItinerary,
+} from "../revise-itinerary.ts";
+import { getTripItinerary } from "../get-itinerary.ts";
 import { updateTripRoom } from "../update-room.ts";
 import { ROLE_PERMISSIONS } from "../../domain/auth-guards.ts";
 import {
@@ -37,6 +42,11 @@ const createInMemoryRepositoryLayer = (
 ): Layer.Layer<TripRoomRepository | ConfirmedItineraryRepository> => {
   let rooms: TripRoom[] = [...initialRooms];
   const itineraries = new Map<string, ConfirmedItinerary>();
+  const acknowledgements = new Map<string, Array<{
+    readonly participantId: typeof UserIdSchema.Type;
+    readonly acknowledgedRevision: typeof RevisionSchema.Type;
+    readonly acknowledgedAt: string;
+  }>>();
 
   const repoImpl = {
     getRoom: (
@@ -207,6 +217,46 @@ const createInMemoryRepositoryLayer = (
       return Effect.succeed(itinerary);
     },
     findByTripId: (tripId) => Effect.succeed(itineraries.get(tripId)),
+    revise: ({ itinerary, expectedRevision }) => {
+      const current = itineraries.get(itinerary.tripId);
+      if (!current) {
+        return Effect.fail(
+          new NotFoundError({ entity: "ConfirmedItinerary", id: itinerary.id })
+        );
+      }
+      if (current.currentRevision !== expectedRevision) {
+        return Effect.fail(new RevisionConflictError({
+          message: "Revision mismatch",
+          expectedRevision,
+          actualRevision: current.currentRevision,
+        }));
+      }
+      itineraries.set(itinerary.tripId, itinerary);
+      return Effect.succeed(itinerary);
+    },
+    acknowledge: ({ itineraryId, participantId, expectedRevision, acknowledgedAt }) => {
+      const itinerary = [...itineraries.values()].find(({ id }) => id === itineraryId);
+      if (!itinerary) {
+        return Effect.fail(
+          new NotFoundError({ entity: "ConfirmedItinerary", id: itineraryId })
+        );
+      }
+      if (itinerary.currentRevision !== expectedRevision) {
+        return Effect.fail(new RevisionConflictError({
+          message: "Revision mismatch",
+          expectedRevision,
+          actualRevision: itinerary.currentRevision,
+        }));
+      }
+      const acknowledgement = { participantId, acknowledgedRevision: expectedRevision, acknowledgedAt };
+      acknowledgements.set(itineraryId, [
+        ...(acknowledgements.get(itineraryId) ?? []).filter((value) => value.participantId !== participantId),
+        acknowledgement,
+      ]);
+      return Effect.succeed(acknowledgement);
+    },
+    getAcknowledgements: (itineraryId) =>
+      Effect.succeed(acknowledgements.get(itineraryId) ?? []),
   });
   return Layer.merge(
     Layer.succeed(TripRoomRepository, repoImpl),
@@ -1461,6 +1511,122 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         )
       );
       expect(room).toEqual(confirmableRoom);
+    });
+
+    it("방장 수정은 독립 revision과 before/after를 남기고 원본 plan을 보존한다", async () => {
+      const repository = createInMemoryRepositoryLayer([confirmableRoom]);
+      const hostEnv = Layer.merge(repository, createTestSessionLayer(aliceUser));
+      const confirmed = await Effect.runPromise(
+        confirmTripPlan(
+          confirmableRoom.id,
+          PlanIdSchema.make("plan-1"),
+          confirmableRoom.revision
+        ).pipe(Effect.provide(hostEnv))
+      );
+
+      const revised = await Effect.runPromise(
+        reviseTripItinerary(
+          confirmableRoom.id,
+          [
+            {
+              type: "STAY",
+              itemId: "stay-jeju",
+              date: "2026-09-01",
+              endDate: "2026-09-05",
+              hotelName: "새 제주 호텔",
+              memo: "체크인 전 연락",
+            },
+            {
+              type: "TRANSPORT",
+              itemId: "return-jeju",
+              date: "2026-09-05",
+              fromCity: "제주도",
+              toCity: "서울",
+              mode: "항공",
+            },
+          ],
+          confirmed.currentRevision
+        ).pipe(Effect.provide(hostEnv))
+      );
+
+      expect(revised.currentRevision).toBe(2);
+      expect(revised.changes?.[0]).toMatchObject({
+        itemId: "stay-jeju",
+        before: { type: "STAY", endDate: "2026-09-04" },
+        after: { type: "STAY", endDate: "2026-09-05" },
+      });
+      const room = await Effect.runPromise(
+        TripRoomRepository.pipe(
+          Effect.flatMap((repo) => repo.getRoom(confirmableRoom.id)),
+          Effect.provide(hostEnv)
+        )
+      );
+      expect(room.plans[0]?.accommodations?.[0]?.hotelName).toBe("");
+    });
+
+    it("일반 참여자 수정은 거부하고 새 revision 뒤 이전 확인은 최신이 아니다", async () => {
+      const repository = createInMemoryRepositoryLayer([confirmableRoom]);
+      const hostEnv = Layer.merge(repository, createTestSessionLayer(aliceUser));
+      const memberEnv = Layer.merge(repository, createTestSessionLayer(bobUser));
+      const confirmed = await Effect.runPromise(
+        confirmTripPlan(
+          confirmableRoom.id,
+          PlanIdSchema.make("plan-1"),
+          confirmableRoom.revision
+        ).pipe(Effect.provide(hostEnv))
+      );
+
+      await expect(Effect.runPromise(
+        reviseTripItinerary(
+          confirmableRoom.id,
+          [{
+            type: "STAY",
+            itemId: "stay-jeju",
+            date: "2026-09-01",
+            endDate: "2026-09-04",
+            hotelName: "위조 숙소",
+          }],
+          confirmed.currentRevision
+        ).pipe(Effect.provide(memberEnv))
+      )).rejects.toBeInstanceOf(ForbiddenError);
+
+      await Effect.runPromise(
+        acknowledgeTripItinerary(
+          confirmableRoom.id,
+          confirmed.currentRevision
+        ).pipe(Effect.provide(memberEnv))
+      );
+      await Effect.runPromise(
+        reviseTripItinerary(
+          confirmableRoom.id,
+          [{
+            type: "TRANSPORT",
+            itemId: "return-jeju",
+            date: "2026-09-04",
+            fromCity: "제주도",
+            toCity: "서울",
+            mode: "항공",
+            memo: "편명 변경",
+          }],
+          confirmed.currentRevision
+        ).pipe(Effect.provide(hostEnv))
+      );
+
+      const state = await Effect.runPromise(
+        getTripItinerary(confirmableRoom.id).pipe(Effect.provide(memberEnv))
+      );
+      expect(state).toMatchObject({
+        status: "CONFIRMED",
+        viewerAcknowledgedRevision: 1,
+        unacknowledgedCount: 2,
+        itinerary: { currentRevision: 2 },
+      });
+      await expect(Effect.runPromise(
+        acknowledgeTripItinerary(
+          confirmableRoom.id,
+          confirmed.currentRevision
+        ).pipe(Effect.provide(memberEnv))
+      )).rejects.toBeInstanceOf(RevisionConflictError);
     });
   });
 

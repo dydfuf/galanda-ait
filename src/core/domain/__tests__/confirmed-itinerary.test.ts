@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { PlanIdSchema, RevisionSchema } from "../ids.ts";
+import {
+  ItineraryIdSchema,
+  ParticipantIdSchema,
+  PlanIdSchema,
+  RevisionSchema,
+  TripIdSchema,
+} from "../ids.ts";
 import type { TripPlan } from "../room.ts";
-import { buildConfirmedItinerarySnapshot } from "../confirmed-itinerary.ts";
+import {
+  buildConfirmedItinerarySnapshot,
+  reviseConfirmedItinerary,
+  type ConfirmedItinerary,
+} from "../confirmed-itinerary.ts";
 
 describe("buildConfirmedItinerarySnapshot", () => {
   it("다도시 여행안을 날짜가 명시된 독립 snapshot으로 복사한다", () => {
@@ -43,5 +53,82 @@ describe("buildConfirmedItinerarySnapshot", () => {
       "2026-10-06",
     ]);
     expect(snapshot.items[1]?.type === "STAY" && snapshot.items[1].accommodation.hotelName).toBe("A");
+
+    const itinerary: ConfirmedItinerary = {
+      id: ItineraryIdSchema.make("itinerary-1"),
+      tripId: TripIdSchema.make("trip-1"),
+      sourcePlanId: plan.id,
+      sourcePlanRevision: plan.revision!,
+      currentRevision: RevisionSchema.make(1),
+      snapshot,
+      createdBy: ParticipantIdSchema.make("host-1"),
+      createdAt: "2026-08-24T00:00:00.000Z",
+    };
+    const revised = reviseConfirmedItinerary(
+      itinerary,
+      [{
+        type: "STAY",
+        itemId: "a",
+        date: "2026-10-01",
+        endDate: "2026-10-04",
+        hotelName: "새 호텔",
+        memo: "체크인 15시",
+      }],
+      ParticipantIdSchema.make("host-1"),
+      "2026-08-25T00:00:00.000Z"
+    );
+
+    expect(typeof revised).not.toBe("string");
+    const value = revised as ConfirmedItinerary;
+    expect(value.currentRevision).toBe(2);
+    expect(value.snapshot.routes[0]?.departureDate).toBe("2026-10-04");
+    expect(value.changes?.[0]).toMatchObject({
+      itemId: "a",
+      before: { type: "STAY", endDate: "2026-10-03" },
+      after: { type: "STAY", endDate: "2026-10-04", memo: "체크인 15시" },
+    });
+    expect(itinerary.snapshot.routes[0]?.departureDate).toBe("2026-10-03");
+  });
+
+  it("겹치는 체류 날짜는 새 revision을 만들지 않는다", () => {
+    const snapshot = buildConfirmedItinerarySnapshot({
+      id: PlanIdSchema.make("plan-2"),
+      title: "일정",
+      status: "VOTING",
+      revision: RevisionSchema.make(1),
+      baseHeadcount: 1,
+      routes: [
+        { city: "A", arrivalDate: "2026-10-01", departureDate: "2026-10-03" },
+        { city: "B", arrivalDate: "2026-10-03", departureDate: "2026-10-05" },
+      ],
+      accommodations: [
+        { id: "a", city: "A", period: "2박", nights: 2, hotelName: "A", bookingStatus: "AVAILABLE" },
+        { id: "b", city: "B", period: "2박", nights: 2, hotelName: "B", bookingStatus: "AVAILABLE" },
+      ],
+      transports: [
+        { id: "o", fromCity: "X", toCity: "A", mode: "차", hasTransfer: false, durationText: "", bookingStatus: "AVAILABLE" },
+        { id: "m", fromCity: "A", toCity: "B", mode: "차", hasTransfer: false, durationText: "", bookingStatus: "AVAILABLE" },
+        { id: "r", fromCity: "B", toCity: "X", mode: "차", hasTransfer: false, durationText: "", bookingStatus: "AVAILABLE" },
+      ],
+      places: [],
+      voteCount: 0,
+    }, "AB")!;
+    const itinerary: ConfirmedItinerary = {
+      id: ItineraryIdSchema.make("itinerary-2"),
+      tripId: TripIdSchema.make("trip-2"),
+      sourcePlanId: PlanIdSchema.make("plan-2"),
+      sourcePlanRevision: RevisionSchema.make(1),
+      currentRevision: RevisionSchema.make(1),
+      snapshot,
+      createdBy: ParticipantIdSchema.make("host-1"),
+      createdAt: "2026-08-24T00:00:00.000Z",
+    };
+
+    expect(reviseConfirmedItinerary(
+      itinerary,
+      [{ type: "STAY", itemId: "a", date: "2026-10-01", endDate: "2026-10-04", hotelName: "A" }],
+      ParticipantIdSchema.make("host-1"),
+      "2026-08-25T00:00:00.000Z"
+    )).toBe("도시 체류 일정은 서로 겹칠 수 없습니다.");
   });
 });

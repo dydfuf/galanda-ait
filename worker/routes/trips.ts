@@ -8,6 +8,7 @@ import {
   TripIdSchema,
 } from "../../src/core/domain/ids.ts";
 import type { TripPlan } from "../../src/core/domain/room.ts";
+import { ItineraryItemPatchSchema } from "../../src/core/domain/confirmed-itinerary.ts";
 import type { IdGenerator } from "../../src/core/ports/id-generator.ts";
 import type { InviteRepository } from "../../src/core/ports/invite-repository.ts";
 import type { SessionService } from "../../src/core/ports/session.ts";
@@ -23,6 +24,10 @@ import {
 } from "../../src/core/usecases/get-room.ts";
 import { confirmTripPlan } from "../../src/core/usecases/confirm-plan.ts";
 import { getTripItinerary } from "../../src/core/usecases/get-itinerary.ts";
+import {
+  acknowledgeTripItinerary,
+  reviseTripItinerary,
+} from "../../src/core/usecases/revise-itinerary.ts";
 import {
   PlanEditableFieldsSchema,
   createPlan,
@@ -73,6 +78,10 @@ const UpdatePlanRequestSchema = Schema.Struct({
   expectedRevision: ExpectedRevisionSchema,
 });
 const RevisionRequestSchema = Schema.Struct({
+  expectedRevision: ExpectedRevisionSchema,
+});
+const ReviseItineraryRequestSchema = Schema.Struct({
+  patches: Schema.Array(ItineraryItemPatchSchema).check(Schema.isNonEmpty()),
   expectedRevision: ExpectedRevisionSchema,
 });
 const OpinionRequestSchema = Schema.Struct({
@@ -156,6 +165,35 @@ tripsRoute.get(
   "/:tripId/itinerary",
   effectValidator("param", TripParamsSchema),
   (c) => runTripEffect(c, getTripItinerary(c.req.valid("param").tripId))
+);
+
+tripsRoute.patch(
+  "/:tripId/itinerary",
+  effectValidator("param", TripParamsSchema),
+  effectValidator("json", ReviseItineraryRequestSchema, strictInput),
+  (c) =>
+    runTripEffect(
+      c,
+      reviseTripItinerary(
+        c.req.valid("param").tripId,
+        c.req.valid("json").patches,
+        c.req.valid("json").expectedRevision
+      )
+    )
+);
+
+tripsRoute.post(
+  "/:tripId/itinerary/acknowledgements",
+  effectValidator("param", TripParamsSchema),
+  effectValidator("json", RevisionRequestSchema, strictInput),
+  (c) =>
+    runTripEffect(
+      c,
+      acknowledgeTripItinerary(
+        c.req.valid("param").tripId,
+        c.req.valid("json").expectedRevision
+      )
+    )
 );
 
 tripsRoute.get(

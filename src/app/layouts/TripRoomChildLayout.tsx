@@ -7,6 +7,9 @@ import { PageHeader } from "@/components/galanda/page-header.tsx";
 
 /** 현재 경로에 맞는 상단 내비게이션 제목을 정해요. */
 function resolveTitle(pathname: string): string {
+  if (pathname.endsWith("/itinerary/edit")) {
+    return "일정 수정";
+  }
   if (pathname.includes("/plans/new")) {
     return "새 여행안";
   }

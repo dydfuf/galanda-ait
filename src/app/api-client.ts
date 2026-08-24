@@ -19,7 +19,13 @@ import type { UpdateRoomParams } from "../core/ports/trip-room-repository.ts";
 import type { CreateRoomInput } from "../core/usecases/create-room.ts";
 import type { CreatePlanCommand } from "../core/usecases/save-plan.ts";
 import type { SubmitPlanOpinionInput } from "../core/usecases/submit-opinion.ts";
-import { ItineraryStateResponseSchema } from "../contracts/itinerary.ts";
+import {
+  ConfirmItineraryResultSchema,
+  ItineraryAcknowledgementResponseSchema,
+  ItineraryStateResponseSchema,
+  ConfirmedItineraryResponseSchema,
+} from "../contracts/itinerary.ts";
+import type { ItineraryItemPatch } from "../core/domain/confirmed-itinerary.ts";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -208,7 +214,27 @@ export const confirmTripPlan = (
   planId: PlanId,
   expectedRevision: Revision
 ) =>
-  requestJson(`${planPath(tripId, planId)}/confirm`, ItineraryStateResponseSchema, {
+  requestJson(`${planPath(tripId, planId)}/confirm`, ConfirmItineraryResultSchema, {
     method: "POST",
     body: JSON.stringify({ expectedRevision }),
   });
+
+export const reviseTripItinerary = (
+  tripId: TripId,
+  patches: ReadonlyArray<ItineraryItemPatch>,
+  expectedRevision: Revision
+) =>
+  requestJson(`${tripPath(tripId)}/itinerary`, ConfirmedItineraryResponseSchema, {
+    method: "PATCH",
+    body: JSON.stringify({ patches, expectedRevision }),
+  });
+
+export const acknowledgeTripItinerary = (
+  tripId: TripId,
+  expectedRevision: Revision
+) =>
+  requestJson(
+    `${tripPath(tripId)}/itinerary/acknowledgements`,
+    ItineraryAcknowledgementResponseSchema,
+    { method: "POST", body: JSON.stringify({ expectedRevision }) }
+  );
