@@ -50,6 +50,13 @@
       "when": 1787574117619,
       "tag": "0006_lush_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787576264676,
+      "tag": "0007_grant_itinerary_runtime_access",
+      "breakpoints": true
     }
   ]
 }
