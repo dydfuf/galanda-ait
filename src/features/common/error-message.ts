@@ -36,6 +36,9 @@ export const toUserMessage = (error: unknown, fallback: string): string => {
 export const isRevisionConflict = (error: unknown): error is ApiClientError =>
   error instanceof ApiClientError && error.code === "REVISION_CONFLICT";
 
+export const isStateConflict = (error: unknown): error is ApiClientError =>
+  error instanceof ApiClientError && error.code === "STATE_CONFLICT";
+
 export const toRevisionConflictMessage = (error: ApiClientError): string => {
   const details = error.details as {
     readonly expectedRevision?: unknown;

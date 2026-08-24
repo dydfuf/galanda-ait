@@ -59,6 +59,7 @@ export function ItineraryPage(): JSX.Element {
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
   const acknowledgeMutation = useAcknowledgeItineraryMutation();
   const [conflictNotice, setConflictNotice] = useState<string>();
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -154,17 +155,23 @@ export function ItineraryPage(): JSX.Element {
                 <Button
                   type="button"
                   size="sm"
-                  disabled={acknowledgeMutation.isPending}
+                  disabled={acknowledgeMutation.isPending || isResolvingConflict}
                   onClick={() => {
-                    if (acknowledgeMutation.isPending) return;
+                    if (acknowledgeMutation.isPending || isResolvingConflict) return;
                     setConflictNotice(undefined);
                     void acknowledgeMutation.mutateAsync({
                       tripId,
                       expectedRevision: itineraryState.itinerary.currentRevision,
                     }).catch(async (mutationError: unknown) => {
                       if (isRevisionConflict(mutationError)) {
-                        await refetchItinerary();
-                        setConflictNotice(toRevisionConflictMessage(mutationError));
+                        setIsResolvingConflict(true);
+                        const refreshed = await refetchItinerary();
+                        setConflictNotice(
+                          refreshed.isError || !refreshed.data
+                            ? "최신 일정 상태를 불러오지 못했습니다. 다시 시도해주세요."
+                            : toRevisionConflictMessage(mutationError)
+                        );
+                        setIsResolvingConflict(false);
                       }
                     });
                   }}

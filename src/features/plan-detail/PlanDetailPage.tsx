@@ -9,6 +9,7 @@ import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-para
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import {
   isRevisionConflict,
+  isStateConflict,
   toRevisionConflictMessage,
   toUserMessage,
 } from "../common/error-message.ts";
@@ -73,6 +74,7 @@ export function PlanDetailPage(): JSX.Element {
   const [sheet, setSheet] = useState<PlanSheet>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [conflictNotice, setConflictNotice] = useState<string>();
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -125,7 +127,7 @@ export function PlanDetailPage(): JSX.Element {
     reaction: ReactionType,
     reason?: string
   ): Promise<void> => {
-    if (submitOpinionMutation.isPending) return;
+    if (submitOpinionMutation.isPending || isResolvingConflict) return;
 
     setConflictNotice(undefined);
     try {
@@ -139,9 +141,16 @@ export function PlanDetailPage(): JSX.Element {
       setIsOpinionSheetOpen(false);
       toast("의견을 저장했어요.");
     } catch (err: unknown) {
-      if (isRevisionConflict(err)) {
-        await refetch();
-        setConflictNotice(toRevisionConflictMessage(err));
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        setIsResolvingConflict(true);
+        const refreshed = await refetch();
+        if (isStateConflict(err)) setIsOpinionSheetOpen(false);
+        if (refreshed.isError || !refreshed.data) {
+          toast("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
+        } else if (isRevisionConflict(err)) {
+          setConflictNotice(toRevisionConflictMessage(err));
+        }
+        setIsResolvingConflict(false);
       } else {
         toast(toUserMessage(err, "의견을 등록하지 못했습니다."));
       }
@@ -149,7 +158,7 @@ export function PlanDetailPage(): JSX.Element {
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
-    if (deletePlanMutation.isPending) return;
+    if (deletePlanMutation.isPending || isResolvingConflict) return;
 
     setConflictNotice(undefined);
     try {
@@ -162,9 +171,15 @@ export function PlanDetailPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
       setIsDeleteConfirmOpen(false);
-      if (isRevisionConflict(err)) {
-        await refetch();
-        setConflictNotice(toRevisionConflictMessage(err));
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        setIsResolvingConflict(true);
+        const refreshed = await refetch();
+        if (refreshed.isError || !refreshed.data) {
+          toast("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
+        } else if (isRevisionConflict(err)) {
+          setConflictNotice(toRevisionConflictMessage(err));
+        }
+        setIsResolvingConflict(false);
       } else {
         toast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
       }
@@ -293,7 +308,7 @@ export function PlanDetailPage(): JSX.Element {
           <Button
             type="button"
             size="xl"
-            disabled={submitOpinionMutation.isPending}
+            disabled={submitOpinionMutation.isPending || isResolvingConflict}
             onClick={() => setIsOpinionSheetOpen(true)}
           >
             {plan.myReaction ? "내 의견 수정하기" : "내 의견 남기기"}
@@ -398,10 +413,10 @@ export function PlanDetailPage(): JSX.Element {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletePlanMutation.isPending}>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletePlanMutation.isPending || isResolvingConflict}>취소</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              disabled={deletePlanMutation.isPending}
+              disabled={deletePlanMutation.isPending || isResolvingConflict}
               onClick={() => void handleConfirmDelete()}
             >
               {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}
@@ -415,7 +430,7 @@ export function PlanDetailPage(): JSX.Element {
         onClose={() => setIsOpinionSheetOpen(false)}
         initialReaction={plan.myReaction as ReactionType | undefined}
         initialReason={plan.myOpinionReason ?? ""}
-        isSubmitting={submitOpinionMutation.isPending}
+        isSubmitting={submitOpinionMutation.isPending || isResolvingConflict}
         onSubmit={(reaction, reason) => void handleOpinionSubmit(reaction, reason)}
       />
     </PageBody>

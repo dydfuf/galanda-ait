@@ -19,6 +19,7 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import {
   isRevisionConflict,
+  isStateConflict,
   toRevisionConflictMessage,
   toUserMessage,
 } from "../common/error-message.ts";
@@ -28,7 +29,12 @@ import {
   isRoomConfirmed,
 } from "../../core/domain/auth-guards.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
-import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
+import {
+  getPlanEditorInitialData,
+  rebasePlanEditorData,
+  usePlanEditorState,
+  type PlanEditorFormData,
+} from "./hooks/usePlanEditorState.ts";
 import {
   PlanEditorSections,
   RevisionConflictChoice,
@@ -85,6 +91,8 @@ export function PlanEditPage(): JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [revisionConflict, setRevisionConflict] = useState<string>();
+  const [rebasedEditor, setRebasedEditor] = useState<PlanEditorFormData>();
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const plan = room?.plans.find((p) => p.id === planId);
@@ -100,7 +108,8 @@ export function PlanEditPage(): JSX.Element {
     room,
     plan,
     undefined,
-    canEdit ? session?.participantId : undefined
+    canEdit ? session?.participantId : undefined,
+    isResolvingConflict
   );
 
   if (Result.isFailure(validated)) {
@@ -172,13 +181,12 @@ export function PlanEditPage(): JSX.Element {
   }
 
   const handleSubmit = async (): Promise<void> => {
-    if (!editor.validation.isValid || isSubmitting) return;
+    if (!editor.validation.isValid || isSubmitting || isResolvingConflict) return;
 
     setIsSubmitting(true);
     setActionError(null);
     setRevisionConflict(undefined);
-    try {
-      const updatedPlan: TripPlan = {
+    const updatedPlan: TripPlan = {
         ...plan,
         title: editor.title.trim(),
         proposalReason: editor.proposalReason.trim() || undefined,
@@ -187,7 +195,10 @@ export function PlanEditPage(): JSX.Element {
         accommodations: [...editor.accommodations],
         transports: [...editor.transports],
       };
+    const baseEditor = getPlanEditorInitialData(room, plan);
+    const localEditor = getPlanEditorInitialData(room, updatedPlan);
 
+    try {
       await updatePlanMutation.mutateAsync({
         roomId: tripId,
         plan: updatedPlan,
@@ -197,20 +208,49 @@ export function PlanEditPage(): JSX.Element {
       editor.discardDraft();
       navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
     } catch (err: unknown) {
-      setIsSubmitting(false);
       if (isRevisionConflict(err)) {
-        const latest = (await refetch()).data;
+        setIsResolvingConflict(true);
+        const refreshed = await refetch();
+        const latest = refreshed.data;
+        if (refreshed.isError || !latest) {
+          setIsResolvingConflict(false);
+          setIsSubmitting(false);
+          setActionError("최신 여행안을 불러오지 못했습니다. 다시 시도해주세요.");
+          return;
+        }
         const latestPlan = latest?.plans.find((candidate) => candidate.id === plan.id);
+        if (!latestPlan) {
+          setIsResolvingConflict(false);
+          setIsSubmitting(false);
+          setActionError("다른 사용자가 이 여행안을 삭제했습니다.");
+          return;
+        }
         const difference = latestPlan
           ? calculatePlanDifference(plan, latestPlan)
           : undefined;
-        const changed = !latestPlan
-          ? "이 여행안이 삭제됐습니다."
-          : difference?.hasChanges
+        const changed = difference?.hasChanges
             ? `최신 공개본 변경: ${difference.summaryText}.`
             : "여행방의 다른 내용이 변경됐습니다.";
+        setRebasedEditor(
+          rebasePlanEditorData(
+            baseEditor,
+            localEditor,
+            getPlanEditorInitialData(latest, latestPlan)
+          )
+        );
         setRevisionConflict(`${toRevisionConflictMessage(err)} ${changed} 작성 중인 입력은 보존했습니다.`);
+      } else if (isStateConflict(err)) {
+        setIsResolvingConflict(true);
+        const refreshed = await refetch();
+        setIsResolvingConflict(false);
+        setIsSubmitting(false);
+        if (refreshed.isError || !refreshed.data) {
+          setActionError("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
+        } else if (!isRoomConfirmed(refreshed.data)) {
+          setActionError(toUserMessage(err, "여행안 수정에 실패했습니다."));
+        }
       } else {
+        setIsSubmitting(false);
         setActionError(toUserMessage(err, "여행안 수정에 실패했습니다."));
       }
     }
@@ -221,6 +261,7 @@ export function PlanEditPage(): JSX.Element {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await deletePlanMutation.mutateAsync({
         roomId: tripId,
@@ -231,10 +272,18 @@ export function PlanEditPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
       setIsDeleteConfirmOpen(false);
-      if (isRevisionConflict(err)) {
-        await refetch();
-        setActionError(toRevisionConflictMessage(err));
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        const refreshed = await refetch();
+        setIsSubmitting(false);
+        setActionError(
+          refreshed.isError || !refreshed.data
+            ? "최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요."
+            : isRevisionConflict(err)
+              ? toRevisionConflictMessage(err)
+              : toUserMessage(err, "여행안 삭제에 실패했습니다.")
+        );
       } else {
+        setIsSubmitting(false);
         setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
       }
     }
@@ -257,10 +306,19 @@ export function PlanEditPage(): JSX.Element {
       {revisionConflict ? (
         <RevisionConflictChoice
           message={revisionConflict}
-          onReapply={() => setRevisionConflict(undefined)}
+          onReapply={() => {
+            if (rebasedEditor) editor.replaceFormData(rebasedEditor);
+            setRebasedEditor(undefined);
+            setRevisionConflict(undefined);
+            setIsResolvingConflict(false);
+            setIsSubmitting(false);
+          }}
           onUseLatest={() => {
             editor.useLatestPublishedPlan();
+            setRebasedEditor(undefined);
             setRevisionConflict(undefined);
+            setIsResolvingConflict(false);
+            setIsSubmitting(false);
           }}
         />
       ) : (

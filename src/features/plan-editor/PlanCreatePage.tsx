@@ -15,6 +15,7 @@ import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
 import {
   isRevisionConflict,
+  isStateConflict,
   toRevisionConflictMessage,
   toUserMessage,
 } from "../common/error-message.ts";
@@ -147,11 +148,18 @@ export function PlanCreatePage(): JSX.Element {
       }
     } catch (err: unknown) {
       // 비로그인·권한 부족 등 작성 실패 사유를 화면에 그대로 전달한다
-      setIsSubmitting(false);
-      if (isRevisionConflict(err)) {
-        await refetch();
-        setErrorMsg(toRevisionConflictMessage(err));
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        const refreshed = await refetch();
+        setIsSubmitting(false);
+        if (refreshed.isError || !refreshed.data) {
+          setErrorMsg("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
+        } else if (isRevisionConflict(err)) {
+          setErrorMsg(toRevisionConflictMessage(err));
+        } else if (!isRoomConfirmed(refreshed.data)) {
+          setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
+        }
       } else {
+        setIsSubmitting(false);
         setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
       }
     }
