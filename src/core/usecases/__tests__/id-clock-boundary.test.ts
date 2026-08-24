@@ -163,6 +163,37 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
       const program = createPlan({
         roomId: sampleRoom.id,
         title: "알찬 3박 4일 코스",
+        baseHeadcount: 2,
+        routes: [{ city: "서울", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
+        accommodations: [{
+          id: "stay-seoul",
+          city: "서울",
+          period: "2026-09-01 ~ 2026-09-04",
+          nights: 3,
+          hotelName: "",
+          isSearching: true,
+          bookingStatus: "NOT_CHECKED",
+        }],
+        transports: [
+          {
+            id: "outbound-seoul",
+            fromCity: "부산",
+            toCity: "서울",
+            mode: "",
+            hasTransfer: false,
+            durationText: "",
+            bookingStatus: "NOT_CHECKED",
+          },
+          {
+            id: "return-seoul",
+            fromCity: "서울",
+            toCity: "부산",
+            mode: "",
+            hasTransfer: false,
+            durationText: "",
+            bookingStatus: "NOT_CHECKED",
+          },
+        ],
         places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));

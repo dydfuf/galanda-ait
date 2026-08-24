@@ -131,13 +131,12 @@ export function TransportSection({
   const handleAddNew = () => {
     onAdd({
       id: `trans-${Date.now()}`,
-      fromCity: "출발지",
-      toCity: "도착지",
-      mode: "렌터카 / 대중교통",
+      fromCity: "",
+      toCity: "",
+      mode: "",
       hasTransfer: false,
-      durationText: "약 1시간",
-      bookingStatus: "AVAILABLE",
-      priceRange: { min: 0, max: 0 },
+      durationText: "",
+      bookingStatus: "NOT_CHECKED",
     });
   };
 
@@ -241,10 +240,13 @@ export function TransportSection({
                   type="number"
                   placeholder="0"
                   step="10000"
-                  value={trans.priceRange?.min || ""}
+                  min="0"
+                  value={trans.priceRange?.min ?? ""}
                   onChange={(e) => {
-                    const val = parseInt(e.target.value, 10) || 0;
-                    onUpdate(trans.id, { priceRange: { min: val, max: val } });
+                    const value = e.target.value;
+                    onUpdate(trans.id, {
+                      priceRange: value ? { min: Number(value), max: Number(value) } : undefined,
+                    });
                   }}
                   css={inputStyle}
                 />

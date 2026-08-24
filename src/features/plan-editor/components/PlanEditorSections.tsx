@@ -97,7 +97,11 @@ export function PlanEditorSections({
 
   if (!section) {
     const perPersonCost = editor.costSummary.hasCost
-      ? formatCostRangeText(editor.costSummary.minPerPerson, editor.costSummary.maxPerPerson)
+      ? formatCostRangeText(
+          editor.costSummary.minPerPerson,
+          editor.costSummary.maxPerPerson,
+          editor.costSummary.unpricedCount
+        )
       : "가격 미정";
 
     return (
@@ -148,7 +152,7 @@ export function PlanEditorSections({
             title="교통"
             summary={transportEmpty
               ? "아직 추가하지 않았어요"
-              : editor.transports.map((item) => item.mode).filter(Boolean).join(" · ")}
+              : editor.transports.map((item) => item.mode.trim() || "교통편 확인 전").join(" · ")}
             status={transportEmpty ? "입력 전" : transportChecks ? "확인 필요" : "완료"}
             complete={!transportEmpty && transportChecks === 0}
             onClick={() => onOpenSection("transport")}

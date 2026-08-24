@@ -306,4 +306,20 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
 
     expect(costDifference?.deltaText).toBe("1인 기준 +1만원");
   });
+
+  it("가격 미정 항목이 있으면 부분 합계의 차액을 확정값처럼 표시하지 않는다", (): void => {
+    const plan = toPlanDetailViewModel(makeRoom(), HOST_ID).plans[0];
+    if (!plan) throw new Error("fixture에 여행안이 있어야 한다");
+
+    const incompleteCostPlan = {
+      ...plan,
+      costSummary: { ...plan.costSummary, unpricedCount: 1 },
+    };
+    const difference = buildPlanCompareDifferences(plan, incompleteCostPlan).find(
+      (item) => item.kind === "COST"
+    );
+
+    expect(difference?.rightValue).toContain("가격 미정 1건 별도");
+    expect(difference?.deltaText).toBeUndefined();
+  });
 });

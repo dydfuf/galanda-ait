@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { getRouteValidationError, getStayNightCount, type AccommodationSnapshot, type CityStay, type TransportSnapshot, type TripPlan, type TripRoom } from "../../../core/domain/room.ts";
+import { getPlanPublishValidationErrors, getStayNightCount, type AccommodationSnapshot, type CityStay, type TransportSnapshot, type TripPlan, type TripRoom } from "../../../core/domain/room.ts";
 import { calculatePlanCost } from "../../../core/calculations/plan-cost.ts";
 import { calculatePlanDifference } from "../../../core/calculations/plan-diff.ts";
 
@@ -32,7 +32,12 @@ export const syncAccommodationNights = (
       ? indexedRoute
       : routes.find((stay) => stay.city === accommodation.city) ?? indexedRoute;
     return route
-      ? { ...accommodation, nights: Math.max(0, getStayNightCount(route)) }
+      ? {
+          ...accommodation,
+          city: route.city,
+          period: `${route.arrivalDate} ~ ${route.departureDate}`,
+          nights: Math.max(0, getStayNightCount(route)),
+        }
       : accommodation;
   });
 
@@ -54,7 +59,9 @@ export function getPlanEditorInitialData(
     proposalReason: source?.proposalReason ?? "",
     baseHeadcount: source?.baseHeadcount ?? Math.max(1, room?.members.length ?? 1),
     routes: structuredClone(source?.routes ?? []),
-    accommodations: structuredClone(source?.accommodations ?? []),
+    accommodations: structuredClone(source?.accommodations ?? []).map((stay) =>
+      stay.isSearching ? { ...stay, hotelName: "" } : stay
+    ),
     transports: structuredClone(source?.transports ?? []),
     ...(cloneFromPlan ? { clonedFromPlanId: cloneFromPlan.id } : {}),
   };
@@ -279,23 +286,13 @@ export function usePlanEditorState(
 
   // 유효성 검사
   const validation = useMemo(() => {
-    const errors: string[] = [];
-
-    if (!title.trim()) {
-      errors.push("여행안 제목을 입력해주세요.");
-    }
-    if (routes.length === 0) {
-      errors.push("최소 1개 이상의 방문 도시를 추가해주세요.");
-    }
-    for (const r of routes) {
-      if (!r.city.trim()) {
-        errors.push("도시 이름을 모두 입력해주세요.");
-        break;
-      }
-      if (!r.arrivalDate || !r.departureDate) errors.push(`${r.city || "도시"}의 도착일과 출발일을 입력해주세요.`);
-    }
-    const routeError = getRouteValidationError(routes);
-    if (routeError) errors.push(routeError);
+    const errors = getPlanPublishValidationErrors({
+      title,
+      baseHeadcount,
+      routes,
+      accommodations,
+      transports,
+    });
 
     return {
       isValid: errors.length === 0,
@@ -303,7 +300,7 @@ export function usePlanEditorState(
       errorCount: errors.length,
       errors,
     };
-  }, [title, routes]);
+  }, [title, baseHeadcount, routes, accommodations, transports]);
 
   // 도시 관리 핸들러
   const handleAddCity = useCallback((city: string = "") => {

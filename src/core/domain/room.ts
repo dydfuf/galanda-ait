@@ -166,6 +166,95 @@ export const TripPlanSchema = Schema.Struct({
 });
 export type TripPlan = typeof TripPlanSchema.Type;
 
+export const getPlanPublishValidationErrors = (
+  plan: Pick<
+    TripPlan,
+    | "title"
+    | "baseHeadcount"
+    | "routes"
+    | "accommodations"
+    | "transports"
+  >
+): ReadonlyArray<string> => {
+  const errors: string[] = [];
+  const routes = plan.routes ?? [];
+  const accommodations = plan.accommodations ?? [];
+  const transports = plan.transports ?? [];
+
+  if (!plan.title.trim()) errors.push("여행안 제목을 입력해주세요.");
+  if (!Number.isInteger(plan.baseHeadcount) || (plan.baseHeadcount ?? 0) < 1) {
+    errors.push("기준 인원수는 1명 이상이어야 합니다.");
+  }
+  if (routes.length === 0) {
+    errors.push("최소 1개 이상의 방문 도시를 추가해주세요.");
+  } else {
+    const incompleteRoute = routes.find(
+      ({ city, arrivalDate, departureDate }) =>
+        !city.trim() || !arrivalDate || !departureDate
+    );
+    if (incompleteRoute) {
+      errors.push(`${incompleteRoute.city || "도시"}의 도착일과 출발일을 입력해주세요.`);
+    }
+    const routeError = getRouteValidationError(routes);
+    if (routeError) errors.push(routeError);
+
+    const missingAccommodation =
+      accommodations.length < routes.length ||
+      routes.some((route) =>
+        !accommodations.some(
+          (stay) =>
+            stay.city.trim() === route.city.trim() &&
+            Boolean(stay.period.trim()) &&
+            stay.nights === getStayNightCount(route) &&
+            Boolean(stay.isSearching || stay.hotelName.trim())
+        )
+      );
+    if (missingAccommodation) {
+      errors.push("각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요.");
+    }
+
+    const requiredTransportCount = routes.length + 1;
+    if (transports.length < requiredTransportCount) {
+      errors.push(`출국·도시 간 이동·귀국 교통을 ${requiredTransportCount}개 추가해주세요.`);
+    }
+  }
+
+  if (accommodations.some((stay) =>
+    !stay.city.trim() ||
+    !stay.period.trim() ||
+    !Number.isInteger(stay.nights) ||
+    stay.nights < 1 ||
+    (stay.isSearching ? Boolean(stay.hotelName.trim()) : !stay.hotelName.trim())
+  )) {
+    errors.push("각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요.");
+  }
+
+  const incompleteTransport = transports.find(
+    (transport) =>
+      !transport.fromCity.trim() ||
+      !transport.toCity.trim() ||
+      (transport.bookingStatus !== "NOT_CHECKED" &&
+        (!transport.mode.trim() || !transport.durationText.trim()))
+  );
+  if (incompleteTransport) {
+    errors.push("교통 구간의 출발지·도착지와 확인 상태를 입력해주세요.");
+  }
+
+  const invalidPriceRange = [...accommodations, ...transports].find(
+    ({ priceRange }) =>
+      priceRange &&
+      (!Number.isFinite(priceRange.min) ||
+        !Number.isFinite(priceRange.max) ||
+        priceRange.min < 0 ||
+        priceRange.max < priceRange.min)
+  );
+  if (invalidPriceRange) {
+    errors.push("가격 범위는 0원 이상이며 최소 금액이 최대 금액보다 클 수 없습니다.");
+  }
+
+  return [...new Set(errors)];
+};
+
 export const TripMemberSchema = Schema.Struct({
   id: ParticipantIdSchema,
   name: Schema.String,

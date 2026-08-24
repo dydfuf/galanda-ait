@@ -99,7 +99,7 @@ const opinionSignature = (plan: DetailedPlanViewModel): string =>
 
 const formatCost = (plan: DetailedPlanViewModel): string =>
   plan.costSummary.hasCost
-    ? `1인 ${formatCostRangeText(plan.costSummary.minPerPerson, plan.costSummary.maxPerPerson)}`
+    ? `1인 ${formatCostRangeText(plan.costSummary.minPerPerson, plan.costSummary.maxPerPerson, plan.costSummary.unpricedCount)}`
     : "예상 경비 미정";
 
 const formatSignedCost = (amount: number): string =>
@@ -109,7 +109,9 @@ const formatCostDelta = (
   left: DetailedPlanViewModel["costSummary"],
   right: DetailedPlanViewModel["costSummary"]
 ): string | undefined => {
-  if (!left.hasCost || !right.hasCost) return undefined;
+  if (!left.hasCost || !right.hasCost || left.unpricedCount > 0 || right.unpricedCount > 0) {
+    return undefined;
+  }
 
   const minDelta = right.minPerPerson - left.minPerPerson;
   const maxDelta = right.maxPerPerson - left.maxPerPerson;
@@ -188,6 +190,7 @@ export const buildPlanCompareDifferences = (
     rightValue: formatCost(right),
     isChanged:
       left.costSummary.hasCost !== right.costSummary.hasCost ||
+      left.costSummary.unpricedCount !== right.costSummary.unpricedCount ||
       left.costSummary.minPerPerson !== right.costSummary.minPerPerson ||
       left.costSummary.maxPerPerson !== right.costSummary.maxPerPerson,
     deltaText: formatCostDelta(left.costSummary, right.costSummary),
