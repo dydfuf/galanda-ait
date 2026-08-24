@@ -13,6 +13,7 @@ import { PlanDetailPage } from "../features/plan-detail/PlanDetailPage.tsx";
 import { PlanEditPage } from "../features/plan-editor/PlanEditPage.tsx";
 import { PlanComparePage } from "../features/plan-compare/PlanComparePage.tsx";
 import { ItineraryPage } from "../features/itinerary/ItineraryPage.tsx";
+import { ItineraryEditPage } from "../features/itinerary/ItineraryEditPage.tsx";
 import { NotFoundPage } from "../pages/NotFoundPage.tsx";
 import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { SessionRoute } from "../features/auth/SessionRoute.tsx";
@@ -38,6 +39,10 @@ export function AppRouter() {
           <Route path="/trips" element={<TripListPage />} />
           <Route element={<SessionRoute registered />}>
             <Route path="/trips/new" element={<TripCreatePage />} />
+          </Route>
+
+          <Route path="/trips/:tripId/itinerary/edit" element={<TripRoomChildLayout />}>
+            <Route index element={<ItineraryEditPage />} />
           </Route>
 
           {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}

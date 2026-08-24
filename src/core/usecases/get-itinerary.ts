@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { TripId } from "../domain/ids.ts";
 import { NotFoundError } from "../domain/errors.ts";
-import { requireRoomMember } from "../domain/auth-guards.ts";
+import { getRoomActor, requireRoomMember } from "../domain/auth-guards.ts";
 import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
 import { ConfirmedItineraryRepository } from "../ports/confirmed-itinerary-repository.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
@@ -22,7 +22,24 @@ export const getTripItinerary = Effect.fn("getTripItinerary")(
 
     const itineraries = yield* ConfirmedItineraryRepository;
     const itinerary = yield* itineraries.findByTripId(tripId);
-    if (itinerary) return { status: "CONFIRMED" as const, itinerary };
+    if (itinerary) {
+      const acknowledgements = yield* itineraries.getAcknowledgements(itinerary.id);
+      const latest = new Set(
+        acknowledgements
+          .filter(({ acknowledgedRevision }) => acknowledgedRevision === itinerary.currentRevision)
+          .map(({ participantId }) => participantId)
+      );
+      return {
+        status: "CONFIRMED" as const,
+        itinerary,
+        canEdit: getRoomActor(room, session.participantIds).isHost,
+        acknowledgements,
+        viewerAcknowledgedRevision: acknowledgements.find(({ participantId }) =>
+          session.participantIds.includes(participantId)
+        )?.acknowledgedRevision,
+        unacknowledgedCount: room.members.filter(({ id }) => !latest.has(id)).length,
+      };
+    }
     return room.confirmedPlanId
       ? { status: "MISSING" as const }
       : { status: "UNCONFIRMED" as const };

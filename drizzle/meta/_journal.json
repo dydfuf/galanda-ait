@@ -43,6 +43,13 @@
       "when": 1787573379203,
       "tag": "0005_equal_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787574117619,
+      "tag": "0006_lush_power_pack",
+      "breakpoints": true
     }
   ]
 }

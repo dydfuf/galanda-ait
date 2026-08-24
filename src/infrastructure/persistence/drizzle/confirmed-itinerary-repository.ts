@@ -9,11 +9,17 @@ import {
   ConfirmedItinerarySchema,
   type ConfirmedItinerary,
 } from "../../../core/domain/confirmed-itinerary.ts";
-import { RevisionSchema, type TripId } from "../../../core/domain/ids.ts";
+import {
+  ItineraryIdSchema,
+  ParticipantIdSchema,
+  RevisionSchema,
+  type TripId,
+} from "../../../core/domain/ids.ts";
 import { ConfirmedItineraryRepository } from "../../../core/ports/confirmed-itinerary-repository.ts";
 import { Database } from "./database.ts";
 import {
   confirmedItineraries,
+  itineraryAcknowledgements,
   itineraryRevisions,
   type ConfirmedItineraryRow,
 } from "./schema/confirmed-itinerary.ts";
@@ -33,11 +39,17 @@ const databaseEffect = <A>(operation: string, run: () => PromiseLike<A>) =>
   });
 
 const decodeItinerary = (
-  row: ConfirmedItineraryRow & { snapshot: unknown }
+  row: ConfirmedItineraryRow & {
+    snapshot: unknown;
+    changes: unknown;
+    changedBy: string;
+    changedAt: Date;
+  }
 ): Effect.Effect<ConfirmedItinerary, RepositoryError> =>
   Schema.decodeUnknownEffect(ConfirmedItinerarySchema)({
     ...row,
     createdAt: row.createdAt.toISOString(),
+    changedAt: row.changedAt.toISOString(),
   }).pipe(
     Effect.mapError(
       () =>
@@ -101,6 +113,7 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
                 itineraryId: itinerary.id,
                 revision: itinerary.currentRevision,
                 snapshot: itinerary.snapshot,
+                changes: [],
                 changedBy: itinerary.createdBy,
                 createdAt: new Date(itinerary.createdAt),
               });
@@ -138,6 +151,9 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
                 createdBy: confirmedItineraries.createdBy,
                 createdAt: confirmedItineraries.createdAt,
                 snapshot: itineraryRevisions.snapshot,
+                changes: itineraryRevisions.changes,
+                changedBy: itineraryRevisions.changedBy,
+                changedAt: itineraryRevisions.createdAt,
               })
               .from(confirmedItineraries)
               .innerJoin(
@@ -154,6 +170,141 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
               .limit(1)
           );
           return row ? yield* decodeItinerary(row) : undefined;
+        }),
+
+      revise: ({ itinerary, expectedRevision }) =>
+        Effect.gen(function* () {
+          const result = yield* databaseEffect("reviseItinerary", () =>
+            db.transaction(async (tx) => {
+              const [updated] = await tx
+                .update(confirmedItineraries)
+                .set({ currentRevision: itinerary.currentRevision })
+                .where(
+                  and(
+                    eq(confirmedItineraries.id, itinerary.id),
+                    eq(confirmedItineraries.currentRevision, expectedRevision)
+                  )
+                )
+                .returning({ revision: confirmedItineraries.currentRevision });
+              if (!updated) {
+                const [current] = await tx
+                  .select({ revision: confirmedItineraries.currentRevision })
+                  .from(confirmedItineraries)
+                  .where(eq(confirmedItineraries.id, itinerary.id))
+                  .limit(1);
+                return current
+                  ? ({ _tag: "Conflict", revision: current.revision } as const)
+                  : ({ _tag: "NotFound" } as const);
+              }
+              await tx.insert(itineraryRevisions).values({
+                itineraryId: itinerary.id,
+                revision: itinerary.currentRevision,
+                snapshot: itinerary.snapshot,
+                changes: itinerary.changes ?? [],
+                changedBy: itinerary.changedBy ?? itinerary.createdBy,
+                createdAt: new Date(itinerary.changedAt ?? itinerary.createdAt),
+              });
+              return { _tag: "Revised", itinerary } as const;
+            })
+          );
+          if (result._tag === "NotFound") {
+            return yield* Effect.fail(
+              new NotFoundError({ entity: "ConfirmedItinerary", id: itinerary.id })
+            );
+          }
+          if (result._tag === "Conflict") {
+            return yield* Effect.fail(
+              new RevisionConflictError({
+                message: "다른 사용자가 이미 확정 일정을 수정했습니다.",
+                expectedRevision,
+                actualRevision: RevisionSchema.make(result.revision),
+              })
+            );
+          }
+          return result.itinerary;
+        }),
+
+      acknowledge: ({
+        itineraryId,
+        participantId,
+        expectedRevision,
+        acknowledgedAt,
+      }) =>
+        Effect.gen(function* () {
+          const result = yield* databaseEffect("acknowledgeItinerary", () =>
+            db.transaction(async (tx) => {
+              const [current] = await tx
+                .select({ revision: confirmedItineraries.currentRevision })
+                .from(confirmedItineraries)
+                .where(eq(confirmedItineraries.id, itineraryId))
+                .limit(1)
+                .for("update");
+              if (!current) return { _tag: "NotFound" } as const;
+              if (current.revision !== expectedRevision) {
+                return { _tag: "Conflict", revision: current.revision } as const;
+              }
+              const [row] = await tx
+                .insert(itineraryAcknowledgements)
+                .values({
+                  itineraryId,
+                  participantId,
+                  acknowledgedRevision: expectedRevision,
+                  acknowledgedAt: new Date(acknowledgedAt),
+                })
+                .onConflictDoUpdate({
+                  target: [
+                    itineraryAcknowledgements.itineraryId,
+                    itineraryAcknowledgements.participantId,
+                  ],
+                  set: {
+                    acknowledgedRevision: expectedRevision,
+                    acknowledgedAt: new Date(acknowledgedAt),
+                  },
+                })
+                .returning();
+              if (!row) throw new Error("확인 상태 저장 결과가 없습니다.");
+              return { _tag: "Acknowledged", row } as const;
+            })
+          );
+          if (result._tag === "NotFound") {
+            return yield* Effect.fail(
+              new NotFoundError({ entity: "ConfirmedItinerary", id: itineraryId })
+            );
+          }
+          if (result._tag === "Conflict") {
+            return yield* Effect.fail(
+              new RevisionConflictError({
+                message: "최신 일정 revision을 다시 확인해주세요.",
+                expectedRevision,
+                actualRevision: RevisionSchema.make(result.revision),
+              })
+            );
+          }
+          return {
+            participantId: ParticipantIdSchema.make(result.row.participantId),
+            acknowledgedRevision: RevisionSchema.make(
+              result.row.acknowledgedRevision
+            ),
+            acknowledgedAt: result.row.acknowledgedAt.toISOString(),
+          };
+        }),
+
+      getAcknowledgements: (itineraryId) =>
+        databaseEffect("getItineraryAcknowledgements", async () => {
+          const rows = await db
+            .select()
+            .from(itineraryAcknowledgements)
+            .where(
+              eq(
+                itineraryAcknowledgements.itineraryId,
+                ItineraryIdSchema.make(itineraryId)
+              )
+            );
+          return rows.map((row) => ({
+            participantId: ParticipantIdSchema.make(row.participantId),
+            acknowledgedRevision: RevisionSchema.make(row.acknowledgedRevision),
+            acknowledgedAt: row.acknowledgedAt.toISOString(),
+          }));
         }),
     };
   })

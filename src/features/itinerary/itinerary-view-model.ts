@@ -18,6 +18,7 @@ interface ItineraryItemBase {
   readonly confirmedInfo: string;
   readonly bookingUrl?: string;
   readonly subText: string;
+  readonly memo?: string;
 }
 
 export interface ItineraryStayItem extends ItineraryItemBase {
@@ -189,6 +190,7 @@ export function toItineraryViewModel(
         confirmedInfo: confirmationText(accommodation.confirmedBy, accommodation.confirmedAt),
         bookingUrl: accommodation.bookingUrl,
         subText: `${daysBetween(item.date, item.endDate)}박 · ${badge.label}`,
+        memo: item.memo,
       };
       sections.set(item.date, [...(sections.get(item.date) ?? []), viewItem]);
       if (status !== "AVAILABLE") {
@@ -227,6 +229,7 @@ export function toItineraryViewModel(
       confirmedInfo: confirmationText(transport.confirmedBy, transport.confirmedAt),
       bookingUrl: transport.bookingUrl,
       subText: `${transport.mode} · ${badge.label}`,
+      memo: item.memo,
     };
     sections.set(item.date, [...(sections.get(item.date) ?? []), viewItem]);
     if (status !== "AVAILABLE") {

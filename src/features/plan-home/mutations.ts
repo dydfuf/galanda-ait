@@ -5,7 +5,7 @@ import {
   PlanIdSchema,
   RevisionSchema,
 } from "../../core/domain/ids.ts";
-import type { ItineraryStateResponse } from "../../contracts/itinerary.ts";
+import type { ConfirmItineraryResult } from "../../contracts/itinerary.ts";
 import { itineraryKeys } from "../itinerary/queries.ts";
 import { tripRoomKeys } from "./queries.ts";
 
@@ -16,7 +16,7 @@ export interface ConfirmPlanVariables {
 }
 
 export const useConfirmPlanMutation = (): UseMutationResult<
-  ItineraryStateResponse,
+  ConfirmItineraryResult,
   Error,
   ConfirmPlanVariables,
   unknown
@@ -24,7 +24,7 @@ export const useConfirmPlanMutation = (): UseMutationResult<
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ roomId, planId, revision }: ConfirmPlanVariables): Promise<ItineraryStateResponse> =>
+    mutationFn: ({ roomId, planId, revision }: ConfirmPlanVariables): Promise<ConfirmItineraryResult> =>
       confirmTripPlan(
         TripIdSchema.make(roomId),
         PlanIdSchema.make(planId),
