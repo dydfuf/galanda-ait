@@ -19,6 +19,7 @@ import {
   getTrips,
   issueTripInvite,
   joinInvite,
+  signInAnonymously,
   submitTripPlanOpinion,
   updateTrip,
   updateTripPlan,
@@ -37,6 +38,23 @@ const jsonResponse = (body: unknown, status = 200) =>
   });
 
 describe("API client", () => {
+  it("anonymous sign-in을 JSON 요청으로 전송한다", async () => {
+    let request: RequestInit | undefined;
+    globalThis.fetch = async (_input, init) => {
+      request = init;
+      return jsonResponse({ token: "session-token", user: { id: "guest-1" } });
+    };
+
+    await signInAnonymously();
+
+    expect(request).toMatchObject({
+      method: "POST",
+      body: "{}",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+    });
+  });
+
   it("Better Auth session과 Trip 응답을 decode하고 same-origin cookie를 사용한다", async () => {
     const room: TripRoom = {
       id: TripIdSchema.make("trip-1"),

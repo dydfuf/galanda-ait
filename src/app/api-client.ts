@@ -100,7 +100,7 @@ export const signInAnonymously = () =>
       token: Schema.String,
       user: Schema.Struct({ id: Schema.String }),
     }),
-    { method: "POST" }
+    { method: "POST", body: "{}" }
   );
 
 export const getTrips = (signal?: AbortSignal) =>
