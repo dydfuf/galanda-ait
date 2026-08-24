@@ -145,12 +145,47 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
     role: "MEMBER",
   };
 
+  const publishablePlanFields = {
+    baseHeadcount: 2,
+    routes: [{ city: "제주도", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
+    accommodations: [{
+      id: "stay-jeju",
+      city: "제주도",
+      period: "2026-09-01 ~ 2026-09-04",
+      nights: 3,
+      hotelName: "",
+      isSearching: true,
+      bookingStatus: "NOT_CHECKED",
+    }],
+    transports: [
+      {
+        id: "outbound-jeju",
+        fromCity: "서울",
+        toCity: "제주도",
+        mode: "",
+        hasTransfer: false,
+        durationText: "",
+        bookingStatus: "NOT_CHECKED",
+      },
+      {
+        id: "return-jeju",
+        fromCity: "제주도",
+        toCity: "서울",
+        mode: "",
+        hasTransfer: false,
+        durationText: "",
+        bookingStatus: "NOT_CHECKED",
+      },
+    ],
+  } satisfies Pick<TripPlan, "baseHeadcount" | "routes" | "accommodations" | "transports">;
+
   const authorPlan: TripPlan = {
     id: PlanIdSchema.make("plan-author-1"),
     title: "작성자의 여행안",
     status: "DRAFT",
     authorId: authorUser.id,
     authorName: authorUser.name,
+    ...publishablePlanFields,
     places: [],
     voteCount: 0,
   };
@@ -161,6 +196,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
     status: "DRAFT",
     authorId: hostUser.id,
     authorName: hostUser.name,
+    ...publishablePlanFields,
     places: [],
     voteCount: 0,
   };
@@ -286,6 +322,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         id: PlanIdSchema.make("plan-legacy-orphan"),
         title: "작성자 정보 없는 레거시 플랜",
         status: "DRAFT",
+        ...publishablePlanFields,
         places: [],
         voteCount: 0,
       };
@@ -329,6 +366,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         createPlan({
           roomId: sampleRoom.id,
           title: "신규 제안",
+          ...publishablePlanFields,
           places: [],
           expectedRevision: sampleRoom.revision,
         }).pipe(Effect.provide(env))
@@ -365,6 +403,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         createPlan({
           roomId: room.id,
           title: "복제한 대안",
+          ...publishablePlanFields,
           places: [],
           cloneFromPlanId: sourcePlan.id,
           expectedRevision: room.revision,
@@ -512,6 +551,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         id: PlanIdSchema.make("plan-orphan"),
         title: "작성자 정보가 유실된 플랜",
         status: "DRAFT",
+        ...publishablePlanFields,
         places: [],
         voteCount: 0,
       };
@@ -660,6 +700,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         id: PlanIdSchema.make("plan-orphan"),
         title: "작성자 정보가 유실된 플랜",
         status: "DRAFT",
+        ...publishablePlanFields,
         places: [],
         voteCount: 0,
       };
@@ -847,6 +888,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       status: "VOTING",
       authorId: authorUser.id,
       authorName: authorUser.name,
+      ...publishablePlanFields,
       places: [],
       voteCount: 2,
       memberOpinions: [
@@ -966,6 +1008,14 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
             proposalReason: "숙소를 바꿨어요",
             baseHeadcount: 5,
             routes: [{ city: "서귀포", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
+            accommodations: [{
+              ...publishablePlanFields.accommodations[0],
+              city: "서귀포",
+            }],
+            transports: [
+              { ...publishablePlanFields.transports[0], toCity: "서귀포" },
+              { ...publishablePlanFields.transports[1], fromCity: "서귀포" },
+            ],
           },
           expectedRevision: roomWithOpinions.revision,
         }).pipe(Effect.provide(env))

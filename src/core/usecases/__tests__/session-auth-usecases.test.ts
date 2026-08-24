@@ -248,6 +248,40 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     isAuthenticated: false,
   };
 
+  const publishablePlanFields = {
+    baseHeadcount: 2,
+    routes: [{ city: "제주도", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
+    accommodations: [{
+      id: "stay-jeju",
+      city: "제주도",
+      period: "2026-09-01 ~ 2026-09-04",
+      nights: 3,
+      hotelName: "",
+      isSearching: true,
+      bookingStatus: "NOT_CHECKED",
+    }],
+    transports: [
+      {
+        id: "outbound-jeju",
+        fromCity: "서울",
+        toCity: "제주도",
+        mode: "",
+        hasTransfer: false,
+        durationText: "",
+        bookingStatus: "NOT_CHECKED",
+      },
+      {
+        id: "return-jeju",
+        fromCity: "제주도",
+        toCity: "서울",
+        mode: "",
+        hasTransfer: false,
+        durationText: "",
+        bookingStatus: "NOT_CHECKED",
+      },
+    ],
+  } satisfies Pick<TripPlan, "baseHeadcount" | "routes" | "accommodations" | "transports">;
+
   const sampleRoom: TripRoom = {
     id: TripIdSchema.make("room-1"),
     title: "제주도 힐링 여행",
@@ -264,7 +298,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         status: "DRAFT",
         authorId: UserIdSchema.make("user-alice"),
         authorName: "앨리스",
-        routes: [{ city: "제주도", arrivalDate: "2026-09-01", departureDate: "2026-09-04" }],
+        ...publishablePlanFields,
         places: [],
         voteCount: 0,
       },
@@ -367,6 +401,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const program = createPlan({
         roomId: sampleRoom.id,
         title: "밥의 대안",
+        ...publishablePlanFields,
         places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
@@ -408,6 +443,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         createPlan({
           roomId: linkedRoom.id,
           title: "승격 후 여행안",
+          ...publishablePlanFields,
           places: [],
           expectedRevision: linkedRoom.revision,
         }).pipe(
@@ -440,6 +476,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       const program = createPlan({
         roomId: sampleRoom.id,
         title: "위조된 작성자 여행안",
+        ...publishablePlanFields,
         places: [],
         expectedRevision: sampleRoom.revision,
       }).pipe(Effect.provide(testEnv));
@@ -770,6 +807,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
             status: "DRAFT",
             authorId: undefined, // 레거시 데이터로 authorId 누락
             authorName: "밥",
+            ...publishablePlanFields,
             places: [],
             voteCount: 0,
           },
@@ -822,6 +860,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
             status: "DRAFT",
             authorId: undefined,
             authorName: "밥",
+            ...publishablePlanFields,
             places: [],
             voteCount: 0,
           },
@@ -875,6 +914,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
             status: "DRAFT",
             authorId: undefined,
             authorName: "밥",
+            ...publishablePlanFields,
             places: [],
             voteCount: 0,
           },
@@ -962,6 +1002,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
             status: "DRAFT",
             authorId: undefined,
             authorName: "밥",
+            ...publishablePlanFields,
             places: [],
             voteCount: 0,
           },

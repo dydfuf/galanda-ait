@@ -116,10 +116,10 @@ export const toPlanDetailViewModel = (
     // 비용 계산
     const costSummary = calculatePlanCost(p.accommodations, p.transports, headcount);
     const groupCostText = costSummary.hasCost
-      ? `그룹 총액 ${formatCostRangeText(costSummary.minTotal, costSummary.maxTotal)}`
+      ? `${costSummary.unpricedCount > 0 ? "확인된 그룹 금액" : "그룹 총액"} ${formatCostRangeText(costSummary.minTotal, costSummary.maxTotal, costSummary.unpricedCount)}`
       : "예상 경비 미정";
     const perPersonCostText = costSummary.hasCost
-      ? `${headcount}명 기준 1인 ${formatCostRangeText(costSummary.minPerPerson, costSummary.maxPerPerson)}`
+      ? `${headcount}명 기준 1인 ${formatCostRangeText(costSummary.minPerPerson, costSummary.maxPerPerson, costSummary.unpricedCount)}`
       : "비용 미정";
 
     const accommodations = p.accommodations ?? [];

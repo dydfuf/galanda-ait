@@ -140,13 +140,12 @@ export function AccommodationSection({
     const route = routes[accommodations.length] ?? routes[0];
     onAdd({
       id: `stay-${Date.now()}`,
-      city: route?.city || "방문 도시",
-      period: "체류 기간",
+      city: route?.city ?? "",
+      period: route ? `${route.arrivalDate} ~ ${route.departureDate}` : "",
       nights: route ? Math.max(0, getStayNightCount(route)) : 0,
-      hotelName: "숙소 찾는 중",
+      hotelName: "",
       isSearching: true,
-      bookingStatus: "NEED_CHECK",
-      priceRange: { min: 0, max: 0 },
+      bookingStatus: "NOT_CHECKED",
     });
   };
 
@@ -195,7 +194,7 @@ export function AccommodationSection({
                   onChange={(e) =>
                     onUpdate(acc.id, {
                       isSearching: e.target.checked,
-                      hotelName: e.target.checked ? "숙소 찾는 중" : "",
+                      hotelName: e.target.checked ? "" : acc.hotelName,
                     })
                   }
                 />
@@ -213,11 +212,14 @@ export function AccommodationSection({
                   type="number"
                   placeholder="0"
                   step="10000"
-                  value={acc.priceRange?.min || ""}
+                  min="0"
+                  value={acc.priceRange?.min ?? ""}
                   onChange={(e) => {
-                    const min = parseInt(e.target.value, 10) || 0;
-                    const max = Math.max(min, acc.priceRange?.max || 0);
-                    onUpdate(acc.id, { priceRange: { min, max } });
+                    if (!e.target.value) return onUpdate(acc.id, { priceRange: undefined });
+                    const min = Number(e.target.value);
+                    onUpdate(acc.id, {
+                      priceRange: { min, max: Math.max(min, acc.priceRange?.max ?? min) },
+                    });
                   }}
                   css={inputStyle}
                 />
@@ -231,11 +233,14 @@ export function AccommodationSection({
                   type="number"
                   placeholder="0"
                   step="10000"
-                  value={acc.priceRange?.max || ""}
+                  min="0"
+                  value={acc.priceRange?.max ?? ""}
                   onChange={(e) => {
-                    const max = parseInt(e.target.value, 10) || 0;
-                    const min = acc.priceRange?.min || 0;
-                    onUpdate(acc.id, { priceRange: { min, max } });
+                    if (!e.target.value) return onUpdate(acc.id, { priceRange: undefined });
+                    const max = Number(e.target.value);
+                    onUpdate(acc.id, {
+                      priceRange: { min: Math.min(acc.priceRange?.min ?? max, max), max },
+                    });
                   }}
                   css={inputStyle}
                 />
@@ -278,7 +283,7 @@ export function AccommodationSection({
           </div>
         ))}
 
-        <button type="button" onClick={handleAddNew} css={addAccButtonStyle}>
+        <button type="button" disabled={routes.length === 0 || accommodations.length >= routes.length} onClick={handleAddNew} css={addAccButtonStyle}>
           + 숙소 구간 추가
         </button>
       </div>

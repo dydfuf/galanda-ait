@@ -23,7 +23,7 @@ const validDraft = {
     city: "도쿄",
     period: "전체 일정",
     nights: 3,
-    hotelName: "숙소 찾는 중",
+    hotelName: "",
     isSearching: true,
     bookingStatus: "NEED_CHECK",
     priceRange: { min: 0, max: 0 },
@@ -121,6 +121,19 @@ describe("plan editor initial data", () => {
     expect(clone.accommodations[0]?.priceRange).not.toBe(
       publishedPlan.accommodations?.[0]?.priceRange
     );
+  });
+
+  it("기존 찾는 중 숙소의 예시 이름을 편집 데이터에서 제거한다", () => {
+    const legacyPlan = {
+      ...publishedPlan,
+      accommodations: publishedPlan.accommodations?.map((stay) => ({
+        ...stay,
+        hotelName: "숙소 찾는 중",
+        isSearching: true,
+      })),
+    };
+
+    expect(getPlanEditorInitialData(room, legacyPlan).accommodations[0]?.hotelName).toBe("");
   });
 });
 

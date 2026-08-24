@@ -8,7 +8,11 @@ describe("syncAccommodationNights", () => {
       [{ id: "stay-1", city: "여행지", period: "전체 일정", nights: 0, hotelName: "찾는 중", bookingStatus: "NEED_CHECK" }]
     );
 
-    expect(accommodations[0].nights).toBe(3);
+    expect(accommodations[0]).toMatchObject({
+      city: "도쿄",
+      period: "2026-12-10 ~ 2026-12-13",
+      nights: 3,
+    });
   });
 
   it("같은 도시의 두 번째 숙소는 배열 index가 아닌 해당 도시 route를 사용한다", () => {

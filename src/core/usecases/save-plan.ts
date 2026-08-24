@@ -20,7 +20,7 @@ import {
 import {
   BookingStatusSchema,
   CityStaySchema,
-  getRouteValidationError,
+  getPlanPublishValidationErrors,
   PriceRangeSchema,
   TripPlaceSchema,
   TripPlanSchema,
@@ -159,22 +159,10 @@ export const createPlan = Effect.fn("createPlan")(
       "여행방 참여자만 여행안을 작성할 수 있습니다."
     );
 
-    // 3. 여행안 입력 유효성 검증
-    if (!command.title.trim()) {
-      return yield* Effect.fail(
-        new ValidationError({ message: "여행안 제목을 입력해주세요." })
-      );
-    }
-
-    if (command.baseHeadcount !== undefined && command.baseHeadcount < 1) {
-      return yield* Effect.fail(
-        new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
-      );
-    }
-
-    const routeError = getRouteValidationError(command.routes ?? []);
-    if (routeError) {
-      return yield* Effect.fail(new ValidationError({ message: routeError }));
+    // 3. 공개 가능한 실제 사용자 입력인지 검증
+    const validationError = getPlanPublishValidationErrors(command)[0];
+    if (validationError) {
+      return yield* Effect.fail(new ValidationError({ message: validationError }));
     }
 
     const sourcePlan = command.cloneFromPlanId
@@ -233,25 +221,6 @@ export const updatePlan = Effect.fn("updatePlan")(
       "여행안을 수정하려면 로그인이 필요합니다."
     );
 
-    // 2. 여행안 제목 유효성 검증
-    if (!input.plan.title?.trim()) {
-      return yield* Effect.fail(
-        new ValidationError({ message: "여행안 제목을 입력해주세요." })
-      );
-    }
-
-    // 3. 인원수 유효성 검증
-    if (input.plan.baseHeadcount !== undefined && input.plan.baseHeadcount < 1) {
-      return yield* Effect.fail(
-        new ValidationError({ message: "기준 인원수는 1명 이상이어야 합니다." })
-      );
-    }
-
-    const routeError = getRouteValidationError(input.plan.routes ?? []);
-    if (routeError) {
-      return yield* Effect.fail(new ValidationError({ message: routeError }));
-    }
-
     const repo = yield* TripRoomRepository;
     const room = mergeParticipantIdentityInRoom(
       yield* repo.getRoom(input.roomId),
@@ -283,6 +252,12 @@ export const updatePlan = Effect.fn("updatePlan")(
       "확정된 여행안은 수정할 수 없습니다."
     );
 
+    // 7. 공개 가능한 실제 사용자 입력인지 검증
+    const validationError = getPlanPublishValidationErrors(input.plan)[0];
+    if (validationError) {
+      return yield* Effect.fail(new ValidationError({ message: validationError }));
+    }
+
     // 작성자 정보 보존 및 기존에 authorId가 누락된 경우 유일 매칭 시 보정(backfill)
     const matchingMembers = existingPlan.authorName
       ? room.members.filter((m) => m.name === existingPlan.authorName)
@@ -295,7 +270,7 @@ export const updatePlan = Effect.fn("updatePlan")(
     const resolvedAuthorName =
       existingPlan.authorName ?? uniqueAuthorMember?.name;
 
-    // 7. 서버가 소유하는 필드는 입력값을 신뢰하지 않고 기존 여행안에서 이어받는다
+    // 8. 서버가 소유하는 필드는 입력값을 신뢰하지 않고 기존 여행안에서 이어받는다
     //    - status/revision/publishedAt: 공개 반영 시 서버가 결정한다
     //    - memberOpinions/voteCount: 입력으로 덮어쓰지 않고, 의사결정 필드 변경 때만 초기화한다
     //    - clonedFromPlanId: 생성 시점에 정해지는 복제 계보이므로 수정 대상이 아니다
@@ -319,7 +294,7 @@ export const updatePlan = Effect.fn("updatePlan")(
       finalPlan = { ...finalPlan, memberOpinions: [], voteCount: 0 };
     }
 
-    // 8. 복제된 여행안인 경우, 변경사항 재계산하여 동기화
+    // 9. 복제된 여행안인 경우, 변경사항 재계산하여 동기화
     if (finalPlan.clonedFromPlanId) {
       const originalPlan = room.plans.find(
         (p) => p.id === finalPlan.clonedFromPlanId

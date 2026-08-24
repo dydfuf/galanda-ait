@@ -24,7 +24,7 @@ export function calculatePlanCost(
 
   if (accommodations) {
     for (const acc of accommodations) {
-      if (acc.priceRange && (acc.priceRange.min > 0 || acc.priceRange.max > 0)) {
+      if (acc.priceRange) {
         minTotal += acc.priceRange.min;
         maxTotal += acc.priceRange.max;
         hasPricedItem = true;
@@ -36,7 +36,7 @@ export function calculatePlanCost(
 
   if (transports) {
     for (const trans of transports) {
-      if (trans.priceRange && (trans.priceRange.min > 0 || trans.priceRange.max > 0)) {
+      if (trans.priceRange) {
         minTotal += trans.priceRange.min;
         maxTotal += trans.priceRange.max;
         hasPricedItem = true;
@@ -77,8 +77,15 @@ export function formatCostText(amount: number): string {
   return `${amount.toLocaleString()}원`;
 }
 
-export function formatCostRangeText(min: number, max: number): string {
-  if (min === 0 && max === 0) return "가격 미정";
-  if (min === max) return formatCostText(min);
-  return `${formatCostText(min)} ~ ${formatCostText(max)}`;
+export function formatCostRangeText(
+  min: number,
+  max: number,
+  unpricedCount = 0
+): string {
+  const range = min === max
+    ? formatCostText(min)
+    : `${formatCostText(min)} ~ ${formatCostText(max)}`;
+  return unpricedCount > 0
+    ? `${range} (가격 미정 ${unpricedCount}건 별도)`
+    : range;
 }
