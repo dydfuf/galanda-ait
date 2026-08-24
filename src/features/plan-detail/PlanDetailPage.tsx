@@ -7,7 +7,11 @@ import { useSubmitOpinionMutation } from "./mutations.ts";
 import { useDeletePlanMutation } from "../plan-editor/mutations.ts";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { toUserMessage } from "../common/error-message.ts";
+import {
+  isRevisionConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
@@ -62,12 +66,13 @@ export function PlanDetailPage(): JSX.Element {
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
 
   const { isError: isSessionError, error: sessionError } = useSessionQuery();
-  const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
+  const { data: room, isLoading, isError, error, refetch } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
   const deletePlanMutation = useDeletePlanMutation();
   const [isOpinionSheetOpen, setIsOpinionSheetOpen] = useState(false);
   const [sheet, setSheet] = useState<PlanSheet>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [conflictNotice, setConflictNotice] = useState<string>();
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -108,9 +113,9 @@ export function PlanDetailPage(): JSX.Element {
   }
 
   const isConfirmed = plan.id === room.confirmedPlanId;
-  const isRoomConfirmed = Boolean(room.confirmedPlanId);
+  const isRoomConfirmed = room.isConfirmed;
   const canChangeOpinion = !isRoomConfirmed;
-  const canManage = !isRoomConfirmed && !isConfirmed && Boolean(plan.canManage);
+  const canManage = Boolean(plan.canManage);
   const opinionSummary = `좋아요 ${plan.opinions.likeCount} · 괜찮아요 ${plan.opinions.okayCount} · 어려워요 ${plan.opinions.hardCount}`;
   const myOpinionSummary = plan.myReaction
     ? `내 의견: ${reactionLabels[plan.myReaction]}`
@@ -122,6 +127,7 @@ export function PlanDetailPage(): JSX.Element {
   ): Promise<void> => {
     if (submitOpinionMutation.isPending) return;
 
+    setConflictNotice(undefined);
     try {
       await submitOpinionMutation.mutateAsync({
         roomId: room.id,
@@ -133,13 +139,19 @@ export function PlanDetailPage(): JSX.Element {
       setIsOpinionSheetOpen(false);
       toast("의견을 저장했어요.");
     } catch (err: unknown) {
-      toast(toUserMessage(err, "의견을 등록하지 못했습니다."));
+      if (isRevisionConflict(err)) {
+        await refetch();
+        setConflictNotice(toRevisionConflictMessage(err));
+      } else {
+        toast(toUserMessage(err, "의견을 등록하지 못했습니다."));
+      }
     }
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
     if (deletePlanMutation.isPending) return;
 
+    setConflictNotice(undefined);
     try {
       await deletePlanMutation.mutateAsync({
         roomId: room.id,
@@ -150,7 +162,12 @@ export function PlanDetailPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
       setIsDeleteConfirmOpen(false);
-      toast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+      if (isRevisionConflict(err)) {
+        await refetch();
+        setConflictNotice(toRevisionConflictMessage(err));
+      } else {
+        toast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+      }
     }
   };
 
@@ -180,6 +197,21 @@ export function PlanDetailPage(): JSX.Element {
           </Button>
         )}
       </div>
+
+      {conflictNotice && (
+        <section className="mb-4 rounded-xl border border-warning-border bg-warning-muted p-4" role="alert">
+          <p className="text-sm leading-normal text-foreground">{conflictNotice}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={() => setConflictNotice(undefined)}
+          >
+            최신 내용 확인했어요
+          </Button>
+        </section>
+      )}
 
       <section className="flex flex-col gap-4 px-1 pt-1 pb-5" aria-label="여행안 요약">
         <RouteRail route={plan.route} differenceSummary={plan.differenceSummary} />

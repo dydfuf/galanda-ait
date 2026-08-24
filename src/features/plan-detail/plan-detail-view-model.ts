@@ -10,7 +10,8 @@ import {
 } from "../../core/domain/room.ts";
 import {
   isPlanAuthor,
-  canManagePlan,
+  canMutatePlan,
+  isRoomConfirmed,
   getRoomActor,
   type ParticipantIdentity,
   type RoomRole,
@@ -56,6 +57,7 @@ export interface PlanDetailViewModel {
   /** 세션 사용자의 방 내 역할. 방장 전용 동작(확정 등) 노출 판단에 사용해요. */
   readonly viewerRole: RoomRole;
   readonly isViewerHost: boolean;
+  readonly isConfirmed: boolean;
   readonly confirmedPlanId?: string;
   readonly confirmedPlanTitle?: string;
   readonly decisionStatusText: string;
@@ -68,7 +70,7 @@ export const toPlanDetailViewModel = (
   currentUserIds?: ParticipantIdentity
 ): PlanDetailViewModel => {
   const confirmed = getConfirmedPlan(room);
-  const isConfirmed = Boolean(room.confirmedPlanId);
+  const isConfirmed = isRoomConfirmed(room);
   const viewer = getRoomActor(room, currentUserIds);
 
   let decisionStatusText = "여행안을 고르고 있어요";
@@ -251,7 +253,7 @@ export const toPlanDetailViewModel = (
     const hardCount = privateOpinions.filter((m) => m.reaction === "HARD").length;
 
     const isAuthor = isPlanAuthor(room, p, currentUserIds);
-    const canManage = canManagePlan(room, p, currentUserIds);
+    const canManage = canMutatePlan(room, p, currentUserIds);
 
     // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
     // (하드코딩된 로컬 사용자 폴백은 남의 의견을 내 것으로 표시하므로 사용하지 않는다)
@@ -307,6 +309,7 @@ export const toPlanDetailViewModel = (
     revision: room.revision,
     viewerRole: viewer.role,
     isViewerHost: viewer.isHost,
+    isConfirmed,
     confirmedPlanId: room.confirmedPlanId,
     confirmedPlanTitle: confirmed?.title,
     decisionStatusText,

@@ -15,6 +15,7 @@ import { MobileList } from "@/components/galanda/mobile-list.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { PlanListRow } from "./components/PlanListRow.tsx";
 import { toTripRoomViewModel } from "./plan-home-view-model.ts";
+import { isRoomConfirmed } from "../../core/domain/auth-guards.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -69,7 +70,7 @@ export function PlanHomePage() {
 
   const room = toTripRoomViewModel(rawRoom, session?.participantIds);
 
-  const isConfirmed = Boolean(room.confirmedPlanId);
+  const isConfirmed = isRoomConfirmed(rawRoom);
   const plans = room.plans;
 
   const primaryCta = isConfirmed

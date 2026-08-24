@@ -3,7 +3,11 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, CompareQuerySchema, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { toUserMessage } from "../common/error-message.ts";
+import {
+  isRevisionConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
@@ -50,7 +54,7 @@ export function PlanComparePage() {
     right: rightParam,
   });
 
-  const { data: room, isLoading, isError, error } = useTripRoomDetailQuery(tripId);
+  const { data: room, isLoading, isError, error, refetch } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -101,7 +105,7 @@ export function PlanComparePage() {
     );
   }
 
-  const isRoomConfirmed = Boolean(room.confirmedPlanId);
+  const isRoomConfirmed = room.isConfirmed;
   const confirmState = getCompareConfirmState({
     isViewerHost: room.isViewerHost,
     isRoomConfirmed,
@@ -139,7 +143,12 @@ export function PlanComparePage() {
       navigate(`/trips/${tripId}/itinerary`, { replace: true });
     } catch (err: unknown) {
       setIsConfirmSheetOpen(false);
-      setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+      if (isRevisionConflict(err)) {
+        await refetch();
+        setConfirmError(toRevisionConflictMessage(err));
+      } else {
+        setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+      }
     }
   };
 

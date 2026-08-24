@@ -17,15 +17,27 @@ import { Result } from "effect";
 import { decodeRouteParams, PlanParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { useSessionQuery } from "../../hooks/useSession.ts";
-import { toUserMessage } from "../common/error-message.ts";
-import { canManagePlan } from "../../core/domain/auth-guards.ts";
+import {
+  isRevisionConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
+import {
+  canManagePlan,
+  canMutatePlan,
+  isRoomConfirmed,
+} from "../../core/domain/auth-guards.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
-import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
+import {
+  PlanEditorSections,
+  RevisionConflictChoice,
+} from "./components/PlanEditorSections.tsx";
 import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useUpdatePlanMutation, useDeletePlanMutation } from "./mutations.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
+import { calculatePlanDifference } from "../../core/calculations/plan-diff.ts";
 
 const pageContainerStyle = css`
   padding: 16px 20px var(--app-cta-space, 112px);
@@ -67,23 +79,21 @@ export function PlanEditPage(): JSX.Element {
     isError: isSessionError,
     error: sessionError,
   } = useSessionQuery();
-  const { data: room, isLoading: isRoomLoading, isError } = useTripRoomRawQuery(tripId);
+  const { data: room, isLoading: isRoomLoading, isError, refetch } = useTripRoomRawQuery(tripId);
   const updatePlanMutation = useUpdatePlanMutation();
   const deletePlanMutation = useDeletePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [revisionConflict, setRevisionConflict] = useState<string>();
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const plan = room?.plans.find((p) => p.id === planId);
-  const isConfirmed = plan
-    ? plan.id === room?.confirmedPlanId || plan.status === "CONFIRMED"
-    : false;
+  const isConfirmed = room ? isRoomConfirmed(room) : false;
   const canEdit = Boolean(
     room &&
     plan &&
     session &&
-    canManagePlan(room, plan, session.participantIds) &&
-    !isConfirmed
+    canMutatePlan(room, plan, session.participantIds)
   );
 
   const editor = usePlanEditorState(
@@ -153,10 +163,10 @@ export function PlanEditPage(): JSX.Element {
   if (isConfirmed) {
     return (
       <RouteErrorFallback
-        title="확정된 여행안은 수정할 수 없습니다"
-        message="이미 확정된 여행안은 세부 일정을 변경할 수 없습니다."
-        actionText="여행안 상세로 돌아가기"
-        onAction={() => navigate(`/trips/${tripId}/plans/${planId}`, { replace: true })}
+        title="확정된 여행에서는 여행안을 수정할 수 없습니다"
+        message="확정 이후 변경은 확정 일정에서 진행해주세요."
+        actionText="확정 일정 보기"
+        onAction={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
       />
     );
   }
@@ -166,6 +176,7 @@ export function PlanEditPage(): JSX.Element {
 
     setIsSubmitting(true);
     setActionError(null);
+    setRevisionConflict(undefined);
     try {
       const updatedPlan: TripPlan = {
         ...plan,
@@ -187,7 +198,21 @@ export function PlanEditPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans/${plan.id}`, { replace: true });
     } catch (err: unknown) {
       setIsSubmitting(false);
-      setActionError(toUserMessage(err, "여행안 수정에 실패했습니다."));
+      if (isRevisionConflict(err)) {
+        const latest = (await refetch()).data;
+        const latestPlan = latest?.plans.find((candidate) => candidate.id === plan.id);
+        const difference = latestPlan
+          ? calculatePlanDifference(plan, latestPlan)
+          : undefined;
+        const changed = !latestPlan
+          ? "이 여행안이 삭제됐습니다."
+          : difference?.hasChanges
+            ? `최신 공개본 변경: ${difference.summaryText}.`
+            : "여행방의 다른 내용이 변경됐습니다.";
+        setRevisionConflict(`${toRevisionConflictMessage(err)} ${changed} 작성 중인 입력은 보존했습니다.`);
+      } else {
+        setActionError(toUserMessage(err, "여행안 수정에 실패했습니다."));
+      }
     }
   };
 
@@ -206,7 +231,12 @@ export function PlanEditPage(): JSX.Element {
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
       setIsDeleteConfirmOpen(false);
-      setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+      if (isRevisionConflict(err)) {
+        await refetch();
+        setActionError(toRevisionConflictMessage(err));
+      } else {
+        setActionError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+      }
     }
   };
 
@@ -224,17 +254,28 @@ export function PlanEditPage(): JSX.Element {
 
   return (
     <div css={pageContainerStyle}>
-      <PlanEditorSections
-        editor={editor}
-        section={section}
-        isEditMode={true}
-        isCloneMode={false}
-        onOpenSection={openSection}
-        onCompleteSection={completeSection}
-      />
+      {revisionConflict ? (
+        <RevisionConflictChoice
+          message={revisionConflict}
+          onReapply={() => setRevisionConflict(undefined)}
+          onUseLatest={() => {
+            editor.useLatestPublishedPlan();
+            setRevisionConflict(undefined);
+          }}
+        />
+      ) : (
+        <PlanEditorSections
+          editor={editor}
+          section={section}
+          isEditMode={true}
+          isCloneMode={false}
+          onOpenSection={openSection}
+          onCompleteSection={completeSection}
+        />
+      )}
 
       {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
-      {!section && !editor.draftConflict && (
+      {!section && !editor.draftConflict && !revisionConflict && (
         <BottomAction
           accessory={
             editor.validation.firstError || actionError ? (

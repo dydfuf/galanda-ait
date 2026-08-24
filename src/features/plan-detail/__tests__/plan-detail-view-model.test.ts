@@ -78,6 +78,29 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     expect(plan.canManage).toBe(false);
   });
 
+  it("확정된 방에서는 작성자의 미확정 여행안 관리 CTA도 잠근다", (): void => {
+    const confirmedPlan = {
+      ...room.plans[0],
+      id: PlanIdSchema.make("plan-confirmed"),
+      title: "확정안",
+      status: "CONFIRMED" as const,
+    };
+    const lockedRoom = {
+      ...room,
+      plans: [room.plans[0], confirmedPlan],
+      confirmedPlanId: confirmedPlan.id,
+    };
+
+    const plan = toPlanDetailViewModel(
+      lockedRoom,
+      UserIdSchema.make("user-local-me")
+    ).plans[0];
+
+    expect(plan.isConfirmed).toBe(false);
+    expect(plan.isAuthor).toBe(true);
+    expect(plan.canManage).toBe(false);
+  });
+
   it("의견을 남기지 않은 사용자에게는 다른 사람의 사유가 노출되지 않는다", (): void => {
     const vm = toPlanDetailViewModel(room, UserIdSchema.make("user-stranger"));
     const plan = vm.plans[0];

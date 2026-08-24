@@ -14,7 +14,11 @@ import type {
 } from "../../core/domain/confirmed-itinerary.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { toUserMessage } from "../common/error-message.ts";
+import {
+  isRevisionConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
 import { useItineraryQuery } from "./queries.ts";
 import { useReviseItineraryMutation } from "./mutations.ts";
 
@@ -43,13 +47,16 @@ const toPatches = (itinerary: ConfirmedItinerary): ItineraryItemPatch[] =>
 function ItineraryEditor({
   tripId,
   itinerary,
+  onRefresh,
 }: {
   readonly tripId: string;
   readonly itinerary: ConfirmedItinerary;
+  readonly onRefresh: () => Promise<unknown>;
 }) {
   const navigate = useNavigate();
   const mutation = useReviseItineraryMutation();
   const [patches, setPatches] = useState(() => toPatches(itinerary));
+  const [conflictNotice, setConflictNotice] = useState<string>();
   const update = (index: number, patch: ItineraryItemPatch) =>
     setPatches((current) => [
       ...current.slice(0, index),
@@ -62,6 +69,23 @@ function ItineraryEditor({
       : !patch.fromCity.trim() || !patch.toCity.trim()
   );
   const unchanged = JSON.stringify(patches) === JSON.stringify(toPatches(itinerary));
+  const save = async (): Promise<void> => {
+    if (mutation.isPending) return;
+    setConflictNotice(undefined);
+    try {
+      await mutation.mutateAsync({
+        tripId,
+        patches,
+        expectedRevision: itinerary.currentRevision,
+      });
+      navigate(`/trips/${tripId}/itinerary`, { replace: true });
+    } catch (error: unknown) {
+      if (isRevisionConflict(error)) {
+        await onRefresh();
+        setConflictNotice(`${toRevisionConflictMessage(error)} 작성 중인 입력은 보존했습니다.`);
+      }
+    }
+  };
 
   return (
     <PageBody withBottomAction className="mx-auto max-w-[640px] gap-4 py-4">
@@ -149,7 +173,11 @@ function ItineraryEditor({
       </div>
       <BottomAction
         accessory={
-          mutation.isError ? (
+          conflictNotice ? (
+            <p className="text-center text-[13px] text-warning" role="alert">
+              {conflictNotice}
+            </p>
+          ) : mutation.isError ? (
             <p className="text-center text-[13px] text-destructive">
               {toUserMessage(mutation.error, "일정을 저장하지 못했습니다.")}
             </p>
@@ -160,15 +188,7 @@ function ItineraryEditor({
           type="button"
           size="xl"
           disabled={invalid || unchanged || mutation.isPending}
-          onClick={() => {
-            void mutation.mutateAsync({
-                tripId,
-                patches,
-                expectedRevision: itinerary.currentRevision,
-              })
-              .then(() => navigate(`/trips/${tripId}/itinerary`, { replace: true }))
-              .catch(() => undefined);
-          }}
+          onClick={() => void save()}
         >
           변경 저장
         </Button>
@@ -204,5 +224,11 @@ export function ItineraryEditPage(): JSX.Element {
       />
     );
   }
-  return <ItineraryEditor tripId={tripId} itinerary={query.data.itinerary} />;
+  return (
+    <ItineraryEditor
+      tripId={tripId}
+      itinerary={query.data.itinerary}
+      onRefresh={() => query.refetch()}
+    />
+  );
 }

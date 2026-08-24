@@ -1,3 +1,5 @@
+import { ApiClientError } from "../../app/api-client.ts";
+
 /**
  * 사용자에게 보여줄 오류 문구를 결정한다.
  *
@@ -29,4 +31,20 @@ export const toUserMessage = (error: unknown, fallback: string): string => {
   }
 
   return fallback;
+};
+
+export const isRevisionConflict = (error: unknown): error is ApiClientError =>
+  error instanceof ApiClientError && error.code === "REVISION_CONFLICT";
+
+export const toRevisionConflictMessage = (error: ApiClientError): string => {
+  const details = error.details as {
+    readonly expectedRevision?: unknown;
+    readonly actualRevision?: unknown;
+  } | undefined;
+  const expected = details?.expectedRevision;
+  const actual = details?.actualRevision;
+
+  return typeof expected === "number" && typeof actual === "number"
+    ? `다른 사용자가 먼저 변경했습니다 (v${expected} → v${actual}). 최신 내용을 확인한 뒤 다시 적용해주세요.`
+    : "다른 사용자가 먼저 변경했습니다. 최신 내용을 확인한 뒤 다시 적용해주세요.";
 };

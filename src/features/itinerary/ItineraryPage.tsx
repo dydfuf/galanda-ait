@@ -3,7 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import { toUserMessage } from "../common/error-message.ts";
+import {
+  isRevisionConflict,
+  toRevisionConflictMessage,
+  toUserMessage,
+} from "../common/error-message.ts";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
@@ -54,6 +58,7 @@ export function ItineraryPage(): JSX.Element {
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
   const acknowledgeMutation = useAcknowledgeItineraryMutation();
+  const [conflictNotice, setConflictNotice] = useState<string>();
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -150,12 +155,19 @@ export function ItineraryPage(): JSX.Element {
                   type="button"
                   size="sm"
                   disabled={acknowledgeMutation.isPending}
-                  onClick={() =>
-                    acknowledgeMutation.mutate({
+                  onClick={() => {
+                    if (acknowledgeMutation.isPending) return;
+                    setConflictNotice(undefined);
+                    void acknowledgeMutation.mutateAsync({
                       tripId,
                       expectedRevision: itineraryState.itinerary.currentRevision,
-                    })
-                  }
+                    }).catch(async (mutationError: unknown) => {
+                      if (isRevisionConflict(mutationError)) {
+                        await refetchItinerary();
+                        setConflictNotice(toRevisionConflictMessage(mutationError));
+                      }
+                    });
+                  }}
                 >
                   변경 내용 확인
                 </Button>
@@ -171,7 +183,11 @@ export function ItineraryPage(): JSX.Element {
                 </Button>
               )}
             </div>
-            {acknowledgeMutation.isError && (
+            {conflictNotice ? (
+              <p className="mt-2 text-[13px] text-warning" role="alert">
+                {conflictNotice}
+              </p>
+            ) : acknowledgeMutation.isError && (
               <p className="mt-2 text-[13px] text-destructive">
                 {toUserMessage(acknowledgeMutation.error, "확인 상태를 저장하지 못했습니다.")}
               </p>

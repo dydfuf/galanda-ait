@@ -332,6 +332,23 @@ export const requirePlanAuthor = (
 export const isPlanConfirmed = (room: TripRoom, plan: TripPlan): boolean =>
   room.confirmedPlanId === plan.id || plan.status === "CONFIRMED";
 
+export const isRoomConfirmed = (room: TripRoom): boolean =>
+  room.confirmedPlanId !== undefined || room.plans.some((plan) => plan.status === "CONFIRMED");
+
+export const canMutatePlan = (
+  room: TripRoom,
+  plan: TripPlan,
+  identity: ParticipantIdentity
+): boolean => !isRoomConfirmed(room) && canManagePlan(room, plan, identity);
+
+export const requireRoomUnconfirmed = (
+  room: TripRoom,
+  reason = "확정된 여행에서는 여행안을 변경할 수 없습니다."
+): Effect.Effect<void, StateConflictError> =>
+  isRoomConfirmed(room)
+    ? Effect.fail(new StateConflictError({ message: reason }))
+    : Effect.void;
+
 /**
  * 확정된 여행안의 변경(수정/삭제)을 거부하는 도메인 가드
  * - 확정본은 방 전체가 공유하는 공개본이므로 작성자에게도 변경을 허용하지 않는다
