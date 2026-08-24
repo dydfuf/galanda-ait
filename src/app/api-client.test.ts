@@ -159,6 +159,44 @@ describe("API client", () => {
     const calls: Array<{ readonly input: RequestInfo | URL; readonly init?: RequestInit }> = [];
     globalThis.fetch = async (input, init) => {
       calls.push({ input, init });
+      const path =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (path.endsWith("/confirm")) {
+        return jsonResponse({
+          status: "CONFIRMED",
+          itinerary: {
+            id: "itinerary-1",
+            tripId,
+            sourcePlanId: planId,
+            sourcePlanRevision: 1,
+            currentRevision: 1,
+            createdBy: "user-1",
+            createdAt: "2026-08-24T00:00:00.000Z",
+            snapshot: {
+              planTitle: "수정안",
+              destination: "오사카",
+              routes: [{ city: "오사카", arrivalDate: "2026-09-01", departureDate: "2026-09-02" }],
+              items: [{
+                type: "TRANSPORT",
+                date: "2026-09-01",
+                transport: {
+                  id: "transport-1",
+                  fromCity: "서울",
+                  toCity: "오사카",
+                  mode: "항공",
+                  hasTransfer: false,
+                  durationText: "2시간",
+                  bookingStatus: "AVAILABLE",
+                },
+              }],
+            },
+          },
+        });
+      }
       return jsonResponse(room);
     };
     const plan = {

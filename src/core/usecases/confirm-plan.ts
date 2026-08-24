@@ -1,13 +1,16 @@
-import { Effect } from "effect";
-import type { PlanId, Revision, TripId } from "../domain/ids.ts";
+import { Clock, Effect } from "effect";
+import { RevisionSchema, type PlanId, type Revision, type TripId } from "../domain/ids.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
+import { ConfirmedItineraryRepository } from "../ports/confirmed-itinerary-repository.ts";
+import { IdGenerator } from "../ports/id-generator.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import {
   isPlanConfirmed,
   requirePlanInRoom,
   requireRoomHost,
 } from "../domain/auth-guards.ts";
-import { getPlanDateRange } from "../domain/room.ts";
+import { getPlanPublishValidationErrors } from "../domain/room.ts";
+import { buildConfirmedItinerarySnapshot } from "../domain/confirmed-itinerary.ts";
 import {
   confirmPlanInRoom,
   mergeParticipantIdentityInRoom,
@@ -52,16 +55,40 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
       );
     }
 
-    if (!getPlanDateRange(plan)) {
+    const validationError = getPlanPublishValidationErrors(plan)[0];
+    if (plan.status !== "VOTING" || !plan.revision || validationError) {
       return yield* Effect.fail(
-        new ValidationError({ message: "날짜가 있는 여행안만 확정할 수 있습니다." })
+        new ValidationError({
+          message: validationError ?? "공개된 여행안 revision만 확정할 수 있습니다.",
+        })
       );
     }
 
-    // 6. 확정 실행 (Revision 낙관적 락 보장)
-    return yield* repo.saveRoom(
-      confirmPlanInRoom(room, plan),
-      expectedRevision
-    );
+    const snapshot = buildConfirmedItinerarySnapshot(plan, room.destination);
+    if (!snapshot) {
+      return yield* Effect.fail(
+        new ValidationError({ message: "일정 스냅샷을 만들 수 없는 여행안입니다." })
+      );
+    }
+
+    const ids = yield* IdGenerator;
+    const createdAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+    const itinerary = {
+      id: yield* ids.itineraryId,
+      tripId: room.id,
+      sourcePlanId: plan.id,
+      sourcePlanRevision: plan.revision,
+      currentRevision: RevisionSchema.make(1),
+      snapshot,
+      createdBy: session.participantId,
+      createdAt,
+    };
+
+    const itineraries = yield* ConfirmedItineraryRepository;
+    return yield* itineraries.confirm({
+      room: confirmPlanInRoom(room, plan),
+      expectedRoomRevision: expectedRevision,
+      itinerary,
+    });
   }
 );

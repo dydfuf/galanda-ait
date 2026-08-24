@@ -22,7 +22,9 @@ const hostId = UserIdSchema.make("host-1");
 const plan: TripPlan = {
   id: PlanIdSchema.make("plan-1"),
   title: "첫 여행안",
-  status: "DRAFT",
+  status: "VOTING",
+  revision: RevisionSchema.make(1),
+  publishedAt: "2026-08-24T00:00:00.000Z",
   authorId: hostId,
   authorName: "Host",
   baseHeadcount: 2,
@@ -103,6 +105,7 @@ const makeApp = (
       params: unknown[] = []
     ) => {
       if (config.text.includes('from "participant_alias"')) return { rows: [] };
+      if (/^(begin|commit|rollback)/i.test(config.text)) return { rows: [] };
       calls.push({ text: config.text, params });
       return { rows: responses.shift() ?? [] };
     },
@@ -382,7 +385,7 @@ describe("Trip API vertical slice", () => {
     expect(calls).toEqual([]);
   });
 
-  it("opinion/confirm/delete를 domain transition과 CAS 저장으로 연결한다", async () => {
+  it("opinion/delete를 domain transition과 CAS 저장으로 연결한다", async () => {
     const cases = [
       {
         method: "PUT",
@@ -401,18 +404,6 @@ describe("Trip API vertical slice", () => {
               voteCount: 1,
             },
           ],
-        },
-      },
-      {
-        method: "POST",
-        path: "/api/trips/trip-1/plans/plan-1/confirm",
-        body: { expectedRevision: 3 },
-        initial: roomWithPlan,
-        updated: {
-          ...roomWithPlan,
-          revision: RevisionSchema.make(4),
-          plans: [{ ...plan, status: "CONFIRMED" as const }],
-          confirmedPlanId: plan.id,
         },
       },
       {
@@ -456,6 +447,56 @@ describe("Trip API vertical slice", () => {
         "select",
         "update",
       ]);
+    }
+  });
+
+  it("confirm을 TripRoom CAS와 itinerary revision 1의 단일 transaction으로 저장한다", async () => {
+    const { app, calls } = makeApp([
+      [rowValues(roomWithPlan)],
+      [[4]],
+      [],
+      [],
+    ]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/plans/plan-1/confirm", {
+        method: "POST",
+        body: JSON.stringify({ expectedRevision: 3 }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      status: "CONFIRMED",
+      itinerary: {
+        tripId: "trip-1",
+        sourcePlanId: "plan-1",
+        sourcePlanRevision: 1,
+        currentRevision: 1,
+      },
+    });
+    expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
+      "select",
+      "update",
+      "insert",
+      "insert",
+    ]);
+  });
+
+  it("itinerary 조회가 미확정과 legacy snapshot 누락을 구분한다", async () => {
+    for (const [initial, status] of [
+      [room, "UNCONFIRMED"],
+      [{ ...roomWithPlan, confirmedPlanId: plan.id }, "MISSING"],
+    ] as const) {
+      const { app } = makeApp([[rowValues(initial)], []]);
+      const response = await app.fetch(
+        request("/api/trips/trip-1/itinerary"),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ status });
     }
   });
 });
