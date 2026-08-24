@@ -56,6 +56,12 @@ Safe-area와 화면 공통 여백은 `--safe-*`, `--app-*` 토큰을 계속 사�
 상단 safe-area는 `PageHeader`가, 헤더가 없는 route는 `PageBody safeTop`이,
 하단은 `BottomAction`과 `DrawerFooter`가 소유해요.
 
+Trip Room의 Apps in Toss shell에서는 native navigation이 back/title/accessory를
+소유하고, 웹은 그 아래 mode switcher만 렌더링합니다. 이때 `env(safe-area-inset-top)`을
+중복 적용하지 않고 platform adapter가 제공하는 native content inset을 `PageHeader`에
+한 번만 적용합니다. accessory 등록 실패는 예약된 우측 슬롯의 웹 공유 버튼으로
+fallback하며 header owner를 바꾸지 않습니다.
+
 ## 컴포넌트 추가 방법
 
 ```bash

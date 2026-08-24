@@ -1,4 +1,13 @@
-import { appLogin, Clipboard, Device, partner, Screen, Share, tdsEvent } from "@apps-in-toss/web-framework";
+import {
+  appLogin,
+  Clipboard,
+  Device,
+  partner,
+  SafeAreaInsets,
+  Screen,
+  Share,
+  tdsEvent,
+} from "@apps-in-toss/web-framework";
 import type {
   AccessoryButtonOptions,
   PlatformAdapter,
@@ -8,6 +17,18 @@ import type {
 } from "../types.ts";
 import { copyToClipboard, webAdapter } from "../web/adapter.ts";
 import { postAuthJson, safeReturnTo } from "../auth.ts";
+
+// ponytail: 구형 host/mock이 초기 inset을 주입하지 않을 때의 partner nav 실측값.
+const PARTNER_NAV_FALLBACK_TOP_INSET = 54;
+
+const getPartnerFallbackTopInset = () =>
+  typeof window !== "undefined" && window.matchMedia("(orientation: portrait)").matches
+    ? PARTNER_NAV_FALLBACK_TOP_INSET
+    : 0;
+
+export function toContentTopInset(value: number, fallback = 0): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
 
 /** 실제 토스 앱 WebView 안에서 실행 중인지 확인해요 (AIT 빌드를 브라우저로 열어볼 수도 있어요). */
 export function isTossAppRuntime(): boolean {
@@ -40,6 +61,14 @@ function createTossNavigation(): PlatformNavigation {
   let removeAccessoryListener: (() => void) | undefined;
 
   return {
+    contentTopInset: toContentTopInset(
+      SafeAreaInsets.get().top,
+      getPartnerFallbackTopInset(),
+    ),
+    subscribeContentTopInset: (onChange) =>
+      SafeAreaInsets.subscribe({
+        onEvent: ({ top }) => onChange(toContentTopInset(top, getPartnerFallbackTopInset())),
+      }),
     addAccessoryButton: ({ id, title, iconName, callback }: AccessoryButtonOptions) => {
       removeAccessoryListener?.();
       const removeListener = tdsEvent.addEventListener("navigationAccessoryEvent", {

@@ -238,9 +238,9 @@ export function ItineraryPage(): JSX.Element {
         ) : (
           viewModel.sections.map((section) => (
             <div key={section.id} id={section.id} className="mb-2">
-              <h3 className="px-(--app-inline-padding) pt-3 pb-1 text-[14px] font-bold text-foreground">
+              <h2 className="px-(--app-inline-padding) pt-3 pb-1 text-[14px] font-bold text-foreground">
                 {section.dateHeader}
-              </h3>
+              </h2>
               <MobileList aria-label={section.dateHeader}>
                 {section.items.map((item) => (
                   <MobileListItem
