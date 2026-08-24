@@ -82,10 +82,11 @@ export function getPlanEditorDraftKey(
 }
 
 export function getPlanFingerprint(
-  plan: Pick<TripPlan, "title" | "proposalReason" | "baseHeadcount" | "routes" | "accommodations" | "transports"> | undefined
+  plan: Pick<TripPlan, "revision" | "title" | "proposalReason" | "baseHeadcount" | "routes" | "accommodations" | "transports"> | undefined
 ): string | undefined {
   if (!plan) return undefined;
   return JSON.stringify({
+    revision: plan.revision,
     title: plan.title,
     proposalReason: plan.proposalReason,
     baseHeadcount: plan.baseHeadcount,

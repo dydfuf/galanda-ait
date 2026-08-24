@@ -269,9 +269,11 @@ describe("Trip API vertical slice", () => {
       title: "첫 여행안",
       authorId: hostId,
       authorName: "Host",
-      status: "DRAFT",
+      status: "VOTING",
+      revision: 1,
       voteCount: 0,
     });
+    expect(Date.parse(persistedPlans[0].publishedAt ?? "")).not.toBeNaN();
   });
 
   it("plan update DTO의 서버 소유 필드를 거부한다", async () => {
@@ -287,6 +289,8 @@ describe("Trip API vertical slice", () => {
           status: "CONFIRMED",
           authorId: "attacker",
           voteCount: 999,
+          revision: 999,
+          publishedAt: "2026-08-24T00:00:00.000Z",
         }),
       }),
       env

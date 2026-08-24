@@ -136,10 +136,21 @@ export const TripPlaceSchema = Schema.Struct({
 });
 export type TripPlace = typeof TripPlaceSchema.Type;
 
+const PublishedAtSchema = Schema.String.check(
+  Schema.makeFilter((value) => {
+    const millis = Date.parse(value);
+    return Number.isFinite(millis) && new Date(millis).toISOString() === value;
+  }, { message: "publishedAt은 UTC ISO 날짜-시간이어야 합니다." })
+);
+
 export const TripPlanSchema = Schema.Struct({
   id: PlanIdSchema,
   title: Schema.String,
   status: PlanStatusSchema,
+  revision: Schema.optional(
+    RevisionSchema.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1))
+  ),
+  publishedAt: Schema.optional(PublishedAtSchema),
   proposalReason: Schema.optional(Schema.String),
   authorId: Schema.optional(ParticipantIdSchema),
   authorName: Schema.optional(Schema.String),
