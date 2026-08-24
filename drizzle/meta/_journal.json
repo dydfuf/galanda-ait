@@ -36,6 +36,13 @@
       "when": 1787505061269,
       "tag": "0004_flat_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787573379203,
+      "tag": "0005_equal_maestro",
+      "breakpoints": true
     }
   ]
 }

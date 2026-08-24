@@ -12,6 +12,7 @@ import type { IdGenerator } from "../../src/core/ports/id-generator.ts";
 import type { InviteRepository } from "../../src/core/ports/invite-repository.ts";
 import type { SessionService } from "../../src/core/ports/session.ts";
 import type { TripRoomRepository } from "../../src/core/ports/trip-room-repository.ts";
+import type { ConfirmedItineraryRepository } from "../../src/core/ports/confirmed-itinerary-repository.ts";
 import {
   CreateRoomInputSchema,
   createTripRoom,
@@ -21,6 +22,7 @@ import {
   getTripRooms,
 } from "../../src/core/usecases/get-room.ts";
 import { confirmTripPlan } from "../../src/core/usecases/confirm-plan.ts";
+import { getTripItinerary } from "../../src/core/usecases/get-itinerary.ts";
 import {
   PlanEditableFieldsSchema,
   createPlan,
@@ -33,6 +35,7 @@ import { IdGeneratorLive } from "../../src/infrastructure/id-generator.ts";
 import { InviteRepositoryLive } from "../../src/infrastructure/persistence/drizzle/invite-repository.ts";
 import { Database } from "../../src/infrastructure/persistence/drizzle/database.ts";
 import { TripRoomRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-room-repository.ts";
+import { ConfirmedItineraryRepositoryLive } from "../../src/infrastructure/persistence/drizzle/confirmed-itinerary-repository.ts";
 import type { AppEnv } from "../app.ts";
 import { runEffect } from "../http/effect-handler.ts";
 import { effectValidator } from "../http/effect-validator.ts";
@@ -83,6 +86,7 @@ type TripRequirements =
   | RequestScopeService
   | SessionService
   | TripRoomRepository
+  | ConfirmedItineraryRepository
   | InviteRepository
   | IdGenerator;
 
@@ -104,8 +108,14 @@ const runTripEffect = <A, E>(
     );
   }
 
-  const services = Layer.merge(
-    Layer.merge(TripRoomRepositoryLive, InviteRepositoryLive).pipe(
+  const services = Layer.mergeAll(
+    TripRoomRepositoryLive.pipe(
+      Layer.provide(Layer.succeed(Database, { db }))
+    ),
+    InviteRepositoryLive.pipe(
+      Layer.provide(Layer.succeed(Database, { db }))
+    ),
+    ConfirmedItineraryRepositoryLive.pipe(
       Layer.provide(Layer.succeed(Database, { db }))
     ),
     IdGeneratorLive
@@ -141,6 +151,12 @@ invitesRoute.post(
 );
 
 tripsRoute.get("/", (c) => runTripEffect(c, getTripRooms()));
+
+tripsRoute.get(
+  "/:tripId/itinerary",
+  effectValidator("param", TripParamsSchema),
+  (c) => runTripEffect(c, getTripItinerary(c.req.valid("param").tripId))
+);
 
 tripsRoute.get(
   "/:tripId",
@@ -253,7 +269,7 @@ tripsRoute.post(
         c.req.valid("param").tripId,
         c.req.valid("param").planId,
         c.req.valid("json").expectedRevision
-      )
+      ).pipe(Effect.map((itinerary) => ({ status: "CONFIRMED" as const, itinerary })))
     )
 );
 

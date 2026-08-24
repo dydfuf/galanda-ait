@@ -19,6 +19,7 @@ import type { UpdateRoomParams } from "../core/ports/trip-room-repository.ts";
 import type { CreateRoomInput } from "../core/usecases/create-room.ts";
 import type { CreatePlanCommand } from "../core/usecases/save-plan.ts";
 import type { SubmitPlanOpinionInput } from "../core/usecases/submit-opinion.ts";
+import { ItineraryStateResponseSchema } from "../contracts/itinerary.ts";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -108,6 +109,11 @@ export const getTrips = (signal?: AbortSignal) =>
 
 export const getTrip = (tripId: TripId, signal?: AbortSignal) =>
   requestJson(tripPath(tripId), TripRoomSchema, {
+    signal,
+  });
+
+export const getTripItinerary = (tripId: TripId, signal?: AbortSignal) =>
+  requestJson(`${tripPath(tripId)}/itinerary`, ItineraryStateResponseSchema, {
     signal,
   });
 
@@ -202,7 +208,7 @@ export const confirmTripPlan = (
   planId: PlanId,
   expectedRevision: Revision
 ) =>
-  requestJson(`${planPath(tripId, planId)}/confirm`, TripRoomSchema, {
+  requestJson(`${planPath(tripId, planId)}/confirm`, ItineraryStateResponseSchema, {
     method: "POST",
     body: JSON.stringify({ expectedRevision }),
   });

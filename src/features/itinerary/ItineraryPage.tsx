@@ -21,8 +21,7 @@ import {
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { RouteRail } from "../common/RouteRail.tsx";
 import { platform } from "../../platform/index.ts";
-import { useSessionQuery } from "../../hooks/useSession.ts";
-import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
+import { useItineraryQuery } from "./queries.ts";
 import {
   toItineraryViewModel,
   type ItineraryItem,
@@ -44,19 +43,12 @@ export function ItineraryPage(): JSX.Element {
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
   const {
-    isError: isSessionError,
-    error: sessionError,
-    data: session,
-    refetch: refetchSession,
-  } = useSessionQuery();
-
-  const {
-    data: rawRoom,
+    data: itineraryState,
     isLoading,
     isError,
     error,
-    refetch: refetchRoom,
-  } = useTripRoomRawQuery(tripId);
+    refetch: refetchItinerary,
+  } = useItineraryQuery(tripId);
 
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
@@ -69,31 +61,18 @@ export function ItineraryPage(): JSX.Element {
     return <PageState status="loading" message="확정 일정을 불러오는 중입니다..." />;
   }
 
-  if (isSessionError) {
-    return (
-      <RouteErrorFallback
-        title="로그인 정보를 확인할 수 없습니다"
-        message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")}
-        actionText="다시 시도"
-        onAction={() => void refetchSession()}
-      />
-    );
-  }
-
-  if (isError || !rawRoom) {
+  if (isError || !itineraryState) {
     return (
       <RouteErrorFallback
         title="일정 정보를 찾을 수 없습니다"
         message={toUserMessage(error, "요청한 정보를 찾을 수 없습니다.")}
         actionText="다시 시도"
-        onAction={() => void refetchRoom()}
+        onAction={() => void refetchItinerary()}
       />
     );
   }
 
-  const viewModel = toItineraryViewModel(rawRoom, session?.participantId);
-
-  if (!viewModel.isConfirmed || !viewModel.confirmedPlanId) {
+  if (itineraryState.status === "UNCONFIRMED") {
     return (
       <PageBody>
         <PageState
@@ -106,6 +85,22 @@ export function ItineraryPage(): JSX.Element {
       </PageBody>
     );
   }
+
+  if (itineraryState.status === "MISSING") {
+    return (
+      <PageBody>
+        <PageState
+          status="error"
+          title="확정 일정 데이터가 없어요"
+          description="기존 확정 정보는 있지만 저장된 확정 일정이 없습니다. 복구가 필요합니다."
+          actionText="후보 여행안 보러가기"
+          onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
+        />
+      </PageBody>
+    );
+  }
+
+  const viewModel = toItineraryViewModel(itineraryState.itinerary);
 
   return (
     <PageBody className="mx-auto box-border max-w-[640px]">

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { Effect, Layer, Option } from "effect";
 import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../domain/ids.ts";
 import type { TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
+import type { ConfirmedItinerary } from "../../domain/confirmed-itinerary.ts";
 import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession } from "../../ports/session.ts";
 import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams } from "../../ports/trip-room-repository.ts";
+import { ConfirmedItineraryRepository } from "../../ports/confirmed-itinerary-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
 import { createTripRoom, type CreateRoomInput } from "../create-room.ts";
 import { createPlan, updatePlan, deletePlan } from "../save-plan.ts";
@@ -32,8 +34,9 @@ import { IdGeneratorLive } from "../../../infrastructure/id-generator.ts";
  */
 const createInMemoryRepositoryLayer = (
   initialRooms: TripRoom[] = []
-): Layer.Layer<TripRoomRepository> => {
+): Layer.Layer<TripRoomRepository | ConfirmedItineraryRepository> => {
   let rooms: TripRoom[] = [...initialRooms];
+  const itineraries = new Map<string, ConfirmedItinerary>();
 
   const repoImpl = {
     getRoom: (
@@ -181,7 +184,34 @@ const createInMemoryRepositoryLayer = (
     },
   };
 
-  return Layer.succeed(TripRoomRepository, repoImpl);
+  const itineraryRepo = ConfirmedItineraryRepository.of({
+    confirm: ({ room, expectedRoomRevision, itinerary }) => {
+      const index = rooms.findIndex(({ id }) => id === room.id);
+      const current = rooms[index];
+      if (!current) {
+        return Effect.fail(new NotFoundError({ entity: "TripRoom", id: room.id }));
+      }
+      if (current.revision !== expectedRoomRevision) {
+        return Effect.fail(new RevisionConflictError({
+          message: "Revision mismatch",
+          expectedRevision: expectedRoomRevision,
+          actualRevision: current.revision,
+        }));
+      }
+      rooms = [
+        ...rooms.slice(0, index),
+        { ...room, revision: RevisionSchema.make(expectedRoomRevision + 1) },
+        ...rooms.slice(index + 1),
+      ];
+      itineraries.set(room.id, itinerary);
+      return Effect.succeed(itinerary);
+    },
+    findByTripId: (tripId) => Effect.succeed(itineraries.get(tripId)),
+  });
+  return Layer.merge(
+    Layer.succeed(TripRoomRepository, repoImpl),
+    Layer.succeed(ConfirmedItineraryRepository, itineraryRepo)
+  );
 };
 
 const createTestSessionLayer = (
@@ -1262,6 +1292,16 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
   });
 
   describe("6. confirmTripPlan", (): void => {
+    const confirmableRoom: TripRoom = {
+      ...sampleRoom,
+      plans: sampleRoom.plans.map((plan) => ({
+        ...plan,
+        status: "VOTING" as const,
+        revision: RevisionSchema.make(1),
+        publishedAt: "2026-08-24T00:00:00.000Z",
+      })),
+    };
+
     it("확정 권한은 HOST에게만 부여된다", (): void => {
       expect(ROLE_PERMISSIONS.HOST.has("plan:confirm")).toBe(true);
       expect(ROLE_PERMISSIONS.MEMBER.has("plan:confirm")).toBe(false);
@@ -1270,24 +1310,25 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
     it("방장만 여행안을 확정할 수 있다", async (): Promise<void> => {
       const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
+        createInMemoryRepositoryLayer([confirmableRoom]),
         createTestSessionLayer(aliceUser)
       );
 
       const program = confirmTripPlan(
-        sampleRoom.id,
+        confirmableRoom.id,
         PlanIdSchema.make("plan-1"),
-        sampleRoom.revision
+        confirmableRoom.revision
       ).pipe(Effect.provide(testEnv));
 
-      const room = await Effect.runPromise(program);
-      expect(room.confirmedPlanId).toBe("plan-1");
+      const itinerary = await Effect.runPromise(program);
+      expect(itinerary.sourcePlanId).toBe("plan-1");
+      expect(itinerary.currentRevision).toBe(1);
     });
 
     it("날짜가 없는 여행안은 확정할 수 없고 저장 상태를 보존한다", async (): Promise<void> => {
       const undatedRoom: TripRoom = {
-        ...sampleRoom,
-        plans: sampleRoom.plans.map((plan) => ({ ...plan, routes: [] })),
+        ...confirmableRoom,
+        plans: confirmableRoom.plans.map((plan) => ({ ...plan, routes: [] })),
       };
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([undatedRoom]),
@@ -1313,14 +1354,14 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
     it("일반 참여자가 직접 호출하면 실패하고 저장 상태를 바꾸지 않는다", async (): Promise<void> => {
       const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
+        createInMemoryRepositoryLayer([confirmableRoom]),
         createTestSessionLayer(bobUser)
       );
 
       const program = confirmTripPlan(
-        sampleRoom.id,
+        confirmableRoom.id,
         PlanIdSchema.make("plan-1"),
-        sampleRoom.revision
+        confirmableRoom.revision
       ).pipe(Effect.provide(testEnv));
 
       try {
@@ -1332,23 +1373,23 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const room = await Effect.runPromise(
         TripRoomRepository.pipe(
-          Effect.flatMap((repo) => repo.getRoom(sampleRoom.id)),
+          Effect.flatMap((repo) => repo.getRoom(confirmableRoom.id)),
           Effect.provide(testEnv)
         )
       );
-      expect(room).toEqual(sampleRoom);
+      expect(room).toEqual(confirmableRoom);
     });
 
     it("비로그인 상태에서는 여행안 확정이 실패한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
+        createInMemoryRepositoryLayer([confirmableRoom]),
         createTestSessionLayer(unauthenticatedSession)
       );
 
       const program = confirmTripPlan(
-        sampleRoom.id,
+        confirmableRoom.id,
         PlanIdSchema.make("plan-1"),
-        sampleRoom.revision
+        confirmableRoom.revision
       ).pipe(Effect.provide(testEnv));
 
       try {
@@ -1361,9 +1402,9 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
     it("이미 확정된 여행안은 다시 확정할 수 없고 저장 상태를 보존한다", async (): Promise<void> => {
       const confirmedRoom: TripRoom = {
-        ...sampleRoom,
+        ...confirmableRoom,
         confirmedPlanId: PlanIdSchema.make("plan-1"),
-        plans: sampleRoom.plans.map((plan) =>
+        plans: confirmableRoom.plans.map((plan) =>
           plan.id === "plan-1" ? { ...plan, status: "CONFIRMED" as const } : plan
         ),
       };
@@ -1396,14 +1437,14 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
     it("존재하지 않는 여행안은 실패하고 저장 상태를 바꾸지 않는다", async (): Promise<void> => {
       const testEnv = Layer.merge(
-        createInMemoryRepositoryLayer([sampleRoom]),
+        createInMemoryRepositoryLayer([confirmableRoom]),
         createTestSessionLayer(aliceUser)
       );
 
       const program = confirmTripPlan(
-        sampleRoom.id,
+        confirmableRoom.id,
         PlanIdSchema.make("plan-missing"),
-        sampleRoom.revision
+        confirmableRoom.revision
       ).pipe(Effect.provide(testEnv));
 
       try {
@@ -1415,11 +1456,11 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
 
       const room = await Effect.runPromise(
         TripRoomRepository.pipe(
-          Effect.flatMap((repo) => repo.getRoom(sampleRoom.id)),
+          Effect.flatMap((repo) => repo.getRoom(confirmableRoom.id)),
           Effect.provide(testEnv)
         )
       );
-      expect(room).toEqual(sampleRoom);
+      expect(room).toEqual(confirmableRoom);
     });
   });
 
