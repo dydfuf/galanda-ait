@@ -383,7 +383,9 @@ ValidationError	semantic validation 실패	422
 RevisionConflictError	optimistic CAS 실패	409
 StateConflictError	현재 domain state에서 command 수행 불가	409
 SessionUnavailableError	authentication dependency 장애	503
-RepositoryError	persistence dependency 장애	503
+RepositoryError	persistence adapter failure (현재 통합 오류)	503
+
+현재 `RepositoryError`는 database availability/SQL failure뿐 아니라 persisted data decode/integrity failure와 server-generated identifier collision도 함께 포함한다. 따라서 현재의 503 mapping은 dependency unavailable만을 뜻하는 완전한 invariant가 아니라 preflight 시점의 limitation이다. 후속 error hardening에서 `RepositoryUnavailableError → 503`과 `PersistenceIntegrityError → 500`으로 분리한다.
 
 RevisionConflictError만 다음 필드를 가진다.
 

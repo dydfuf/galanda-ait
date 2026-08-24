@@ -81,6 +81,13 @@
 
 작업 범위에 해당하면 다음 문서를 우선 확인한다.
 
+### Architecture
+
+`docs/adr/ADR-001-galanda-effect-v4-architecture.md`
+
+서버 애플리케이션 경계, Effect 책임, error algebra와
+persistence/concurrency 설계는 이 ADR을 따른다.
+
 ### UI
 
 `docs/ui-foundation.md`

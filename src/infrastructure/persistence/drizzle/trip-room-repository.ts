@@ -4,7 +4,6 @@ import {
   NotFoundError,
   RepositoryError,
   RevisionConflictError,
-  StateConflictError,
 } from "../../../core/domain/errors.ts";
 import {
   RevisionSchema,
@@ -267,7 +266,8 @@ export const TripRoomRepositoryLive: Layer.Layer<
             );
           }
           return yield* Effect.fail(
-            new StateConflictError({
+            new RepositoryError({
+              operation: "createRoom",
               message: "같은 ID의 여행방이 이미 존재합니다.",
             })
           );
