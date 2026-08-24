@@ -7,7 +7,6 @@ import {
 } from "../../../core/domain/ids.ts";
 import type { TripRoom } from "../../../core/domain/room.ts";
 import {
-  addDaysToYMD,
   formatDotDate,
   formatKoreanDate,
   formatPeriodText,
@@ -114,15 +113,6 @@ describe("itinerary-view-model date helper functions", () => {
     expect(parseYMD("invalid-date")).toBeNull();
   });
 
-  it("addDaysToYMD correctly increments across month and year boundaries", () => {
-    const ymd = { year: 2026, month: 12, day: 30 };
-    const nextYear = addDaysToYMD(ymd, 3);
-    expect(nextYear).toEqual({ year: 2027, month: 1, day: 2 });
-
-    const leapFeb = { year: 2028, month: 2, day: 28 };
-    expect(addDaysToYMD(leapFeb, 1)).toEqual({ year: 2028, month: 2, day: 29 });
-  });
-
   it("formatKoreanDate and formatDotDate format properly", () => {
     expect(formatKoreanDate({ year: 2026, month: 12, day: 10 })).toBe("12월 10일");
     expect(formatDotDate({ year: 2026, month: 12, day: 10 })).toBe("12.10");
@@ -159,12 +149,6 @@ describe("toItineraryViewModel (RAON-167)", () => {
     expect(vm.nights).toBe(6);
     expect(vm.days).toBe(7);
 
-    // Sections:
-    // 1: 12월 10일 · 도쿄 (호텔 그레이서리)
-    // 2: 12월 13일 · 이동 (도쿄 → 하코네)
-    // 3: 12월 13일 · 하코네 (하코네 료칸)
-    // 4: 12월 15일 · 이동 (하코네 → 도쿄)
-    // 5: 12월 15일 · 도쿄 (신주쿠 워싱턴 호텔)
     expect(vm.sections).toHaveLength(5);
 
     expect(vm.sections[0]?.dateHeader).toBe("12월 10일 · 도쿄");
@@ -172,26 +156,26 @@ describe("toItineraryViewModel (RAON-167)", () => {
     expect(vm.sections[0]?.items[0]?.statusLabel).toBe("예약 완료");
     expect(vm.sections[0]?.items[0]?.subText).toBe("3박 · 예약 완료");
 
-    expect(vm.sections[1]?.dateHeader).toBe("12월 13일 · 이동");
-    expect(vm.sections[1]?.items[0]?.type).toBe("TRANSPORT");
+    expect(vm.sections[1]?.dateHeader).toBe("12월 13일 · 하코네");
+    expect(vm.sections[1]?.items[0]?.type).toBe("STAY");
     expect(vm.sections[1]?.items[0]?.statusLabel).toBe("확인 필요");
-    expect(vm.sections[1]?.items[0]?.subText).toBe("로망스카 · 확인 필요");
+    expect(vm.sections[1]?.items[0]?.subText).toBe("2박 · 확인 필요");
 
-    expect(vm.sections[2]?.dateHeader).toBe("12월 13일 · 하코네");
+    expect(vm.sections[2]?.dateHeader).toBe("12월 15일 · 도쿄");
     expect(vm.sections[2]?.items[0]?.type).toBe("STAY");
-    expect(vm.sections[2]?.items[0]?.statusLabel).toBe("확인 필요");
-    expect(vm.sections[2]?.items[0]?.subText).toBe("2박 · 확인 필요");
+    expect(vm.sections[2]?.items[0]?.statusLabel).toBe("예약 완료");
 
-    expect(vm.sections[3]?.dateHeader).toBe("12월 15일 · 이동");
+    expect(vm.sections[3]?.dateHeader).toBe("이동");
     expect(vm.sections[3]?.items[0]?.type).toBe("TRANSPORT");
-    expect(vm.sections[3]?.items[0]?.statusLabel).toBe("예매 가능");
+    expect(vm.sections[3]?.items[0]?.statusLabel).toBe("확인 필요");
+    expect(vm.sections[3]?.dateStr).toBeUndefined();
 
-    expect(vm.sections[4]?.dateHeader).toBe("12월 15일 · 도쿄");
-    expect(vm.sections[4]?.items[0]?.type).toBe("STAY");
-    expect(vm.sections[4]?.items[0]?.statusLabel).toBe("예약 완료");
+    expect(vm.sections[4]?.dateHeader).toBe("이동");
+    expect(vm.sections[4]?.items[0]?.type).toBe("TRANSPORT");
+    expect(vm.sections[4]?.items[0]?.statusLabel).toBe("예매 가능");
   });
 
-  it("인바운드(도착) 및 아웃바운드(출발) 이동이 포함되어도 정확한 시간순으로 배치된다", () => {
+  it("명시적 날짜가 없는 교통편에는 날짜를 추론하지 않는다", () => {
     const roomWithInboundOutbound: TripRoom = {
       ...baseRoom,
       plans: [
@@ -251,31 +235,14 @@ describe("toItineraryViewModel (RAON-167)", () => {
     const vm = toItineraryViewModel(roomWithInboundOutbound);
     expect(vm.sections).toHaveLength(5);
 
-    // 1. 인바운드 이동: 12월 10일 (첫 숙소 전)
-    expect(vm.sections[0]?.dateHeader).toBe("12월 10일 · 이동");
-    expect(vm.sections[0]?.items[0]?.type).toBe("TRANSPORT");
-    expect((vm.sections[0]?.items[0] as { routeTitle: string })?.routeTitle).toBe("서울 → 도쿄");
-
-    // 2. 도쿄 숙소: 12월 10일 (3박)
-    expect(vm.sections[1]?.dateHeader).toBe("12월 10일 · 도쿄");
-    expect(vm.sections[1]?.items[0]?.type).toBe("STAY");
-
-    // 3. 도쿄 -> 하코네 이동: 12월 13일
-    expect(vm.sections[2]?.dateHeader).toBe("12월 13일 · 이동");
-    expect(vm.sections[2]?.items[0]?.type).toBe("TRANSPORT");
-    expect((vm.sections[2]?.items[0] as { routeTitle: string })?.routeTitle).toBe("도쿄 → 하코네");
-
-    // 4. 하코네 숙소: 12월 13일 (2박)
-    expect(vm.sections[3]?.dateHeader).toBe("12월 13일 · 하코네");
-    expect(vm.sections[3]?.items[0]?.type).toBe("STAY");
-
-    // 5. 아웃바운드 이동: 12월 15일 (마지막 숙소 체크아웃 후)
-    expect(vm.sections[4]?.dateHeader).toBe("12월 15일 · 이동");
-    expect(vm.sections[4]?.items[0]?.type).toBe("TRANSPORT");
-    expect((vm.sections[4]?.items[0] as { routeTitle: string })?.routeTitle).toBe("하코네 → 서울");
+    const transports = vm.sections.filter((section) => section.items[0]?.type === "TRANSPORT");
+    expect(transports.map((section) => section.dateHeader)).toEqual(["이동", "이동", "이동"]);
+    expect(transports.map((section) => section.dateStr)).toEqual([undefined, undefined, undefined]);
+    expect((transports[0]?.items[0] as { routeTitle: string })?.routeTitle).toBe("서울 → 도쿄");
+    expect((transports[2]?.items[0] as { routeTitle: string })?.routeTitle).toBe("하코네 → 서울");
   });
 
-  it("숙소가 삭제되거나 교통편만 있는 경우에도 순서와 날짜를 정상 생성한다", () => {
+  it("교통편만 있는 경우 존재하지 않는 날짜를 생성하지 않는다", () => {
     const transportsOnlyRoom: TripRoom = {
       ...baseRoom,
       plans: [
@@ -308,8 +275,9 @@ describe("toItineraryViewModel (RAON-167)", () => {
 
     const vm = toItineraryViewModel(transportsOnlyRoom);
     expect(vm.sections).toHaveLength(2);
-    expect(vm.sections[0]?.dateHeader).toBe("12월 10일 · 이동");
-    expect(vm.sections[1]?.dateHeader).toBe("12월 11일 · 이동");
+    expect(vm.sections[0]?.dateHeader).toBe("이동");
+    expect(vm.sections[1]?.dateHeader).toBe("이동");
+    expect(vm.sections.every((section) => section.dateStr === undefined)).toBe(true);
   });
 
   it("3일 일정 (2박 3일, 숙소 연속 및 이동 혼합)을 올바르게 처리한다", () => {
@@ -360,8 +328,8 @@ describe("toItineraryViewModel (RAON-167)", () => {
     expect(vm.periodText).toBe("8.10 ~ 8.12");
     expect(vm.sections).toHaveLength(3);
     expect(vm.sections[0]?.dateHeader).toBe("8월 10일 · 제주시");
-    expect(vm.sections[1]?.dateHeader).toBe("8월 11일 · 이동");
-    expect(vm.sections[2]?.dateHeader).toBe("8월 11일 · 서귀포");
+    expect(vm.sections[1]?.dateHeader).toBe("8월 11일 · 서귀포");
+    expect(vm.sections[2]?.dateHeader).toBe("이동");
   });
 
   it("확인 필요 예약 항목(2건)을 정확히 집계한다", () => {
@@ -486,7 +454,7 @@ describe("toItineraryViewModel (RAON-167)", () => {
     expect(vm.sections[0]?.dateHeader).toBe("5월 1일 · 강릉");
   });
 
-  it("경로 날짜가 없는 경우 Day 번호 기반 fallback을 제공한다", () => {
+  it("경로 날짜가 없는 경우 Day나 날짜를 임의 생성하지 않는다", () => {
     const noDateRoom: TripRoom = {
       ...baseRoom,
       plans: [
@@ -499,12 +467,20 @@ describe("toItineraryViewModel (RAON-167)", () => {
 
     const vm = toItineraryViewModel(noDateRoom);
     expect(vm.periodText).toBe("일정 미정");
-    expect(vm.sections[0]?.dateHeader).toBe("Day 1 · 도쿄");
-    expect(vm.sections[1]?.dateHeader).toBe("Day 4 · 이동");
-    expect(vm.sections[2]?.dateHeader).toBe("Day 4 · 하코네");
+    expect(vm.nights).toBe(0);
+    expect(vm.days).toBe(0);
+    expect(vm.route).toEqual([]);
+    expect(vm.sections.every((section) => section.dateStr === undefined)).toBe(true);
+    expect(vm.sections.map((section) => section.dateHeader)).toEqual([
+      "도쿄",
+      "하코네",
+      "도쿄",
+      "이동",
+      "이동",
+    ]);
   });
 
-  it("routes가 없고 places만 있는 경우 places로부터 route를 구성한다", () => {
+  it("routes가 없고 places만 있어도 route를 만들지 않는다", () => {
     const placesOnlyRoom: TripRoom = {
       ...baseRoom,
       plans: [
@@ -522,8 +498,8 @@ describe("toItineraryViewModel (RAON-167)", () => {
     };
 
     const vm = toItineraryViewModel(placesOnlyRoom);
-    expect(vm.route).toHaveLength(2);
-    expect(vm.route[0]?.city).toBe("오사카");
-    expect(vm.route[1]?.city).toBe("교토");
+    expect(vm.route).toEqual([]);
+    expect(vm.nights).toBe(0);
+    expect(vm.days).toBe(0);
   });
 });

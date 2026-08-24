@@ -16,6 +16,7 @@ import {
   getTripListStatusText,
   type TripRoomViewModel,
 } from "../plan-home/plan-home-view-model.ts";
+import { isPastTravelDate, toLocalTravelDate } from "../../core/domain/room.ts";
 
 type TripListTab = "ONGOING" | "PAST";
 
@@ -55,19 +56,9 @@ export function TripListPage() {
     refetch: refetchRooms,
   } = useTripRoomsQuery();
 
-  const now = new Date();
-  const ongoingRooms =
-    rooms?.filter((room) => {
-      if (!room.displayEndDate) return true;
-      const end = new Date(room.displayEndDate);
-      return end >= now || Number.isNaN(end.getTime());
-    }) ?? [];
-  const pastRooms =
-    rooms?.filter((room) => {
-      if (!room.displayEndDate) return false;
-      const end = new Date(room.displayEndDate);
-      return end < now && !Number.isNaN(end.getTime());
-    }) ?? [];
+  const today = toLocalTravelDate(new Date());
+  const ongoingRooms = rooms?.filter((room) => !isPastTravelDate(room.displayEndDate, today)) ?? [];
+  const pastRooms = rooms?.filter((room) => isPastTravelDate(room.displayEndDate, today)) ?? [];
   const displayRooms = activeTab === "ONGOING" ? ongoingRooms : pastRooms;
 
   const content = isLoading ? (

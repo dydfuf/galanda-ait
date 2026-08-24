@@ -6,6 +6,8 @@ import {
   getPlanDateRange,
   getRouteValidationError,
   getStayNightCount,
+  isPastTravelDate,
+  toLocalTravelDate,
 } from "../room.ts";
 
 describe("여행안 날짜 모델", () => {
@@ -49,5 +51,13 @@ describe("여행안 날짜 모델", () => {
     expect(getPlanDateRange(clone)).toEqual(getPlanDateRange(planA));
     expect(getPlanDateRange(editedClone)?.startDate).toBe("2026-12-11");
     expect(getPlanDateRange(planA)?.startDate).toBe("2026-12-10");
+  });
+
+  it("종료일은 시각이나 timezone 파싱 없이 다음 캘린더 날짜부터 과거다", () => {
+    expect(isPastTravelDate("2026-08-24", "2026-08-24")).toBe(false);
+    expect(isPastTravelDate("2026-08-24", "2026-08-25")).toBe(true);
+    expect(isPastTravelDate(undefined, "2026-08-25")).toBe(false);
+    expect(isPastTravelDate("invalid", "2026-08-25")).toBe(false);
+    expect(toLocalTravelDate(new Date(2026, 7, 24, 23, 59))).toBe("2026-08-24");
   });
 });

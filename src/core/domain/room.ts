@@ -25,6 +25,12 @@ const isValidTravelDate = (value: string): boolean => {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 };
 
+export const toLocalTravelDate = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+export const isPastTravelDate = (endDate: string | undefined, today: string): boolean =>
+  Boolean(endDate && isValidTravelDate(endDate) && isValidTravelDate(today) && endDate < today);
+
 export const TravelDateSchema = Schema.String.check(
   Schema.makeFilter(isValidTravelDate, { message: "YYYY-MM-DD 형식의 유효한 날짜여야 합니다." })
 );
