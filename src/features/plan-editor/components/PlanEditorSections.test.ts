@@ -9,6 +9,7 @@ import {
   PlanEditorSections,
   RevisionConflictChoice,
 } from "./PlanEditorSections.tsx";
+import { RouteCitySection } from "./RouteCitySection.tsx";
 
 describe("PlanEditorSections", () => {
   it("draft 저장 상태별 문구를 구분한다", () => {
@@ -58,5 +59,25 @@ describe("PlanEditorSections", () => {
     expect(html).toContain("내 변경 다시 적용");
     expect(html).toContain("최신 공개본 사용");
     expect(html).toContain("v3에서 v4로 변경됐어요.");
+  });
+
+  it("도시별 날짜 입력과 삭제 행동을 분리해 표시한다", () => {
+    const html = renderToStaticMarkup(createElement(RouteCitySection, {
+      routes: [
+        { city: "아주 긴 도시 이름", arrivalDate: "2026-12-10", departureDate: "2026-12-12" },
+        { city: "다음 도시", arrivalDate: "2026-12-12", departureDate: "2026-12-14" },
+      ],
+      totalTripNights: 4,
+      currentTotalNights: 4,
+      onAddCity: () => undefined,
+      onUpdateCity: () => undefined,
+      onRemoveCity: () => undefined,
+    }));
+
+    expect(html.match(/type="date"/g)).toHaveLength(4);
+    expect(html).toContain('for="route-0-arrival"');
+    expect(html).toContain('for="route-0-departure"');
+    expect(html).toContain('aria-label="도시 1 삭제"');
+    expect(html).toContain('aria-label="도시 2 삭제"');
   });
 });
