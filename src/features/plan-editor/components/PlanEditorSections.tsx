@@ -72,6 +72,8 @@ export function PlanEditorSections({
   const transportChecks = editor.transports.filter(
     (item) => item.bookingStatus !== "AVAILABLE"
   ).length;
+  const accommodationEmpty = editor.accommodations.length === 0;
+  const transportEmpty = editor.transports.length === 0;
 
   if (editor.draftConflict) {
     return (
@@ -103,7 +105,7 @@ export function PlanEditorSections({
         <PlanEditorHeader
           isEditMode={isEditMode}
           isCloneMode={isCloneMode}
-          lastSavedTime={editor.lastSavedTime}
+          draftSaveStatus={editor.draftSaveStatus}
           onClearDraft={editor.clearDraft}
         />
 
@@ -126,23 +128,29 @@ export function PlanEditorSections({
           />
           <SummaryRow
             title="여행 경로"
-            summary={editor.routes.map((route) => `${route.city || "도시 미정"} ${Math.max(0, getStayNightCount(route))}박`).join(" · ")}
-            status={routeComplete ? "완료" : "확인 필요"}
+            summary={editor.routes.length > 0
+              ? editor.routes.map((route) => `${route.city || "도시 미정"} ${Math.max(0, getStayNightCount(route))}박`).join(" · ")
+              : "방문 도시와 날짜를 정해주세요."}
+            status={routeComplete ? "완료" : editor.routes.length > 0 ? "확인 필요" : "입력 필요"}
             complete={routeComplete}
             onClick={() => onOpenSection("route")}
           />
           <SummaryRow
             title="숙소"
-            summary={`${editor.accommodations.length}곳${accommodationChecks ? ` · 확인 필요 ${accommodationChecks}곳` : ""}`}
-            status={accommodationChecks ? "확인 필요" : "완료"}
-            complete={accommodationChecks === 0}
+            summary={accommodationEmpty
+              ? "아직 추가하지 않았어요"
+              : `${editor.accommodations.length}곳${accommodationChecks ? ` · 확인 필요 ${accommodationChecks}곳` : ""}`}
+            status={accommodationEmpty ? "입력 전" : accommodationChecks ? "확인 필요" : "완료"}
+            complete={!accommodationEmpty && accommodationChecks === 0}
             onClick={() => onOpenSection("accommodation")}
           />
           <SummaryRow
             title="교통"
-            summary={editor.transports.map((item) => item.mode).filter(Boolean).join(" · ") || "교통편 없음"}
-            status={transportChecks ? "확인 필요" : "완료"}
-            complete={transportChecks === 0}
+            summary={transportEmpty
+              ? "아직 추가하지 않았어요"
+              : editor.transports.map((item) => item.mode).filter(Boolean).join(" · ")}
+            status={transportEmpty ? "입력 전" : transportChecks ? "확인 필요" : "완료"}
+            complete={!transportEmpty && transportChecks === 0}
             onClick={() => onOpenSection("transport")}
           />
           <MobileListItem

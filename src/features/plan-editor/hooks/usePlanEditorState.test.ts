@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPlanEditorInitialData,
   getPlanEditorDraftKey,
   getPlanFingerprint,
   hasDraftBaseChanged,
   parsePlanEditorDraft,
+  savePlanEditorDraft,
+  type StoredPlanEditorDraft,
 } from "./usePlanEditorState.ts";
+import type { TripPlan, TripRoom } from "../../../core/domain/room.ts";
 
 const validDraft = {
   ownerId: "user-a",
@@ -55,5 +59,77 @@ describe("parsePlanEditorDraft", () => {
 
     expect(hasDraftBaseChanged(before, current)).toBe(true);
     expect(hasDraftBaseChanged(current, current)).toBe(false);
+  });
+});
+
+describe("plan editor initial data", () => {
+  const room = {
+    members: [
+      { id: "host-1", name: "Host", role: "HOST" },
+      { id: "member-1", name: "Member", role: "MEMBER" },
+    ],
+  } as unknown as TripRoom;
+  const publishedPlan = {
+    id: "plan-1",
+    title: "도쿄 여행",
+    status: "VOTING",
+    proposalReason: "이동을 줄인 안",
+    baseHeadcount: 3,
+    routes: validDraft.routes,
+    accommodations: validDraft.accommodations,
+    transports: validDraft.transports,
+    places: [],
+    voteCount: 0,
+  } as unknown as TripPlan;
+
+  it("신규 여행안을 실제 빈 사용자 상태로 시작한다", () => {
+    expect(getPlanEditorInitialData(room)).toEqual({
+      title: "",
+      proposalReason: "",
+      baseHeadcount: 2,
+      routes: [],
+      accommodations: [],
+      transports: [],
+    });
+  });
+
+  it("수정과 복제는 기존 값을 보존하되 원본 객체를 공유하지 않는다", () => {
+    const edit = getPlanEditorInitialData(room, publishedPlan);
+    const clone = getPlanEditorInitialData(room, undefined, publishedPlan);
+
+    expect(edit).toMatchObject({
+      title: publishedPlan.title,
+      accommodations: publishedPlan.accommodations,
+      transports: publishedPlan.transports,
+    });
+    expect(clone).toMatchObject({
+      title: `${publishedPlan.title} 대안`,
+      clonedFromPlanId: publishedPlan.id,
+      accommodations: publishedPlan.accommodations,
+      transports: publishedPlan.transports,
+    });
+    expect(clone.routes).not.toBe(publishedPlan.routes);
+    expect(clone.routes[0]).not.toBe(publishedPlan.routes?.[0]);
+    expect(clone.accommodations[0]?.priceRange).not.toBe(
+      publishedPlan.accommodations?.[0]?.priceRange
+    );
+  });
+});
+
+describe("draft persistence status", () => {
+  it("실제 write 결과를 반환하고 다음 write에서 ERROR에서 회복한다", () => {
+    let shouldFail = false;
+    const storage = {
+      setItem: () => {
+        if (shouldFail) throw new Error("quota exceeded");
+      },
+    };
+    const draft = validDraft as unknown as StoredPlanEditorDraft;
+
+    expect(savePlanEditorDraft(storage, "draft", draft)).toBe("SAVED");
+    shouldFail = true;
+    expect(savePlanEditorDraft(storage, "draft", draft)).toBe("ERROR");
+    shouldFail = false;
+    expect(savePlanEditorDraft(storage, "draft", draft)).toBe("SAVED");
   });
 });
