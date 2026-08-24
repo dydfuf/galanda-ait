@@ -1,7 +1,8 @@
 ---
 date: 2026-08-16
 topic: galanda-effect-first-architecture
-status: confirmed
+status: superseded
+superseded_by: ../adr/ADR-001-galanda-effect-v4-architecture.md
 source: ./2026-08-16-galanda-technical-stack.md
 ---
 

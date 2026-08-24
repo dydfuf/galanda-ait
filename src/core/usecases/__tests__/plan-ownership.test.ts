@@ -22,9 +22,11 @@ import {
   canManagePlan,
 } from "../../domain/auth-guards.ts";
 import {
+  ForbiddenError,
   NotFoundError,
+  StateConflictError,
   UnauthorizedError,
-  ConflictError,
+  RevisionConflictError,
   RepositoryError,
 } from "../../domain/errors.ts";
 import { LocalTripRoomRepositoryLayer } from "../../../infrastructure/local/local-trip-room-repo.ts";
@@ -55,11 +57,11 @@ const createInMemoryRepo = (
       roomId: TripId,
       plan: TripPlan,
       expectedRevision: Revision
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const idx = rooms.findIndex((r) => r.id === roomId);
       if (idx === -1) return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       if (rooms[idx].revision !== expectedRevision) {
-        return Effect.fail(new ConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
+        return Effect.fail(new RevisionConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
       }
       const updated: TripRoom = {
         ...rooms[idx],
@@ -73,11 +75,11 @@ const createInMemoryRepo = (
       roomId: TripId,
       plan: TripPlan,
       expectedRevision: Revision
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const idx = rooms.findIndex((r) => r.id === roomId);
       if (idx === -1) return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
       if (rooms[idx].revision !== expectedRevision) {
-        return Effect.fail(new ConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
+        return Effect.fail(new RevisionConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
       }
       const planIdx = rooms[idx].plans.findIndex((p) => p.id === plan.id);
       if (planIdx === -1) return Effect.fail(new NotFoundError({ entity: "TripPlan", id: plan.id }));
@@ -93,7 +95,7 @@ const createInMemoryRepo = (
     saveRoom: (
       nextRoom: TripRoom,
       expectedRevision: Revision
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const idx = rooms.findIndex((room) => room.id === nextRoom.id);
       if (idx === -1) {
         return Effect.fail(
@@ -101,7 +103,7 @@ const createInMemoryRepo = (
         );
       }
       if (rooms[idx].revision !== expectedRevision) {
-        return Effect.fail(new ConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
+        return Effect.fail(new RevisionConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
       }
       const updated: TripRoom = {
         ...nextRoom,
@@ -251,7 +253,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(isPlanAuthor(sampleRoom, authorPlan, undefined)).toBe(false);
     });
 
-    it("requirePlanAuthor 가드는 작성자에게만 성공하고 비작성자/방장에게는 UnauthorizedError를 반환한다", async () => {
+    it("requirePlanAuthor 가드는 작성자에게만 성공하고 비작성자/방장에게는 ForbiddenError를 반환한다", async () => {
       const authorSuccess = await Effect.runPromise(
         requirePlanAuthor(sampleRoom, authorPlan, authorUser.id)
       );
@@ -262,7 +264,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         await Effect.runPromise(hostFail);
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
 
@@ -350,7 +352,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("member should fail on ambiguous legacy plan");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
   });
@@ -444,7 +446,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(Date.parse(target?.publishedAt ?? "")).not.toBeNaN();
     });
 
-    it("방장(HOST)이라도 타인의 여행안 수정을 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
+    it("방장(HOST)이라도 타인의 여행안 수정을 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async () => {
       const env = Layer.merge(
         createInMemoryRepo([sampleRoom]),
         createSessionLayer(hostSession)
@@ -460,7 +462,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         await Effect.runPromise(program);
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 원본 보존 확인
@@ -475,7 +477,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(check.revision).toBe(1);
     });
 
-    it("다른 일반 참여자(MEMBER)가 타인의 여행안 수정을 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
+    it("다른 일반 참여자(MEMBER)가 타인의 여행안 수정을 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async () => {
       const env = Layer.merge(
         createInMemoryRepo([sampleRoom]),
         createSessionLayer(strangerSession)
@@ -491,7 +493,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         await Effect.runPromise(program);
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 원본 보존 확인
@@ -597,7 +599,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(res.plans).toHaveLength(1);
     });
 
-    it("방장(HOST)이라도 타인의 여행안 삭제를 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
+    it("방장(HOST)이라도 타인의 여행안 삭제를 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async () => {
       const env = Layer.merge(
         createInMemoryRepo([sampleRoom]),
         createSessionLayer(hostSession)
@@ -613,7 +615,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 원본 보존 확인
@@ -626,7 +628,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(check.plans.some((p) => p.id === authorPlan.id)).toBe(true);
     });
 
-    it("다른 일반 참여자(MEMBER)가 타인의 여행안 삭제를 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async () => {
+    it("다른 일반 참여자(MEMBER)가 타인의 여행안 삭제를 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async () => {
       const env = Layer.merge(
         createInMemoryRepo([sampleRoom]),
         createSessionLayer(strangerSession)
@@ -642,7 +644,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 원본 보존 확인
@@ -776,7 +778,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(target?.title).toBe("로컬에서 작성자가 수정한 제목");
       expect(target?.authorId).toBe(authorUser.id);
 
-      // 3. 비작성자가 수정 시도 시 UnauthorizedError로 실패
+      // 3. 비작성자가 수정 시도 시 ForbiddenError로 실패
       const strangerEnv = Layer.merge(
         LocalTripRoomRepositoryLayer,
         createLocalSessionLayer({
@@ -798,7 +800,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 4. 작성자가 삭제 수행
@@ -1046,8 +1048,8 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
-        expect((err as UnauthorizedError).reason).toContain(
+        expect(err).toBeInstanceOf(StateConflictError);
+        expect((err as StateConflictError).message).toContain(
           "확정된 여행안은 수정할 수 없습니다."
         );
       }
@@ -1074,8 +1076,8 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
-        expect((err as UnauthorizedError).reason).toContain(
+        expect(err).toBeInstanceOf(StateConflictError);
+        expect((err as StateConflictError).message).toContain(
           "확정된 여행안은 삭제할 수 없습니다."
         );
       }
@@ -1119,7 +1121,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
           await Effect.runPromise(program.pipe(Effect.provide(env)));
           expect.unreachable("should fail");
         } catch (err) {
-          expect(err).toBeInstanceOf(UnauthorizedError);
+          expect(err).toBeInstanceOf(StateConflictError);
         }
       }
 
@@ -1139,7 +1141,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
         );
         expect.unreachable("should fail");
       } catch (err) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(StateConflictError);
       }
     });
 
@@ -1217,7 +1219,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
           );
           expect.unreachable("should fail");
         } catch (err) {
-          expect(err).toBeInstanceOf(UnauthorizedError);
+          expect(err).toBeInstanceOf(StateConflictError);
         }
 
         try {
@@ -1230,7 +1232,7 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
           );
           expect.unreachable("should fail");
         } catch (err) {
-          expect(err).toBeInstanceOf(UnauthorizedError);
+          expect(err).toBeInstanceOf(StateConflictError);
         }
 
         expect(globalThis.window.localStorage.getItem(storageKey)).toBe(

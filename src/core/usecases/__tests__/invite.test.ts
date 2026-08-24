@@ -157,7 +157,7 @@ describe("invite use cases", () => {
     );
     expect(Exit.isFailure(exit)).toBe(true);
     if (Exit.isFailure(exit)) {
-      expect(JSON.stringify(exit.cause)).toContain("UnauthorizedError");
+      expect(JSON.stringify(exit.cause)).toContain("ForbiddenError");
     }
   });
 

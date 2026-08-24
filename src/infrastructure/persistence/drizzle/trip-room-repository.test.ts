@@ -1,7 +1,7 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
-import { ConflictError } from "../../../core/domain/errors.ts";
+import { RevisionConflictError } from "../../../core/domain/errors.ts";
 import {
   RevisionSchema,
   PlanIdSchema,
@@ -148,7 +148,7 @@ describe("TripRoomRepositoryLive", () => {
     });
   });
 
-  it("revision 조건을 포함한 단일 UPDATE로 CAS하고 stale 쓰기를 ConflictError로 거부한다", async () => {
+  it("revision 조건을 포함한 단일 UPDATE로 CAS하고 stale 쓰기를 RevisionConflictError로 거부한다", async () => {
     const room: TripRoom = {
       id: TripIdSchema.make("room-1"),
       title: "오사카 여행",
@@ -209,7 +209,7 @@ describe("TripRoomRepositoryLive", () => {
     const conflict = await Effect.runPromise(Effect.flip(save(3)));
 
     expect(saved.revision).toBe(4);
-    expect(conflict).toBeInstanceOf(ConflictError);
+    expect(conflict).toBeInstanceOf(RevisionConflictError);
     expect(conflict).toMatchObject({ expectedRevision: 3, actualRevision: 4 });
     expect(calls[0].text).toContain('update "trip_rooms"');
     expect(calls[0].text).toContain('"revision" = "trip_rooms"."revision" + 1');

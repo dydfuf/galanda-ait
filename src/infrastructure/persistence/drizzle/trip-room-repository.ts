@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import {
-  ConflictError,
   NotFoundError,
   RepositoryError,
+  RevisionConflictError,
+  StateConflictError,
 } from "../../../core/domain/errors.ts";
 import {
   RevisionSchema,
@@ -157,7 +158,7 @@ const compareAndSet = (
   expectedRevision: Revision,
   changes: RoomChanges,
   operation: string
-): Effect.Effect<TripRoom, NotFoundError | ConflictError | RepositoryError> =>
+): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError | RepositoryError> =>
   Effect.gen(function* () {
     const [row] = yield* databaseEffect(operation, () =>
       db
@@ -192,7 +193,7 @@ const compareAndSet = (
       );
     }
     return yield* Effect.fail(
-      new ConflictError({
+      new RevisionConflictError({
         message: "다른 사용자가 이미 방 정보를 수정했습니다.",
         expectedRevision,
         actualRevision,
@@ -266,10 +267,8 @@ export const TripRoomRepositoryLive: Layer.Layer<
             );
           }
           return yield* Effect.fail(
-            new ConflictError({
+            new StateConflictError({
               message: "같은 ID의 여행방이 이미 존재합니다.",
-              expectedRevision: 0,
-              actualRevision,
             })
           );
         }),
@@ -319,7 +318,7 @@ export const TripRoomRepositoryLive: Layer.Layer<
           const room = yield* findRoom(db, roomId, "updatePlan.findRoom");
           if (room.revision !== expectedRevision) {
             return yield* Effect.fail(
-              new ConflictError({
+              new RevisionConflictError({
                 message: "다른 사용자가 이미 방 정보를 수정했습니다.",
                 expectedRevision,
                 actualRevision: room.revision,

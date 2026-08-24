@@ -117,15 +117,21 @@ stale 문서를 함께 갱신한다.
 Web/PWA / Apps in Toss
         ↓
 React feature layer
+        ↓ HTTP / JSON
+Hono transport
         ↓
-core use cases / domain
+Effect application use cases
         ↓
-ports
+core domain / ports
         ↓
 infrastructure adapters
         ↓
-Hono + Effect / Drizzle / external systems
+Better Auth / Drizzle / external systems
 ````
+
+* Hono owns transport: routing, HTTP validation과 status/DTO mapping을 담당한다.
+* Effect owns application execution: use case orchestration과 typed expected failure를 담당한다.
+* 외부 I/O가 없는 domain rule과 transition은 순수 함수로 유지한다.
 
 ### Core
 

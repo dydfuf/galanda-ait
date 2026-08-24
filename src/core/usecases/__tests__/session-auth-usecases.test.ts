@@ -15,10 +15,12 @@ import { confirmTripPlan } from "../confirm-plan.ts";
 import { updateTripRoom } from "../update-room.ts";
 import { ROLE_PERMISSIONS } from "../../domain/auth-guards.ts";
 import {
+  ForbiddenError,
   NotFoundError,
   AccountUpgradeRequiredError,
-  ConflictError,
+  RevisionConflictError,
   SessionUnavailableError,
+  StateConflictError,
   UnauthorizedError,
   ValidationError,
 } from "../../domain/errors.ts";
@@ -63,7 +65,7 @@ const createInMemoryRepositoryLayer = (
       roomId: typeof TripIdSchema.Type,
       params: UpdateRoomParams,
       expectedRevision: typeof RevisionSchema.Type
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -71,7 +73,7 @@ const createInMemoryRepositoryLayer = (
       const room = rooms[index];
       if (room.revision !== expectedRevision) {
         return Effect.fail(
-          new ConflictError({
+          new RevisionConflictError({
             message: "Revision mismatch",
             expectedRevision,
             actualRevision: room.revision,
@@ -91,7 +93,7 @@ const createInMemoryRepositoryLayer = (
       roomId: typeof TripIdSchema.Type,
       plan: TripPlan,
       expectedRevision: typeof RevisionSchema.Type
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -99,7 +101,7 @@ const createInMemoryRepositoryLayer = (
       const room = rooms[index];
       if (room.revision !== expectedRevision) {
         return Effect.fail(
-          new ConflictError({
+          new RevisionConflictError({
             message: "Revision mismatch",
             expectedRevision,
             actualRevision: room.revision,
@@ -118,7 +120,7 @@ const createInMemoryRepositoryLayer = (
       roomId: typeof TripIdSchema.Type,
       plan: TripPlan,
       expectedRevision: typeof RevisionSchema.Type
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const index = rooms.findIndex((r) => r.id === roomId);
       if (index === -1) {
         return Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
@@ -126,7 +128,7 @@ const createInMemoryRepositoryLayer = (
       const room = rooms[index];
       if (room.revision !== expectedRevision) {
         return Effect.fail(
-          new ConflictError({
+          new RevisionConflictError({
             message: "Revision mismatch",
             expectedRevision,
             actualRevision: room.revision,
@@ -149,7 +151,7 @@ const createInMemoryRepositoryLayer = (
     saveRoom: (
       nextRoom: TripRoom,
       expectedRevision: typeof RevisionSchema.Type
-    ): Effect.Effect<TripRoom, NotFoundError | ConflictError> => {
+    ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const index = rooms.findIndex((room) => room.id === nextRoom.id);
       if (index === -1) {
         return Effect.fail(
@@ -159,7 +161,7 @@ const createInMemoryRepositoryLayer = (
       const room = rooms[index];
       if (room.revision !== expectedRevision) {
         return Effect.fail(
-          new ConflictError({
+          new RevisionConflictError({
             message: "Revision mismatch",
             expectedRevision,
             actualRevision: room.revision,
@@ -534,7 +536,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(program);
         expect.unreachable("should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
 
@@ -601,7 +603,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(plan?.authorId).toBe("user-alice"); // 원래 작성자 유지
     });
 
-    it("작성자나 방장이 아닌 일반 멤버(MEMBER)가 다른 사람의 여행안 수정을 시도하면 UnauthorizedError로 실패한다", async (): Promise<void> => {
+    it("작성자나 방장이 아닌 일반 멤버(MEMBER)가 다른 사람의 여행안 수정을 시도하면 ForbiddenError로 실패한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(bobUser)
@@ -622,11 +624,11 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(program);
         expect.unreachable("should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
 
-    it("작성자나 방장이 아닌 일반 멤버(MEMBER)가 다른 사람의 여행안 삭제를 시도하면 UnauthorizedError로 실패한다", async (): Promise<void> => {
+    it("작성자나 방장이 아닌 일반 멤버(MEMBER)가 다른 사람의 여행안 삭제를 시도하면 ForbiddenError로 실패한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([sampleRoom]),
         createTestSessionLayer(bobUser)
@@ -642,11 +644,11 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(program);
         expect.unreachable("should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
 
-    it("방장(HOST)이라도 타 멤버(MEMBER)가 작성한 여행안 수정을 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async (): Promise<void> => {
+    it("방장(HOST)이라도 타 멤버(MEMBER)가 작성한 여행안 수정을 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([roomWithBobPlan]),
         createTestSessionLayer(aliceUser)
@@ -667,7 +669,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(updateProgram);
         expect.unreachable("host should not be allowed to update other member's plan");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 원본 데이터가 손상되지 않고 보존되었는지 검증
@@ -681,7 +683,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
       expect(bobPlan?.authorId).toBe("user-bob");
     });
 
-    it("방장(HOST)이라도 타 멤버(MEMBER)가 작성한 여행안 삭제를 시도하면 UnauthorizedError로 실패하고 원본이 보존된다", async (): Promise<void> => {
+    it("방장(HOST)이라도 타 멤버(MEMBER)가 작성한 여행안 삭제를 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer([roomWithBobPlan]),
         createTestSessionLayer(aliceUser)
@@ -697,7 +699,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(deleteProgram);
         expect.unreachable("host should not be allowed to delete other member's plan");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 원본 데이터가 삭제되지 않고 보존되었는지 검증
@@ -882,7 +884,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(updateProgram);
         expect.unreachable("should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       const deleteProgram = deletePlan({
@@ -895,7 +897,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(deleteProgram);
         expect.unreachable("should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
 
@@ -941,7 +943,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         );
         expect.unreachable("bob1 update should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 밥2의 수정 시도 -> 실패
@@ -955,7 +957,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         );
         expect.unreachable("bob2 update should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 밥1의 삭제 시도 -> 실패
@@ -969,7 +971,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         );
         expect.unreachable("bob1 delete should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       // 밥2의 삭제 시도 -> 실패
@@ -983,7 +985,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         );
         expect.unreachable("bob2 delete should fail");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
     });
 
@@ -1325,7 +1327,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(program);
         expect.unreachable("member should not confirm a plan");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       const room = await Effect.runPromise(
@@ -1380,7 +1382,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(program);
         expect.unreachable("confirmed room should reject reconfirmation");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(ConflictError);
+        expect(err).toBeInstanceOf(StateConflictError);
       }
 
       const room = await Effect.runPromise(
@@ -1675,7 +1677,7 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
         await Effect.runPromise(program);
         expect.unreachable("member should not be allowed to update room");
       } catch (err: unknown) {
-        expect(err).toBeInstanceOf(UnauthorizedError);
+        expect(err).toBeInstanceOf(ForbiddenError);
       }
 
       const room = await Effect.runPromise(
