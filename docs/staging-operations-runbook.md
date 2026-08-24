@@ -62,7 +62,7 @@ npx wrangler hyperdrive get 36428926fddb413e82914434280e3ffc
 npx wrangler secret list --env staging
 ```
 
-`hyperdrive get`에서 Direct hostname/port, `galanda_worker`, `sslmode: require`, `caching.disabled: true`를 확인한다. secret 목록에는 `BETTER_AUTH_SECRET` 이름만 있어야 하며 값을 출력하지 않는다.
+`hyperdrive get`에서 Direct hostname/port, `galanda_worker`, `sslmode: require`, `caching.disabled: true`를 확인한다. Web/PWA staging secret 목록에는 `BETTER_AUTH_SECRET`, `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` 이름이 있어야 하며 값을 출력하지 않는다.
 
 cache가 활성화된 경우 즉시 다시 끈다.
 

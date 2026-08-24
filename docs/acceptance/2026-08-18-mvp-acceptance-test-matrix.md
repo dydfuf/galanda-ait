@@ -29,7 +29,7 @@ status: smoke-verified-with-gaps
 
 | 표기 | 의미 |
 |---|---|
-| `P` | 2026-08-18 로컬 smoke에서 기대 결과 확인 |
+| `P` | 표기된 날짜와 실행 환경에서 기대 결과 확인 |
 | `F` | smoke에서 현재 구현의 실패 또는 설계 불일치 확인 |
 | `N` | 이번 smoke에서 실행하지 않음 |
 | `B` | 현재 테스트 기반 또는 실행 환경이 없어 검증 불가 |
@@ -108,7 +108,7 @@ location.href = "/trips";
 |---|---|---|---|---|---|---|
 | `TR01-N` | 정상 | M | 인증된 `H/M`이 참여 중인 여행방을 가진다 | `/trips`를 열고 여행 항목을 선택한다 | 상태·날짜·도시·다음 맥락을 보고 확정 전이면 `PL-01`, 확정 후면 `IT-01`로 이동한다 | `P` |
 | `TR01-E` | 빈 상태 | M | 참여 중인 여행방이 없다 | `/trips`를 연다 | 빈 상태 안내와 `새 여행 만들기`를 확인한다. 생성 CTA는 한 개만 노출한다 | `F` duplicate CTA |
-| `TR01-P` | 권한 오류 | M | `G` 또는 참여하지 않은 사용자가 다른 방의 식별자를 안다 | 목록 또는 방 URL에 접근한다 | 참여하지 않은 방은 목록에 없고 데이터가 노출되지 않으며 참여 안내를 보여준다 | `B` |
+| `TR01-P` | 권한 오류 | M | `G` 또는 참여하지 않은 사용자가 다른 방의 식별자를 안다 | 목록 또는 방 URL에 접근한다 | 참여하지 않은 방은 목록에 없고 데이터가 노출되지 않으며 참여 안내를 보여준다 | `P` 2026-08-24 staging 401/404 |
 | `TR01-S` | 저장/조회 실패 | A/M | 여행 목록 조회가 실패한다 | `/trips`를 새로고침한다 | 오류 문구와 `다시 시도`를 보여주고 기존 목록이 있으면 유지한다 | `B` |
 
 ### `TR-02` 여행방 만들기
@@ -124,10 +124,10 @@ location.href = "/trips";
 
 | ID | 유형 | 방식 | Given | When | Then | 상태 |
 |---|---|---|---|---|---|---|
-| `IN01-N` | 정상 | M | 만료되지 않은 불투명 초대 토큰이 있다 | 초대장을 열고 닉네임으로 수락한다 | 여행 이름·초대한 사람·일정의 최소 정보만 보이고 가입 폼 없이 Guest `M`으로 한 번 참여해 Trip Room으로 이동한다 | `F` staging E2E 필요 |
+| `IN01-N` | 정상 | M | 만료되지 않은 불투명 초대 토큰이 있다 | 초대장을 열고 닉네임으로 수락한다 | 여행 이름·초대한 사람·일정의 최소 정보만 보이고 가입 폼 없이 Guest `M`으로 한 번 참여해 Trip Room으로 이동한다 | `P` 2026-08-24 staging 2-user |
 | `IN01-E` | 빈/만료 | M | 토큰이 잘못됐거나 만료·폐기됐다 | `/invites/:inviteToken`을 연다 | 여행방 정보가 노출되지 않고 만료 또는 유효하지 않다는 오류와 목록 이동을 보여준다 | `P` invalid token |
-| `IN01-P` | 권한 오류 | M | 세션 없는 사용자가 초대장을 연다 | 링크만 조회하거나 닉네임으로 수락한다 | 조회만으로 session/membership을 만들지 않고, 수락할 때 anonymous session을 보장한 뒤 session 신원으로만 참여한다 | `B` |
-| `IN01-S` | 저장 실패 | A/M | 참여 등록이 실패한다 | 같은 초대를 다시 수락한다 | 오류를 표시하고 재시도할 수 있으며 같은 사용자 또는 같은 참여 요청이 중복 등록되지 않는다 | `B` |
+| `IN01-P` | 권한 오류 | M | 세션 없는 사용자가 초대장을 연다 | 링크만 조회하거나 닉네임으로 수락한다 | 조회만으로 session/membership을 만들지 않고, 수락할 때 anonymous session을 보장한 뒤 session 신원으로만 참여한다 | `P` 2026-08-24 staging |
+| `IN01-S` | 저장 실패 | A/M | 참여 등록이 실패한다 | 같은 초대를 다시 수락한다 | 오류를 표시하고 재시도할 수 있으며 같은 사용자 또는 같은 참여 요청이 중복 등록되지 않는다 | `P` automated rollback + staging retry |
 
 #### 초대 capability 계약 (2026-08-24)
 
@@ -139,6 +139,15 @@ location.href = "/trips";
 - `POST /api/invites/:inviteToken/join`은 nickname만 받고 id·role·tripId는 session/token에서 결정한다. invite와 Trip row를 함께 잠가 검증과 membership CAS를 한 transaction에서 처리한다.
 - 직접 `POST /api/trips/:tripId/join` 경로는 제거한다. 같은 session의 중복 제출·네트워크 재시도는 membership을 추가로 쓰지 않고 기존 Trip을 반환한다.
 - 링크 조회만으로 user/session/membership은 생성되지 않는다. 수락 시에만 기존 Better Auth anonymous session을 보장하고, nickname은 auth profile이 아닌 `TripMember.name`에 저장한다.
+
+#### 2026-08-24 staging evidence
+
+- PR #51~#54와 Worker version `3df8f777-8313-4c39-bc1b-b905c80b5215`를 사용했다.
+- 등록된 Host와 독립된 무세션 Guest 브라우저로 opaque invite deep link를 열었다. 공개 preview 전후 user/session/member 수는 변하지 않았다.
+- 닉네임 수락 시 anonymous user/session과 membership이 각각 한 번 생성됐고, nickname은 `TripMember.name`으로 저장됐다. Host와 Guest 모두 같은 Trip에서 참여 2명을 확인했다.
+- Guest 목록에 참여한 Trip이 즉시 나타났고, 같은 invite 재진입 후에도 member 수와 Trip revision은 변하지 않았다.
+- 무세션 목록/상세는 401, 로그인했지만 멤버가 아닌 사용자의 상세는 404/not-found로 확인했다.
+- Web/PWA cold-open은 실제 staging에서 확인했다. Apps-in-Toss build는 통과했지만 실제 Toss WebView QR cold start는 모바일 app/mTLS 실행 환경에서 별도 확인이 필요하다.
 
 ### `PL-01` 계획 탭 홈
 
