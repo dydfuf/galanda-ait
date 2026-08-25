@@ -26,6 +26,7 @@ import { PlanCandidatesHeader } from "./components/PlanCandidatesHeader.tsx";
 import { TripSummarySection } from "./components/TripSummarySection.tsx";
 import { DecisionSummarySection } from "./components/DecisionSummarySection.tsx";
 import { resolvePlanHomeCta, toTripRoomViewModel } from "./plan-home-view-model.ts";
+import { getRoomActor } from "../../core/domain/auth-guards.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -110,9 +111,17 @@ export function PlanHomePage() {
     navigate(`/trips/${tripId}/plans/compare?left=${left}&right=${right}`);
   };
 
-  const cta = resolvePlanHomeCta(room.isConfirmed, room.candidateCount);
+  // CTA 노출은 서버 use case와 동일한 도메인 RBAC 계약을 따른다 (plan:create).
+  const canCreatePlan = getRoomActor(rawRoom, session?.participantIds).can("plan:create");
+
+  const cta = resolvePlanHomeCta({
+    isConfirmed: room.isConfirmed,
+    candidateCount: room.candidateCount,
+    canCreatePlan,
+  });
 
   const runPrimaryCta = (): void => {
+    if (!cta.primaryKind) return;
     switch (cta.primaryKind) {
       case "view-itinerary":
         navigate(`/trips/${tripId}/itinerary`, { replace: true });
@@ -132,7 +141,7 @@ export function PlanHomePage() {
   };
 
   return (
-    <PageBody withBottomAction={plans.length > 0}>
+    <PageBody withBottomAction={cta.primaryKind !== null}>
       <TripSummarySection
         title={room.title}
         destination={room.destination}
@@ -162,9 +171,13 @@ export function PlanHomePage() {
           <PageState
             status="empty"
             title="아직 여행안이 없어요"
-            description="첫 여행안을 만들어 친구들과 함께 골라보세요."
-            actionText={cta.primaryLabel}
-            onAction={runPrimaryCta}
+            description={
+              canCreatePlan
+                ? "첫 여행안을 만들어 친구들과 함께 골라보세요."
+                : "여행 참여자가 첫 여행안을 만들면 여기에 표시돼요."
+            }
+            actionText={cta.primaryLabel ?? undefined}
+            onAction={cta.primaryKind ? runPrimaryCta : undefined}
           />
         ) : (
           <ul
@@ -180,7 +193,7 @@ export function PlanHomePage() {
         )}
       </section>
 
-      {plans.length > 0 && (
+      {cta.primaryKind !== null && (
         <BottomAction>
           <Button type="button" size="xl" onClick={runPrimaryCta}>
             {cta.primaryLabel}

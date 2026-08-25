@@ -37,7 +37,7 @@ describe("PlanCandidatesHeader (RAON-228)", () => {
   });
 
   it("secondary 버튼 탭 시 새 여행안 제안 진입 콜백을 실행한다", () => {
-    const onNewProposalAction = vi.fn();
+    const onNewProposalAction = vi.fn<() => void>();
     render(
       <PlanCandidatesHeader
         candidateCount={2}
