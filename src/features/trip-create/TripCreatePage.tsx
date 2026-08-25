@@ -40,8 +40,8 @@ export function TripCreatePage() {
         title: trimmedTitle,
       });
 
-      // 생성 성공 시 여행방 계획 탭 홈으로 이동 (기획서 TR-02 명세)
-      navigate(`/trips/${newRoom.id}/plans`, { replace: true });
+      // 생성 성공 시 canonical Trip Room 진입점으로 이동해 TripRoomEntry가 기본 탭을 결정한다.
+      navigate(`/trips/${newRoom.id}`, { replace: true });
     } catch (err: unknown) {
       setErrorMsg(toUserMessage(err, "여행을 만들지 못했어요. 다시 시도해주세요."));
     } finally {
