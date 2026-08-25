@@ -22,9 +22,10 @@ import {
 import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { PlanDecisionCard } from "./components/PlanDecisionCard.tsx";
+import { PlanCandidatesHeader } from "./components/PlanCandidatesHeader.tsx";
 import { TripSummarySection } from "./components/TripSummarySection.tsx";
 import { DecisionSummarySection } from "./components/DecisionSummarySection.tsx";
-import { toTripRoomViewModel } from "./plan-home-view-model.ts";
+import { resolvePlanHomeCta, toTripRoomViewModel } from "./plan-home-view-model.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -82,7 +83,6 @@ export function PlanHomePage() {
 
   const room = toTripRoomViewModel(rawRoom, session?.participantIds);
 
-  const isConfirmed = room.isConfirmed;
   const plans = room.plans;
 
   const toggleCompareSelection = (planId: string): void => {
@@ -110,25 +110,26 @@ export function PlanHomePage() {
     navigate(`/trips/${tripId}/plans/compare?left=${left}&right=${right}`);
   };
 
-  const primaryCta = isConfirmed
-    ? {
-        label: "확정 일정 보기",
-        onClick: () => navigate(`/trips/${tripId}/itinerary`, { replace: true }),
-      }
-    : plans.length === 1
-      ? {
-          label: "새 여행안 제안하기",
-          onClick: () => navigate(`/trips/${tripId}/plans/new`),
-        }
-      : plans.length === 0
-        ? {
-            label: "첫 여행안 만들기",
-            onClick: () => navigate(`/trips/${tripId}/plans/new`),
-          }
-        : {
-            label: "여행안 비교하기",
-            onClick: openComparePicker,
-          };
+  const cta = resolvePlanHomeCta(room.isConfirmed, room.candidateCount);
+
+  const runPrimaryCta = (): void => {
+    switch (cta.primaryKind) {
+      case "view-itinerary":
+        navigate(`/trips/${tripId}/itinerary`, { replace: true });
+        return;
+      case "create-first":
+      case "propose-new":
+        navigate(`/trips/${tripId}/plans/new`);
+        return;
+      case "compare":
+        openComparePicker();
+        return;
+    }
+  };
+
+  const proposeNewPlan = (): void => {
+    navigate(`/trips/${tripId}/plans/new`);
+  };
 
   return (
     <PageBody withBottomAction={plans.length > 0}>
@@ -151,20 +152,19 @@ export function PlanHomePage() {
       />
 
       <section aria-labelledby="plan-candidates-heading" className="pt-1">
-        <div className="flex items-center justify-between gap-3 px-(--app-inline-padding) pb-2">
-          <h2 id="plan-candidates-heading" className="text-[15px] font-bold leading-none text-foreground">
-            여행안
-          </h2>
-          <span className="text-[12px] leading-none text-muted-foreground">후보 {room.candidateCount}개</span>
-        </div>
+        <PlanCandidatesHeader
+          candidateCount={room.candidateCount}
+          showNewProposalAction={cta.showNewProposalEntry}
+          onNewProposalAction={proposeNewPlan}
+        />
 
         {plans.length === 0 ? (
           <PageState
             status="empty"
             title="아직 여행안이 없어요"
             description="첫 여행안을 만들어 친구들과 함께 골라보세요."
-            actionText={primaryCta.label}
-            onAction={primaryCta.onClick}
+            actionText={cta.primaryLabel}
+            onAction={runPrimaryCta}
           />
         ) : (
           <ul
@@ -182,8 +182,8 @@ export function PlanHomePage() {
 
       {plans.length > 0 && (
         <BottomAction>
-          <Button type="button" size="xl" onClick={primaryCta.onClick}>
-            {primaryCta.label}
+          <Button type="button" size="xl" onClick={runPrimaryCta}>
+            {cta.primaryLabel}
           </Button>
         </BottomAction>
       )}

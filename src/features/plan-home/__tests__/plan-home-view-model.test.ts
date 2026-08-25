@@ -6,7 +6,7 @@ import {
   UserIdSchema,
 } from "../../../core/domain/ids.ts";
 import type { TripRoom } from "../../../core/domain/room.ts";
-import { getTripListStatusText, toTripRoomViewModel } from "../plan-home-view-model.ts";
+import { getTripListStatusText, resolvePlanHomeCta, toTripRoomViewModel } from "../plan-home-view-model.ts";
 
 const room: TripRoom = {
   id: TripIdSchema.make("room-1"),
@@ -146,6 +146,40 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
     expect(vm.totalOpinionCount).toBe(2);
     // legacy plan에는 opinion author가 없으므로 참여자는 집계하지 않는다
     expect(vm.participatedMemberCount).toBe(0);
+  });
+});
+
+describe("resolvePlanHomeCta 상태별 CTA contract (RAON-228)", (): void => {
+  it.each([
+    [false, 0, "create-first", "첫 여행안 만들기"],
+    [false, 1, "propose-new", "새 여행안 제안하기"],
+    [false, 2, "compare", "여행안 비교하기"],
+    [false, 5, "compare", "여행안 비교하기"],
+    [true, 0, "view-itinerary", "확정 일정 보기"],
+    [true, 2, "view-itinerary", "확정 일정 보기"],
+  ] as const)(
+    "미확정=%s 후보=%i → primary %s (%s)",
+    (isConfirmed, candidateCount, expectedKind, expectedLabel): void => {
+      const cta = resolvePlanHomeCta(isConfirmed, candidateCount);
+      expect(cta.primaryKind).toBe(expectedKind);
+      expect(cta.primaryLabel).toBe(expectedLabel);
+    },
+  );
+
+  it("primary는 상태별로 하나이며, 새 여행안 진입은 비교가 primary인 2개 이상 & 미확정에서만 secondary로 노출된다", (): void => {
+    expect(resolvePlanHomeCta(false, 0).showNewProposalEntry).toBe(false);
+    // 후보 1개에서는 primary 자체가 제안이므로 secondary를 겹쳐 노출하지 않는다
+    expect(resolvePlanHomeCta(false, 1).showNewProposalEntry).toBe(false);
+    expect(resolvePlanHomeCta(false, 2).showNewProposalEntry).toBe(true);
+    expect(resolvePlanHomeCta(false, 3).showNewProposalEntry).toBe(true);
+  });
+
+  it("확정 상태에서는 허용되지 않은 mutation 진입(새 여행안/비교)을 노출하지 않는다", (): void => {
+    const cta = resolvePlanHomeCta(true, 3);
+    expect(cta.primaryKind).toBe("view-itinerary");
+    expect(cta.showNewProposalEntry).toBe(false);
+    expect(cta.primaryKind).not.toBe("compare");
+    expect(cta.primaryKind).not.toBe("propose-new");
   });
 });
 

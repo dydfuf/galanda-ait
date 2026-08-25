@@ -68,6 +68,62 @@ export const getTripListStatusText = (
   return `여행안 ${room.plans.length}개 · 비교 중`;
 };
 
+/**
+ * PL-01 상태별 CTA contract (RAON-228).
+ *
+ * primary는 상태별로 정확히 하나만 존재한다.
+ * - 후보 0개: 첫 여행안 만들기
+ * - 후보 1개: 새 여행안 제안하기 (비교 CTA 없음)
+ * - 후보 2개 이상: 여행안 비교하기 (fast compare / selector는 기존 계약 유지)
+ * - 확정: 확정 일정 보기 (mutation 진입 없음)
+ *
+ * 후보 추가 진입(`새 여행안 제안하기`)은 비교가 primary가 되는 2개 이상 & 미확정에서만
+ * 후보 section의 secondary로 노출해 bottom sticky에서 primary끼리 경쟁하지 않게 한다.
+ */
+export type PlanHomePrimaryCtaKind =
+  | "create-first"
+  | "propose-new"
+  | "compare"
+  | "view-itinerary";
+
+export interface PlanHomeCtaContract {
+  readonly primaryKind: PlanHomePrimaryCtaKind;
+  readonly primaryLabel: string;
+  readonly showNewProposalEntry: boolean;
+}
+
+export const resolvePlanHomeCta = (
+  isConfirmed: boolean,
+  candidateCount: number,
+): PlanHomeCtaContract => {
+  if (isConfirmed) {
+    return {
+      primaryKind: "view-itinerary",
+      primaryLabel: "확정 일정 보기",
+      showNewProposalEntry: false,
+    };
+  }
+  if (candidateCount === 0) {
+    return {
+      primaryKind: "create-first",
+      primaryLabel: "첫 여행안 만들기",
+      showNewProposalEntry: false,
+    };
+  }
+  if (candidateCount === 1) {
+    return {
+      primaryKind: "propose-new",
+      primaryLabel: "새 여행안 제안하기",
+      showNewProposalEntry: false,
+    };
+  }
+  return {
+    primaryKind: "compare",
+    primaryLabel: "여행안 비교하기",
+    showNewProposalEntry: true,
+  };
+};
+
 export const toTripRoomViewModel = (
   room: TripRoom,
   currentUserIds?: ParticipantIdentity
