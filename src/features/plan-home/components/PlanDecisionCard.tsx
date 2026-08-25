@@ -5,38 +5,17 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 
 import type { PlanSummaryData } from "../plan-home-view-model.ts";
+import { Pill, PlanOpinionSummary } from "./PlanOpinionSummary.tsx";
 
 interface PlanDecisionCardProps {
   readonly plan: PlanSummaryData;
   readonly to: string;
 }
 
-const getReactionLabel = (reaction: PlanSummaryData["myReaction"]): string | undefined => {
-  switch (reaction) {
-    case "LIKE":
-      return "좋아요";
-    case "OKAY":
-      return "괜찮아요";
-    case "HARD":
-      return "어려워요";
-    default:
-      return undefined;
-  }
-};
-
 export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   const isConfirmed = plan.isConfirmed;
   const badgeVariant = isConfirmed ? "success-solid" : plan.planTag === "BASIC" ? "info" : "neutral";
   const badgeLabel = isConfirmed ? "확정안" : plan.planTagLabel;
-
-  const myReactionLabel = getReactionLabel(plan.myReaction);
-
-  const opinionCounts: Array<string> = [];
-  if (plan.opinions.likeCount > 0) opinionCounts.push(`좋아요 ${plan.opinions.likeCount}`);
-  if (plan.opinions.okayCount > 0) opinionCounts.push(`괜찮아요 ${plan.opinions.okayCount}`);
-  if (plan.opinions.hardCount > 0) opinionCounts.push(`어려워요 ${plan.opinions.hardCount}`);
-
-  const hasOpinion = opinionCounts.length > 0;
 
   // 기간 표시: 확정된 날짜가 있으면 날짜 범위를, 없으면 박/일 또는 일정 미정을 보여준다.
   const hasDuration = plan.days > 0;
@@ -79,13 +58,9 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         </h3>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {durationLabel ? (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground-muted whitespace-nowrap">
-              {durationLabel}
-            </span>
+            <Pill className="font-semibold tabular-nums">{durationLabel}</Pill>
           ) : (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground-muted whitespace-nowrap">
-              일정 미정
-            </span>
+            <Pill className="font-semibold">일정 미정</Pill>
           )}
           {periodText && (
             <span className="min-w-0 break-words text-[12px] leading-normal text-foreground-muted line-clamp-1">
@@ -110,33 +85,7 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
       )}
 
       {/* 5. 의견 요약 / 내 의견 상태 – text 덩어리보다 빠르게 읽히는 경량 구분선 + wrap */}
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5 gap-y-1 border-t border-border pt-3 text-[12px] leading-normal">
-        {hasOpinion ? (
-          <>
-            {opinionCounts.map((text) => (
-              <span
-                key={text}
-                className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground-muted whitespace-nowrap"
-              >
-                {text}
-              </span>
-            ))}
-          </>
-        ) : (
-          <span className="min-w-0 break-words text-foreground-muted">아직 의견이 없어요</span>
-        )}
-        <span className="shrink-0 text-border-strong" aria-hidden="true">
-          ·
-        </span>
-        <span
-          className={cn(
-            "min-w-0 break-words whitespace-nowrap",
-            myReactionLabel ? "font-semibold text-foreground" : "text-foreground-muted",
-          )}
-        >
-          {myReactionLabel ? `내 의견 ${myReactionLabel}` : "내 의견 전"}
-        </span>
-      </div>
+      <PlanOpinionSummary opinions={plan.opinions} myReaction={plan.myReaction} />
     </Link>
   );
 }

@@ -30,6 +30,9 @@ RAON-181 이후 Galanda의 UI implementation layer 기준입니다. 화면 문�
    같은 TDS adaptive naming을 신규 코드에 확산하지 않습니다.
 7. **플랫폼 API는 `src/platform/*` 경유.** `@apps-in-toss/*`는 Web/PWA UI 계층에서
    직접 import하지 않습니다 (RAON-188).
+8. **아이콘으로 압축된 정보는 `sr-only` 한글 텍스트를 동반합니다.** 아이콘만으로 의미를
+   전달하지 않습니다. `aria-label`로 덮어쓰는 대신 DOM 순서를 지키는 `sr-only` span을
+   두어, 보이는 콘텐츠와 읽히는 콘텐츠가 1:1로 대응하게 합니다 (RAON-227).
 
 ## 토큰 요약
 
