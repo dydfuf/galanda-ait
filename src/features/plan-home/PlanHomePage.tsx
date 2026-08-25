@@ -40,6 +40,7 @@ export function PlanHomePage() {
 
   const {
     isError: isSessionError,
+    isLoading: isSessionLoading,
     error: sessionError,
     data: session,
     refetch: refetchSession,
@@ -57,6 +58,12 @@ export function PlanHomePage() {
   }
 
   if (isLoading) {
+    return <PageState status="loading" message="계획 정보를 불러오는 중입니다..." />;
+  }
+
+  // room query는 session 성공 이후 enabled 되므로, 세션 로딩 중에는
+  // rawRoom 부재를 오류로 판단하거나 capability을 GUEST로 확정하지 않는다.
+  if (isSessionLoading) {
     return <PageState status="loading" message="계획 정보를 불러오는 중입니다..." />;
   }
 
@@ -140,8 +147,12 @@ export function PlanHomePage() {
     navigate(`/trips/${tripId}/plans/new`);
   };
 
+  // 후보 0개의 create-first는 empty state 안에서만 렌더한다.
+  // sticky BottomAction과 경쟁시키면 primary가 두 개가 된다 (RAON-228 계약).
+  const showBottomPrimary = plans.length > 0 && cta.primaryKind !== null;
+
   return (
-    <PageBody withBottomAction={cta.primaryKind !== null}>
+    <PageBody withBottomAction={showBottomPrimary}>
       <TripSummarySection
         title={room.title}
         destination={room.destination}
@@ -193,7 +204,7 @@ export function PlanHomePage() {
         )}
       </section>
 
-      {cta.primaryKind !== null && (
+      {showBottomPrimary && (
         <BottomAction>
           <Button type="button" size="xl" onClick={runPrimaryCta}>
             {cta.primaryLabel}
