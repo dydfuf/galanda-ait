@@ -1,4 +1,5 @@
 import type { DetailedPlanViewModel } from "../plan-detail/plan-detail-view-model.ts";
+import { REACTION_DISPLAY, type ReactionDisplayKey } from "../common/reaction-display.tsx";
 import { formatCostRangeText, formatCostText } from "../../core/calculations/plan-cost.ts";
 
 export type CompareDifferenceKind = "SCHEDULE" | "BOOKING" | "COST" | "OPINIONS";
@@ -91,7 +92,14 @@ const formatOpinions = (plan: DetailedPlanViewModel): string => {
   const total = plan.opinions.likeCount + plan.opinions.okayCount + plan.opinions.hardCount;
   if (total === 0) return "아직 의견 없음";
 
-  return `좋아요 ${plan.opinions.likeCount} · 괜찮아요 ${plan.opinions.okayCount} · 어려워요 ${plan.opinions.hardCount}`;
+  // 표시 순서와 한글 label은 REACTION_DISPLAY가 단일 출처다. 비교 행의 조합 문구는 그대로 유지한다.
+  const counts: Record<ReactionDisplayKey, number> = {
+    LIKE: plan.opinions.likeCount,
+    OKAY: plan.opinions.okayCount,
+    HARD: plan.opinions.hardCount,
+  };
+
+  return REACTION_DISPLAY.map(({ key, label }) => `${label} ${counts[key]}`).join(" · ");
 };
 
 const opinionSignature = (plan: DetailedPlanViewModel): string =>
