@@ -3,11 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
-import {
-  isRevisionConflict,
-  toRevisionConflictMessage,
-  toUserMessage,
-} from "../common/error-message.ts";
+import { isRevisionConflict, toUserMessage } from "../common/error-message.ts";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
@@ -60,6 +56,7 @@ export function ItineraryPage(): JSX.Element {
   const [isChangeReviewOpen, setIsChangeReviewOpen] = useState(false);
   const acknowledgeMutation = useAcknowledgeItineraryMutation();
   const [conflictNotice, setConflictNotice] = useState<string>();
+  const [drawerConflictNotice, setDrawerConflictNotice] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
 
   if (Result.isFailure(validated)) {
@@ -159,6 +156,7 @@ export function ItineraryPage(): JSX.Element {
                   disabled={acknowledgeMutation.isPending || isResolvingConflict}
                   onClick={() => {
                     setConflictNotice(undefined);
+                    setDrawerConflictNotice(undefined);
                     setIsChangeReviewOpen(true);
                   }}
                 >
@@ -310,7 +308,7 @@ export function ItineraryPage(): JSX.Element {
         </DrawerContent>
       </Drawer>
 
-      {/* 일정 변경 리뷰 Drawer: 변경 전후를 확인하고 명시적으로 승인해요 */}
+      {/* 일정 변경 리뷰 Drawer: 변경 전후를 확인하고 명시적으로 확인해요 */}
       <Drawer open={isChangeReviewOpen} onOpenChange={setIsChangeReviewOpen} showSwipeHandle>
         <DrawerContent>
           <DrawerHeader>
@@ -319,54 +317,85 @@ export function ItineraryPage(): JSX.Element {
             </DrawerTitle>
             <DrawerDescription className="text-left">
               {itineraryState.status === "CONFIRMED" && itineraryState.itinerary.changes?.length
-                ? `v${itineraryState.itinerary.currentRevision}에서 ${itineraryState.itinerary.changes.length}개 항목이 변경됐어요. 내용을 확인한 뒤 승인해주세요.`
-                : "변경된 항목을 확인하고 승인해주세요."}
+                ? `v${itineraryState.itinerary.currentRevision}에서 ${itineraryState.itinerary.changes.length}개 항목이 변경됐어요. 내용을 확인한 뒤 알려주세요.`
+                : "변경된 항목을 확인하고 알려주세요."}
             </DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {itineraryState.status === "CONFIRMED" && itineraryState.itinerary.changes?.length ? (
               <MobileList aria-label="변경된 일정 항목">
                 {itineraryState.itinerary.changes.map(({ itemId, before, after }) => {
-                  const beforeTitle =
-                    before.type === "STAY"
-                      ? `${before.accommodation.city} · ${before.accommodation.hotelName} · ${before.date}~${before.endDate}`
-                      : `${before.transport.fromCity} → ${before.transport.toCity} · ${before.transport.mode} · ${before.date}`;
-                  const afterTitle =
-                    after.type === "STAY"
-                      ? `${after.accommodation.city} · ${after.accommodation.hotelName} · ${after.date}~${after.endDate}`
-                      : `${after.transport.fromCity} → ${after.transport.toCity} · ${after.transport.mode} · ${after.date}`;
-                  const beforeMemo = before.memo?.trim();
-                  const afterMemo = after.memo?.trim();
+                  const changedFields: ReadonlyArray<{ label: string; before: string; after: string }> = (() => {
+                    if (before.type === "STAY" && after.type === "STAY") {
+                      const fields: Array<{ label: string; before: string; after: string }> = [];
+                      if (before.accommodation.hotelName !== after.accommodation.hotelName) {
+                        fields.push({ label: "숙소", before: before.accommodation.hotelName || "(호텔명 없음)", after: after.accommodation.hotelName || "(호텔명 없음)" });
+                      }
+                      if (before.accommodation.city !== after.accommodation.city) {
+                        fields.push({ label: "도시", before: before.accommodation.city, after: after.accommodation.city });
+                      }
+                      if (before.date !== after.date) {
+                        fields.push({ label: "도착일", before: before.date, after: after.date });
+                      }
+                      if (before.endDate !== after.endDate) {
+                        fields.push({ label: "출발일", before: before.endDate, after: after.endDate });
+                      }
+                      if ((before.memo ?? "") !== (after.memo ?? "")) {
+                        fields.push({ label: "메모", before: before.memo?.trim() || "(메모 없음)", after: after.memo?.trim() || "(메모 없음)" });
+                      }
+                      if (before.accommodation.bookingStatus !== after.accommodation.bookingStatus) {
+                        fields.push({ label: "예약 상태", before: before.accommodation.bookingStatus, after: after.accommodation.bookingStatus });
+                      }
+                      if (fields.length === 0) {
+                        fields.push({ label: "숙소", before: before.accommodation.hotelName, after: after.accommodation.hotelName });
+                      }
+                      return fields;
+                    }
+                    if (before.type === "TRANSPORT" && after.type === "TRANSPORT") {
+                      const fields: Array<{ label: string; before: string; after: string }> = [];
+                      if (before.transport.fromCity !== after.transport.fromCity) {
+                        fields.push({ label: "출발지", before: before.transport.fromCity, after: after.transport.fromCity });
+                      }
+                      if (before.transport.toCity !== after.transport.toCity) {
+                        fields.push({ label: "도착지", before: before.transport.toCity, after: after.transport.toCity });
+                      }
+                      if (before.transport.mode !== after.transport.mode) {
+                        fields.push({ label: "수단", before: before.transport.mode || "(수단 없음)", after: after.transport.mode || "(수단 없음)" });
+                      }
+                      if (before.transport.hasTransfer !== after.transport.hasTransfer) {
+                        fields.push({ label: "환승", before: before.transport.hasTransfer ? "환승 필요" : "직통", after: after.transport.hasTransfer ? "환승 필요" : "직통" });
+                      }
+                      if (before.date !== after.date) {
+                        fields.push({ label: "이동일", before: before.date, after: after.date });
+                      }
+                      if ((before.memo ?? "") !== (after.memo ?? "")) {
+                        fields.push({ label: "메모", before: before.memo?.trim() || "(메모 없음)", after: after.memo?.trim() || "(메모 없음)" });
+                      }
+                      if (fields.length === 0) {
+                        fields.push({ label: "이동", before: `${before.transport.fromCity} → ${before.transport.toCity}`, after: `${after.transport.fromCity} → ${after.transport.toCity}` });
+                      }
+                      return fields;
+                    }
+                    return [];
+                  })();
+                  const title = after.type === "STAY" ? after.accommodation.hotelName : `${after.transport.fromCity} → ${after.transport.toCity}`;
                   return (
                     <MobileListItem key={itemId}>
                       <ItemTitle className="flex items-center gap-2">
-                        {after.type === "STAY" ? after.accommodation.hotelName : `${after.transport.fromCity} → ${after.transport.toCity}`}
+                        {title}
                         <Badge variant="warning">변경됨</Badge>
                       </ItemTitle>
                       <div className="flex flex-col gap-1.5 pt-1.5">
-                        <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
-                          <span className="text-xs font-bold text-muted-foreground">이전</span>
-                          <span className="min-w-0 text-[13px] break-words text-secondary-foreground">{beforeTitle}</span>
-                        </div>
-                        {beforeMemo && (
-                          <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
-                            <span className="text-xs font-bold text-muted-foreground">이전 메모</span>
-                            <span className="min-w-0 text-[13px] break-words text-secondary-foreground">{beforeMemo}</span>
+                        {changedFields.map((field) => (
+                          <div key={field.label} className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
+                            <span className="text-xs font-bold text-muted-foreground">{field.label}</span>
+                            <span className="min-w-0 text-[13px] break-words">
+                              <span className="text-secondary-foreground line-through decoration-muted-foreground/50">{field.before}</span>
+                              <span className="px-1 text-muted-foreground">→</span>
+                              <span className="font-bold text-info">{field.after}</span>
+                            </span>
                           </div>
-                        )}
-                        <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
-                          <span className="text-xs font-bold text-info">변경 후</span>
-                          <span className="min-w-0 text-[13px] break-words text-foreground">{afterTitle}</span>
-                        </div>
-                        {afterMemo && afterMemo !== beforeMemo && (
-                          <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
-                            <span className="text-xs font-bold text-info">변경 메모</span>
-                            <span className="min-w-0 text-[13px] break-words text-foreground">{afterMemo}</span>
-                          </div>
-                        )}
-                        {before.type === "STAY" && after.type === "STAY" && before.date !== after.date && (
-                          <span className="text-xs font-bold text-info">날짜가 {before.date} → {after.date} 로 변경</span>
-                        )}
+                        ))}
                       </div>
                     </MobileListItem>
                   );
@@ -376,6 +405,13 @@ export function ItineraryPage(): JSX.Element {
               <p className="px-(--app-inline-padding) py-4 text-[13px] text-muted-foreground">
                 변경된 항목이 없거나 불러오는 중이에요. 새로고침 후 다시 확인해주세요.
               </p>
+            )}
+            {(drawerConflictNotice || acknowledgeMutation.isError) && (
+              <div className="px-(--app-inline-padding) pt-2">
+                <p className="text-[13px] text-warning" role="alert">
+                  {drawerConflictNotice ?? toUserMessage(acknowledgeMutation.error, "확인 상태를 저장하지 못했습니다.")}
+                </p>
+              </div>
             )}
           </div>
           <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
@@ -389,6 +425,7 @@ export function ItineraryPage(): JSX.Element {
               onClick={() => {
                 if (acknowledgeMutation.isPending || isResolvingConflict) return;
                 setConflictNotice(undefined);
+                setDrawerConflictNotice(undefined);
                 void acknowledgeMutation
                   .mutateAsync({
                     tripId,
@@ -399,17 +436,19 @@ export function ItineraryPage(): JSX.Element {
                     if (isRevisionConflict(mutationError)) {
                       setIsResolvingConflict(true);
                       const refreshed = await refetchItinerary();
-                      setConflictNotice(
-                        refreshed.isError || !refreshed.data
-                          ? "최신 일정 상태를 불러오지 못했습니다. 다시 시도해주세요."
-                          : toRevisionConflictMessage(mutationError)
-                      );
+                      const message = refreshed.isError || !refreshed.data
+                        ? "최신 일정 상태를 불러오지 못했습니다. 다시 시도해주세요."
+                        : "일정이 다시 변경되어 최신 내용을 불러왔어요. 새 내용을 확인한 뒤 다시 알려주세요.";
+                      setDrawerConflictNotice(message);
+                      setConflictNotice(message);
                       setIsResolvingConflict(false);
+                    } else {
+                      setDrawerConflictNotice(toUserMessage(mutationError, "확인 상태를 저장하지 못했습니다."));
                     }
                   });
               }}
             >
-              {acknowledgeMutation.isPending ? "확인 중..." : "확인했어요"}
+              {acknowledgeMutation.isPending ? "확인 중..." : isResolvingConflict ? "불러오는 중..." : "확인했어요"}
             </Button>
           </DrawerFooter>
         </DrawerContent>

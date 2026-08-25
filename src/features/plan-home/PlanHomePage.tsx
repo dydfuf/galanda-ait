@@ -101,10 +101,7 @@ export function PlanHomePage() {
       navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`);
       return;
     }
-    // 3개 이상이면 명시적 선택을 위해 Drawer를 열어요. 초기값은 비워두고 사용자가 고르게 해요.
-    if (selectedCompareIds.length === 0 && plans.length >= 2) {
-      setSelectedCompareIds([plans[0].id, plans[1].id].slice(0, 2));
-    }
+    // 3개 이상이면 명시적 선택을 위해 Drawer를 열어요. 초기값은 비워두고 사용자가 직접 고르게 해요.
     setIsComparePickerOpen(true);
   };
 
