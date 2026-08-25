@@ -170,7 +170,10 @@ export function PlanEditorSections({
   })();
 
   const editorBaseHeadcount = editor.baseHeadcount ?? editor.costSummary?.baseHeadcount ?? 0;
-  const basicComplete = Boolean(editor.title.trim()) && editorBaseHeadcount >= 1;
+  const basicComplete =
+    Boolean(editor.title.trim()) &&
+    Number.isInteger(editorBaseHeadcount) &&
+    editorBaseHeadcount >= 1;
   const routeComplete = isRouteValid;
   const accommodationComplete = isAccommodationSectionValid;
   const transportComplete = isTransportSectionValid;
