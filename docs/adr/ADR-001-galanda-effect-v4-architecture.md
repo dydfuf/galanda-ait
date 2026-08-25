@@ -1061,6 +1061,6 @@ Effect unstable HttpApi/RPC
 
 모든 변경은 기존 canonical gate:
 
-npm run check
+pnpm check
 
 를 통과해야 한다.

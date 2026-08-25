@@ -38,8 +38,8 @@ See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rule
 ## Web/PWA (기본)
 
 ```bash
-npm run dev        # 일반 브라우저 개발
-npm run build      # Web/PWA production build (= build:web)
+pnpm dev        # 일반 브라우저 개발
+pnpm build      # Web/PWA production build (= build:web)
 ```
 
 UI는 shadcn/ui(Base UI) + Tailwind CSS 기반이에요. 규칙은 `docs/ui-foundation.md`를 참고해요.
@@ -47,9 +47,9 @@ UI는 shadcn/ui(Base UI) + Tailwind CSS 기반이에요. 규칙은 `docs/ui-foun
 ## Cloudflare Worker
 
 ```bash
-npm run dev:worker       # Web build 후 Worker + Static Assets 로컬 실행
-npm run dev:staging      # staging Hyperdrive를 사용하는 Cloudflare 원격 개발
-npm run deploy:staging  # Web build 후 Cloudflare Workers 배포
+pnpm dev:worker       # Web build 후 Worker + Static Assets 로컬 실행
+pnpm dev:staging      # staging Hyperdrive를 사용하는 Cloudflare 원격 개발
+pnpm deploy:staging  # Web build 후 Cloudflare Workers 배포
 ```
 
 `/api/*`는 Worker가 처리하고, 그 외 경로는 `dist/`의 SPA로 서빙해요.
@@ -75,15 +75,15 @@ HYPERDRIVE          staging/production Worker의 Cloudflare Hyperdrive binding
 Auth schema도 Drizzle migration에 포함되므로 DB 반영은 기존 명령을 사용해요.
 
 ```bash
-npm run db:migrate
+pnpm db:migrate
 ```
 
 ## Apps in Toss (선택적 target)
 
 ```bash
-npm run dev:ait    # AIT devtools를 켠 개발
-npm run build:ait  # Web bundle + AIT packaging
-npm run deploy
+pnpm dev:ait    # AIT devtools를 켠 개발
+pnpm build:ait  # Web bundle + AIT packaging
+pnpm deploy
 ```
 
 플랫폼 설정은 `apps-in-toss.config.ts`에서, AIT SDK 사용은 `src/platform/ait/`에서 관리해요.
@@ -95,16 +95,16 @@ Node 24를 사용하며, `main`에 merge하려면 `CI / verify` required check�
 PR은 최신 `main`과 동기화된 상태에서 아래 명령을 모두 통과해야 해요.
 
 ```bash
-npm ci
-npm run lint
-npm test
-npm run db:check
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm test
+pnpm db:check
 bash scripts/check-drizzle-drift.sh # Drizzle migration drift check (no DB required)
-npm run build
-npm run build:ait
+pnpm build
+pnpm build:ait
 ```
 
-`npm run check:db`는 `db:check`와 drift check를 함께 실행해요. CI는 `db:migrate`를 실행하지 않으며 `DATABASE_URL`/`BETTER_AUTH_SECRET` 등 DB credential이 필요 없어요.
+`pnpm check:db`는 `db:check`와 drift check를 함께 실행해요. CI는 `db:migrate`를 실행하지 않으며 `DATABASE_URL`/`BETTER_AUTH_SECRET` 등 DB credential이 필요 없어요.
 
 ## Effect with AI agents
 
@@ -113,6 +113,6 @@ npm run build:ait
 To upgrade both together:
 
 ```bash
-npm install effect@<version> --save-exact
+pnpm add effect@<version> --save-exact
 git subtree pull --prefix=repos/effect https://github.com/Effect-TS/effect.git effect@<version> --squash
 ```

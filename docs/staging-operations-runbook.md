@@ -77,8 +77,8 @@ npx wrangler hyperdrive update 36428926fddb413e82914434280e3ffc --caching-disabl
 Node 24에서 실행한다.
 
 ```bash
-npm ci
-npm run check
+pnpm install --frozen-lockfile
+pnpm check
 ```
 
 ### 2. Supabase와 migration
@@ -94,7 +94,7 @@ IFS= read -r -s DATABASE_URL
 printf '\n' >&2
 export DATABASE_URL
 (
-  npm run db:migrate &&
+  pnpm db:migrate &&
     psql "$DATABASE_URL" -f scripts/verify-database-privileges.sql
 )
 unset DATABASE_URL
@@ -146,10 +146,10 @@ binding으로 연결한다. 인증서 ID는 환경별 값이므로 실제 ID가 
 ### 5. Types, deploy, remote smoke
 
 ```bash
-npm run types:worker
-npm run typecheck
+pnpm types:worker
+pnpm typecheck
 npx wrangler deploy --env staging --dry-run
-npm run deploy:staging
+pnpm deploy:staging
 ```
 
 배포 출력에서 `ASSETS`, `HYPERDRIVE`, `BETTER_AUTH_URL` binding과 version ID를 기록하되 secret 값은 기록하지 않는다.

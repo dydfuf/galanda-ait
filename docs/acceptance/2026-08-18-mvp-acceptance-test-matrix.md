@@ -232,9 +232,9 @@ location.href = "/trips";
 터미널 1:
 
 ```bash
-npm ci
-npm run build
-npm run dev -- --host 127.0.0.1
+pnpm install --frozen-lockfile
+pnpm build
+pnpm dev -- --host 127.0.0.1
 ```
 
 터미널 2:

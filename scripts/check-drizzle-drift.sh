@@ -17,9 +17,9 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 0
   else
     echo "❌ Drizzle schema drift detected - migration is missing."
-    echo "Run 'npm run db:generate' locally and commit the new migration."
+   echo "Run 'pnpm db:generate' locally and commit the new migration."
     exit 1
-  fi
+   fi
 fi
 
 # Run generate with a temporary name; if schema is in sync, no file is created.
@@ -32,7 +32,7 @@ AFTER=$(git status --porcelain -- drizzle || true)
 if [ -n "$AFTER" ]; then
   echo ""
   echo "❌ Drizzle schema drift detected - migration is missing or drizzle metadata is out of sync."
-  echo "Run 'npm run db:generate' locally and commit the new migration."
+  echo "Run 'pnpm db:generate' locally and commit the new migration."
   echo ""
   echo "git status --porcelain -- drizzle:"
   echo "$AFTER"

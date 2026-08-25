@@ -2,18 +2,20 @@
   "name": "galanda",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "pnpm@9.15.1",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24 <25",
+    "pnpm": ">=9"
   },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:ait": "vite --mode ait",
-    "build": "npm run typecheck && vite build",
-    "build:web": "npm run build",
-    "build:ait": "npm run typecheck && vite build --mode ait && ait build",
-    "dev:worker": "npm run build:web && wrangler dev",
-    "dev:staging": "npm run build:web && wrangler dev --remote --env staging",
+    "build": "pnpm typecheck && vite build",
+    "build:web": "pnpm build",
+    "build:ait": "pnpm typecheck && vite build --mode ait && ait build",
+    "dev:worker": "pnpm build:web && wrangler dev",
+    "dev:staging": "pnpm build:web && wrangler dev --remote --env staging",
     "lint": "oxlint --disable-nested-config",
     "lint:fix": "oxlint --disable-nested-config --fix",
     "types:worker": "wrangler types",
@@ -22,11 +24,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.dev.vars ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:check": "drizzle-kit check",
-    "check:db": "npm run db:check && bash scripts/check-drizzle-drift.sh",
-    "check": "npm run lint && npm test && npm run check:db && npm run build && npm run build:ait",
+    "check:db": "pnpm db:check && bash scripts/check-drizzle-drift.sh",
+    "check": "pnpm lint && pnpm test && pnpm check:db && pnpm build && pnpm build:ait",
     "preview": "vite preview",
     "deploy": "ait deploy",
-    "deploy:staging": "npm run build:web && wrangler deploy --env staging"
+    "deploy:staging": "pnpm build:web && wrangler deploy --env staging"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "3.0.3",

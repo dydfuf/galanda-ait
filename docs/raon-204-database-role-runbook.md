@@ -5,7 +5,7 @@
 ## 적용
 
 1. Supabase Data API가 disabled인지 Dashboard에서 확인한다.
-2. 관리자 전용 `DATABASE_URL`로 `npm run db:migrate`를 실행한다.
+2. 관리자 전용 `DATABASE_URL`로 `pnpm db:migrate`를 실행한다.
 3. 같은 관리자 연결로 권한 검증을 실행한다.
 
    ```bash
