@@ -1,23 +1,59 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppRootLayout } from "./layouts/AppRootLayout.tsx";
 import { TripRoomTabLayout } from "./layouts/TripRoomTabLayout.tsx";
 import { TripRoomChildLayout } from "./layouts/TripRoomChildLayout.tsx";
-
-import { TripListPage } from "../features/trip-list/TripListPage.tsx";
-import { TripCreatePage } from "../features/trip-create/TripCreatePage.tsx";
-import { InvitePage } from "../features/invite/InvitePage.tsx";
-import { TripRoomEntry } from "../features/trip-room/TripRoomEntry.tsx";
-import { PlanHomePage } from "../features/plan-home/PlanHomePage.tsx";
-import { PlanCreatePage } from "../features/plan-editor/PlanCreatePage.tsx";
-import { PlanDetailPage } from "../features/plan-detail/PlanDetailPage.tsx";
-import { PlanEditPage } from "../features/plan-editor/PlanEditPage.tsx";
-import { PlanComparePage } from "../features/plan-compare/PlanComparePage.tsx";
-import { ItineraryPage } from "../features/itinerary/ItineraryPage.tsx";
-import { ItineraryEditPage } from "../features/itinerary/ItineraryEditPage.tsx";
-import { NotFoundPage } from "../pages/NotFoundPage.tsx";
-import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { SessionRoute } from "../features/auth/SessionRoute.tsx";
 import { platformOnlyRoutes } from "../platform/index.ts";
+import { PageState } from "@/components/galanda/page-state.tsx";
+
+const TripListPage = lazy(() =>
+  import("../features/trip-list/TripListPage.tsx").then((m) => ({ default: m.TripListPage })),
+);
+const TripCreatePage = lazy(() =>
+  import("../features/trip-create/TripCreatePage.tsx").then((m) => ({ default: m.TripCreatePage })),
+);
+const InvitePage = lazy(() =>
+  import("../features/invite/InvitePage.tsx").then((m) => ({ default: m.InvitePage })),
+);
+const TripRoomEntry = lazy(() =>
+  import("../features/trip-room/TripRoomEntry.tsx").then((m) => ({ default: m.TripRoomEntry })),
+);
+const PlanHomePage = lazy(() =>
+  import("../features/plan-home/PlanHomePage.tsx").then((m) => ({ default: m.PlanHomePage })),
+);
+const PlanCreatePage = lazy(() =>
+  import("../features/plan-editor/PlanCreatePage.tsx").then((m) => ({ default: m.PlanCreatePage })),
+);
+const PlanDetailPage = lazy(() =>
+  import("../features/plan-detail/PlanDetailPage.tsx").then((m) => ({ default: m.PlanDetailPage })),
+);
+const PlanEditPage = lazy(() =>
+  import("../features/plan-editor/PlanEditPage.tsx").then((m) => ({ default: m.PlanEditPage })),
+);
+const PlanComparePage = lazy(() =>
+  import("../features/plan-compare/PlanComparePage.tsx").then((m) => ({ default: m.PlanComparePage })),
+);
+const ItineraryPage = lazy(() =>
+  import("../features/itinerary/ItineraryPage.tsx").then((m) => ({ default: m.ItineraryPage })),
+);
+const ItineraryEditPage = lazy(() =>
+  import("../features/itinerary/ItineraryEditPage.tsx").then((m) => ({ default: m.ItineraryEditPage })),
+);
+const NotFoundPage = lazy(() =>
+  import("../pages/NotFoundPage.tsx").then((m) => ({ default: m.NotFoundPage })),
+);
+const LoginPage = lazy(() =>
+  import("../features/auth/LoginPage.tsx").then((m) => ({ default: m.LoginPage })),
+);
+
+function RouteFallback() {
+  return <PageState status="loading" message="화면을 불러오는 중이에요." />;
+}
+
+function withSuspense(element: React.ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
+}
 
 export function AppRouter() {
   return (
@@ -25,10 +61,10 @@ export function AppRouter() {
       <Route element={<AppRootLayout />}>
         {/* 루트 -> 여행 목록 리다이렉트 */}
         <Route path="/" element={<Navigate to="/trips" replace />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={withSuspense(<LoginPage />)} />
 
         {/* 초대장 */}
-        <Route path="/invites/:inviteToken" element={<InvitePage />} />
+        <Route path="/invites/:inviteToken" element={withSuspense(<InvitePage />)} />
 
         {/* 플랫폼 전용 라우트 (예: AIT 인앱 광고 디버그). Web 빌드에서는 비어 있어요. */}
         {platformOnlyRoutes.map(({ path, Component }) => (
@@ -36,37 +72,37 @@ export function AppRouter() {
         ))}
 
         <Route element={<SessionRoute />}>
-          <Route path="/trips" element={<TripListPage />} />
+          <Route path="/trips" element={withSuspense(<TripListPage />)} />
           <Route element={<SessionRoute registered />}>
-            <Route path="/trips/new" element={<TripCreatePage />} />
+            <Route path="/trips/new" element={withSuspense(<TripCreatePage />)} />
           </Route>
 
           <Route path="/trips/:tripId/itinerary/edit" element={<TripRoomChildLayout />}>
-            <Route index element={<ItineraryEditPage />} />
+            <Route index element={withSuspense(<ItineraryEditPage />)} />
           </Route>
 
           {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
-          <Route path="/trips/:tripId" element={<TripRoomEntry />} />
+          <Route path="/trips/:tripId" element={withSuspense(<TripRoomEntry />)} />
 
           {/* 여행방 탭 레이아웃: 계획 탭 홈 및 일정 탭 홈 */}
           <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
-            <Route path="plans" element={<PlanHomePage />} />
-            <Route path="itinerary" element={<ItineraryPage />} />
+            <Route path="plans" element={withSuspense(<PlanHomePage />)} />
+            <Route path="itinerary" element={withSuspense(<ItineraryPage />)} />
           </Route>
 
           {/* 여행방 서브페이지 레이아웃 (뒤로가기 헤더): 계획 생성, 상세, 편집, 비교 */}
           <Route path="/trips/:tripId/plans" element={<TripRoomChildLayout />}>
-            <Route path="new" element={<PlanCreatePage />} />
-            <Route path="new/:section" element={<PlanCreatePage />} />
-            <Route path="compare" element={<PlanComparePage />} />
-            <Route path=":planId" element={<PlanDetailPage />} />
-            <Route path=":planId/edit" element={<PlanEditPage />} />
-            <Route path=":planId/edit/:section" element={<PlanEditPage />} />
+            <Route path="new" element={withSuspense(<PlanCreatePage />)} />
+            <Route path="new/:section" element={withSuspense(<PlanCreatePage />)} />
+            <Route path="compare" element={withSuspense(<PlanComparePage />)} />
+            <Route path=":planId" element={withSuspense(<PlanDetailPage />)} />
+            <Route path=":planId/edit" element={withSuspense(<PlanEditPage />)} />
+            <Route path=":planId/edit/:section" element={withSuspense(<PlanEditPage />)} />
           </Route>
         </Route>
 
         {/* 404 Not Found */}
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="*" element={withSuspense(<NotFoundPage />)} />
       </Route>
     </Routes>
   );

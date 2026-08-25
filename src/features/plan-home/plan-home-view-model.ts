@@ -1,5 +1,6 @@
 import { getConfirmedPlan, getPlanDateRange, getPlanNightCount, getTripRoomDisplayDate, type TripRoom } from "../../core/domain/room.ts";
 import {
+  hasResolvablePlanAuthor,
   isPlanAuthor,
   canManagePlan,
   type ParticipantIdentity,
@@ -87,10 +88,12 @@ export const toTripRoomViewModel = (
   const plans: ReadonlyArray<PlanSummaryData> = room.plans.map((p, idx) => {
     const isPlanConfirmed = p.id === room.confirmedPlanId;
     const isBasic = idx === 0;
-    const authorName =
-      p.authorName ??
-      room.members.find((m) => m.id === p.authorId)?.name ??
-      (room.members[0]?.name ?? "작성자");
+    const resolvable = hasResolvablePlanAuthor(room, p);
+    const authorName = resolvable
+      ? (p.authorName ??
+        room.members.find((m) => m.id === p.authorId)?.name ??
+        "작성자 미확인")
+      : "작성자 미확인";
     const range = getPlanDateRange(p);
     const nights = getPlanNightCount(p);
     const days = nights > 0 ? nights + 1 : 0;

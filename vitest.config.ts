@@ -12,7 +12,9 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.{test,spec}.ts", "worker/**/*.{test,spec}.ts"],
+    environment: "node",
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "worker/**/*.{test,spec}.ts"],
     exclude: ["repos/**", "node_modules/**", "dist/**"],
   },
 });

@@ -92,3 +92,97 @@ describe("getTripListStatusText (RAON-161)", (): void => {
     expect(toTripRoomViewModel({ ...room, plans: [datedPlan], confirmedPlanId: datedPlan.id }).period).toBe("2026-12-12 ~ 2026-12-17");
   });
 });
+
+describe("toTripRoomViewModel 작성자 미확인 (RAON-153)", (): void => {
+  it("authorId/authorName이 없는 legacy plan은 방장 이름으로 오표기하지 않고 '작성자 미확인'으로 표시한다", (): void => {
+    const orphanPlan = {
+      id: PlanIdSchema.make("plan-orphan"),
+      title: "legacy",
+      status: "DRAFT" as const,
+      places: [],
+      voteCount: 0,
+    };
+    const vm = toTripRoomViewModel({ ...room, plans: [orphanPlan] }, UserIdSchema.make("user-local-me"));
+    expect(vm.plans[0].authorName).toBe("작성자 미확인");
+    // 방장이어도 라벨은 미확인이며 관리 권한은 canManage가 별도로 결정한다
+    expect(vm.plans[0].canManage).toBe(true);
+    expect(vm.plans[0].isAuthor).toBe(false);
+  });
+
+  it("authorName-only legacy에서 동명이인이 2명 이상이면 '작성자 미확인'으로 표시한다", (): void => {
+    const dupRoom: TripRoom = {
+      ...room,
+      members: [
+        ...room.members,
+        { id: UserIdSchema.make("user-alice2"), name: "밥", role: "MEMBER" },
+      ],
+      plans: [
+        {
+          id: PlanIdSchema.make("plan-legacy"),
+          title: "legacy dup",
+          status: "DRAFT",
+          authorName: "밥",
+          places: [],
+          voteCount: 0,
+        },
+      ],
+    };
+    const vm = toTripRoomViewModel(dupRoom, UserIdSchema.make("user-bob"));
+    expect(vm.plans[0].authorName).toBe("작성자 미확인");
+    expect(vm.plans[0].canManage).toBe(false);
+  });
+
+  it("authorName-only legacy에서 유일한 매칭 멤버가 있으면 해당 이름을 표시한다", (): void => {
+    const legacyPlan = {
+      id: PlanIdSchema.make("plan-legacy"),
+      title: "legacy unique",
+      status: "DRAFT" as const,
+      authorName: "밥",
+      places: [],
+      voteCount: 0,
+    };
+    const vm = toTripRoomViewModel({ ...room, plans: [legacyPlan] }, UserIdSchema.make("user-bob"));
+    expect(vm.plans[0].authorName).toBe("밥");
+    expect(vm.plans[0].isAuthor).toBe(true);
+  });
+
+  it("정상 plan의 작성자 표시는 회귀하지 않는다", (): void => {
+    const vm = toTripRoomViewModel(room, UserIdSchema.make("user-local-me"));
+    expect(vm.plans[0].authorName).toBe("나");
+    expect(vm.plans[0].isAuthor).toBe(true);
+    expect(vm.plans[0].canManage).toBe(true);
+  });
+
+  it("authorId가 있지만 방에 해당 멤버가 없어도 첫 번째 멤버로 오표기하지 않는다", (): void => {
+    const stalePlan = {
+      id: PlanIdSchema.make("plan-stale"),
+      title: "stale",
+      status: "DRAFT" as const,
+      authorId: UserIdSchema.make("user-ghost"),
+      places: [],
+      voteCount: 0,
+    };
+    const vm = toTripRoomViewModel({ ...room, plans: [stalePlan] }, UserIdSchema.make("user-local-me"));
+    // authorId가 있으면 hasResolvable=true지만 멤버 조회 실패 시 "작성자 미확인"
+    expect(vm.plans[0].authorName).toBe("작성자 미확인");
+  });
+
+  it("stale authorId(탈퇴 멤버)인 경우 UI는 미확인이지만 방장 복구 권한은 열리지 않는다 — ID ownership은 영구 신뢰", (): void => {
+    const stalePlan = {
+      id: PlanIdSchema.make("plan-stale"),
+      title: "stale",
+      status: "DRAFT" as const,
+      authorId: UserIdSchema.make("user-ghost"),
+      places: [],
+      voteCount: 0,
+    };
+    // HOST가 봐도 authorName은 미확인, hasResolvable=true이므로 방장 복구 권한(!hasResolvable) 은 false
+    const hostVm = toTripRoomViewModel({ ...room, plans: [stalePlan] }, UserIdSchema.make("user-local-me"));
+    expect(hostVm.plans[0].authorName).toBe("작성자 미확인");
+    expect(hostVm.plans[0].canManage).toBe(false);
+    expect(hostVm.plans[0].isAuthor).toBe(false);
+
+    const memberVm = toTripRoomViewModel({ ...room, plans: [stalePlan] }, UserIdSchema.make("user-bob"));
+    expect(memberVm.plans[0].canManage).toBe(false);
+  });
+});
