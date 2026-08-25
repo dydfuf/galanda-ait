@@ -80,4 +80,31 @@ describe("PlanEditorSections", () => {
     expect(html).toContain('aria-label="도시 1 삭제"');
     expect(html).toContain('aria-label="도시 2 삭제"');
   });
+
+  it("첫 여행안에서는 진행률과 다음 추천을 안내한다", () => {
+    const editor = {
+      title: "첫 여행",
+      routes: [],
+      accommodations: [],
+      transports: [],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("첫 여행안을 만들어볼까요?");
+    expect(html).toContain("필수 정보 1/4 완료");
+    expect(html).toContain("다음으로 추천");
+    expect(html).toContain("아직 예약하지 않았어도 괜찮아요");
+  });
 });
