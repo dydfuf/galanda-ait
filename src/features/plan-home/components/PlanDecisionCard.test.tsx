@@ -29,6 +29,23 @@ const renderCard = (overrides: Partial<PlanSummaryData> = {}, to = "/trips/t1/pl
   );
 };
 
+/**
+ * 반응 pill은 시각적으로 `[아이콘] 2`라 텍스트로 잡을 수 없다.
+ * pill 컨테이너를 구조(둥근 pill + 합성 텍스트 "좋아요 2명")로 찾는다.
+ */
+const findReactionPill = (label: string, count: number): HTMLElement | undefined => {
+  const link = screen.getByRole("link");
+  return Array.from(link.querySelectorAll("span")).find(
+    (el) => el.className.includes("rounded-full") && el.textContent === `${label} ${count}명`,
+  );
+};
+
+const getReactionPill = (label: string, count: number): HTMLElement => {
+  const pill = findReactionPill(label, count);
+  if (!pill) throw new Error(`반응 pill을 찾지 못했습니다: ${label} ${count}명`);
+  return pill;
+};
+
 describe("PlanDecisionCard (RAON-226)", () => {
   it("기본안·대안·확정안을 badge text로 구분한다 (색상만 의존하지 않음)", () => {
     const { unmount } = renderCard({ planTag: "BASIC", planTagLabel: "기본안", isConfirmed: false });
@@ -57,8 +74,8 @@ describe("PlanDecisionCard (RAON-226)", () => {
     renderCard({ differenceSummary: "오사카 1박 추가 · 교토 숙소 변경" });
     const diff = screen.getByText("오사카 1박 추가 · 교토 숙소 변경");
     expect(diff).toBeInTheDocument();
-    // 차이 박스는 의견 텍스트보다 앞에 있어야 한다 (DOM 순서)
-    const opinion = screen.getByText("좋아요 2");
+    // 차이 박스는 의견 영역보다 앞에 있어야 한다 (DOM 순서)
+    const opinion = getReactionPill("좋아요", 2);
     expect(diff.compareDocumentPosition(opinion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -113,15 +130,15 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(durationEl.className).toMatch(/text-foreground-muted/);
     expect(durationEl.className).not.toMatch(/text-muted-foreground/);
 
-    const opinionEl = screen.getByText("좋아요 2");
+    const opinionEl = getReactionPill("좋아요", 2);
     expect(opinionEl.className).toMatch(/text-foreground-muted/);
   });
 
-  it("내 의견이 없을 때도 저대비 muted-foreground를 쓰지 않는다", () => {
+  it("의견이 없을 때의 빈 상태 문장도 저대비 muted-foreground를 쓰지 않는다", () => {
     renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: undefined });
-    const idleEl = screen.getByText("내 의견 전");
-    expect(idleEl.className).toMatch(/text-foreground-muted/);
-    expect(idleEl.className).not.toMatch(/text-muted-foreground/);
+    const emptyEl = screen.getByText("아직 의견이 없어요");
+    expect(emptyEl.className).toMatch(/text-foreground-muted/);
+    expect(emptyEl.className).not.toMatch(/text-muted-foreground/);
   });
 
   it("긴 제목/차이가 line-clamp로 제한되며 break-words/overflow-hidden을 갖는다", () => {
@@ -139,14 +156,52 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(diffEl.className).toMatch(/line-clamp-2/);
   });
 
-  it("의견이 없을 때 '아직 의견이 없어요'와 '내 의견 전'을 표시한다", () => {
+  it("의견이 없을 때 '아직 의견이 없어요'만 표시하고 내 의견 chip을 렌더하지 않는다 (RAON-227)", () => {
     renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: undefined });
     expect(screen.getByText("아직 의견이 없어요")).toBeInTheDocument();
-    expect(screen.getByText("내 의견 전")).toBeInTheDocument();
+    const link = screen.getByRole("link");
+    // 내 의견도 aggregate에 집계되므로 합이 0이면 "내 의견" 표시는 같은 사실의 중복이다
+    expect(link.textContent).not.toMatch(/내 의견/);
+    // 매달린 가운데점도 남지 않는다
+    expect(link.textContent).not.toMatch(/·/);
+  });
+
+  it("aggregate가 0이어도 myReaction이 있으면 내 의견 chip을 표시한다 (legacy voteCount 폴백 방어)", () => {
+    renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: "OKAY" });
+    expect(screen.getByText("내 의견 괜찮아요")).toBeInTheDocument();
+    expect(screen.queryByText("아직 의견이 없어요")).not.toBeInTheDocument();
   });
 
   it("내 의견이 있으면 '내 의견 좋아요' 형태로 강조한다", () => {
     renderCard({ myReaction: "LIKE" });
     expect(screen.getByText("내 의견 좋아요")).toBeInTheDocument();
+  });
+
+  it("accessible name에 '좋아요 2명', '괜찮아요 1명'처럼 의미와 단위가 보존된다 (RAON-227)", () => {
+    renderCard();
+    const link = screen.getByRole("link");
+    expect(link).toHaveAccessibleName(/좋아요 2명/);
+    expect(link).toHaveAccessibleName(/괜찮아요 1명/);
+  });
+
+  it("0-count 반응은 pill을 렌더하지 않는다 (RAON-227)", () => {
+    renderCard({ opinions: { likeCount: 2, okayCount: 1, hardCount: 0 } });
+    expect(findReactionPill("좋아요", 2)).toBeDefined();
+    expect(findReactionPill("괜찮아요", 1)).toBeDefined();
+    expect(findReactionPill("어려워요", 0)).toBeUndefined();
+    const link = screen.getByRole("link");
+    expect(link.textContent).not.toMatch(/어려워요/);
+  });
+
+  it("반응 아이콘은 aria-hidden이라 accessible name에 기여하지 않는다 (RAON-227)", () => {
+    renderCard();
+    const pill = getReactionPill("좋아요", 2);
+    const icon = pill.querySelector("svg");
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    expect(icon).not.toHaveAttribute("aria-label");
+    // 아이콘은 텍스트를 갖지 않고, pill이 읽히는 내용은 sr-only 한글 label + 숫자 + 단위뿐이다
+    expect(icon?.textContent).toBe("");
+    expect(pill.textContent).toBe("좋아요 2명");
   });
 });

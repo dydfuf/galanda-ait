@@ -15,6 +15,7 @@ import {
 } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { RouteRail } from "../common/RouteRail.tsx";
+import { REACTION_DISPLAY, getReactionLabel } from "../common/reaction-display.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
@@ -46,12 +47,6 @@ import { DetailTimeline } from "./components/DetailTimeline.tsx";
 import { OpinionBottomSheet, type ReactionType } from "./components/OpinionBottomSheet.tsx";
 
 type PlanSheet = "cost" | "details" | "actions" | null;
-
-const reactionLabels: Record<ReactionType, string> = {
-  LIKE: "좋아요",
-  OKAY: "괜찮아요",
-  HARD: "어려워요",
-};
 
 const getPlanBadgeVariant = (
   isConfirmed: boolean,
@@ -118,10 +113,17 @@ export function PlanDetailPage(): JSX.Element {
   const isRoomConfirmed = room.isConfirmed;
   const canChangeOpinion = !isRoomConfirmed;
   const canManage = Boolean(plan.canManage);
-  const opinionSummary = `좋아요 ${plan.opinions.likeCount} · 괜찮아요 ${plan.opinions.okayCount} · 어려워요 ${plan.opinions.hardCount}`;
-  const myOpinionSummary = plan.myReaction
-    ? `내 의견: ${reactionLabels[plan.myReaction]}`
-    : "아직 내 의견이 없어요";
+  // 표시 순서와 한글 label은 REACTION_DISPLAY가 단일 출처다. 이 화면의 조합 문구는 그대로 유지한다.
+  const opinionCounts: Record<ReactionType, number> = {
+    LIKE: plan.opinions.likeCount,
+    OKAY: plan.opinions.okayCount,
+    HARD: plan.opinions.hardCount,
+  };
+  const opinionSummary = REACTION_DISPLAY.map(
+    ({ key, label }) => `${label} ${opinionCounts[key]}`
+  ).join(" · ");
+  const myReactionLabel = getReactionLabel(plan.myReaction);
+  const myOpinionSummary = myReactionLabel ? `내 의견: ${myReactionLabel}` : "아직 내 의견이 없어요";
 
   const handleOpinionSubmit = async (
     reaction: ReactionType,

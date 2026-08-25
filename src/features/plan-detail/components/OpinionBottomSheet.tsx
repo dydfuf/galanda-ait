@@ -11,6 +11,7 @@ import {
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { cn } from "@/lib/utils.ts";
+import { REACTION_DISPLAY } from "../../common/reaction-display.tsx";
 
 export type ReactionType = "LIKE" | "OKAY" | "HARD";
 
@@ -23,11 +24,18 @@ interface OpinionBottomSheetProps {
   readonly isSubmitting?: boolean;
 }
 
-const REACTION_OPTIONS = [
-  { value: "LIKE", emoji: "👍", label: "좋아요" },
-  { value: "OKAY", emoji: "🙂", label: "괜찮아요" },
-  { value: "HARD", emoji: "😢", label: "어려워요" },
-] as const satisfies ReadonlyArray<{
+// 이모지는 의견 입력 화면 고유 자산이라 공유 모듈로 옮기지 않아요. 순서와 한글 label만 공유해요.
+const REACTION_EMOJI = {
+  LIKE: "👍",
+  OKAY: "🙂",
+  HARD: "😢",
+} as const satisfies Record<ReactionType, string>;
+
+const REACTION_OPTIONS = REACTION_DISPLAY.map(({ key, label }) => ({
+  value: key,
+  emoji: REACTION_EMOJI[key],
+  label,
+})) satisfies ReadonlyArray<{
   value: ReactionType;
   emoji: string;
   label: string;
