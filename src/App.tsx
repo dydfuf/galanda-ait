@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./app/query-client.ts";
 import { AppRouter } from "./app/router.tsx";
 import { Toaster } from "@/components/ui/sonner.tsx";
+import { PwaUpdatePrompt } from "@/pwa/PwaUpdatePrompt.tsx";
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         position="bottom-center"
         mobileOffset={{ bottom: "calc(84px + env(safe-area-inset-bottom, 0px))" }}
       />
+      <PwaUpdatePrompt />
     </QueryClientProvider>
   );
 }
