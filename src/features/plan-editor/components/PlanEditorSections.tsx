@@ -24,6 +24,7 @@ interface PlanEditorSectionsProps {
   readonly isEditMode: boolean;
   readonly isCloneMode: boolean;
   readonly cloneTitle?: string;
+  readonly isFirstPlan?: boolean;
   readonly onOpenSection: (section: PlanEditorSection) => void;
   readonly onCompleteSection: () => void;
 }
@@ -88,6 +89,7 @@ export function PlanEditorSections({
   isEditMode,
   isCloneMode,
   cloneTitle,
+  isFirstPlan = false,
   onOpenSection,
   onCompleteSection,
 }: PlanEditorSectionsProps): JSX.Element {
@@ -132,6 +134,24 @@ export function PlanEditorSections({
         )
       : "가격 미정";
 
+    const basicComplete = Boolean(editor.title.trim());
+    const isFirstPlanGuide = isFirstPlan && !isEditMode && !isCloneMode;
+    const completedCount = [
+      basicComplete,
+      routeComplete,
+      !accommodationEmpty && accommodationChecks === 0,
+      !transportEmpty && transportChecks === 0,
+    ].filter(Boolean).length;
+    const nextRecommended: PlanEditorSection | undefined = !basicComplete
+      ? "basic"
+      : !routeComplete
+        ? "route"
+        : accommodationEmpty || accommodationChecks > 0
+          ? "accommodation"
+          : transportEmpty || transportChecks > 0
+            ? "transport"
+            : undefined;
+
     return (
       <>
         <PlanEditorHeader
@@ -145,16 +165,35 @@ export function PlanEditorSections({
           <DiffBanner diff={editor.diffFromOriginal} originalTitle={cloneTitle} />
         )}
 
-        <SectionHeader
-          className="px-0"
-          title="여행안 구성"
-          description="항목을 하나씩 열어 내용을 정리해주세요."
-        />
+        {isFirstPlanGuide ? (
+          <div className="px-0 pb-2">
+            <PageTitle
+              className="px-0"
+              title="첫 여행안을 만들어볼까요?"
+              description={`필수 정보 ${completedCount}/4 완료 · 항목을 하나씩 열어 정리해주세요.`}
+            />
+            <p className="pt-2 text-[13px] leading-relaxed text-muted-foreground">
+              아직 예약하지 않았어도 괜찮아요. 정하지 못한 숙소/교통은 찾는 중·확인 전으로 남길 수 있어요.
+            </p>
+          </div>
+        ) : (
+          <SectionHeader
+            className="px-0"
+            title="여행안 구성"
+            description="항목을 하나씩 열어 내용을 정리해주세요."
+          />
+        )}
         <MobileList aria-label="여행안 편집 항목" className="mb-5">
           <SummaryRow
             title="기본 정보"
             summary={editor.title.trim() || "여행안 이름을 입력해주세요."}
-            status={editor.title.trim() ? "완료" : "입력 필요"}
+            status={
+              isFirstPlanGuide && nextRecommended === "basic" && !basicComplete
+                ? "다음으로 추천"
+                : editor.title.trim()
+                  ? "완료"
+                  : "입력 필요"
+            }
             complete={Boolean(editor.title.trim())}
             onClick={() => onOpenSection("basic")}
           />
@@ -163,7 +202,15 @@ export function PlanEditorSections({
             summary={editor.routes.length > 0
               ? editor.routes.map((route) => `${route.city || "도시 미정"} ${Math.max(0, getStayNightCount(route))}박`).join(" · ")
               : "방문 도시와 날짜를 정해주세요."}
-            status={routeComplete ? "완료" : editor.routes.length > 0 ? "확인 필요" : "입력 필요"}
+            status={
+              isFirstPlanGuide && nextRecommended === "route" && !routeComplete
+                ? "다음으로 추천"
+                : routeComplete
+                  ? "완료"
+                  : editor.routes.length > 0
+                    ? "확인 필요"
+                    : "입력 필요"
+            }
             complete={routeComplete}
             onClick={() => onOpenSection("route")}
           />
@@ -172,7 +219,15 @@ export function PlanEditorSections({
             summary={accommodationEmpty
               ? "아직 추가하지 않았어요"
               : `${editor.accommodations.length}곳${accommodationChecks ? ` · 확인 필요 ${accommodationChecks}곳` : ""}`}
-            status={accommodationEmpty ? "입력 전" : accommodationChecks ? "확인 필요" : "완료"}
+            status={
+              isFirstPlanGuide && nextRecommended === "accommodation" && (accommodationEmpty || accommodationChecks > 0)
+                ? "다음으로 추천"
+                : accommodationEmpty
+                  ? "입력 전"
+                  : accommodationChecks
+                    ? "확인 필요"
+                    : "완료"
+            }
             complete={!accommodationEmpty && accommodationChecks === 0}
             onClick={() => onOpenSection("accommodation")}
           />
@@ -181,7 +236,15 @@ export function PlanEditorSections({
             summary={transportEmpty
               ? "아직 추가하지 않았어요"
               : editor.transports.map((item) => item.mode.trim() || "교통편 확인 전").join(" · ")}
-            status={transportEmpty ? "입력 전" : transportChecks ? "확인 필요" : "완료"}
+            status={
+              isFirstPlanGuide && nextRecommended === "transport" && (transportEmpty || transportChecks > 0)
+                ? "다음으로 추천"
+                : transportEmpty
+                  ? "입력 전"
+                  : transportChecks
+                    ? "확인 필요"
+                    : "완료"
+            }
             complete={!transportEmpty && transportChecks === 0}
             onClick={() => onOpenSection("transport")}
           />

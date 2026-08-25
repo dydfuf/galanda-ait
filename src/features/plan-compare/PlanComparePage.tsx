@@ -61,6 +61,7 @@ export function PlanComparePage() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<"left" | "right" | null>(null);
 
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -207,6 +208,31 @@ export function PlanComparePage() {
         }
       />
 
+      {room.plans.length > 2 && !isSelectionLocked && (
+        <div className="mb-4 flex gap-2 px-(--app-inline-padding)">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            aria-label="왼쪽 비교 대상 바꾸기"
+            onClick={() => setPickerTarget("left")}
+          >
+            왼쪽 바꾸기
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            aria-label="오른쪽 비교 대상 바꾸기"
+            onClick={() => setPickerTarget("right")}
+          >
+            오른쪽 바꾸기
+          </Button>
+        </div>
+      )}
+
       <RadioGroup
         aria-label={isSelectionLocked ? "확정된 여행안" : "확정할 여행안 선택"}
         className="mb-7 gap-0 divide-y divide-border"
@@ -340,6 +366,46 @@ export function PlanComparePage() {
           </Button>
         </BottomAction>
       )}
+
+      {/* 비교 대상 변경 Drawer: 3개 이상일 때 명시적 2개 선택 */}
+      <Drawer open={pickerTarget !== null} onOpenChange={(open) => { if (!open) setPickerTarget(null); }} showSwipeHandle>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              {pickerTarget === "left" ? "왼쪽 여행안 선택" : "오른쪽 여행안 선택"}
+            </DrawerTitle>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <MobileList aria-label="비교 대상 후보">
+              {room.plans
+                .filter((plan) => pickerTarget === "left" ? plan.id !== right : plan.id !== left)
+                .map((plan) => (
+                  <MobileListItem
+                    key={plan.id}
+                    aria-label={`${plan.title} 선택`}
+                    onClick={() => {
+                      const nextLeft = pickerTarget === "left" ? plan.id : left;
+                      const nextRight = pickerTarget === "right" ? plan.id : right;
+                      setPickerTarget(null);
+                      setSelectedPlanId(null);
+                      navigate(`/trips/${tripId}/plans/compare?left=${nextLeft}&right=${nextRight}`);
+                    }}
+                  >
+                    <ItemTitle>{plan.title}</ItemTitle>
+                    <ItemDescription>
+                      {plan.planTagLabel} · {plan.authorName} 제안 · {plan.nights}박 {plan.days}일
+                    </ItemDescription>
+                  </MobileListItem>
+                ))}
+            </MobileList>
+          </div>
+          <DrawerFooter>
+            <Button type="button" size="xl" variant="secondary" onClick={() => setPickerTarget(null)}>
+              닫기
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       {/* 확정 요약 Drawer: 날짜/경로/비용/주의 항목을 다시 읽고 확정해요. */}
       <Drawer

@@ -12,12 +12,17 @@ const cardStyle = css`
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 `;
 
 const sectionHeaderStyle = css`
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
 `;
 
 const sectionTitleStyle = css`
@@ -34,6 +39,9 @@ const nightsStatusBadgeStyle = (isMatch: boolean) => css`
   border-radius: 6px;
   background-color: ${isMatch ? "var(--info-muted)" : "var(--destructive-muted)"};
   color: ${isMatch ? "var(--info)" : "var(--destructive-strong)"};
+  max-width: 100%;
+  line-height: 1.4;
+  text-align: right;
 `;
 
 const previewBoxStyle = css`
@@ -41,6 +49,7 @@ const previewBoxStyle = css`
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 14px;
+  min-width: 0;
 `;
 
 const previewLabelStyle = css`
@@ -59,23 +68,32 @@ const cityListStyle = css`
 
 const cityRowStyle = css`
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
   background-color: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 12px;
+  min-width: 0;
+`;
+
+const cityRowHeaderStyle = css`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
 `;
 
 const cityIndexStyle = css`
   font-size: 13px;
   font-weight: 700;
   color: var(--foreground-subtle);
-  min-width: 18px;
 `;
 
-const cityInputStyle = css`
-  flex: 1;
+const inputStyle = css`
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--border-strong);
@@ -89,13 +107,40 @@ const cityInputStyle = css`
   }
 `;
 
+const dateGridStyle = css`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+
+  @media (min-width: 390px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+`;
+
+const dateFieldStyle = css`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--foreground-subtle);
+  }
+`;
+
 const deleteCityBtnStyle = css`
   background: none;
   border: none;
   color: var(--border-stronger);
   font-size: 16px;
   cursor: pointer;
-  padding: 4px;
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
 
   &:hover {
     color: var(--destructive);
@@ -162,29 +207,49 @@ export function RouteCitySection({
       <div css={cityListStyle}>
         {routes.map((stay, idx) => (
           <div key={idx} css={cityRowStyle}>
-            <span css={cityIndexStyle} aria-hidden="true">
-              {idx + 1}
-            </span>
+            <div css={cityRowHeaderStyle}>
+              <span css={cityIndexStyle}>도시 {idx + 1}</span>
+              {routes.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveCity(idx)}
+                  css={deleteCityBtnStyle}
+                  aria-label={`도시 ${idx + 1} 삭제`}
+                >
+                  <span aria-hidden="true">✕</span>
+                </button>
+              )}
+            </div>
             <input
               type="text"
               aria-label={`도시 ${idx + 1} 이름`}
               placeholder={`도시 ${idx + 1} 이름`}
               value={stay.city}
               onChange={(e) => onUpdateCity(idx, { city: e.target.value })}
-              css={cityInputStyle}
+              css={inputStyle}
             />
-            <input type="date" aria-label={`도시 ${idx + 1} 도착일`} value={stay.arrivalDate} onChange={(e) => onUpdateCity(idx, { arrivalDate: e.target.value })} />
-            <input type="date" aria-label={`도시 ${idx + 1} 출발일`} value={stay.departureDate} onChange={(e) => onUpdateCity(idx, { departureDate: e.target.value })} />
-            {routes.length > 1 && (
-              <button
-                type="button"
-                onClick={() => onRemoveCity(idx)}
-                css={deleteCityBtnStyle}
-                aria-label={`도시 ${idx + 1} 삭제`}
-              >
-                <span aria-hidden="true">✕</span>
-              </button>
-            )}
+            <div css={dateGridStyle}>
+              <div css={dateFieldStyle}>
+                <label htmlFor={`route-${idx}-arrival`}>도착일</label>
+                <input
+                  id={`route-${idx}-arrival`}
+                  type="date"
+                  value={stay.arrivalDate}
+                  onChange={(e) => onUpdateCity(idx, { arrivalDate: e.target.value })}
+                  css={inputStyle}
+                />
+              </div>
+              <div css={dateFieldStyle}>
+                <label htmlFor={`route-${idx}-departure`}>출발일</label>
+                <input
+                  id={`route-${idx}-departure`}
+                  type="date"
+                  value={stay.departureDate}
+                  onChange={(e) => onUpdateCity(idx, { departureDate: e.target.value })}
+                  css={inputStyle}
+                />
+              </div>
+            </div>
           </div>
         ))}
 

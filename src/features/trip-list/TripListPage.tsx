@@ -20,14 +20,7 @@ import { isPastTravelDate, toLocalTravelDate } from "../../core/domain/room.ts";
 
 type TripListTab = "ONGOING" | "PAST";
 
-const getTripEntryPath = (room: TripRoomViewModel): string => {
-  if (room.confirmedPlanId) return `/trips/${room.id}/itinerary`;
-  if (room.plans.length >= 2) {
-    return `/trips/${room.id}/plans/compare?left=${room.plans[0].id}&right=${room.plans[1].id}`;
-  }
-  if (room.plans.length === 1) return `/trips/${room.id}/plans/${room.plans[0].id}`;
-  return `/trips/${room.id}/plans/new`;
-};
+const getTripEntryPath = (room: TripRoomViewModel): string => `/trips/${room.id}`;
 
 const getTripPeriodText = (room: TripRoomViewModel): string => {
   if (!room.displayStartDate || !room.displayEndDate) return "일정 미정";

@@ -57,6 +57,7 @@ export function ItineraryPage(): JSX.Element {
 
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
+  const [isChangeReviewOpen, setIsChangeReviewOpen] = useState(false);
   const acknowledgeMutation = useAcknowledgeItineraryMutation();
   const [conflictNotice, setConflictNotice] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
@@ -157,23 +158,8 @@ export function ItineraryPage(): JSX.Element {
                   size="sm"
                   disabled={acknowledgeMutation.isPending || isResolvingConflict}
                   onClick={() => {
-                    if (acknowledgeMutation.isPending || isResolvingConflict) return;
                     setConflictNotice(undefined);
-                    void acknowledgeMutation.mutateAsync({
-                      tripId,
-                      expectedRevision: itineraryState.itinerary.currentRevision,
-                    }).catch(async (mutationError: unknown) => {
-                      if (isRevisionConflict(mutationError)) {
-                        setIsResolvingConflict(true);
-                        const refreshed = await refetchItinerary();
-                        setConflictNotice(
-                          refreshed.isError || !refreshed.data
-                            ? "최신 일정 상태를 불러오지 못했습니다. 다시 시도해주세요."
-                            : toRevisionConflictMessage(mutationError)
-                        );
-                        setIsResolvingConflict(false);
-                      }
-                    });
+                    setIsChangeReviewOpen(true);
                   }}
                 >
                   변경 내용 확인
@@ -319,6 +305,111 @@ export function ItineraryPage(): JSX.Element {
           <DrawerFooter>
             <Button type="button" size="xl" onClick={() => setIsNeedCheckSheetOpen(false)}>
               닫기
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      {/* 일정 변경 리뷰 Drawer: 변경 전후를 확인하고 명시적으로 승인해요 */}
+      <Drawer open={isChangeReviewOpen} onOpenChange={setIsChangeReviewOpen} showSwipeHandle>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle className="text-left text-[17px] font-bold">
+              변경된 일정 확인
+            </DrawerTitle>
+            <DrawerDescription className="text-left">
+              {itineraryState.status === "CONFIRMED" && itineraryState.itinerary.changes?.length
+                ? `v${itineraryState.itinerary.currentRevision}에서 ${itineraryState.itinerary.changes.length}개 항목이 변경됐어요. 내용을 확인한 뒤 승인해주세요.`
+                : "변경된 항목을 확인하고 승인해주세요."}
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {itineraryState.status === "CONFIRMED" && itineraryState.itinerary.changes?.length ? (
+              <MobileList aria-label="변경된 일정 항목">
+                {itineraryState.itinerary.changes.map(({ itemId, before, after }) => {
+                  const beforeTitle =
+                    before.type === "STAY"
+                      ? `${before.accommodation.city} · ${before.accommodation.hotelName} · ${before.date}~${before.endDate}`
+                      : `${before.transport.fromCity} → ${before.transport.toCity} · ${before.transport.mode} · ${before.date}`;
+                  const afterTitle =
+                    after.type === "STAY"
+                      ? `${after.accommodation.city} · ${after.accommodation.hotelName} · ${after.date}~${after.endDate}`
+                      : `${after.transport.fromCity} → ${after.transport.toCity} · ${after.transport.mode} · ${after.date}`;
+                  const beforeMemo = before.memo?.trim();
+                  const afterMemo = after.memo?.trim();
+                  return (
+                    <MobileListItem key={itemId}>
+                      <ItemTitle className="flex items-center gap-2">
+                        {after.type === "STAY" ? after.accommodation.hotelName : `${after.transport.fromCity} → ${after.transport.toCity}`}
+                        <Badge variant="warning">변경됨</Badge>
+                      </ItemTitle>
+                      <div className="flex flex-col gap-1.5 pt-1.5">
+                        <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
+                          <span className="text-xs font-bold text-muted-foreground">이전</span>
+                          <span className="min-w-0 text-[13px] break-words text-secondary-foreground">{beforeTitle}</span>
+                        </div>
+                        {beforeMemo && (
+                          <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
+                            <span className="text-xs font-bold text-muted-foreground">이전 메모</span>
+                            <span className="min-w-0 text-[13px] break-words text-secondary-foreground">{beforeMemo}</span>
+                          </div>
+                        )}
+                        <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
+                          <span className="text-xs font-bold text-info">변경 후</span>
+                          <span className="min-w-0 text-[13px] break-words text-foreground">{afterTitle}</span>
+                        </div>
+                        {afterMemo && afterMemo !== beforeMemo && (
+                          <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2">
+                            <span className="text-xs font-bold text-info">변경 메모</span>
+                            <span className="min-w-0 text-[13px] break-words text-foreground">{afterMemo}</span>
+                          </div>
+                        )}
+                        {before.type === "STAY" && after.type === "STAY" && before.date !== after.date && (
+                          <span className="text-xs font-bold text-info">날짜가 {before.date} → {after.date} 로 변경</span>
+                        )}
+                      </div>
+                    </MobileListItem>
+                  );
+                })}
+              </MobileList>
+            ) : (
+              <p className="px-(--app-inline-padding) py-4 text-[13px] text-muted-foreground">
+                변경된 항목이 없거나 불러오는 중이에요. 새로고침 후 다시 확인해주세요.
+              </p>
+            )}
+          </div>
+          <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
+            <Button type="button" size="xl" variant="secondary" onClick={() => setIsChangeReviewOpen(false)}>
+              나중에 확인
+            </Button>
+            <Button
+              type="button"
+              size="xl"
+              disabled={acknowledgeMutation.isPending || isResolvingConflict}
+              onClick={() => {
+                if (acknowledgeMutation.isPending || isResolvingConflict) return;
+                setConflictNotice(undefined);
+                void acknowledgeMutation
+                  .mutateAsync({
+                    tripId,
+                    expectedRevision: itineraryState.status === "CONFIRMED" ? itineraryState.itinerary.currentRevision : 1,
+                  })
+                  .then(() => setIsChangeReviewOpen(false))
+                  .catch(async (mutationError: unknown) => {
+                    if (isRevisionConflict(mutationError)) {
+                      setIsResolvingConflict(true);
+                      const refreshed = await refetchItinerary();
+                      setConflictNotice(
+                        refreshed.isError || !refreshed.data
+                          ? "최신 일정 상태를 불러오지 못했습니다. 다시 시도해주세요."
+                          : toRevisionConflictMessage(mutationError)
+                      );
+                      setIsResolvingConflict(false);
+                    }
+                  });
+              }}
+            >
+              {acknowledgeMutation.isPending ? "확인 중..." : "확인했어요"}
             </Button>
           </DrawerFooter>
         </DrawerContent>

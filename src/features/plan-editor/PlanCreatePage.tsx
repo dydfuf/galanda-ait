@@ -179,6 +179,8 @@ export function PlanCreatePage(): JSX.Element {
     }
   };
 
+  const isFirstPlan = !cloneFromPlan && room.plans.length === 0;
+
   return (
     <div css={pageContainerStyle}>
       <PlanEditorSections
@@ -187,6 +189,7 @@ export function PlanCreatePage(): JSX.Element {
         isEditMode={false}
         isCloneMode={Boolean(cloneFromPlan)}
         cloneTitle={cloneFromPlan?.title}
+        isFirstPlan={isFirstPlan}
         onOpenSection={openSection}
         onCompleteSection={completeSection}
       />
