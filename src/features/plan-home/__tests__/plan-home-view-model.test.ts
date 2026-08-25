@@ -166,4 +166,23 @@ describe("toTripRoomViewModel 작성자 미확인 (RAON-153)", (): void => {
     // authorId가 있으면 hasResolvable=true지만 멤버 조회 실패 시 "작성자 미확인"
     expect(vm.plans[0].authorName).toBe("작성자 미확인");
   });
+
+  it("stale authorId(탈퇴 멤버)인 경우 UI는 미확인이지만 방장 복구 권한은 열리지 않는다 — ID ownership은 영구 신뢰", (): void => {
+    const stalePlan = {
+      id: PlanIdSchema.make("plan-stale"),
+      title: "stale",
+      status: "DRAFT" as const,
+      authorId: UserIdSchema.make("user-ghost"),
+      places: [],
+      voteCount: 0,
+    };
+    // HOST가 봐도 authorName은 미확인, hasResolvable=true이므로 방장 복구 권한(!hasResolvable) 은 false
+    const hostVm = toTripRoomViewModel({ ...room, plans: [stalePlan] }, UserIdSchema.make("user-local-me"));
+    expect(hostVm.plans[0].authorName).toBe("작성자 미확인");
+    expect(hostVm.plans[0].canManage).toBe(false);
+    expect(hostVm.plans[0].isAuthor).toBe(false);
+
+    const memberVm = toTripRoomViewModel({ ...room, plans: [stalePlan] }, UserIdSchema.make("user-bob"));
+    expect(memberVm.plans[0].canManage).toBe(false);
+  });
 });

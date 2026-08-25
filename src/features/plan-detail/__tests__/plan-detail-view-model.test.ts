@@ -205,4 +205,23 @@ describe("toPlanDetailViewModel 작성자 미확인 (RAON-153)", (): void => {
     expect(plan.isAuthor).toBe(true);
     expect(plan.canManage).toBe(true);
   });
+
+  it("stale authorId(탈퇴 멤버)인 경우 UI는 미확인이지만 방장 복구 권한은 열리지 않는다 — ID ownership은 영구 신뢰", (): void => {
+    const stalePlan = {
+      id: PlanIdSchema.make("plan-stale"),
+      title: "stale",
+      status: "DRAFT" as const,
+      authorId: UserIdSchema.make("user-ghost"),
+      places: [],
+      voteCount: 0,
+    };
+    const roomWithStale: TripRoom = { ...room, plans: [stalePlan] };
+    const hostVm = toPlanDetailViewModel(roomWithStale, UserIdSchema.make("user-local-me"));
+    expect(hostVm.plans[0].authorName).toBe("작성자 미확인");
+    expect(hostVm.plans[0].canManage).toBe(false);
+    expect(hostVm.plans[0].isAuthor).toBe(false);
+
+    const memberVm = toPlanDetailViewModel(roomWithStale, UserIdSchema.make("user-bob"));
+    expect(memberVm.plans[0].canManage).toBe(false);
+  });
 });

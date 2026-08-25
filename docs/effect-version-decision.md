@@ -30,7 +30,7 @@ ADR-001이 이미 확정한 아키텍처 소유 관계(Hono transport / Effect a
 
 ### 이유
 - package ↔ vendored source 정합성이 이미 확보되어 추가 migration이 불필요하다.
-- 상위 RC 또는 stable GA가 MVP 필수 기능을 바꾸지 않는다. 현재 RC는 strict/Oxlint/typecheck 및 모든 use-case 테스트를 통과한다.
+- 2026-08-26 기준 npm 최신은 `4.0.0-rc.111`, stable GA는 미출시이다. 현재 `rc.109`는 strict/Oxlint/typecheck 및 모든 use-case 테스트를 통과하며, GA 출시 시 migration 필요성을 재평가한다.
 - 업그레이드는 `repos/effect` subtree 재동기와 전체 `pnpm check` 재검증이 필요해 MVP scope 대비 비용만 증가한다.
 - 불안정 영역(HttpApi/RPC/SQL)을 이유로 아키텍처를 확장하지 않는 ADR-001 원칙을 유지한다.
 
