@@ -22,9 +22,11 @@ import {
 import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { PlanDecisionCard } from "./components/PlanDecisionCard.tsx";
+import { PlanCandidatesHeader } from "./components/PlanCandidatesHeader.tsx";
 import { TripSummarySection } from "./components/TripSummarySection.tsx";
 import { DecisionSummarySection } from "./components/DecisionSummarySection.tsx";
-import { toTripRoomViewModel } from "./plan-home-view-model.ts";
+import { resolvePlanHomeCta, toTripRoomViewModel } from "./plan-home-view-model.ts";
+import { getRoomActor } from "../../core/domain/auth-guards.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -38,6 +40,7 @@ export function PlanHomePage() {
 
   const {
     isError: isSessionError,
+    isLoading: isSessionLoading,
     error: sessionError,
     data: session,
     refetch: refetchSession,
@@ -55,6 +58,12 @@ export function PlanHomePage() {
   }
 
   if (isLoading) {
+    return <PageState status="loading" message="계획 정보를 불러오는 중입니다..." />;
+  }
+
+  // room query는 session 성공 이후 enabled 되므로, 세션 로딩 중에는
+  // rawRoom 부재를 오류로 판단하거나 capability을 GUEST로 확정하지 않는다.
+  if (isSessionLoading) {
     return <PageState status="loading" message="계획 정보를 불러오는 중입니다..." />;
   }
 
@@ -82,7 +91,6 @@ export function PlanHomePage() {
 
   const room = toTripRoomViewModel(rawRoom, session?.participantIds);
 
-  const isConfirmed = room.isConfirmed;
   const plans = room.plans;
 
   const toggleCompareSelection = (planId: string): void => {
@@ -110,28 +118,41 @@ export function PlanHomePage() {
     navigate(`/trips/${tripId}/plans/compare?left=${left}&right=${right}`);
   };
 
-  const primaryCta = isConfirmed
-    ? {
-        label: "확정 일정 보기",
-        onClick: () => navigate(`/trips/${tripId}/itinerary`, { replace: true }),
-      }
-    : plans.length === 1
-      ? {
-          label: "새 여행안 제안하기",
-          onClick: () => navigate(`/trips/${tripId}/plans/new`),
-        }
-      : plans.length === 0
-        ? {
-            label: "첫 여행안 만들기",
-            onClick: () => navigate(`/trips/${tripId}/plans/new`),
-          }
-        : {
-            label: "여행안 비교하기",
-            onClick: openComparePicker,
-          };
+  // CTA 노출은 서버 use case와 동일한 도메인 RBAC 계약을 따른다 (plan:create).
+  const canCreatePlan = getRoomActor(rawRoom, session?.participantIds).can("plan:create");
+
+  const cta = resolvePlanHomeCta({
+    isConfirmed: room.isConfirmed,
+    candidateCount: room.candidateCount,
+    canCreatePlan,
+  });
+
+  const runPrimaryCta = (): void => {
+    if (!cta.primaryKind) return;
+    switch (cta.primaryKind) {
+      case "view-itinerary":
+        navigate(`/trips/${tripId}/itinerary`, { replace: true });
+        return;
+      case "create-first":
+      case "propose-new":
+        navigate(`/trips/${tripId}/plans/new`);
+        return;
+      case "compare":
+        openComparePicker();
+        return;
+    }
+  };
+
+  const proposeNewPlan = (): void => {
+    navigate(`/trips/${tripId}/plans/new`);
+  };
+
+  // 후보 0개의 create-first는 empty state 안에서만 렌더한다.
+  // sticky BottomAction과 경쟁시키면 primary가 두 개가 된다 (RAON-228 계약).
+  const showBottomPrimary = plans.length > 0 && cta.primaryKind !== null;
 
   return (
-    <PageBody withBottomAction={plans.length > 0}>
+    <PageBody withBottomAction={showBottomPrimary}>
       <TripSummarySection
         title={room.title}
         destination={room.destination}
@@ -151,20 +172,23 @@ export function PlanHomePage() {
       />
 
       <section aria-labelledby="plan-candidates-heading" className="pt-1">
-        <div className="flex items-center justify-between gap-3 px-(--app-inline-padding) pb-2">
-          <h2 id="plan-candidates-heading" className="text-[15px] font-bold leading-none text-foreground">
-            여행안
-          </h2>
-          <span className="text-[12px] leading-none text-muted-foreground">후보 {room.candidateCount}개</span>
-        </div>
+        <PlanCandidatesHeader
+          candidateCount={room.candidateCount}
+          showNewProposalAction={cta.showNewProposalEntry}
+          onNewProposalAction={proposeNewPlan}
+        />
 
         {plans.length === 0 ? (
           <PageState
             status="empty"
             title="아직 여행안이 없어요"
-            description="첫 여행안을 만들어 친구들과 함께 골라보세요."
-            actionText={primaryCta.label}
-            onAction={primaryCta.onClick}
+            description={
+              canCreatePlan
+                ? "첫 여행안을 만들어 친구들과 함께 골라보세요."
+                : "여행 참여자가 첫 여행안을 만들면 여기에 표시돼요."
+            }
+            actionText={cta.primaryLabel ?? undefined}
+            onAction={cta.primaryKind ? runPrimaryCta : undefined}
           />
         ) : (
           <ul
@@ -180,10 +204,10 @@ export function PlanHomePage() {
         )}
       </section>
 
-      {plans.length > 0 && (
+      {showBottomPrimary && (
         <BottomAction>
-          <Button type="button" size="xl" onClick={primaryCta.onClick}>
-            {primaryCta.label}
+          <Button type="button" size="xl" onClick={runPrimaryCta}>
+            {cta.primaryLabel}
           </Button>
         </BottomAction>
       )}

@@ -68,6 +68,88 @@ export const getTripListStatusText = (
   return `여행안 ${room.plans.length}개 · 비교 중`;
 };
 
+/**
+ * PL-01 상태별 CTA contract (RAON-228).
+ *
+ * primary는 상태별로 0개 또는 1개만 존재한다.
+ * - 후보 0개: 첫 여행안 만들기
+ * - 후보 1개: 새 여행안 제안하기 (비교 CTA 없음)
+ * - 후보 2개 이상: 여행안 비교하기 (fast compare / selector는 기존 계약 유지)
+ * - 확정: 확정 일정 보기 (mutation 진입 없음)
+ *
+ * RBAC 계약: `새 여행안 만들기/제안하기`는 `plan:create` capability가 있을 때만 노출한다.
+ * GUEST(열람자)에게 허용되지 않은 mutation CTA를 보여주고 편집기 마지막에 거절하지 않는다.
+ * - GUEST + 후보 2개 이상 → 여행안 비교하기(열람)만 노출
+ * - GUEST + 후보 0~1개 → mutation primary 없음 (null)
+ *
+ * 후보 추가 진입(`새 여행안 제안하기`)은 비교가 primary가 되는 2개 이상 & 미확정 &
+ * plan:create 가능자에서만 후보 section의 secondary로 노출해
+ * bottom sticky에서 primary끼리 경쟁하지 않게 한다.
+ */
+export type PlanHomePrimaryCtaKind =
+  | "create-first"
+  | "propose-new"
+  | "compare"
+  | "view-itinerary";
+
+export interface PlanHomeCtaContract {
+  /** 노출할 권한 있는 primary가 없으면 null (예: GUEST + 후보 0~1개) */
+  readonly primaryKind: PlanHomePrimaryCtaKind | null;
+  readonly primaryLabel: string | null;
+  readonly showNewProposalEntry: boolean;
+}
+
+export interface PlanHomeCtaInput {
+  readonly isConfirmed: boolean;
+  readonly candidateCount: number;
+  /** 세션 actor의 `plan:create` capability (RBAC: HOST/MEMBER true, GUEST false) */
+  readonly canCreatePlan: boolean;
+}
+
+export const resolvePlanHomeCta = (
+  input: PlanHomeCtaInput,
+): PlanHomeCtaContract => {
+  const noProposalEntry = { showNewProposalEntry: false } as const;
+
+  if (input.isConfirmed) {
+    return {
+      primaryKind: "view-itinerary",
+      primaryLabel: "확정 일정 보기",
+      ...noProposalEntry,
+    };
+  }
+  if (!input.canCreatePlan) {
+    // 열람자(GUEST): plan:create mutation CTA는 노출하지 않는다. 비교(열람)만 남긴다.
+    if (input.candidateCount >= 2) {
+      return {
+        primaryKind: "compare",
+        primaryLabel: "여행안 비교하기",
+        ...noProposalEntry,
+      };
+    }
+    return { primaryKind: null, primaryLabel: null, ...noProposalEntry };
+  }
+  if (input.candidateCount === 0) {
+    return {
+      primaryKind: "create-first",
+      primaryLabel: "첫 여행안 만들기",
+      ...noProposalEntry,
+    };
+  }
+  if (input.candidateCount === 1) {
+    return {
+      primaryKind: "propose-new",
+      primaryLabel: "새 여행안 제안하기",
+      ...noProposalEntry,
+    };
+  }
+  return {
+    primaryKind: "compare",
+    primaryLabel: "여행안 비교하기",
+    showNewProposalEntry: true,
+  };
+};
+
 export const toTripRoomViewModel = (
   room: TripRoom,
   currentUserIds?: ParticipantIdentity

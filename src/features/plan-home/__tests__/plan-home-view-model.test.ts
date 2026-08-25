@@ -6,7 +6,7 @@ import {
   UserIdSchema,
 } from "../../../core/domain/ids.ts";
 import type { TripRoom } from "../../../core/domain/room.ts";
-import { getTripListStatusText, toTripRoomViewModel } from "../plan-home-view-model.ts";
+import { getTripListStatusText, resolvePlanHomeCta, toTripRoomViewModel } from "../plan-home-view-model.ts";
 
 const room: TripRoom = {
   id: TripIdSchema.make("room-1"),
@@ -146,6 +146,56 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
     expect(vm.totalOpinionCount).toBe(2);
     // legacy plan에는 opinion author가 없으므로 참여자는 집계하지 않는다
     expect(vm.participatedMemberCount).toBe(0);
+  });
+});
+
+describe("resolvePlanHomeCta 상태별 CTA contract (RAON-228)", (): void => {
+  it.each([
+    [true, false, 0, "create-first", "첫 여행안 만들기"],
+    [true, false, 1, "propose-new", "새 여행안 제안하기"],
+    [true, false, 2, "compare", "여행안 비교하기"],
+    [true, false, 5, "compare", "여행안 비교하기"],
+    [true, true, 0, "view-itinerary", "확정 일정 보기"],
+    [true, true, 2, "view-itinerary", "확정 일정 보기"],
+  ] as const)(
+    "plan:create=%s 확정=%s 후보=%i → primary %s (%s)",
+    (canCreatePlan, isConfirmed, candidateCount, expectedKind, expectedLabel): void => {
+      const cta = resolvePlanHomeCta({ canCreatePlan, isConfirmed, candidateCount });
+      expect(cta.primaryKind).toBe(expectedKind);
+      expect(cta.primaryLabel).toBe(expectedLabel);
+    },
+  );
+
+  it("plan:create 가능자(HOST/MEMBER)는 새 여행안 진입을 비교가 primary인 2개 이상 & 미확정에서만 secondary로 노출한다", (): void => {
+    expect(resolvePlanHomeCta({ canCreatePlan: true, isConfirmed: false, candidateCount: 0 }).showNewProposalEntry).toBe(false);
+    // 후보 1개에서는 primary 자체가 제안이므로 secondary를 겹쳐 노출하지 않는다
+    expect(resolvePlanHomeCta({ canCreatePlan: true, isConfirmed: false, candidateCount: 1 }).showNewProposalEntry).toBe(false);
+    expect(resolvePlanHomeCta({ canCreatePlan: true, isConfirmed: false, candidateCount: 2 }).showNewProposalEntry).toBe(true);
+    expect(resolvePlanHomeCta({ canCreatePlan: true, isConfirmed: false, candidateCount: 3 }).showNewProposalEntry).toBe(true);
+  });
+
+  it("확정 상태에서는 허용되지 않은 mutation 진입(새 여행안/비교)을 노출하지 않는다", (): void => {
+    const cta = resolvePlanHomeCta({ canCreatePlan: true, isConfirmed: true, candidateCount: 3 });
+    expect(cta.primaryKind).toBe("view-itinerary");
+    expect(cta.showNewProposalEntry).toBe(false);
+    expect(cta.primaryKind).not.toBe("compare");
+    expect(cta.primaryKind).not.toBe("propose-new");
+  });
+
+  it("GUEST(plan:create 없음)에게 mutation CTA(첫 여행안 만들기/새 여행안 제안하기)를 노출하지 않는다 (RBAC 계약)", (): void => {
+    for (const candidateCount of [0, 1]) {
+      const cta = resolvePlanHomeCta({ canCreatePlan: false, isConfirmed: false, candidateCount });
+      expect(cta.primaryKind).toBeNull();
+      expect(cta.primaryLabel).toBeNull();
+      expect(cta.showNewProposalEntry).toBe(false);
+    }
+  });
+
+  it("GUEST + 후보 2개 이상은 열람 action인 비교하기만 노출하고 section secondary는 숨긴다", (): void => {
+    const cta = resolvePlanHomeCta({ canCreatePlan: false, isConfirmed: false, candidateCount: 3 });
+    expect(cta.primaryKind).toBe("compare");
+    expect(cta.primaryLabel).toBe("여행안 비교하기");
+    expect(cta.showNewProposalEntry).toBe(false);
   });
 });
 
