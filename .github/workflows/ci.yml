@@ -17,16 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.1
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run db:check
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm db:check
       - name: Verify Drizzle migrations are in sync (no DB required)
         run: bash scripts/check-drizzle-drift.sh
-      - run: npm run build
-      - run: npm run build:ait
+      - run: pnpm build
+      - run: pnpm build:ait

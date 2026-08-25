@@ -36,7 +36,7 @@ connection pool을 재시작해 기존 Session Pooler 연결을 drain한 뒤 sta
 ## 검증
 
 ```bash
-npm run check
+pnpm check
 npx wrangler deploy --env staging --dry-run
 npx wrangler check startup
 ```
@@ -55,7 +55,7 @@ rollback credential과 전체 connection URL도 문서나 명령 인자에 남�
 ## 2026-08-23 staging 검증
 
 - Worker version: `e18cf9ff-f8e9-4dd4-8d2d-bd17c423c0c7`
-- `npm run check`, staging deploy dry-run, startup check 통과
+- `pnpm check`, staging deploy dry-run, startup check 통과
 - Better Auth sign-up/session/sign-out와 secure cookie 속성 확인
 - Trip create/list/detail/update, Plan create/update/opinion/confirm, second-user join 통과
 - stale revision `409`와 Trip/confirm 직후 fresh read 확인

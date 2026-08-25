@@ -302,7 +302,7 @@ UI test만으로 검증하지 않는다.
 코드 변경을 완료하기 전에 현재 repository의 canonical gate를 실행한다.
 
 ```bash
-npm run check
+pnpm check
 ```
 
 현재 command 이름과 세부 단계는 항상 `package.json`을 source of truth로 사용한다.
@@ -321,7 +321,7 @@ required check를 통과시키기 위해:
 현재 repository toolchain을 따른다.
 
 * Node 24
-* npm / `package-lock.json`
+* pnpm 9 / `pnpm-lock.yaml` (Corepack `packageManager` 고정)
 * TypeScript strict configuration
 * Oxlint
 * Vitest
