@@ -84,6 +84,7 @@ describe("PlanEditorSections", () => {
   it("첫 여행안에서는 진행률과 다음 추천을 안내한다", () => {
     const editor = {
       title: "첫 여행",
+      baseHeadcount: 2,
       routes: [],
       accommodations: [],
       transports: [],
@@ -106,5 +107,151 @@ describe("PlanEditorSections", () => {
     expect(html).toContain("필수 정보 1/4 완료");
     expect(html).toContain("다음으로 추천");
     expect(html).toContain("아직 예약하지 않았어도 괜찮아요");
+  });
+
+  it("숙소 찾는 중은 domain에서 완료로 취급한다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [{ city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-12" }],
+      accommodations: [{
+        id: "stay-1",
+        city: "도쿄",
+        period: "2026-12-10 ~ 2026-12-12",
+        nights: 2,
+        hotelName: "",
+        isSearching: true,
+        bookingStatus: "AVAILABLE" as const,
+      }],
+      transports: [
+        { id: "t1", fromCity: "서울", toCity: "도쿄", mode: "항공", hasTransfer: false, durationText: "2시간", bookingStatus: "AVAILABLE" as const },
+        { id: "t2", fromCity: "도쿄", toCity: "서울", mode: "항공", hasTransfer: false, durationText: "2시간", bookingStatus: "AVAILABLE" as const },
+      ],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    // isSearching이라도 domain상 완료 → 4/4 또는 최소 숙소는 완료로 표시, 다음 추천은 없음
+    expect(html).toContain("숙소");
+    expect(html).not.toContain("숙소 찾는 중");
+    // 숙소 row should show 완료, not 확인 필요
+    expect(html.match(/숙소/g)).toBeTruthy();
+  });
+
+  it("교통 확인 전(NOT_CHECKED)은 유효한 교통으로 취급한다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [{ city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-12" }],
+      accommodations: [{
+        id: "stay-1",
+        city: "도쿄",
+        period: "2026-12-10 ~ 2026-12-12",
+        nights: 2,
+        hotelName: "도쿄 호텔",
+        bookingStatus: "AVAILABLE" as const,
+      }],
+      transports: [
+        { id: "t1", fromCity: "서울", toCity: "도쿄", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" as const },
+        { id: "t2", fromCity: "도쿄", toCity: "서울", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" as const },
+      ],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("교통");
+    // NOT_CHECKED with valid from/to should be considered complete, so 교통 row should show 완료
+    expect(html).toContain("완료");
+  });
+
+  it("겹치는 도시 일정은 완료로 취급하지 않는다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [
+        { city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-12" },
+        { city: "오사카", arrivalDate: "2026-12-11", departureDate: "2026-12-14" },
+      ],
+      accommodations: [],
+      transports: [],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("여행 경로");
+    expect(html).toContain("다음으로 추천");
+    // route should be not complete, so completedCount should be 1/4 (only basic)
+    expect(html).toContain("필수 정보 1/4 완료");
+  });
+
+  it("도시별 숙소가 누락되면 완료로 취급하지 않는다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [{ city: "도쿄", arrivalDate: "2026-12-10", departureDate: "2026-12-12" }],
+      accommodations: [{
+        id: "stay-1",
+        city: "오사카",
+        period: "2026-12-10 ~ 2026-12-12",
+        nights: 2,
+        hotelName: "오사카 호텔",
+        bookingStatus: "AVAILABLE" as const,
+      }],
+      transports: [
+        { id: "t1", fromCity: "서울", toCity: "도쿄", mode: "항공", hasTransfer: false, durationText: "2시간", bookingStatus: "AVAILABLE" as const },
+        { id: "t2", fromCity: "도쿄", toCity: "서울", mode: "항공", hasTransfer: false, durationText: "2시간", bookingStatus: "AVAILABLE" as const },
+      ],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("숙소");
+    expect(html).toContain("다음으로 추천");
+    // basic + route + transport complete = 3/4, accommodation incomplete
+    expect(html).toContain("필수 정보 3/4 완료");
   });
 });

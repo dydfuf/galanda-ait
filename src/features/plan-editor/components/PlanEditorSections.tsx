@@ -1,5 +1,8 @@
 import { formatCostRangeText } from "../../../core/calculations/plan-cost.ts";
-import { getStayNightCount } from "../../../core/domain/room.ts";
+import {
+  getRouteValidationError,
+  getStayNightCount,
+} from "../../../core/domain/room.ts";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
@@ -93,15 +96,84 @@ export function PlanEditorSections({
   onOpenSection,
   onCompleteSection,
 }: PlanEditorSectionsProps): JSX.Element {
-  const routeComplete =
-    editor.routes.length > 0 &&
-    editor.routes.every((route) => route.city.trim() && getStayNightCount(route) > 0);
-  const accommodationChecks = editor.accommodations.filter(
-    (item) => item.isSearching || item.bookingStatus !== "AVAILABLE"
-  ).length;
-  const transportChecks = editor.transports.filter(
-    (item) => item.bookingStatus !== "AVAILABLE"
-  ).length;
+  // Domain-aligned section validity (matches getPlanPublishValidationErrors)
+  const isRouteValid = (() => {
+    if (editor.routes.length === 0) return false;
+    if (editor.routes.some((route) => !route.city.trim() || !route.arrivalDate || !route.departureDate)) {
+      return false;
+    }
+    if (getRouteValidationError(editor.routes)) return false;
+    return true;
+  })();
+
+  const isAccommodationSectionValid = (() => {
+    if (editor.routes.length === 0) return false;
+    if (editor.accommodations.length === 0) return false;
+    // missingAccommodation per domain
+    const missingAccommodation =
+      editor.accommodations.length < editor.routes.length ||
+      editor.routes.some(
+        (route) =>
+          !editor.accommodations.some(
+            (stay) =>
+              stay.city.trim() === route.city.trim() &&
+              Boolean(stay.period.trim()) &&
+              stay.nights === getStayNightCount(route) &&
+              (stay.isSearching || Boolean(stay.hotelName.trim()))
+          )
+      );
+    if (missingAccommodation) return false;
+    const invalidAccommodation = editor.accommodations.some(
+      (stay) =>
+        !stay.city.trim() ||
+        !stay.period.trim() ||
+        !Number.isInteger(stay.nights) ||
+        stay.nights < 1 ||
+        (stay.isSearching ? Boolean(stay.hotelName.trim()) : !stay.hotelName.trim())
+    );
+    if (invalidAccommodation) return false;
+    // priceRange invalid also makes it incomplete (domain)
+    const invalidPrice = editor.accommodations.some(
+      ({ priceRange }) =>
+        priceRange &&
+        (!Number.isFinite(priceRange.min) ||
+          !Number.isFinite(priceRange.max) ||
+          priceRange.min < 0 ||
+          priceRange.max < priceRange.min)
+    );
+    if (invalidPrice) return false;
+    return true;
+  })();
+
+  const isTransportSectionValid = (() => {
+    if (editor.routes.length === 0) return false;
+    const requiredTransportCount = editor.routes.length + 1;
+    if (editor.transports.length < requiredTransportCount) return false;
+    const incompleteTransport = editor.transports.find(
+      (transport) =>
+        !transport.fromCity.trim() ||
+        !transport.toCity.trim() ||
+        (transport.bookingStatus !== "NOT_CHECKED" &&
+          (!transport.mode.trim() || !transport.durationText.trim()))
+    );
+    if (incompleteTransport) return false;
+    const invalidPrice = editor.transports.some(
+      ({ priceRange }) =>
+        priceRange &&
+        (!Number.isFinite(priceRange.min) ||
+          !Number.isFinite(priceRange.max) ||
+          priceRange.min < 0 ||
+          priceRange.max < priceRange.min)
+    );
+    if (invalidPrice) return false;
+    return true;
+  })();
+
+  const editorBaseHeadcount = editor.baseHeadcount ?? editor.costSummary?.baseHeadcount ?? 0;
+  const basicComplete = Boolean(editor.title.trim()) && editorBaseHeadcount >= 1;
+  const routeComplete = isRouteValid;
+  const accommodationComplete = isAccommodationSectionValid;
+  const transportComplete = isTransportSectionValid;
   const accommodationEmpty = editor.accommodations.length === 0;
   const transportEmpty = editor.transports.length === 0;
 
@@ -134,21 +206,20 @@ export function PlanEditorSections({
         )
       : "가격 미정";
 
-    const basicComplete = Boolean(editor.title.trim());
     const isFirstPlanGuide = isFirstPlan && !isEditMode && !isCloneMode;
     const completedCount = [
       basicComplete,
       routeComplete,
-      !accommodationEmpty && accommodationChecks === 0,
-      !transportEmpty && transportChecks === 0,
+      accommodationComplete,
+      transportComplete,
     ].filter(Boolean).length;
     const nextRecommended: PlanEditorSection | undefined = !basicComplete
       ? "basic"
       : !routeComplete
         ? "route"
-        : accommodationEmpty || accommodationChecks > 0
+        : !accommodationComplete
           ? "accommodation"
-          : transportEmpty || transportChecks > 0
+          : !transportComplete
             ? "transport"
             : undefined;
 
@@ -190,11 +261,11 @@ export function PlanEditorSections({
             status={
               isFirstPlanGuide && nextRecommended === "basic" && !basicComplete
                 ? "다음으로 추천"
-                : editor.title.trim()
+                : basicComplete
                   ? "완료"
                   : "입력 필요"
             }
-            complete={Boolean(editor.title.trim())}
+            complete={basicComplete}
             onClick={() => onOpenSection("basic")}
           />
           <SummaryRow
@@ -218,17 +289,17 @@ export function PlanEditorSections({
             title="숙소"
             summary={accommodationEmpty
               ? "아직 추가하지 않았어요"
-              : `${editor.accommodations.length}곳${accommodationChecks ? ` · 확인 필요 ${accommodationChecks}곳` : ""}`}
+              : `${editor.accommodations.length}곳`}
             status={
-              isFirstPlanGuide && nextRecommended === "accommodation" && (accommodationEmpty || accommodationChecks > 0)
+              isFirstPlanGuide && nextRecommended === "accommodation" && !accommodationComplete
                 ? "다음으로 추천"
-                : accommodationEmpty
-                  ? "입력 전"
-                  : accommodationChecks
-                    ? "확인 필요"
-                    : "완료"
+                : !accommodationComplete
+                  ? accommodationEmpty
+                    ? "입력 전"
+                    : "확인 필요"
+                  : "완료"
             }
-            complete={!accommodationEmpty && accommodationChecks === 0}
+            complete={accommodationComplete}
             onClick={() => onOpenSection("accommodation")}
           />
           <SummaryRow
@@ -237,15 +308,15 @@ export function PlanEditorSections({
               ? "아직 추가하지 않았어요"
               : editor.transports.map((item) => item.mode.trim() || "교통편 확인 전").join(" · ")}
             status={
-              isFirstPlanGuide && nextRecommended === "transport" && (transportEmpty || transportChecks > 0)
+              isFirstPlanGuide && nextRecommended === "transport" && !transportComplete
                 ? "다음으로 추천"
-                : transportEmpty
-                  ? "입력 전"
-                  : transportChecks
-                    ? "확인 필요"
-                    : "완료"
+                : !transportComplete
+                  ? transportEmpty
+                    ? "입력 전"
+                    : "확인 필요"
+                  : "완료"
             }
-            complete={!transportEmpty && transportChecks === 0}
+            complete={transportComplete}
             onClick={() => onOpenSection("transport")}
           />
           <MobileListItem
