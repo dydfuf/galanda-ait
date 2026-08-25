@@ -142,11 +142,10 @@ describe("PlanEditorSections", () => {
       onCompleteSection: () => undefined,
     }));
 
-    // isSearching이라도 domain상 완료 → 4/4 또는 최소 숙소는 완료로 표시, 다음 추천은 없음
-    expect(html).toContain("숙소");
+    // isSearching이라도 domain상 완료 → 4/4 완료, 다음 추천 없음
+    expect(html).toContain("필수 정보 4/4 완료");
+    expect(html).not.toContain("다음으로 추천");
     expect(html).not.toContain("숙소 찾는 중");
-    // 숙소 row should show 완료, not 확인 필요
-    expect(html.match(/숙소/g)).toBeTruthy();
   });
 
   it("교통 확인 전(NOT_CHECKED)은 유효한 교통으로 취급한다", () => {
@@ -181,9 +180,9 @@ describe("PlanEditorSections", () => {
       onCompleteSection: () => undefined,
     }));
 
-    expect(html).toContain("교통");
-    // NOT_CHECKED with valid from/to should be considered complete, so 교통 row should show 완료
-    expect(html).toContain("완료");
+    // NOT_CHECKED with valid from/to should be considered complete → 4/4 완료
+    expect(html).toContain("필수 정보 4/4 완료");
+    expect(html).not.toContain("다음으로 추천");
   });
 
   it("겹치는 도시 일정은 완료로 취급하지 않는다", () => {

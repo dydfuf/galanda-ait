@@ -155,6 +155,7 @@ export function ItineraryPage(): JSX.Element {
                   size="sm"
                   disabled={acknowledgeMutation.isPending || isResolvingConflict}
                   onClick={() => {
+                    acknowledgeMutation.reset();
                     setConflictNotice(undefined);
                     setDrawerConflictNotice(undefined);
                     setIsChangeReviewOpen(true);
@@ -309,7 +310,18 @@ export function ItineraryPage(): JSX.Element {
       </Drawer>
 
       {/* 일정 변경 리뷰 Drawer: 변경 전후를 확인하고 명시적으로 확인해요 */}
-      <Drawer open={isChangeReviewOpen} onOpenChange={setIsChangeReviewOpen} showSwipeHandle>
+      <Drawer
+        open={isChangeReviewOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            acknowledgeMutation.reset();
+            setConflictNotice(undefined);
+            setDrawerConflictNotice(undefined);
+          }
+          setIsChangeReviewOpen(Boolean(open));
+        }}
+        showSwipeHandle
+      >
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle className="text-left text-[17px] font-bold">
