@@ -151,3 +151,58 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     }
   );
 });
+
+describe("toPlanDetailViewModel 작성자 미확인 (RAON-153)", (): void => {
+  it("author 정보가 없는 legacy plan은 '작성자 미확인'으로 표시하고 방장만 관리 가능하다", (): void => {
+    const orphanPlan = {
+      id: PlanIdSchema.make("plan-orphan"),
+      title: "legacy",
+      status: "DRAFT" as const,
+      places: [],
+      voteCount: 0,
+    };
+    const roomWithOrphan: TripRoom = {
+      ...room,
+      plans: [orphanPlan],
+    };
+    const hostVm = toPlanDetailViewModel(roomWithOrphan, UserIdSchema.make("user-local-me"));
+    expect(hostVm.plans[0].authorName).toBe("작성자 미확인");
+    expect(hostVm.plans[0].canManage).toBe(true);
+    expect(hostVm.plans[0].isAuthor).toBe(false);
+
+    const memberVm = toPlanDetailViewModel(roomWithOrphan, UserIdSchema.make("user-bob"));
+    expect(memberVm.plans[0].authorName).toBe("작성자 미확인");
+    expect(memberVm.plans[0].canManage).toBe(false);
+  });
+
+  it("동명이인 legacy는 '작성자 미확인'으로 표시하고 일반 멤버는 관리 불가", (): void => {
+    const dupRoom: TripRoom = {
+      ...room,
+      members: [
+        ...room.members,
+        { id: UserIdSchema.make("user-alice2"), name: "밥", role: "MEMBER" },
+      ],
+      plans: [
+        {
+          id: PlanIdSchema.make("plan-legacy"),
+          title: "legacy dup",
+          status: "DRAFT",
+          authorName: "밥",
+          places: [],
+          voteCount: 0,
+        },
+      ],
+    };
+    const vm = toPlanDetailViewModel(dupRoom, UserIdSchema.make("user-bob"));
+    expect(vm.plans[0].authorName).toBe("작성자 미확인");
+    expect(vm.plans[0].canManage).toBe(false);
+  });
+
+  it("정상 plan은 작성자 표시가 유지되고 canManage와 모순되지 않는다", (): void => {
+    const vm = toPlanDetailViewModel(room, UserIdSchema.make("user-local-me"));
+    const plan = vm.plans[0];
+    expect(plan.authorName).toBe("나");
+    expect(plan.isAuthor).toBe(true);
+    expect(plan.canManage).toBe(true);
+  });
+});

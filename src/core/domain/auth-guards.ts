@@ -363,22 +363,4 @@ export const requireMutablePlan = (
     ? Effect.fail(new StateConflictError({ message: reason }))
     : Effect.void;
 
-/**
- * 여행안 작성자 또는 방장 권한을 요구하는 가드 (하위 호환성 유지용)
- */
-export const requirePlanAuthorOrHost = (
-  room: TripRoom,
-  plan: TripPlan,
-  identity: ParticipantIdentity,
-  reason = "여행안 작성자 또는 방장만 수행할 수 있습니다."
-): Effect.Effect<RoomActor, ForbiddenError> =>
-  Effect.gen(function* () {
-    const actor = getRoomActor(room, identity);
-    const isAuthor = isPlanAuthor(room, plan, identity);
 
-    if (!isAuthor && !actor.isHost) {
-      return yield* Effect.fail(new ForbiddenError({ reason }));
-    }
-
-    return actor;
-  });

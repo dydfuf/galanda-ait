@@ -58,6 +58,8 @@
   "devDependencies": {
     "@apps-in-toss/devtools": "3.0.3",
     "@better-auth/memory-adapter": "1.7.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
     "@types/babel__core": "7.20.5",
     "@types/node": "24.13.3",
     "@types/pg": "8.23.1",
@@ -65,6 +67,7 @@
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "6.0.4",
     "drizzle-kit": "0.31.10",
+    "jsdom": "^30.0.1",
     "oxlint": "1.79.0",
     "oxlint-tsgolint": "7.0.2001",
     "typescript": "7.0.2",
