@@ -83,7 +83,7 @@ pnpm test              # vitest run — src/**/*.{test,spec}.{ts,tsx}, worker/**
 
 - `src/core/calculations/plan-cost.test.ts` — 확정가/범위/미정, 0원(known zero) 구분 검증
 - `src/core/calculations/plan-diff.test.ts` — 도시/숙소/교통 추가·삭제·변경, 비용 차이, 제목 변경, 변경 없음, stable summaryText
-- `src/components/ui/badge.test.tsx`, `src/features/common/DecisionStatusBanner.test.tsx` 등 `.tsx` 화면 경계 smoke — jsdom 환경에서 수집됨을 증명
+- `src/components/ui/badge.test.tsx`, `src/features/plan-home/components/DecisionSummarySection.test.tsx` 등 `.tsx` 화면 경계 smoke — jsdom 환경에서 수집됨을 증명
 - 새 테스트 의존성(`jsdom`, `@testing-library/react`, `@testing-library/jest-dom`)은 devDependency로만 포함됨 (production bundle 미포함)
 
 ## 검증 (CI gate)

@@ -3,6 +3,8 @@ import {
   hasResolvablePlanAuthor,
   isPlanAuthor,
   canManagePlan,
+  isPlanConfirmed as isDomainPlanConfirmed,
+  isRoomConfirmed as isDomainRoomConfirmed,
   type ParticipantIdentity,
 } from "../../core/domain/auth-guards.ts";
 
@@ -44,6 +46,12 @@ export interface TripRoomViewModel {
   readonly confirmedPlanTitle?: string;
   readonly decisionStatusText: string;
   readonly decisionSubText: string;
+  readonly decisionBadgeText: string;
+  readonly decisionBadgeVariant: "success" | "info" | "warning";
+  readonly candidateCount: number;
+  readonly totalOpinionCount: number;
+  readonly participatedMemberCount: number;
+  readonly isConfirmed: boolean;
   readonly plans: ReadonlyArray<PlanSummaryData>;
 }
 
@@ -65,14 +73,21 @@ export const toTripRoomViewModel = (
   currentUserIds?: ParticipantIdentity
 ): TripRoomViewModel => {
   const confirmed = getConfirmedPlan(room);
-  const isConfirmed = Boolean(room.confirmedPlanId);
+  // 도메인 계약을 따른다: confirmedPlanId가 없어도 plan.status가 CONFIRMED인
+  // legacy 데이터에서 확정 상태를 보호한다 (auth-guards isRoomConfirmed).
+  const isConfirmed = isDomainRoomConfirmed(room);
 
   // 결정 상태 문구 결정 (기획 문서 PL-01 명세)
   let decisionStatusText = "여행안을 고르고 있어요";
   let decisionSubText = "후보 여행안을 살펴보고 의견을 남겨보세요.";
 
-  if (isConfirmed && confirmed) {
-    decisionStatusText = `'${confirmed.title}'(으)로 일정을 확정했어요`;
+  if (isConfirmed) {
+    const confirmedTitle =
+      confirmed?.title ??
+      room.plans.find((p) => p.status === "CONFIRMED")?.title;
+    decisionStatusText = confirmedTitle
+      ? `'${confirmedTitle}'(으)로 일정을 확정했어요`
+      : "일정이 확정되었어요";
     decisionSubText = "확정된 일정은 [일정] 탭에서 날짜별로 확인할 수 있어요.";
   } else if (room.plans.length === 0) {
     decisionStatusText = "아직 등록된 여행안이 없어요";
@@ -86,7 +101,7 @@ export const toTripRoomViewModel = (
   }
 
   const plans: ReadonlyArray<PlanSummaryData> = room.plans.map((p, idx) => {
-    const isPlanConfirmed = p.id === room.confirmedPlanId;
+    const isPlanConfirmed = isDomainPlanConfirmed(room, p);
     const isBasic = idx === 0;
     const resolvable = hasResolvablePlanAuthor(room, p);
     const authorName = resolvable
@@ -144,6 +159,28 @@ export const toTripRoomViewModel = (
   });
 
   const displayDate = getTripRoomDisplayDate(room);
+  const candidateCount = room.plans.length;
+  const totalOpinionCount = plans.reduce(
+    (acc, p) => acc + p.opinions.likeCount + p.opinions.okayCount + p.opinions.hardCount,
+    0,
+  );
+  const participatedIds = new Set<string>();
+  for (const plan of room.plans) {
+    for (const opinion of plan.memberOpinions ?? []) {
+      participatedIds.add(opinion.userId);
+    }
+  }
+  const participatedMemberCount = participatedIds.size;
+  const decisionBadgeText = isConfirmed
+    ? "확정됨"
+    : candidateCount === 0
+      ? "첫 여행안 필요"
+      : "의견 수집 중";
+  const decisionBadgeVariant: TripRoomViewModel["decisionBadgeVariant"] = isConfirmed
+    ? "success"
+    : candidateCount === 0
+      ? "warning"
+      : "info";
   return {
     id: room.id,
     title: room.title,
@@ -158,6 +195,12 @@ export const toTripRoomViewModel = (
     confirmedPlanTitle: confirmed?.title,
     decisionStatusText,
     decisionSubText,
+    decisionBadgeText,
+    decisionBadgeVariant,
+    candidateCount,
+    totalOpinionCount,
+    participatedMemberCount,
+    isConfirmed,
     plans,
   };
 };

@@ -6,11 +6,8 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
-import { DecisionStatusBanner } from "../common/DecisionStatusBanner.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
-import { PageTitle } from "@/components/galanda/page-title.tsx";
-import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -25,8 +22,9 @@ import {
 import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { PlanDecisionCard } from "./components/PlanDecisionCard.tsx";
+import { TripSummarySection } from "./components/TripSummarySection.tsx";
+import { DecisionSummarySection } from "./components/DecisionSummarySection.tsx";
 import { toTripRoomViewModel } from "./plan-home-view-model.ts";
-import { isRoomConfirmed } from "../../core/domain/auth-guards.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -84,7 +82,7 @@ export function PlanHomePage() {
 
   const room = toTripRoomViewModel(rawRoom, session?.participantIds);
 
-  const isConfirmed = isRoomConfirmed(rawRoom);
+  const isConfirmed = room.isConfirmed;
   const plans = room.plans;
 
   const toggleCompareSelection = (planId: string): void => {
@@ -134,39 +132,53 @@ export function PlanHomePage() {
 
   return (
     <PageBody withBottomAction={plans.length > 0}>
-      <PageTitle
+      <TripSummarySection
         title={room.title}
-        description={`${room.destination} · ${room.period} · 참여 ${room.memberCount}명`}
+        destination={room.destination}
+        period={room.period}
+        memberCount={room.memberCount}
       />
 
-      <DecisionStatusBanner
+      <DecisionSummarySection
+        badgeText={room.decisionBadgeText}
+        badgeVariant={room.decisionBadgeVariant}
         statusText={room.decisionStatusText}
         subText={room.decisionSubText}
-        isConfirmed={isConfirmed}
+        candidateCount={room.candidateCount}
+        totalOpinionCount={room.totalOpinionCount}
+        participatedMemberCount={room.participatedMemberCount}
+        memberCount={room.memberCount}
       />
 
-      <SectionHeader title="여행안" description="후보를 훑어보고 자세히 볼 여행안을 선택하세요." />
+      <section aria-labelledby="plan-candidates-heading" className="pt-1">
+        <div className="flex items-center justify-between gap-3 px-(--app-inline-padding) pb-2">
+          <h2 id="plan-candidates-heading" className="text-[15px] font-bold leading-none text-foreground">
+            여행안
+          </h2>
+          <span className="text-[12px] leading-none text-muted-foreground">후보 {room.candidateCount}개</span>
+        </div>
 
-      {plans.length === 0 ? (
-        <PageState
-          status="empty"
-          title="아직 여행안이 없어요"
-          description="첫 여행안을 만들어 친구들과 함께 골라보세요."
-          actionText={primaryCta.label}
-          onAction={primaryCta.onClick}
-        />
-      ) : (
-        <ul
-          className="flex list-none flex-col gap-3 px-(--app-inline-padding)"
-          aria-label="제안된 여행안"
-        >
-          {plans.map((plan) => (
-            <li key={plan.id} className="min-w-0 list-none">
-              <PlanDecisionCard plan={plan} to={`/trips/${tripId}/plans/${plan.id}`} />
-            </li>
-          ))}
-        </ul>
-      )}
+        {plans.length === 0 ? (
+          <PageState
+            status="empty"
+            title="아직 여행안이 없어요"
+            description="첫 여행안을 만들어 친구들과 함께 골라보세요."
+            actionText={primaryCta.label}
+            onAction={primaryCta.onClick}
+          />
+        ) : (
+          <ul
+            className="flex list-none flex-col gap-3 px-(--app-inline-padding)"
+            aria-label="제안된 여행안"
+          >
+            {plans.map((plan) => (
+              <li key={plan.id} className="min-w-0 list-none">
+                <PlanDecisionCard plan={plan} to={`/trips/${tripId}/plans/${plan.id}`} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {plans.length > 0 && (
         <BottomAction>
