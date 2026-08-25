@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/drawer.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
-import { PlanListRow } from "./components/PlanListRow.tsx";
+import { PlanDecisionCard } from "./components/PlanDecisionCard.tsx";
 import { toTripRoomViewModel } from "./plan-home-view-model.ts";
 import { isRoomConfirmed } from "../../core/domain/auth-guards.ts";
 
@@ -156,11 +156,16 @@ export function PlanHomePage() {
           onAction={primaryCta.onClick}
         />
       ) : (
-        <MobileList aria-label="제안된 여행안">
+        <ul
+          className="flex list-none flex-col gap-3 px-(--app-inline-padding)"
+          aria-label="제안된 여행안"
+        >
           {plans.map((plan) => (
-            <PlanListRow key={plan.id} plan={plan} to={`/trips/${tripId}/plans/${plan.id}`} />
+            <li key={plan.id} className="min-w-0 list-none">
+              <PlanDecisionCard plan={plan} to={`/trips/${tripId}/plans/${plan.id}`} />
+            </li>
           ))}
-        </MobileList>
+        </ul>
       )}
 
       {plans.length > 0 && (
