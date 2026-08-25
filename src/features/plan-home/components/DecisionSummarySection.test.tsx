@@ -39,7 +39,9 @@ describe("DecisionSummarySection (RAON-225)", () => {
       />,
     );
 
-    expect(screen.getByText(/후보 2개 · 의견 4개 · 참여 3\/4명/)).toBeInTheDocument();
+    // 후보 수는 여행안 섹션이 소유하므로 진행 상태 카드에서 반복하지 않는다
+    expect(screen.getByText(/참여 3\/4명 · 의견 4개/)).toBeInTheDocument();
+    expect(screen.queryByText(/후보/)).not.toBeInTheDocument();
   });
 
   it("subText가 없어도 렌더링에 실패하지 않는다", () => {
@@ -54,5 +56,22 @@ describe("DecisionSummarySection (RAON-225)", () => {
 
     expect(screen.getByText("첫 여행안 필요")).toBeInTheDocument();
     expect(screen.queryByText("마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.")).not.toBeInTheDocument();
+  });
+
+  it("후보가 없으면 배지만 노출해 empty state와의 중복을 막는다", () => {
+    render(
+      <DecisionSummarySection
+        {...baseProps}
+        candidateCount={0}
+        totalOpinionCount={0}
+        participatedMemberCount={0}
+        badgeText="첫 여행안 필요"
+        badgeVariant="warning"
+      />,
+    );
+
+    expect(screen.getByText("첫 여행안 필요")).toBeInTheDocument();
+    expect(screen.queryByText(baseProps.statusText)).not.toBeInTheDocument();
+    expect(screen.queryByText(/참여/)).not.toBeInTheDocument();
   });
 });

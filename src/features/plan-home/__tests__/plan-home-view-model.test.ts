@@ -95,6 +95,45 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
     expect(vm.isConfirmed).toBe(true);
   });
 
+  it("confirmedPlanId 없이 plan.status만 CONFIRMED인 legacy 방도 확정 상태로 보호한다 (도메인 isRoomConfirmed 계약)", (): void => {
+    const legacyConfirmed: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          id: PlanIdSchema.make("plan-legacy-c"),
+          status: "CONFIRMED",
+        },
+      ],
+    };
+
+    const vm = toTripRoomViewModel(legacyConfirmed);
+    expect(vm.isConfirmed).toBe(true);
+    expect(vm.decisionBadgeText).toBe("확정됨");
+    expect(vm.decisionBadgeVariant).toBe("success");
+    // status-only 확정에서도 어떤 안으로 확정했는지 문구가 일관되게 나온다
+    expect(vm.decisionStatusText).toBe("'기본 1안'(으)로 일정을 확정했어요");
+  });
+
+  it("legacy 확정 방의 해당 플랜도 카드에서 '확정안'으로 표시된다 (도메인 isPlanConfirmed 계약)", (): void => {
+    const legacyConfirmed: TripRoom = {
+      ...room,
+      plans: [
+        { ...room.plans[0], id: PlanIdSchema.make("plan-a"), status: "DRAFT" as const },
+        {
+          ...room.plans[0],
+          id: PlanIdSchema.make("plan-b"),
+          status: "CONFIRMED",
+        },
+      ],
+    };
+
+    const vm = toTripRoomViewModel(legacyConfirmed);
+    expect(vm.plans[1].isConfirmed).toBe(true);
+    expect(vm.plans[1].planTag).toBe("CONFIRMED");
+    expect(vm.plans[0].isConfirmed).toBe(false);
+  });
+
   it("memberOpinions이 없는 legacy plan은 voteCount를 좋아요 수로 계산한다", (): void => {
     const legacyPlan = {
       id: PlanIdSchema.make("plan-legacy"),
