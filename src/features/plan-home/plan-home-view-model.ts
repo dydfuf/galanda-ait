@@ -44,6 +44,12 @@ export interface TripRoomViewModel {
   readonly confirmedPlanTitle?: string;
   readonly decisionStatusText: string;
   readonly decisionSubText: string;
+  readonly decisionBadgeText: string;
+  readonly decisionBadgeVariant: "success" | "info" | "warning";
+  readonly candidateCount: number;
+  readonly totalOpinionCount: number;
+  readonly participatedMemberCount: number;
+  readonly isConfirmed: boolean;
   readonly plans: ReadonlyArray<PlanSummaryData>;
 }
 
@@ -144,6 +150,28 @@ export const toTripRoomViewModel = (
   });
 
   const displayDate = getTripRoomDisplayDate(room);
+  const candidateCount = room.plans.length;
+  const totalOpinionCount = plans.reduce(
+    (acc, p) => acc + p.opinions.likeCount + p.opinions.okayCount + p.opinions.hardCount,
+    0,
+  );
+  const participatedIds = new Set<string>();
+  for (const plan of room.plans) {
+    for (const opinion of plan.memberOpinions ?? []) {
+      participatedIds.add(opinion.userId);
+    }
+  }
+  const participatedMemberCount = participatedIds.size;
+  const decisionBadgeText = isConfirmed
+    ? "확정됨"
+    : candidateCount === 0
+      ? "첫 여행안 필요"
+      : "의견 수집 중";
+  const decisionBadgeVariant: TripRoomViewModel["decisionBadgeVariant"] = isConfirmed
+    ? "success"
+    : candidateCount === 0
+      ? "warning"
+      : "info";
   return {
     id: room.id,
     title: room.title,
@@ -158,6 +186,12 @@ export const toTripRoomViewModel = (
     confirmedPlanTitle: confirmed?.title,
     decisionStatusText,
     decisionSubText,
+    decisionBadgeText,
+    decisionBadgeVariant,
+    candidateCount,
+    totalOpinionCount,
+    participatedMemberCount,
+    isConfirmed,
     plans,
   };
 };

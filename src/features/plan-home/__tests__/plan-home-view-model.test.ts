@@ -38,6 +38,78 @@ const room: TripRoom = {
   confirmedPlanId: undefined,
 };
 
+describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
+  it("후보 수와 의견 수, 의견 참여 인원을 실제 계산값으로 집계한다", (): void => {
+    const twoPlans: TripRoom = {
+      ...room,
+      members: [
+        ...room.members,
+        { id: UserIdSchema.make("user-alice"), name: "앨리스", role: "MEMBER" },
+      ],
+      plans: [
+        {
+          ...room.plans[0],
+          id: PlanIdSchema.make("plan-1"),
+          memberOpinions: [
+            { userId: UserIdSchema.make("user-local-me"), userName: "나", reaction: "LIKE" },
+            { userId: UserIdSchema.make("user-bob"), userName: "밥", reaction: "OKAY" },
+          ],
+        },
+        {
+          ...room.plans[0],
+          id: PlanIdSchema.make("plan-2"),
+          memberOpinions: [
+            { userId: UserIdSchema.make("user-alice"), userName: "앨리스", reaction: "HARD" },
+            { userId: UserIdSchema.make("user-local-me"), userName: "나", reaction: "LIKE" },
+          ],
+        },
+      ],
+    };
+
+    const vm = toTripRoomViewModel(twoPlans);
+    expect(vm.candidateCount).toBe(2);
+    expect(vm.totalOpinionCount).toBe(4);
+    expect(vm.participatedMemberCount).toBe(3);
+    expect(vm.isConfirmed).toBe(false);
+  });
+
+  it("수집 중 상태는 '의견 수집 중' info 배지를 표시한다", (): void => {
+    const vm = toTripRoomViewModel(room);
+    expect(vm.decisionBadgeText).toBe("의견 수집 중");
+    expect(vm.decisionBadgeVariant).toBe("info");
+  });
+
+  it("후보가 없으면 '첫 여행안 필요' warning 배지를 표시한다", (): void => {
+    const vm = toTripRoomViewModel({ ...room, plans: [] });
+    expect(vm.decisionBadgeText).toBe("첫 여행안 필요");
+    expect(vm.decisionBadgeVariant).toBe("warning");
+    expect(vm.candidateCount).toBe(0);
+    expect(vm.totalOpinionCount).toBe(0);
+    expect(vm.participatedMemberCount).toBe(0);
+  });
+
+  it("확정되면 '확정됨' success 배지를 표시한다", (): void => {
+    const vm = toTripRoomViewModel({ ...room, confirmedPlanId: room.plans[0].id });
+    expect(vm.decisionBadgeText).toBe("확정됨");
+    expect(vm.decisionBadgeVariant).toBe("success");
+    expect(vm.isConfirmed).toBe(true);
+  });
+
+  it("memberOpinions이 없는 legacy plan은 voteCount를 좋아요 수로 계산한다", (): void => {
+    const legacyPlan = {
+      id: PlanIdSchema.make("plan-legacy"),
+      title: "legacy",
+      status: "DRAFT" as const,
+      places: [],
+      voteCount: 2,
+    };
+    const vm = toTripRoomViewModel({ ...room, plans: [legacyPlan] });
+    expect(vm.totalOpinionCount).toBe(2);
+    // legacy plan에는 opinion author가 없으므로 참여자는 집계하지 않는다
+    expect(vm.participatedMemberCount).toBe(0);
+  });
+});
+
 describe("toTripRoomViewModel 세션 신원 처리 (RAON-149)", (): void => {
   it("세션 사용자의 의견만 '내 반응'으로 표시한다", (): void => {
     const vm = toTripRoomViewModel(room, UserIdSchema.make("user-local-me"));
