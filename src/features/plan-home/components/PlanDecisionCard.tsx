@@ -37,7 +37,6 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   if (plan.opinions.hardCount > 0) opinionCounts.push(`어려워요 ${plan.opinions.hardCount}`);
 
   const hasOpinion = opinionCounts.length > 0;
-  const opinionSummaryForAria = hasOpinion ? opinionCounts.join(" · ") : "아직 의견이 없어요";
 
   // 기간 표시: 확정된 날짜가 있으면 날짜 범위를, 없으면 박/일 또는 일정 미정을 보여준다.
   const hasDuration = plan.days > 0;
@@ -53,7 +52,6 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   return (
     <Link
       to={to}
-      aria-label={`${badgeLabel} ${plan.title}, ${opinionSummaryForAria} · 상세 보기`}
       className={cn(
         "group flex min-w-0 flex-col gap-3 rounded-2xl border p-4 text-left no-underline shadow-sm transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -81,31 +79,31 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         </h3>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {durationLabel ? (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground whitespace-nowrap">
+            <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground-muted whitespace-nowrap">
               {durationLabel}
             </span>
           ) : (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
+            <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground-muted whitespace-nowrap">
               일정 미정
             </span>
           )}
           {periodText && (
-            <span className="min-w-0 break-words text-[12px] leading-normal text-muted-foreground line-clamp-1">
+            <span className="min-w-0 break-words text-[12px] leading-normal text-foreground-muted line-clamp-1">
               {periodText}
             </span>
           )}
         </div>
       </div>
 
-      {/* 3. 작성자 */}
-      <p className="min-w-0 break-words text-[13px] leading-normal text-foreground-subtle line-clamp-1">
+      {/* 3. 작성자 – 13px 보조 텍스트는 AA 대비를 만족하는 foreground-muted 사용 */}
+      <p className="min-w-0 break-words text-[13px] leading-normal text-foreground-muted line-clamp-1">
         {plan.authorName} 제안
       </p>
 
       {/* 4. differenceSummary 기반 핵심 차이 – 한 단계 낮지만 의견보다 먼저 읽힌다. 없으면 렌더하지 않는다. */}
       {plan.differenceSummary && (
         <div className="rounded-xl border border-primary-border-weak bg-primary-muted/40 px-3 py-2.5">
-          <p className="break-words text-[13px] font-medium leading-relaxed text-primary [overflow-wrap:anywhere] line-clamp-2">
+          <p className="break-words text-[13px] font-semibold leading-relaxed text-info [overflow-wrap:anywhere] line-clamp-2">
             {plan.differenceSummary}
           </p>
         </div>
@@ -118,14 +116,14 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
             {opinionCounts.map((text) => (
               <span
                 key={text}
-                className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground whitespace-nowrap"
+                className="inline-flex shrink-0 items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground-muted whitespace-nowrap"
               >
                 {text}
               </span>
             ))}
           </>
         ) : (
-          <span className="min-w-0 break-words text-muted-foreground">아직 의견이 없어요</span>
+          <span className="min-w-0 break-words text-foreground-muted">아직 의견이 없어요</span>
         )}
         <span className="shrink-0 text-border-strong" aria-hidden="true">
           ·
@@ -133,7 +131,7 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         <span
           className={cn(
             "min-w-0 break-words whitespace-nowrap",
-            myReactionLabel ? "font-semibold text-foreground" : "text-muted-foreground",
+            myReactionLabel ? "font-semibold text-foreground" : "text-foreground-muted",
           )}
         >
           {myReactionLabel ? `내 의견 ${myReactionLabel}` : "내 의견 전"}

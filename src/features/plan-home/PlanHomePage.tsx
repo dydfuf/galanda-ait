@@ -157,7 +157,7 @@ export function PlanHomePage() {
         />
       ) : (
         <ul
-          className="flex list-none flex-col gap-3 px-(--app-inline-padding) pl-0"
+          className="flex list-none flex-col gap-3 px-(--app-inline-padding)"
           aria-label="제안된 여행안"
         >
           {plans.map((plan) => (

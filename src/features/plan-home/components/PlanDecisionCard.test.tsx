@@ -81,12 +81,47 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(link.querySelectorAll("a").length).toBe(0);
   });
 
-  it("keyboard focus 가능한 단일 surface이며 aria-label에 상세 보기 포함", () => {
+  it("keyboard focus 가능한 단일 surface이며 aria-label 강제 없이 visible content가 name이 된다", () => {
     renderCard();
     const link = screen.getByRole("link");
-    expect(link.getAttribute("aria-label")).toMatch(/상세 보기/);
-    // focusable: link is naturally focusable; ensure no tabindex -1
+    // aria-label로 name을 덮어쓰지 않는다 – 보이는 텍스트가 그대로 accessible content여야 한다
+    expect(link).not.toHaveAttribute("aria-label");
     expect(link.tabIndex).not.toBe(-1);
+  });
+
+  it("link accessible name에 제목·기간·작성자·핵심 차이·내 의견이 모두 포함된다", () => {
+    renderCard({ differenceSummary: "오사카 1박 추가", myReaction: "LIKE" });
+    const link = screen.getByRole("link");
+    expect(link).toHaveAccessibleName(/기본 여행안/);
+    expect(link).toHaveAccessibleName(/3박 4일/);
+    expect(link).toHaveAccessibleName(/민지 제안/);
+    expect(link).toHaveAccessibleName(/오사카 1박 추가/);
+    expect(link).toHaveAccessibleName(/내 의견 좋아요/);
+  });
+
+  it("작은 텍스트가 AA 대비 토큰을 사용한다 (RAON-226 리뷰 P1)", () => {
+    renderCard({ differenceSummary: "차이" });
+    const diffEl = screen.getByText("차이");
+    expect(diffEl.className).toMatch(/text-info/);
+    expect(diffEl.className).not.toMatch(/text-primary\b/);
+
+    const authorEl = screen.getByText("민지 제안");
+    expect(authorEl.className).toMatch(/text-foreground-muted/);
+    expect(authorEl.className).not.toMatch(/text-foreground-subtle/);
+
+    const durationEl = screen.getByText("3박 4일");
+    expect(durationEl.className).toMatch(/text-foreground-muted/);
+    expect(durationEl.className).not.toMatch(/text-muted-foreground/);
+
+    const opinionEl = screen.getByText("좋아요 2");
+    expect(opinionEl.className).toMatch(/text-foreground-muted/);
+  });
+
+  it("내 의견이 없을 때도 저대비 muted-foreground를 쓰지 않는다", () => {
+    renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: undefined });
+    const idleEl = screen.getByText("내 의견 전");
+    expect(idleEl.className).toMatch(/text-foreground-muted/);
+    expect(idleEl.className).not.toMatch(/text-muted-foreground/);
   });
 
   it("긴 제목/차이가 line-clamp로 제한되며 break-words/overflow-hidden을 갖는다", () => {
