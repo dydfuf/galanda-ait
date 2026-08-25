@@ -134,11 +134,11 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(opinionEl.className).toMatch(/text-foreground-muted/);
   });
 
-  it("내 의견이 없을 때도 저대비 muted-foreground를 쓰지 않는다", () => {
+  it("의견이 없을 때의 빈 상태 문장도 저대비 muted-foreground를 쓰지 않는다", () => {
     renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: undefined });
-    const idleEl = screen.getByText("내 의견 전");
-    expect(idleEl.className).toMatch(/text-foreground-muted/);
-    expect(idleEl.className).not.toMatch(/text-muted-foreground/);
+    const emptyEl = screen.getByText("아직 의견이 없어요");
+    expect(emptyEl.className).toMatch(/text-foreground-muted/);
+    expect(emptyEl.className).not.toMatch(/text-muted-foreground/);
   });
 
   it("긴 제목/차이가 line-clamp로 제한되며 break-words/overflow-hidden을 갖는다", () => {
@@ -156,10 +156,20 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(diffEl.className).toMatch(/line-clamp-2/);
   });
 
-  it("의견이 없을 때 '아직 의견이 없어요'와 '내 의견 전'을 표시한다", () => {
+  it("의견이 없을 때 '아직 의견이 없어요'만 표시하고 내 의견 chip을 렌더하지 않는다 (RAON-227)", () => {
     renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: undefined });
     expect(screen.getByText("아직 의견이 없어요")).toBeInTheDocument();
-    expect(screen.getByText("내 의견 전")).toBeInTheDocument();
+    const link = screen.getByRole("link");
+    // 내 의견도 aggregate에 집계되므로 합이 0이면 "내 의견" 표시는 같은 사실의 중복이다
+    expect(link.textContent).not.toMatch(/내 의견/);
+    // 매달린 가운데점도 남지 않는다
+    expect(link.textContent).not.toMatch(/·/);
+  });
+
+  it("aggregate가 0이어도 myReaction이 있으면 내 의견 chip을 표시한다 (legacy voteCount 폴백 방어)", () => {
+    renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: "OKAY" });
+    expect(screen.getByText("내 의견 괜찮아요")).toBeInTheDocument();
+    expect(screen.queryByText("아직 의견이 없어요")).not.toBeInTheDocument();
   });
 
   it("내 의견이 있으면 '내 의견 좋아요' 형태로 강조한다", () => {

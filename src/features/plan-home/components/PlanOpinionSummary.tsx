@@ -43,9 +43,16 @@ export function PlanOpinionSummary({ opinions, myReaction }: PlanOpinionSummaryP
 
   const myReactionLabel = getReactionLabel(myReaction);
 
+  // 내 의견도 memberOpinions에 집계되므로 aggregate가 0이면 내 의견도 논리적으로 존재할 수 없다.
+  // memberOpinions 없이 voteCount 폴백을 타는 legacy 경로만 예외라, myReaction이 있으면 chip을 남긴다.
+  const isEmpty = entries.length === 0 && !myReactionLabel;
+
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5 gap-y-1 border-t border-border pt-3 text-[12px] leading-normal">
-      {entries.length > 0 ? (
+      {isEmpty ? (
+        // 의견이 하나도 없으면 한 문장만 남긴다 – 매달린 구분자나 중복된 "내 의견 없음"을 만들지 않는다.
+        <span className="min-w-0 break-words text-foreground-muted">아직 의견이 없어요</span>
+      ) : (
         <>
           {entries.map(({ key, label, Icon, count }) => (
             // 시각은 [아이콘] 2, accessible text는 "좋아요 2명" – 아이콘만으로 의미를 전달하지 않는다.
@@ -59,21 +66,15 @@ export function PlanOpinionSummary({ opinions, myReaction }: PlanOpinionSummaryP
               <span className="sr-only">명</span>
             </Pill>
           ))}
+          {/*
+           * 남들의 반응은 채움 pill, 내 의견은 아웃라인 chip – 형태 대비가 층위를 구분한다.
+           * ml-auto는 여유가 있을 때만 "왼쪽=남들 / 오른쪽=나" 공간 구분을 주고 wrap되면 자연히 무력화된다.
+           */}
+          <Pill className="ml-auto border border-border-strong bg-background font-semibold text-foreground">
+            {myReactionLabel ? `내 의견 ${myReactionLabel}` : "내 의견 아직 없음"}
+          </Pill>
         </>
-      ) : (
-        <span className="min-w-0 break-words text-foreground-muted">아직 의견이 없어요</span>
       )}
-      <span className="shrink-0 text-border-strong" aria-hidden="true">
-        ·
-      </span>
-      <span
-        className={cn(
-          "min-w-0 break-words whitespace-nowrap",
-          myReactionLabel ? "font-semibold text-foreground" : "text-foreground-muted",
-        )}
-      >
-        {myReactionLabel ? `내 의견 ${myReactionLabel}` : "내 의견 전"}
-      </span>
     </div>
   );
 }
