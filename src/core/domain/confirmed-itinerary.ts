@@ -14,6 +14,8 @@ import {
   type AccommodationSnapshot,
   type TransportSnapshot,
   type TripPlan,
+  type TripRoom,
+  getPlanPublishValidationErrors,
   getRouteValidationError,
 } from "./room.ts";
 
@@ -194,6 +196,40 @@ export const buildConfirmedItinerarySnapshot = (
     items,
   };
 };
+
+export type PlanConfirmability =
+  | { readonly kind: "CONFIRMED" }
+  | { readonly kind: "INVALID_PUBLISH"; readonly message: string }
+  | { readonly kind: "INVALID_SNAPSHOT" }
+  | { readonly kind: "CONFIRMABLE"; readonly snapshot: ConfirmedItinerarySnapshot };
+
+/** 확정 use case와 NBA가 공유하는 순수 확정 가능성 판정이다. */
+export const getPlanConfirmability = (
+  room: TripRoom,
+  plan: TripPlan,
+): PlanConfirmability => {
+  if (room.confirmedPlanId !== undefined || plan.status === "CONFIRMED") {
+    return { kind: "CONFIRMED" };
+  }
+
+  const validationError = getPlanPublishValidationErrors(plan)[0];
+  if (plan.status !== "VOTING" || !plan.revision || validationError) {
+    return {
+      kind: "INVALID_PUBLISH",
+      message: validationError ?? "공개된 여행안 revision만 확정할 수 있습니다.",
+    };
+  }
+
+  const snapshot = buildConfirmedItinerarySnapshot(plan, room.destination);
+  return snapshot
+    ? { kind: "CONFIRMABLE", snapshot }
+    : { kind: "INVALID_SNAPSHOT" };
+};
+
+export const isPlanConfirmable = (
+  room: TripRoom,
+  plan: TripPlan,
+): boolean => getPlanConfirmability(room, plan).kind === "CONFIRMABLE";
 
 export const reviseConfirmedItinerary = (
   itinerary: ConfirmedItinerary,

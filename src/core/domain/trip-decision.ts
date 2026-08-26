@@ -41,6 +41,7 @@ export interface TripDecisionContext {
   readonly opinionParticipantCount: number;
   readonly actorHasOpinion: boolean;
   readonly isConfirmed: boolean;
+  readonly confirmablePlanCount: number;
   readonly conflict?: TripRecommendationConflict;
   readonly firstPlanDraft?: PlanPublishInput;
 }

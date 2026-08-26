@@ -118,14 +118,10 @@ export function PlanHomePage() {
     navigate(`/trips/${tripId}/plans/compare?left=${left}&right=${right}`);
   };
 
-  // CTA 노출은 서버 use case와 동일한 도메인 RBAC 계약을 따른다 (plan:create).
-  const canCreatePlan = getRoomActor(rawRoom, session?.participantIds).can("plan:create");
-
-  const cta = resolvePlanHomeCta({
-    isConfirmed: room.isConfirmed,
-    candidateCount: room.candidateCount,
-    canCreatePlan,
-  });
+  // CTA 노출은 서버 use case와 동일한 도메인 RBAC/NBA 계약을 따른다.
+  const actor = getRoomActor(rawRoom, session?.participantIds);
+  const canCreatePlan = actor.can("plan:create");
+  const cta = resolvePlanHomeCta(rawRoom, actor);
 
   const runPrimaryCta = (): void => {
     if (!cta.primaryKind) return;

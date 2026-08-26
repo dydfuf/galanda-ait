@@ -99,6 +99,7 @@ describe("PlanEditorSections", () => {
       isEditMode: false,
       isCloneMode: false,
       isFirstPlan: true,
+      recommendedActionId: "DEFINE_ROUTE",
       onOpenSection: () => undefined,
       onCompleteSection: () => undefined,
     }));
@@ -107,6 +108,17 @@ describe("PlanEditorSections", () => {
     expect(html).toContain("필수 정보 1/4 완료");
     expect(html).toContain("다음으로 추천");
     expect(html).toContain("아직 예약하지 않았어도 괜찮아요");
+
+    const fallbackHtml = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+    expect(fallbackHtml).toContain("첫 여행안을 만들어볼까요?");
+    expect(fallbackHtml).not.toContain("다음으로 추천");
   });
 
   it("숙소 찾는 중은 domain에서 완료로 취급한다", () => {
@@ -138,6 +150,7 @@ describe("PlanEditorSections", () => {
       isEditMode: false,
       isCloneMode: false,
       isFirstPlan: true,
+      recommendedActionId: "PUBLISH_FIRST_PLAN",
       onOpenSection: () => undefined,
       onCompleteSection: () => undefined,
     }));
@@ -176,6 +189,7 @@ describe("PlanEditorSections", () => {
       isEditMode: false,
       isCloneMode: false,
       isFirstPlan: true,
+      recommendedActionId: "PUBLISH_FIRST_PLAN",
       onOpenSection: () => undefined,
       onCompleteSection: () => undefined,
     }));
@@ -206,6 +220,7 @@ describe("PlanEditorSections", () => {
       isEditMode: false,
       isCloneMode: false,
       isFirstPlan: true,
+      recommendedActionId: "DEFINE_ROUTE",
       onOpenSection: () => undefined,
       onCompleteSection: () => undefined,
     }));
@@ -244,6 +259,7 @@ describe("PlanEditorSections", () => {
       isEditMode: false,
       isCloneMode: false,
       isFirstPlan: true,
+      recommendedActionId: "ADD_ACCOMMODATION",
       onOpenSection: () => undefined,
       onCompleteSection: () => undefined,
     }));

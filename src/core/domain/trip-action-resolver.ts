@@ -138,7 +138,11 @@ export const resolveEligibleTripActions = (
   if (actor.isMember && context.planCount >= 2) {
     eligible.push(actions.COMPARE_PLANS);
   }
-  if (actor.isHost && context.planCount >= 2) {
+  if (
+    actor.isHost &&
+    context.planCount >= 2 &&
+    context.confirmablePlanCount > 0
+  ) {
     eligible.push(actions.CONFIRM_PLAN);
   }
 

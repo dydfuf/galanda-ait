@@ -81,6 +81,7 @@ const context = (
   opinionParticipantCount: 0,
   actorHasOpinion: false,
   isConfirmed: false,
+  confirmablePlanCount: 0,
   ...overrides,
 });
 

@@ -19,7 +19,9 @@ import {
   toRevisionConflictMessage,
   toUserMessage,
 } from "../common/error-message.ts";
-import { isRoomConfirmed } from "../../core/domain/auth-guards.ts";
+import { getRoomActor, isRoomConfirmed } from "../../core/domain/auth-guards.ts";
+import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
+import { toFirstPlanDecisionContext } from "../common/trip-action-presentation.ts";
 
 const pageContainerStyle = css`
   padding: 16px 20px var(--app-cta-space, 112px);
@@ -180,6 +182,18 @@ export function PlanCreatePage(): JSX.Element {
   };
 
   const isFirstPlan = !cloneFromPlan && room.plans.length === 0;
+  const actor = getRoomActor(room, session.participantIds);
+  const recommendedActionId = isFirstPlan
+    ? resolveEligibleTripActions(
+        toFirstPlanDecisionContext(
+          room,
+          actor,
+          editor,
+          editor.draftConflict ? "DRAFT" : undefined,
+        ),
+        actor,
+      )[0]?.actionId
+    : undefined;
 
   return (
     <div css={pageContainerStyle}>
@@ -190,6 +204,7 @@ export function PlanCreatePage(): JSX.Element {
         isCloneMode={Boolean(cloneFromPlan)}
         cloneTitle={cloneFromPlan?.title}
         isFirstPlan={isFirstPlan}
+        recommendedActionId={recommendedActionId}
         onOpenSection={openSection}
         onCompleteSection={completeSection}
       />
