@@ -177,3 +177,98 @@ describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
     expect(screen.queryByText("여행 정보를 찾을 수 없습니다")).not.toBeInTheDocument();
   });
 });
+
+describe("PlanHomePage regression contract (RAON-229)", () => {
+  it("여행 정보 → 진행 상태 → 여행안과 카드 accessible name 순서를 고정한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      members: [
+        ...baseRoom.members,
+        { id: UserIdSchema.make("user-member"), name: "민지", role: "MEMBER" },
+        { id: UserIdSchema.make("user-another"), name: "서준", role: "MEMBER" },
+      ],
+      plans: [
+        {
+          ...planFixture("plan-1"),
+          title: "맛집과 온천을 모두 챙기는 아주 긴 기본 여행안",
+          routes: [{ city: "도쿄", arrivalDate: "2026-09-01", departureDate: "2026-09-06" }],
+          differenceSummary: "도쿄 체류를 늘리고 하코네 온천 숙박을 추가하는 긴 핵심 차이 요약",
+          memberOpinions: [
+            { userId: UserIdSchema.make("user-local-me"), userName: "나", reaction: "LIKE" },
+            { userId: UserIdSchema.make("user-member"), userName: "민지", reaction: "OKAY" },
+            { userId: UserIdSchema.make("user-another"), userName: "서준", reaction: "HARD" },
+          ],
+        },
+        {
+          ...planFixture("plan-2"),
+          authorId: undefined,
+          authorName: undefined,
+          differenceSummary: "교토 숙박 집중",
+          memberOpinions: [
+            { userId: UserIdSchema.make("user-member"), userName: "민지", reaction: "OKAY" },
+          ],
+        },
+        {
+          ...planFixture("plan-3"),
+          authorId: UserIdSchema.make("user-another"),
+          authorName: "서준",
+          memberOpinions: [],
+        },
+      ],
+    };
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(room));
+
+    renderPage();
+
+    const tripSection = screen.getByRole("region", { name: "여행 정보" });
+    const decisionSection = screen.getByRole("region", { name: "진행 상태" });
+    const candidatesSection = screen.getByRole("region", { name: "여행안" });
+    expect(tripSection.compareDocumentPosition(decisionSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(decisionSection.compareDocumentPosition(candidatesSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    expect(screen.getByRole("heading", { level: 1, name: "제주도 힐링 여행" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "제안된 여행안" })).toBeInTheDocument();
+    expect(screen.getByRole("link", {
+      name: /기본안 맛집과 온천.*5박 6일.*나 제안.*긴 핵심 차이 요약.*좋아요 1명.*괜찮아요 1명.*어려워요 1명.*내 의견 좋아요/,
+    })).toHaveAttribute("href", "/trips/trip-1/plans/plan-1");
+    expect(screen.getByRole("link", { name: /대안 1.*작성자 미확인 제안.*괜찮아요 1명.*내 의견 아직 없음/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /대안 2.*서준 제안.*아직 의견이 없어요/ })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["HOST", memberSession, true],
+    [
+      "MEMBER",
+      { ...memberSession, participantId: UserIdSchema.make("user-member"), participantIds: [UserIdSchema.make("user-member")] },
+      true,
+    ],
+    ["GUEST", strangerSession, false],
+  ] as const)("%s의 3+ plan CTA 권한을 고정한다", (_role, session, canCreate) => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(session));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult({
+      ...roomWithPlans(3),
+      members: [
+        ...baseRoom.members,
+        { id: UserIdSchema.make("user-member"), name: "민지", role: "MEMBER" },
+      ],
+    }));
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "여행안 비교하기" })).toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("button", { name: "새 여행안 제안하기" }))).toBe(canCreate);
+  });
+
+  it("확정 카드는 색상과 무관하게 '확정안' accessible name을 제공한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(
+      roomWithPlans(2, PlanIdSchema.make("plan-1")),
+    ));
+
+    renderPage();
+
+    expect(screen.getByRole("link", { name: /확정안 plan-1 여행안/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "확정 일정 보기" })).toBeInTheDocument();
+  });
+});
