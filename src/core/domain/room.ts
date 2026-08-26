@@ -172,26 +172,50 @@ export const TripPlanSchema = Schema.Struct({
 });
 export type TripPlan = typeof TripPlanSchema.Type;
 
-export const getPlanPublishValidationErrors = (
-  plan: Pick<
-    TripPlan,
-    | "title"
-    | "baseHeadcount"
-    | "routes"
-    | "accommodations"
-    | "transports"
-  >
-): ReadonlyArray<string> => {
+export type PlanPublishInput = Pick<
+  TripPlan,
+  | "title"
+  | "baseHeadcount"
+  | "routes"
+  | "accommodations"
+  | "transports"
+>;
+
+export interface PlanPublishCompletion {
+  readonly basic: boolean;
+  readonly route: boolean;
+  readonly accommodation: boolean;
+  readonly transport: boolean;
+}
+
+interface PlanPublishInspection {
+  readonly completion: PlanPublishCompletion;
+  readonly errors: ReadonlyArray<string>;
+}
+
+const inspectPlanForPublish = (
+  plan: PlanPublishInput
+): PlanPublishInspection => {
   const errors: string[] = [];
   const routes = plan.routes ?? [];
   const accommodations = plan.accommodations ?? [];
   const transports = plan.transports ?? [];
 
-  if (!plan.title.trim()) errors.push("여행안 제목을 입력해주세요.");
-  if (!Number.isInteger(plan.baseHeadcount) || (plan.baseHeadcount ?? 0) < 1) {
+  const titleComplete = Boolean(plan.title.trim());
+  const headcountComplete =
+    Number.isInteger(plan.baseHeadcount) && (plan.baseHeadcount ?? 0) >= 1;
+  if (!titleComplete) errors.push("여행안 제목을 입력해주세요.");
+  if (!headcountComplete) {
     errors.push("기준 인원수는 1명 이상이어야 합니다.");
   }
+
+  let routeComplete = true;
+  let accommodationComplete = true;
+  let transportComplete = true;
   if (routes.length === 0) {
+    routeComplete = false;
+    accommodationComplete = false;
+    transportComplete = false;
     errors.push("최소 1개 이상의 방문 도시를 추가해주세요.");
   } else {
     const incompleteRoute = routes.find(
@@ -199,10 +223,14 @@ export const getPlanPublishValidationErrors = (
         !city.trim() || !arrivalDate || !departureDate
     );
     if (incompleteRoute) {
+      routeComplete = false;
       errors.push(`${incompleteRoute.city || "도시"}의 도착일과 출발일을 입력해주세요.`);
     }
     const routeError = getRouteValidationError(routes);
-    if (routeError) errors.push(routeError);
+    if (routeError) {
+      routeComplete = false;
+      errors.push(routeError);
+    }
 
     const missingAccommodation =
       accommodations.length < routes.length ||
@@ -216,22 +244,26 @@ export const getPlanPublishValidationErrors = (
         )
       );
     if (missingAccommodation) {
+      accommodationComplete = false;
       errors.push("각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요.");
     }
 
     const requiredTransportCount = routes.length + 1;
     if (transports.length < requiredTransportCount) {
+      transportComplete = false;
       errors.push(`출국·도시 간 이동·귀국 교통을 ${requiredTransportCount}개 추가해주세요.`);
     }
   }
 
-  if (accommodations.some((stay) =>
+  const invalidAccommodation = accommodations.some((stay) =>
     !stay.city.trim() ||
     !stay.period.trim() ||
     !Number.isInteger(stay.nights) ||
     stay.nights < 1 ||
     (stay.isSearching ? Boolean(stay.hotelName.trim()) : !stay.hotelName.trim())
-  )) {
+  );
+  if (invalidAccommodation) {
+    accommodationComplete = false;
     errors.push("각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요.");
   }
 
@@ -243,10 +275,13 @@ export const getPlanPublishValidationErrors = (
         (!transport.mode.trim() || !transport.durationText.trim()))
   );
   if (incompleteTransport) {
+    transportComplete = false;
     errors.push("교통 구간의 출발지·도착지와 확인 상태를 입력해주세요.");
   }
 
-  const invalidPriceRange = [...accommodations, ...transports].find(
+  const hasInvalidPriceRange = (
+    items: ReadonlyArray<AccommodationSnapshot | TransportSnapshot>
+  ): boolean => items.some(
     ({ priceRange }) =>
       priceRange &&
       (!Number.isFinite(priceRange.min) ||
@@ -254,12 +289,35 @@ export const getPlanPublishValidationErrors = (
         priceRange.min < 0 ||
         priceRange.max < priceRange.min)
   );
-  if (invalidPriceRange) {
+  const invalidAccommodationPrice = hasInvalidPriceRange(accommodations);
+  const invalidTransportPrice = hasInvalidPriceRange(transports);
+  if (invalidAccommodationPrice || invalidTransportPrice) {
+    accommodationComplete &&= !invalidAccommodationPrice;
+    transportComplete &&= !invalidTransportPrice;
     errors.push("가격 범위는 0원 이상이며 최소 금액이 최대 금액보다 클 수 없습니다.");
   }
 
-  return [...new Set(errors)];
+  accommodationComplete &&= routeComplete;
+  transportComplete &&= routeComplete;
+
+  return {
+    completion: {
+      basic: titleComplete && headcountComplete,
+      route: routeComplete,
+      accommodation: accommodationComplete,
+      transport: transportComplete,
+    },
+    errors: [...new Set(errors)],
+  };
 };
+
+export const getPlanPublishCompletion = (
+  plan: PlanPublishInput
+): PlanPublishCompletion => inspectPlanForPublish(plan).completion;
+
+export const getPlanPublishValidationErrors = (
+  plan: PlanPublishInput
+): ReadonlyArray<string> => inspectPlanForPublish(plan).errors;
 
 export const TripMemberSchema = Schema.Struct({
   id: ParticipantIdSchema,
