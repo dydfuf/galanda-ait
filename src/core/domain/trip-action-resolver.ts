@@ -91,7 +91,7 @@ export const resolveEligibleTripActions = (
 ): ReadonlyArray<TripAction> => {
   if (context.conflict) return [];
   if (context.isConfirmed) {
-    return actor.can("room:view") ? [actions.VIEW_ITINERARY] : [];
+    return actor.isMember ? [actions.VIEW_ITINERARY] : [];
   }
 
   const decisions = new Map<DecisionId, string>(
@@ -135,7 +135,7 @@ export const resolveEligibleTripActions = (
   ) {
     eligible.push(actions.GIVE_OPINION);
   }
-  if (actor.can("room:view") && context.planCount >= 2) {
+  if (actor.isMember && context.planCount >= 2) {
     eligible.push(actions.COMPARE_PLANS);
   }
   if (actor.isHost && context.planCount >= 2) {

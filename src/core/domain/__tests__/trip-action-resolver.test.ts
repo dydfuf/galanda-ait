@@ -32,6 +32,7 @@ const room: TripRoom = {
 
 const host = getRoomActor(room, hostId);
 const member = getRoomActor(room, memberId);
+const guest = getRoomActor(room);
 
 const completeDraft: PlanPublishInput = {
   title: "서울 여행",
@@ -143,6 +144,20 @@ describe("deterministic Trip action resolver", () => {
     ));
 
     expect(actions).toEqual(["VIEW_ITINERARY"]);
+  });
+
+  it("guest에게 member journey action을 반환하지 않는다", () => {
+    expect(resolveEligibleTripActions(
+      context({ planCount: 2, isConfirmed: true }),
+      guest
+    )).toEqual([]);
+
+    const actions = actionIds(resolveEligibleTripActions(
+      context({ planCount: 2 }),
+      guest
+    ));
+    expect(actions).not.toContain("VIEW_ITINERARY");
+    expect(actions).not.toContain("COMPARE_PLANS");
   });
 
   it.each(["DRAFT", "REVISION"] as const)(
