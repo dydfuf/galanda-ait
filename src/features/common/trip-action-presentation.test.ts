@@ -48,15 +48,49 @@ describe("trip action journey adapter (RAON-236)", () => {
         voteCount: 0,
       })),
     };
-    const roomAction = resolveEligibleTripActions(
+    const roomActions = resolveEligibleTripActions(
       toTripRoomDecisionContext(twoPlanRoom, actor),
       actor,
-    )[0];
+    );
+    const roomAction = roomActions[0];
 
     expect(roomAction?.actionId).toBe("COMPARE_PLANS");
+    expect(roomActions).not.toContainEqual(
+      expect.objectContaining({ actionId: "CONFIRM_PLAN" }),
+    );
     expect(tripActionPresentation[roomAction!.actionId].route(room.id)).toBe(
       "/trips/trip-1/plans",
     );
     expect(tripActionPresentation[roomAction!.actionId].reason).toBeTruthy();
+  });
+
+  it.each([
+    ["DRAFT", RevisionSchema.make(1), false],
+    ["VOTING", undefined, false],
+    ["VOTING", RevisionSchema.make(1), true],
+  ] as const)("HOST에게 %s/revision=%s plan의 confirm eligibility를 정확히 반영한다", (status, revision, expected) => {
+    const plans = ["plan-1", "plan-2"].map((id) => ({
+      id: PlanIdSchema.make(id),
+      title: id,
+      status: status as "DRAFT" | "VOTING",
+      revision,
+      baseHeadcount: 1,
+      routes: [{ city: "도쿄", arrivalDate: "2026-09-01", departureDate: "2026-09-03" }],
+      accommodations: [{ id: `${id}-stay`, city: "도쿄", period: "2박", nights: 2, hotelName: "", isSearching: true, bookingStatus: "NOT_CHECKED" as const }],
+      transports: [
+        { id: `${id}-out`, fromCity: "서울", toCity: "도쿄", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" as const },
+        { id: `${id}-back`, fromCity: "도쿄", toCity: "서울", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" as const },
+      ],
+      places: [],
+      voteCount: 0,
+    }));
+    const targetRoom: TripRoom = { ...room, plans };
+    const actor = getRoomActor(targetRoom, UserIdSchema.make("host-1"));
+    const actions = resolveEligibleTripActions(
+      toTripRoomDecisionContext(targetRoom, actor),
+      actor,
+    );
+
+    expect(actions.some(({ actionId }) => actionId === "CONFIRM_PLAN")).toBe(expected);
   });
 });

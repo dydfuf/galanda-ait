@@ -5,12 +5,10 @@ import { ConfirmedItineraryRepository } from "../ports/confirmed-itinerary-repos
 import { IdGenerator } from "../ports/id-generator.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import {
-  isPlanConfirmed,
   requirePlanInRoom,
   requireRoomHost,
 } from "../domain/auth-guards.ts";
-import { getPlanPublishValidationErrors } from "../domain/room.ts";
-import { buildConfirmedItinerarySnapshot } from "../domain/confirmed-itinerary.ts";
+import { getPlanConfirmability } from "../domain/confirmed-itinerary.ts";
 import {
   confirmPlanInRoom,
   mergeParticipantIdentityInRoom,
@@ -47,7 +45,8 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     const plan = yield* requirePlanInRoom(room, planId);
 
     // 5. 확정은 한 번만 가능하며, 실패 시 저장소를 호출하지 않는다.
-    if (room.confirmedPlanId !== undefined || isPlanConfirmed(room, plan)) {
+    const confirmability = getPlanConfirmability(room, plan);
+    if (confirmability.kind === "CONFIRMED") {
       return yield* Effect.fail(
         new StateConflictError({
           message: "이미 확정된 여행안이 있어 다시 확정할 수 없습니다.",
@@ -55,21 +54,26 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
       );
     }
 
-    const validationError = getPlanPublishValidationErrors(plan)[0];
-    if (plan.status !== "VOTING" || !plan.revision || validationError) {
+    if (confirmability.kind === "INVALID_PUBLISH") {
       return yield* Effect.fail(
         new ValidationError({
-          message: validationError ?? "공개된 여행안 revision만 확정할 수 있습니다.",
+          message: confirmability.message,
         })
       );
     }
 
-    const snapshot = buildConfirmedItinerarySnapshot(plan, room.destination);
-    if (!snapshot) {
+    if (confirmability.kind === "INVALID_SNAPSHOT") {
       return yield* Effect.fail(
         new ValidationError({ message: "일정 스냅샷을 만들 수 없는 여행안입니다." })
       );
     }
+    const sourcePlanRevision = plan.revision;
+    if (!sourcePlanRevision) {
+      return yield* Effect.fail(
+        new ValidationError({ message: "공개된 여행안 revision만 확정할 수 있습니다." })
+      );
+    }
+    const { snapshot } = confirmability;
 
     const ids = yield* IdGenerator;
     const createdAt = new Date(yield* Clock.currentTimeMillis).toISOString();
@@ -77,7 +81,7 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
       id: yield* ids.itineraryId,
       tripId: room.id,
       sourcePlanId: plan.id,
-      sourcePlanRevision: plan.revision,
+      sourcePlanRevision,
       currentRevision: RevisionSchema.make(1),
       snapshot,
       createdBy: session.participantId,

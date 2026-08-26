@@ -3,6 +3,7 @@ import {
   type RoomActor,
 } from "../../core/domain/auth-guards.ts";
 import type { TripActionId } from "../../core/domain/trip-action.ts";
+import { isPlanConfirmable } from "../../core/domain/confirmed-itinerary.ts";
 import type {
   TripDecisionContext,
   TripRecommendationConflict,
@@ -97,6 +98,9 @@ export const toTripRoomDecisionContext = (
       ? opinionParticipantIds.has(actor.member.id)
       : false,
     isConfirmed: isRoomConfirmed(room),
+    confirmablePlanCount: room.plans.filter((plan) =>
+      isPlanConfirmable(room, plan)
+    ).length,
   };
 };
 
