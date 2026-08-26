@@ -1,5 +1,6 @@
 import { Effect, Exit, Layer } from "effect";
 import { describe, expect, it } from "vitest";
+import { ROLE_PERMISSIONS } from "../../domain/auth-guards.ts";
 import { InvalidInviteError, UnauthorizedError } from "../../domain/errors.ts";
 import {
   InviteTokenSchema,
@@ -97,6 +98,12 @@ const environment = (
   );
 
 describe("invite use cases", () => {
+  it("초대 링크 발급 권한은 HOST에게만 부여한다", () => {
+    expect(ROLE_PERMISSIONS.HOST.has("room:invite")).toBe(true);
+    expect(ROLE_PERMISSIONS.MEMBER.has("room:invite")).toBe(false);
+    expect(ROLE_PERMISSIONS.GUEST.has("room:invite")).toBe(false);
+  });
+
   it("방장이 7일짜리 opaque token을 발급하고 폐기를 멱등 호출한다", async () => {
     let issued: IssueInviteParams | undefined;
     let revokeCount = 0;

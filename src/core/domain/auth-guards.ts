@@ -23,7 +23,7 @@ export type RoomAction =
   | "room:join"        // 방 참여 (MEMBER 등록)
   | "room:update"      // 방 설정(제목, 일정, 목적지) 수정 (HOST 전용)
   | "room:delete"      // 방 삭제 (HOST 전용)
-  | "room:invite"      // 초대 링크 발급/공유
+  | "room:invite"      // 초대 링크 발급/공유 (HOST 전용)
   | "plan:create"      // 새 여행안 제안/생성
   | "plan:update"      // 여행안 수정
   | "plan:delete"      // 여행안 삭제
@@ -49,7 +49,6 @@ export const ROLE_PERMISSIONS: Record<RoomRole, ReadonlySet<RoomAction>> = {
   MEMBER: new Set<RoomAction>([
     "room:view",
     "room:join",
-    "room:invite",
     "plan:create",
     "plan:update",
     "plan:delete",
@@ -362,5 +361,4 @@ export const requireMutablePlan = (
   isPlanConfirmed(room, plan)
     ? Effect.fail(new StateConflictError({ message: reason }))
     : Effect.void;
-
 
