@@ -5,8 +5,15 @@ import {
   canManagePlan,
   isPlanConfirmed as isDomainPlanConfirmed,
   isRoomConfirmed as isDomainRoomConfirmed,
+  type RoomActor,
   type ParticipantIdentity,
 } from "../../core/domain/auth-guards.ts";
+import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
+import type { TripActionId } from "../../core/domain/trip-action.ts";
+import {
+  toTripRoomDecisionContext,
+  tripActionPresentation,
+} from "../common/trip-action-presentation.ts";
 
 export interface PlanOpinionCounts {
   readonly likeCount: number;
@@ -77,10 +84,8 @@ export const getTripListStatusText = (
  * - 후보 2개 이상: 여행안 비교하기 (fast compare / selector는 기존 계약 유지)
  * - 확정: 확정 일정 보기 (mutation 진입 없음)
  *
- * RBAC 계약: `새 여행안 만들기/제안하기`는 `plan:create` capability가 있을 때만 노출한다.
- * GUEST(열람자)에게 허용되지 않은 mutation CTA를 보여주고 편집기 마지막에 거절하지 않는다.
- * - GUEST + 후보 2개 이상 → 여행안 비교하기(열람)만 노출
- * - GUEST + 후보 0~1개 → mutation primary 없음 (null)
+ * RBAC 계약: 공통 eligible action resolver가 HOST/MEMBER에게만 next action을 제공한다.
+ * GUEST에게는 mutation과 recommendation CTA를 모두 노출하지 않는다.
  *
  * 후보 추가 진입(`새 여행안 제안하기`)은 비교가 primary가 되는 2개 이상 & 미확정 &
  * plan:create 가능자에서만 후보 section의 secondary로 노출해
@@ -99,54 +104,30 @@ export interface PlanHomeCtaContract {
   readonly showNewProposalEntry: boolean;
 }
 
-export interface PlanHomeCtaInput {
-  readonly isConfirmed: boolean;
-  readonly candidateCount: number;
-  /** 세션 actor의 `plan:create` capability (RBAC: HOST/MEMBER true, GUEST false) */
-  readonly canCreatePlan: boolean;
-}
+const planHomeCtaKind: Partial<Record<TripActionId, PlanHomePrimaryCtaKind>> = {
+  EDIT_PLAN_BASIC: "create-first",
+  PROPOSE_ALTERNATIVE: "propose-new",
+  COMPARE_PLANS: "compare",
+  VIEW_ITINERARY: "view-itinerary",
+};
 
 export const resolvePlanHomeCta = (
-  input: PlanHomeCtaInput,
+  room: TripRoom,
+  actor: RoomActor,
 ): PlanHomeCtaContract => {
-  const noProposalEntry = { showNewProposalEntry: false } as const;
+  const actionId = resolveEligibleTripActions(
+    toTripRoomDecisionContext(room, actor),
+    actor,
+  )[0]?.actionId;
+  const primaryKind = actionId ? (planHomeCtaKind[actionId] ?? null) : null;
 
-  if (input.isConfirmed) {
-    return {
-      primaryKind: "view-itinerary",
-      primaryLabel: "확정 일정 보기",
-      ...noProposalEntry,
-    };
-  }
-  if (!input.canCreatePlan) {
-    // 열람자(GUEST): plan:create mutation CTA는 노출하지 않는다. 비교(열람)만 남긴다.
-    if (input.candidateCount >= 2) {
-      return {
-        primaryKind: "compare",
-        primaryLabel: "여행안 비교하기",
-        ...noProposalEntry,
-      };
-    }
-    return { primaryKind: null, primaryLabel: null, ...noProposalEntry };
-  }
-  if (input.candidateCount === 0) {
-    return {
-      primaryKind: "create-first",
-      primaryLabel: "첫 여행안 만들기",
-      ...noProposalEntry,
-    };
-  }
-  if (input.candidateCount === 1) {
-    return {
-      primaryKind: "propose-new",
-      primaryLabel: "새 여행안 제안하기",
-      ...noProposalEntry,
-    };
-  }
   return {
-    primaryKind: "compare",
-    primaryLabel: "여행안 비교하기",
-    showNewProposalEntry: true,
+    primaryKind,
+    primaryLabel: primaryKind && actionId
+      ? tripActionPresentation[actionId].label
+      : null,
+    showNewProposalEntry:
+      primaryKind === "compare" && actor.can("plan:create"),
   };
 };
 

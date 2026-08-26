@@ -1,6 +1,7 @@
 import { formatCostRangeText } from "../../../core/calculations/plan-cost.ts";
+import type { TripActionId } from "../../../core/domain/trip-action.ts";
 import {
-  getRouteValidationError,
+  getPlanPublishCompletion,
   getStayNightCount,
 } from "../../../core/domain/room.ts";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
 import type { PlanEditorSection } from "../plan-editor-section.ts";
+import { tripActionPresentation } from "../../common/trip-action-presentation.ts";
 import { AccommodationSection } from "./AccommodationSection.tsx";
 import { BasicInfoSection } from "./BasicInfoSection.tsx";
 import { DiffBanner } from "./DiffBanner.tsx";
@@ -28,6 +30,7 @@ interface PlanEditorSectionsProps {
   readonly isCloneMode: boolean;
   readonly cloneTitle?: string;
   readonly isFirstPlan?: boolean;
+  readonly recommendedActionId?: TripActionId;
   readonly onOpenSection: (section: PlanEditorSection) => void;
   readonly onCompleteSection: () => void;
 }
@@ -93,90 +96,16 @@ export function PlanEditorSections({
   isCloneMode,
   cloneTitle,
   isFirstPlan = false,
+  recommendedActionId,
   onOpenSection,
   onCompleteSection,
 }: PlanEditorSectionsProps): JSX.Element {
-  // Domain-aligned section validity (matches getPlanPublishValidationErrors)
-  const isRouteValid = (() => {
-    if (editor.routes.length === 0) return false;
-    if (editor.routes.some((route) => !route.city.trim() || !route.arrivalDate || !route.departureDate)) {
-      return false;
-    }
-    if (getRouteValidationError(editor.routes)) return false;
-    return true;
-  })();
-
-  const isAccommodationSectionValid = (() => {
-    if (editor.routes.length === 0) return false;
-    if (editor.accommodations.length === 0) return false;
-    // missingAccommodation per domain
-    const missingAccommodation =
-      editor.accommodations.length < editor.routes.length ||
-      editor.routes.some(
-        (route) =>
-          !editor.accommodations.some(
-            (stay) =>
-              stay.city.trim() === route.city.trim() &&
-              Boolean(stay.period.trim()) &&
-              stay.nights === getStayNightCount(route) &&
-              (stay.isSearching || Boolean(stay.hotelName.trim()))
-          )
-      );
-    if (missingAccommodation) return false;
-    const invalidAccommodation = editor.accommodations.some(
-      (stay) =>
-        !stay.city.trim() ||
-        !stay.period.trim() ||
-        !Number.isInteger(stay.nights) ||
-        stay.nights < 1 ||
-        (stay.isSearching ? Boolean(stay.hotelName.trim()) : !stay.hotelName.trim())
-    );
-    if (invalidAccommodation) return false;
-    // priceRange invalid also makes it incomplete (domain)
-    const invalidPrice = editor.accommodations.some(
-      ({ priceRange }) =>
-        priceRange &&
-        (!Number.isFinite(priceRange.min) ||
-          !Number.isFinite(priceRange.max) ||
-          priceRange.min < 0 ||
-          priceRange.max < priceRange.min)
-    );
-    if (invalidPrice) return false;
-    return true;
-  })();
-
-  const isTransportSectionValid = (() => {
-    if (editor.routes.length === 0) return false;
-    const requiredTransportCount = editor.routes.length + 1;
-    if (editor.transports.length < requiredTransportCount) return false;
-    const incompleteTransport = editor.transports.find(
-      (transport) =>
-        !transport.fromCity.trim() ||
-        !transport.toCity.trim() ||
-        (transport.bookingStatus !== "NOT_CHECKED" &&
-          (!transport.mode.trim() || !transport.durationText.trim()))
-    );
-    if (incompleteTransport) return false;
-    const invalidPrice = editor.transports.some(
-      ({ priceRange }) =>
-        priceRange &&
-        (!Number.isFinite(priceRange.min) ||
-          !Number.isFinite(priceRange.max) ||
-          priceRange.min < 0 ||
-          priceRange.max < priceRange.min)
-    );
-    if (invalidPrice) return false;
-    return true;
-  })();
-
-  const editorBaseHeadcount = editor.baseHeadcount ?? editor.costSummary?.baseHeadcount ?? 0;
-  const basicComplete =
-    Boolean(editor.title.trim()) &&
-    Number.isInteger(editorBaseHeadcount) &&
-    editorBaseHeadcount >= 1;
-  const routeComplete = isRouteValid;
-  const accommodationComplete = isAccommodationSectionValid;
-  const transportComplete = isTransportSectionValid;
+  const {
+    basic: basicComplete,
+    route: routeComplete,
+    accommodation: accommodationComplete,
+    transport: transportComplete,
+  } = getPlanPublishCompletion(editor);
   const accommodationEmpty = editor.accommodations.length === 0;
   const transportEmpty = editor.transports.length === 0;
 
@@ -216,15 +145,9 @@ export function PlanEditorSections({
       accommodationComplete,
       transportComplete,
     ].filter(Boolean).length;
-    const nextRecommended: PlanEditorSection | undefined = !basicComplete
-      ? "basic"
-      : !routeComplete
-        ? "route"
-        : !accommodationComplete
-          ? "accommodation"
-          : !transportComplete
-            ? "transport"
-            : undefined;
+    const nextRecommended = recommendedActionId
+      ? tripActionPresentation[recommendedActionId].section
+      : undefined;
 
     return (
       <>

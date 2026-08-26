@@ -117,15 +117,15 @@ describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
     expect(hasStickyCtaSpace(container)).toBe(true);
   });
 
-  it("GUEST에게 mutation CTA(새 여행안 제안하기)를 노출하지 않고 열람 action인 비교하기만 남긴다", () => {
+  it("GUEST에게 공통 NBA recommendation CTA를 노출하지 않는다", () => {
     mockUseSessionQuery.mockReturnValue(toQueryResult(strangerSession));
     mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(3)));
 
     const { container } = renderPage();
 
     expect(screen.queryByRole("button", { name: "새 여행안 제안하기" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "여행안 비교하기" })).toBeInTheDocument();
-    expect(hasStickyCtaSpace(container)).toBe(true);
+    expect(screen.queryByRole("button", { name: "여행안 비교하기" })).not.toBeInTheDocument();
+    expect(hasStickyCtaSpace(container)).toBe(false);
   });
 
   it("GUEST + 후보 0개는 어떤 CTA 버튼도 렌더하지 않는다", () => {
@@ -149,6 +149,18 @@ describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
     expect(screen.getAllByRole("button", { name: "확정 일정 보기" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "여행안 비교하기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "새 여행안 제안하기" })).not.toBeInTheDocument();
+  });
+
+  it("확정 상태도 GUEST에게 itinerary recommendation을 노출하지 않는다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(strangerSession));
+    mockUseTripRoomRawQuery.mockReturnValue(
+      toQueryResult(roomWithPlans(2, PlanIdSchema.make("plan-1"))),
+    );
+
+    const { container } = renderPage();
+
+    expect(screen.queryByRole("button", { name: "확정 일정 보기" })).not.toBeInTheDocument();
+    expect(hasStickyCtaSpace(container)).toBe(false);
   });
 
   it("세션 로딩 중에는 오류 fallback 대신 로딩을 유지해 capability 조기 확정을 막는다", () => {
@@ -256,7 +268,7 @@ describe("PlanHomePage regression contract (RAON-229)", () => {
 
     renderPage();
 
-    expect(screen.getByRole("button", { name: "여행안 비교하기" })).toBeInTheDocument();
+    expect(Boolean(screen.queryByRole("button", { name: "여행안 비교하기" }))).toBe(canCreate);
     expect(Boolean(screen.queryByRole("button", { name: "새 여행안 제안하기" }))).toBe(canCreate);
   });
 
