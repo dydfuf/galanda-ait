@@ -35,6 +35,7 @@ import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { TripActionRanker } from "../ports/trip-action-ranker.ts";
+import type { TripActionRankingInput } from "../ports/trip-action-ranker.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 
 export interface RecommendNextTripActionCommand {
@@ -51,6 +52,7 @@ export interface NextTripActionRecommendation {
   readonly alternatives: ReadonlyArray<TripAction>;
   readonly source: RecommendationSource;
   readonly contextFingerprint: string;
+  readonly rankingInput: TripActionRankingInput;
 }
 
 interface RecommendationFingerprintInput {
@@ -148,13 +150,14 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
     let rankedActions = actions;
     let source: RecommendationSource = "RULE";
     let policyVersion = NBA_RULE_POLICY_VERSION;
+    const rankingInput = {
+      surface: command.surface,
+      decisions: resolveTripDecisions(context),
+      eligibleActions: actions,
+    } satisfies TripActionRankingInput;
     const ranker = yield* Effect.serviceOption(TripActionRanker);
     if (Option.isSome(ranker)) {
-      const ranking = yield* ranker.value.rank({
-        surface: command.surface,
-        decisions: resolveTripDecisions(context),
-        eligibleActions: actions,
-      }).pipe(
+      const ranking = yield* ranker.value.rank(rankingInput).pipe(
         Effect.map(Option.some),
         Effect.catch((error) =>
           Effect.logWarning("nba_ai_ranker_fallback").pipe(
@@ -216,6 +219,7 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       alternatives: rankedActions.slice(1),
       source,
       contextFingerprint,
+      rankingInput,
     } satisfies NextTripActionRecommendation;
   }
 );

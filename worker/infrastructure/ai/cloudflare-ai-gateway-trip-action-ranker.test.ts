@@ -4,6 +4,7 @@ import type { TripActionRankingInput } from "../../../src/core/ports/trip-action
 import {
   makeCloudflareAiGatewayTripActionRanker,
   type CloudflareAiGatewayRankerConfig,
+  type CloudflareAiGatewayRankerTelemetry,
 } from "./cloudflare-ai-gateway-trip-action-ranker.ts";
 
 const config: CloudflareAiGatewayRankerConfig = {
@@ -47,8 +48,9 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
   it("Responses API structured output을 ranking으로 변환한다", async () => {
     let requestedUrl = "";
     let requestedInit: RequestInit | undefined;
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
     const ranker = makeCloudflareAiGatewayTripActionRanker(
-      config,
+      { ...config, onTelemetry: (event) => telemetry.push(event) },
       async (url, init) => {
         requestedUrl = url instanceof Request
           ? url.url
@@ -87,6 +89,22 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
       store: false,
       text: { format: { type: "json_schema", strict: true } },
     });
+    expect(telemetry).toEqual([
+      expect.objectContaining({
+        status: "COMPLETED",
+        provider: "openai",
+        model: "test-model",
+        configuredTimeoutMs: 100,
+        statusCode: 200,
+        inputTokens: 12,
+        outputTokens: 8,
+        totalTokens: 20,
+      }),
+    ]);
+    expect(telemetry[0]?.firstResponseLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(telemetry[0]?.totalLatencyMs).toBeGreaterThanOrEqual(
+      telemetry[0]?.firstResponseLatencyMs ?? 0
+    );
   });
 
   it.each([

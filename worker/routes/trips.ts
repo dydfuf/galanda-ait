@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Logger, Schema } from "effect";
 import { Hono, type Context as HonoContext } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { RepositoryError } from "../../src/core/domain/errors.ts";
@@ -17,6 +17,7 @@ import type { IdGenerator } from "../../src/core/ports/id-generator.ts";
 import type { InviteRepository } from "../../src/core/ports/invite-repository.ts";
 import type { SessionService } from "../../src/core/ports/session.ts";
 import type { TripRoomRepository } from "../../src/core/ports/trip-room-repository.ts";
+import type { TripActionRankerService } from "../../src/core/ports/trip-action-ranker.ts";
 import type { ConfirmedItineraryRepository } from "../../src/core/ports/confirmed-itinerary-repository.ts";
 import {
   CreateRoomInputSchema,
@@ -50,7 +51,10 @@ import { Database } from "../../src/infrastructure/persistence/drizzle/database.
 import { TripRoomRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-room-repository.ts";
 import { ConfirmedItineraryRepositoryLive } from "../../src/infrastructure/persistence/drizzle/confirmed-itinerary-repository.ts";
 import type { AppEnv } from "../app.ts";
-import { runEffect } from "../http/effect-handler.ts";
+import {
+  runEffect,
+  type RunEffectOptions,
+} from "../http/effect-handler.ts";
 import { effectValidator } from "../http/effect-validator.ts";
 import type { RequestScopeService } from "../http/request-scope.ts";
 import {
@@ -59,6 +63,7 @@ import {
   joinTripByInvite,
   revokeTripInvite,
 } from "../../src/core/usecases/invite.ts";
+import { makeCloudflareAiGatewayTripActionRanker } from "../infrastructure/ai/cloudflare-ai-gateway-trip-action-ranker.ts";
 
 const TripParamsSchema = Schema.Struct({ tripId: TripIdSchema });
 const PublicInviteParamsSchema = Schema.Struct({ inviteToken: Schema.String });
@@ -112,6 +117,86 @@ const toRecommendNextActionResponse = (
   contextFingerprint: recommendation.contextFingerprint,
 });
 
+const runShadowRanking = (
+  recommendation: NextTripActionRecommendation,
+  ranker: TripActionRankerService,
+  requestId: string,
+  endpointWallLatencyMs: number
+): Promise<void> =>
+  Effect.runPromise(
+    ranker.rank(recommendation.rankingInput).pipe(
+      Effect.tap((ranking) =>
+        Effect.logInfo("nba_shadow_completed").pipe(
+          Effect.annotateLogs({
+            eventName: "nba_shadow_completed",
+            ruleActionId: recommendation.primary.actionId,
+            shadowActionId: ranking.primaryActionId,
+            disagreed: ranking.primaryActionId !== recommendation.primary.actionId,
+            eligibleActionCount: recommendation.rankingInput.eligibleActions.length,
+            contextFingerprint: recommendation.contextFingerprint,
+            policyVersion: ranker.policyVersion,
+            endpointWallLatencyMs,
+          })
+        )
+      ),
+      Effect.map(() => undefined),
+      Effect.catch((error) =>
+        Effect.logWarning("nba_shadow_failed").pipe(
+          Effect.annotateLogs({
+            eventName: "nba_shadow_failed",
+            failure: error.reason,
+            eligibleActionCount: recommendation.rankingInput.eligibleActions.length,
+            contextFingerprint: recommendation.contextFingerprint,
+            policyVersion: ranker.policyVersion,
+            endpointWallLatencyMs,
+          })
+        )
+      ),
+      Effect.annotateLogs({ requestId }),
+      Effect.provide(Logger.layer([Logger.consoleStructured]))
+    )
+  );
+
+const scheduleShadowRanking = (
+  c: HonoContext<AppEnv>,
+  recommendation: NextTripActionRecommendation,
+  endpointWallLatencyMs: number
+) => {
+  if ((c.env.AI_RECOMMENDATION_MODE?.trim() ?? "off") !== "shadow") return;
+
+  if (recommendation.rankingInput.eligibleActions.length === 1) {
+    c.executionCtx.waitUntil(Effect.runPromise(
+      Effect.logInfo("nba_shadow_skipped").pipe(
+        Effect.annotateLogs({
+          eventName: "nba_shadow_skipped",
+          reason: "SINGLE_ELIGIBLE_ACTION",
+          contextFingerprint: recommendation.contextFingerprint,
+          endpointWallLatencyMs,
+          requestId: c.var.requestId,
+        }),
+        Effect.provide(Logger.layer([Logger.consoleStructured]))
+      )
+    ));
+    return;
+  }
+
+  const ranker = makeCloudflareAiGatewayTripActionRanker({
+    accountId: c.env.AI_GATEWAY_ACCOUNT_ID ?? "",
+    gatewayId: c.env.AI_GATEWAY_ID ?? "",
+    gatewayToken: c.env.AI_GATEWAY_TOKEN ?? "",
+    model: c.env.AI_RECOMMENDATION_MODEL ?? "",
+    policyVersion: c.env.AI_RECOMMENDATION_POLICY_VERSION ?? "",
+    timeoutMs: Number(c.env.AI_RECOMMENDATION_TIMEOUT_MS),
+    openAiApiKey: c.env.OPENAI_API_KEY,
+  });
+  c.executionCtx.waitUntil(runShadowRanking(
+    recommendation,
+    ranker,
+    c.var.requestId,
+    endpointWallLatencyMs
+  ));
+};
+
 type TripRequirements =
   | RequestScopeService
   | SessionService
@@ -123,7 +208,8 @@ type TripRequirements =
 const runTripEffect = <A, E>(
   c: HonoContext<AppEnv>,
   effect: Effect.Effect<A, E, TripRequirements>,
-  status?: ContentfulStatusCode
+  status?: ContentfulStatusCode,
+  mapSuccess?: RunEffectOptions<A>["mapSuccess"]
 ): Promise<Response> => {
   const db = c.var.database;
   if (!db) {
@@ -150,7 +236,10 @@ const runTripEffect = <A, E>(
     ),
     IdGeneratorLive
   );
-  return runEffect(c, effect.pipe(Effect.provide(services)), { status });
+  return runEffect(c, effect.pipe(Effect.provide(services)), {
+    status,
+    mapSuccess,
+  });
 };
 
 export const tripsRoute = new Hono<AppEnv>();
@@ -221,14 +310,33 @@ tripsRoute.post(
   "/:tripId/recommendations/next",
   effectValidator("param", TripParamsSchema),
   effectValidator("json", RecommendNextActionRequestSchema, strictInput),
-  (c) =>
-    runTripEffect(
+  (c) => {
+    const startedAt = Date.now();
+    return runTripEffect(
       c,
       recommendNextTripAction({
         tripId: c.req.valid("param").tripId,
         ...c.req.valid("json"),
-      }).pipe(Effect.map(toRecommendNextActionResponse))
-    )
+      }),
+      undefined,
+      (recommendation, context) => {
+        try {
+          scheduleShadowRanking(
+            context,
+            recommendation,
+            Date.now() - startedAt
+          );
+        } catch (error) {
+          console.error(JSON.stringify({
+            message: "nba_shadow_schedule_failed",
+            requestId: context.var.requestId,
+            error: error instanceof Error ? error.message : String(error),
+          }));
+        }
+        return context.json(toRecommendNextActionResponse(recommendation));
+      }
+    );
+  }
 );
 
 tripsRoute.get(

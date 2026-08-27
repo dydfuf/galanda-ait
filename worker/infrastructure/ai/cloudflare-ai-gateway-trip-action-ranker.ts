@@ -18,6 +18,22 @@ export interface CloudflareAiGatewayRankerConfig {
   readonly policyVersion: string;
   readonly timeoutMs: number;
   readonly openAiApiKey?: string;
+  readonly onTelemetry?: (telemetry: CloudflareAiGatewayRankerTelemetry) => void;
+}
+
+export interface CloudflareAiGatewayRankerTelemetry {
+  readonly status: "COMPLETED" | "FAILED";
+  readonly provider: "openai";
+  readonly model: string;
+  readonly policyVersion: string;
+  readonly firstResponseLatencyMs: number;
+  readonly totalLatencyMs: number;
+  readonly configuredTimeoutMs: number;
+  readonly statusCode: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly totalTokens: number;
+  readonly failure?: TripActionRankingError["reason"];
 }
 
 type Fetcher = (
@@ -108,6 +124,13 @@ export const makeCloudflareAiGatewayTripActionRanker = (
     encodeURIComponent(gatewayId),
     "openai/responses",
   ].join("/");
+  const emitTelemetry = (telemetry: CloudflareAiGatewayRankerTelemetry) => {
+    try {
+      config.onTelemetry?.(telemetry);
+    } catch {
+      // Telemetry observers must never change ranking behavior.
+    }
+  };
 
   return {
     policyVersion,
@@ -179,6 +202,7 @@ export const makeCloudflareAiGatewayTripActionRanker = (
               },
             }),
           });
+          const firstResponseLatencyMs = Date.now() - startedAt;
           if (!response.ok) {
             throw new TripActionRankingError({
               reason: "PROVIDER_ERROR",
@@ -188,6 +212,7 @@ export const makeCloudflareAiGatewayTripActionRanker = (
 
           return {
             ...(await decodeRanking(response, input.eligibleActions)),
+            firstResponseLatencyMs,
             statusCode: response.status,
           };
         },
@@ -200,32 +225,73 @@ export const makeCloudflareAiGatewayTripActionRanker = (
       });
 
       return request.pipe(
-        Effect.tap(({ inputTokens, outputTokens, totalTokens, statusCode }) =>
-          Effect.logInfo("nba_ai_ranker_completed").pipe(
+        Effect.tap(({
+          firstResponseLatencyMs,
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          statusCode,
+        }) => {
+          const totalLatencyMs = Date.now() - startedAt;
+          emitTelemetry({
+            status: "COMPLETED",
+            provider: "openai",
+            model,
+            policyVersion,
+            firstResponseLatencyMs,
+            totalLatencyMs,
+            configuredTimeoutMs: config.timeoutMs,
+            statusCode,
+            inputTokens,
+            outputTokens,
+            totalTokens,
+          });
+          return Effect.logInfo("nba_ai_ranker_completed").pipe(
             Effect.annotateLogs({
               provider: "openai",
               model,
               policyVersion,
-              latencyMs: Date.now() - startedAt,
+              latencyMs: totalLatencyMs,
+              providerFirstResponseLatencyMs: firstResponseLatencyMs,
+              providerTotalLatencyMs: totalLatencyMs,
+              configuredTimeoutMs: config.timeoutMs,
               statusCode,
               inputTokens,
               outputTokens,
               totalTokens,
             })
-          )
-        ),
-        Effect.tapError((error) =>
-          Effect.logWarning("nba_ai_ranker_failed").pipe(
+          );
+        }),
+        Effect.tapError((error) => {
+          const totalLatencyMs = Date.now() - startedAt;
+          emitTelemetry({
+            status: "FAILED",
+            provider: "openai",
+            model,
+            policyVersion,
+            firstResponseLatencyMs: 0,
+            totalLatencyMs,
+            configuredTimeoutMs: config.timeoutMs,
+            statusCode: error.statusCode ?? 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            failure: error.reason,
+          });
+          return Effect.logWarning("nba_ai_ranker_failed").pipe(
             Effect.annotateLogs({
               provider: "openai",
               model,
               policyVersion,
-              latencyMs: Date.now() - startedAt,
+              latencyMs: totalLatencyMs,
+              providerFirstResponseLatencyMs: 0,
+              providerTotalLatencyMs: totalLatencyMs,
+              configuredTimeoutMs: config.timeoutMs,
               failure: error.reason,
               statusCode: error.statusCode ?? 0,
             })
-          )
-        ),
+          );
+        }),
         Effect.map(({ ranking }) => ranking)
       );
     },

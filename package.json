@@ -21,6 +21,7 @@
     "types:worker": "wrangler types",
     "typecheck": "wrangler types --check && tsc -b --pretty false",
     "test": "vitest run",
+    "eval:nba": "node scripts/run-trip-action-ranking-eval.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.dev.vars ./node_modules/drizzle-kit/bin.cjs migrate",
     "db:check": "drizzle-kit check",

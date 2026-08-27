@@ -25,8 +25,19 @@ export interface AppVariables {
   authSessionError?: unknown;
 }
 
+export interface AiRecommendationBindings {
+  readonly AI_RECOMMENDATION_MODE?: string;
+  readonly AI_RECOMMENDATION_MODEL?: string;
+  readonly AI_RECOMMENDATION_POLICY_VERSION?: string;
+  readonly AI_RECOMMENDATION_TIMEOUT_MS?: string;
+  readonly AI_GATEWAY_ACCOUNT_ID?: string;
+  readonly AI_GATEWAY_ID?: string;
+  readonly AI_GATEWAY_TOKEN?: string;
+  readonly OPENAI_API_KEY?: string;
+}
+
 export interface AppEnv {
-  Bindings: Env & BetterAuthEnv;
+  Bindings: Env & BetterAuthEnv & AiRecommendationBindings;
   Variables: AppVariables;
 }
 
