@@ -73,3 +73,10 @@ export const TripActionSchema = Schema.Struct({
   reasonCode: RecommendationReasonSchema,
 });
 export type TripAction = typeof TripActionSchema.Type;
+
+export const TripActionRankingSchema = Schema.Struct({
+  primaryActionId: TripActionIdSchema,
+  alternativeActionIds: Schema.Array(TripActionIdSchema),
+  reasonCode: RecommendationReasonSchema,
+});
+export type TripActionRanking = typeof TripActionRankingSchema.Type;

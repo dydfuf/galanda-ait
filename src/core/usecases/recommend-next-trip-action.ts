@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 import {
   getRoomActor,
   requireRoomMember,
@@ -15,12 +15,17 @@ import type {
 } from "../domain/ids.ts";
 import {
   NBA_RULE_POLICY_VERSION,
+  type RecommendationSource,
   type RecommendationSurface,
   type TripAction,
   type TripActionId,
 } from "../domain/trip-action.ts";
-import { resolveEligibleTripActions } from "../domain/trip-action-resolver.ts";
 import {
+  applyTripActionRanking,
+  resolveEligibleTripActions,
+} from "../domain/trip-action-resolver.ts";
+import {
+  resolveTripDecisions,
   toFirstPlanDecisionContext,
   toTripRoomDecisionContext,
   type TripRecommendationConflict,
@@ -29,6 +34,7 @@ import type { PlanPublishCompletion } from "../domain/room.ts";
 import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
 import { IdGenerator } from "../ports/id-generator.ts";
 import { requireAuthSession } from "../ports/session.ts";
+import { TripActionRanker } from "../ports/trip-action-ranker.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 
 export interface RecommendNextTripActionCommand {
@@ -43,11 +49,12 @@ export interface NextTripActionRecommendation {
   readonly recommendationId: RecommendationId;
   readonly primary: TripAction;
   readonly alternatives: ReadonlyArray<TripAction>;
-  readonly source: "RULE";
+  readonly source: RecommendationSource;
   readonly contextFingerprint: string;
 }
 
 interface RecommendationFingerprintInput {
+  readonly policyVersion: string;
   readonly tripRevision: Revision;
   readonly surface: RecommendationSurface;
   readonly draft?: PlanPublishCompletion & {
@@ -60,7 +67,7 @@ const createRecommendationContextFingerprint = async (
   input: RecommendationFingerprintInput
 ): Promise<string> => {
   const bytes = new TextEncoder().encode(JSON.stringify({
-    policyVersion: NBA_RULE_POLICY_VERSION,
+    policyVersion: input.policyVersion,
     tripRevision: input.tripRevision,
     surface: input.surface,
     draftState: input.draft
@@ -129,8 +136,8 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
         )
       : toTripRoomDecisionContext(room, actor);
     const actions = resolveEligibleTripActions(context, actor);
-    const primary = actions[0];
-    if (!primary) {
+    const deterministicPrimary = actions[0];
+    if (!deterministicPrimary) {
       return yield* Effect.fail(
         new StateConflictError({
           message: "현재 상태에서 추천할 수 있는 다음 행동이 없습니다.",
@@ -138,17 +145,59 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       );
     }
 
+    let rankedActions = actions;
+    let source: RecommendationSource = "RULE";
+    let policyVersion = NBA_RULE_POLICY_VERSION;
+    const ranker = yield* Effect.serviceOption(TripActionRanker);
+    if (Option.isSome(ranker)) {
+      const ranking = yield* ranker.value.rank({
+        surface: command.surface,
+        decisions: resolveTripDecisions(context),
+        eligibleActions: actions,
+      }).pipe(
+        Effect.map(Option.some),
+        Effect.catch((error) =>
+          Effect.logWarning("nba_ai_ranker_fallback").pipe(
+            Effect.annotateLogs({
+              reason: error.reason,
+              surface: command.surface,
+              policyVersion: ranker.value.policyVersion,
+            }),
+            Effect.as(Option.none())
+          )
+        )
+      );
+      if (Option.isSome(ranking)) {
+        const applied = applyTripActionRanking(actions, ranking.value);
+        if (applied?.[0]) {
+          rankedActions = applied;
+          source = "AI";
+          policyVersion = ranker.value.policyVersion;
+        } else {
+          yield* Effect.logWarning("nba_ai_ranker_fallback").pipe(
+            Effect.annotateLogs({
+              reason: "INVALID_OUTPUT",
+              surface: command.surface,
+              policyVersion: ranker.value.policyVersion,
+            })
+          );
+        }
+      }
+    }
+
+    const primary = rankedActions[0] ?? deterministicPrimary;
+
     const ids = yield* IdGenerator;
     const recommendationId = yield* ids.recommendationId;
     const contextFingerprint = yield* Effect.promise(() =>
       createRecommendationContextFingerprint({
+        policyVersion,
         tripRevision: room.revision,
         surface: command.surface,
         draft: command.draft,
         eligibleActionIds: actions.map(({ actionId }) => actionId),
       })
     );
-    const source = "RULE" as const;
     const event = {
       eventName: "nba_recommendation_generated" as const,
       recommendationId,
@@ -156,7 +205,7 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       actionId: primary.actionId,
       reasonCode: primary.reasonCode,
       surface: command.surface,
-      policyVersion: NBA_RULE_POLICY_VERSION,
+      policyVersion,
       contextFingerprint,
     };
     yield* Effect.logInfo(event.eventName).pipe(Effect.annotateLogs(event));
@@ -164,7 +213,7 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
     return {
       recommendationId,
       primary,
-      alternatives: actions.slice(1),
+      alternatives: rankedActions.slice(1),
       source,
       contextFingerprint,
     } satisfies NextTripActionRecommendation;
