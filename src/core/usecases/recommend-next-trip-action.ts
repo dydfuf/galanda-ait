@@ -2,6 +2,7 @@ import { Effect, Option } from "effect";
 import {
   getRoomActor,
   requireRoomMember,
+  type RoomRole,
 } from "../domain/auth-guards.ts";
 import {
   NotFoundError,
@@ -18,10 +19,10 @@ import {
   type RecommendationSource,
   type RecommendationSurface,
   type TripAction,
-  type TripActionId,
 } from "../domain/trip-action.ts";
 import {
   applyTripActionRanking,
+  isAiRankingNeeded,
   resolveEligibleTripActions,
 } from "../domain/trip-action-resolver.ts";
 import {
@@ -51,26 +52,37 @@ export interface NextTripActionRecommendation {
   readonly primary: TripAction;
   readonly alternatives: ReadonlyArray<TripAction>;
   readonly source: RecommendationSource;
+  readonly policyVersion: string;
+  readonly tripRevision: Revision;
   readonly contextFingerprint: string;
   readonly rankingInput: TripActionRankingInput;
 }
 
 interface RecommendationFingerprintInput {
-  readonly policyVersion: string;
+  readonly tripId: TripId;
+  readonly rulePolicyVersion: string;
+  readonly rankingPolicyVersion?: string;
   readonly tripRevision: Revision;
+  readonly actorCapabilityScope: RoomRole;
   readonly surface: RecommendationSurface;
   readonly draft?: PlanPublishCompletion & {
     readonly conflict?: TripRecommendationConflict;
   };
-  readonly eligibleActionIds: ReadonlyArray<TripActionId>;
+  readonly decisions: ReturnType<typeof resolveTripDecisions>;
+  readonly eligibleActions: ReadonlyArray<
+    Pick<TripAction, "actionId" | "decisionId" | "reasonCode">
+  >;
 }
 
 const createRecommendationContextFingerprint = async (
   input: RecommendationFingerprintInput
 ): Promise<string> => {
   const bytes = new TextEncoder().encode(JSON.stringify({
-    policyVersion: input.policyVersion,
+    rulePolicyVersion: input.rulePolicyVersion,
+    rankingPolicyVersion: input.rankingPolicyVersion ?? null,
+    tripId: input.tripId,
     tripRevision: input.tripRevision,
+    actorCapabilityScope: input.actorCapabilityScope,
     surface: input.surface,
     draftState: input.draft
       ? [
@@ -81,7 +93,10 @@ const createRecommendationContextFingerprint = async (
           input.draft.conflict ?? null,
         ]
       : null,
-    eligibleActionSet: input.eligibleActionIds,
+    decisions: input.decisions,
+    eligibleActions: [...input.eligibleActions].sort((left, right) =>
+      left.actionId.localeCompare(right.actionId)
+    ),
   }));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(
@@ -147,24 +162,49 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       );
     }
 
+    const ranker = yield* Effect.serviceOption(TripActionRanker);
+    const activeRanker =
+      Option.isSome(ranker) && isAiRankingNeeded(context, actions)
+        ? ranker.value
+        : undefined;
+    const decisions = resolveTripDecisions(context);
+    const eligibleActions = actions.map(({ actionId, decisionId, reasonCode }) => ({
+      actionId,
+      decisionId,
+      reasonCode,
+    }));
+    const contextFingerprint = yield* Effect.promise(() =>
+      createRecommendationContextFingerprint({
+        tripId: command.tripId,
+        rulePolicyVersion: NBA_RULE_POLICY_VERSION,
+        rankingPolicyVersion: activeRanker?.policyVersion,
+        tripRevision: room.revision,
+        actorCapabilityScope: actor.role,
+        surface: command.surface,
+        draft: command.draft,
+        decisions,
+        eligibleActions,
+      })
+    );
+    const rankingInput = {
+      contextFingerprint,
+      surface: command.surface,
+      decisions,
+      eligibleActions: actions,
+    } satisfies TripActionRankingInput;
+
     let rankedActions = actions;
     let source: RecommendationSource = "RULE";
     let policyVersion = NBA_RULE_POLICY_VERSION;
-    const rankingInput = {
-      surface: command.surface,
-      decisions: resolveTripDecisions(context),
-      eligibleActions: actions,
-    } satisfies TripActionRankingInput;
-    const ranker = yield* Effect.serviceOption(TripActionRanker);
-    if (Option.isSome(ranker)) {
-      const ranking = yield* ranker.value.rank(rankingInput).pipe(
+    if (activeRanker) {
+      const ranking = yield* activeRanker.rank(rankingInput).pipe(
         Effect.map(Option.some),
         Effect.catch((error) =>
           Effect.logWarning("nba_ai_ranker_fallback").pipe(
             Effect.annotateLogs({
               reason: error.reason,
               surface: command.surface,
-              policyVersion: ranker.value.policyVersion,
+              policyVersion: activeRanker.policyVersion,
             }),
             Effect.as(Option.none())
           )
@@ -175,13 +215,13 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
         if (applied?.[0]) {
           rankedActions = applied;
           source = "AI";
-          policyVersion = ranker.value.policyVersion;
+          policyVersion = activeRanker.policyVersion;
         } else {
           yield* Effect.logWarning("nba_ai_ranker_fallback").pipe(
             Effect.annotateLogs({
               reason: "INVALID_OUTPUT",
               surface: command.surface,
-              policyVersion: ranker.value.policyVersion,
+              policyVersion: activeRanker.policyVersion,
             })
           );
         }
@@ -192,15 +232,6 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
 
     const ids = yield* IdGenerator;
     const recommendationId = yield* ids.recommendationId;
-    const contextFingerprint = yield* Effect.promise(() =>
-      createRecommendationContextFingerprint({
-        policyVersion,
-        tripRevision: room.revision,
-        surface: command.surface,
-        draft: command.draft,
-        eligibleActionIds: actions.map(({ actionId }) => actionId),
-      })
-    );
     const event = {
       eventName: "nba_recommendation_generated" as const,
       recommendationId,
@@ -218,6 +249,8 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       primary,
       alternatives: rankedActions.slice(1),
       source,
+      policyVersion,
+      tripRevision: room.revision,
       contextFingerprint,
       rankingInput,
     } satisfies NextTripActionRecommendation;

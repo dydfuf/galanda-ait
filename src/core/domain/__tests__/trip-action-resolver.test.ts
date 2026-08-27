@@ -11,7 +11,11 @@ import {
   type PlanPublishInput,
   type TripRoom,
 } from "../room.ts";
-import { resolveEligibleTripActions } from "../trip-action-resolver.ts";
+import {
+  applyTripActionRanking,
+  isAiRankingNeeded,
+  resolveEligibleTripActions,
+} from "../trip-action-resolver.ts";
 import type { TripDecisionContext } from "../trip-decision.ts";
 
 const hostId = UserIdSchema.make("host-1");
@@ -179,4 +183,35 @@ describe("deterministic Trip action resolver", () => {
       )).toEqual([]);
     }
   );
+
+  it("first-plan 진행 단계는 후보가 여러 개여도 RULE로 고정한다", () => {
+    const decisionContext = context({
+      memberCount: 1,
+      firstPlanCompletion: getPlanPublishCompletion({
+        title: "서울",
+        baseHeadcount: 2,
+      }),
+    });
+    const actions = resolveEligibleTripActions(decisionContext, host);
+
+    expect(actions.length).toBeGreaterThanOrEqual(2);
+    expect(isAiRankingNeeded(decisionContext, actions)).toBe(false);
+  });
+
+  it("등록된 plan 이후의 복수 collaboration action만 AI ranking 대상으로 본다", () => {
+    const decisionContext = context({ planCount: 1 });
+    const actions = resolveEligibleTripActions(decisionContext, host);
+
+    expect(isAiRankingNeeded(decisionContext, actions)).toBe(true);
+  });
+
+  it("eligible action 일부를 누락한 ranking을 거절한다", () => {
+    const actions = resolveEligibleTripActions(context({ planCount: 1 }), host);
+
+    expect(applyTripActionRanking(actions, {
+      primaryActionId: "PROPOSE_ALTERNATIVE",
+      alternativeActionIds: [],
+      reasonCode: "ADD_PLAN_ALTERNATIVE",
+    })).toBeUndefined();
+  });
 });

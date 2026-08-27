@@ -82,6 +82,15 @@ const priority: Record<TripActionId, number> = {
   INVITE_MEMBER: 10,
 };
 
+const deterministicJourneyActions = new Set<TripActionId>([
+  "EDIT_PLAN_BASIC",
+  "DEFINE_ROUTE",
+  "ADD_ACCOMMODATION",
+  "ADD_TRANSPORT",
+  "PUBLISH_FIRST_PLAN",
+  "VIEW_ITINERARY",
+]);
+
 export const rankTripActionsDeterministically = (
   eligibleActions: ReadonlyArray<TripAction>
 ): ReadonlyArray<TripAction> =>
@@ -95,6 +104,7 @@ export const applyTripActionRanking = (
 ): ReadonlyArray<TripAction> | undefined => {
   const byId = new Map(eligibleActions.map((action) => [action.actionId, action]));
   const actionIds = [ranking.primaryActionId, ...ranking.alternativeActionIds];
+  if (actionIds.length !== eligibleActions.length) return undefined;
   if (new Set(actionIds).size !== actionIds.length) return undefined;
 
   const ranked: TripAction[] = [];
@@ -106,6 +116,18 @@ export const applyTripActionRanking = (
 
   return ranked[0]?.reasonCode === ranking.reasonCode ? ranked : undefined;
 };
+
+export const isAiRankingNeeded = (
+  context: TripDecisionContext,
+  eligibleActions: ReadonlyArray<TripAction>
+): boolean =>
+  context.planCount > 0 &&
+  !context.isConfirmed &&
+  context.conflict === undefined &&
+  eligibleActions.length >= 2 &&
+  !eligibleActions.some(({ actionId }) =>
+    deterministicJourneyActions.has(actionId)
+  );
 
 export const resolveEligibleTripActions = (
   context: TripDecisionContext,

@@ -5,7 +5,10 @@ import {
   RecommendationSurfaceSchema,
   TripActionIdSchema,
 } from "../core/domain/trip-action.ts";
-import { RecommendationIdSchema } from "../core/domain/ids.ts";
+import {
+  RecommendationIdSchema,
+  RevisionSchema,
+} from "../core/domain/ids.ts";
 import { PlanPublishCompletionSchema } from "../core/domain/room.ts";
 import { TripRecommendationConflictSchema } from "../core/domain/trip-decision.ts";
 
@@ -33,6 +36,8 @@ export const RecommendNextActionResponseSchema = Schema.Struct({
     Schema.Struct({ actionId: TripActionIdSchema })
   ),
   source: RecommendationSourceSchema,
+  policyVersion: Schema.String,
+  tripRevision: RevisionSchema,
   contextFingerprint: Schema.String,
 });
 export type RecommendNextActionResponse =

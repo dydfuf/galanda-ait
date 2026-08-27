@@ -324,6 +324,7 @@ const rankingInputFor = (
     );
   }
   return {
+    contextFingerprint: goldenCase.id,
     surface: goldenCase.inputContext.surface,
     decisions: resolveTripDecisions(goldenCase.inputContext.decisionContext),
     eligibleActions,

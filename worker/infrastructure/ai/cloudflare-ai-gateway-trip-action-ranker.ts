@@ -41,6 +41,8 @@ type Fetcher = (
   init?: RequestInit
 ) => Promise<Response>;
 
+const ACTIVE_RANKING_CACHE_TTL_SECONDS = 300;
+
 const OpenAiResponseSchema = Schema.Struct({
   output: Schema.Array(Schema.Struct({
     content: Schema.optional(Schema.Array(Schema.Struct({
@@ -323,3 +325,69 @@ export const makeCloudflareAiGatewayTripActionRanker = (
     },
   };
 };
+
+export const makeCachedTripActionRanker = (
+  ranker: TripActionRankerService,
+  cache: Pick<Cache, "match" | "put">,
+  waitUntil: (promise: Promise<unknown>) => void
+): TripActionRankerService => ({
+  policyVersion: ranker.policyVersion,
+  rank: (input) => {
+    const cacheKey = new Request(
+      `https://nba-cache.galanda.internal/${encodeURIComponent(ranker.policyVersion)}/${encodeURIComponent(input.contextFingerprint)}`
+    );
+    const cachedRanking = Effect.promise(async () => {
+      try {
+        const response = await cache.match(cacheKey);
+        if (!response) return undefined;
+        const ranking = await Schema.decodeUnknownPromise(
+          TripActionRankingSchema,
+          { onExcessProperty: "error" }
+        )(await response.json());
+        return applyTripActionRanking(input.eligibleActions, ranking)
+          ? ranking
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    });
+
+    return cachedRanking.pipe(
+      Effect.flatMap((ranking) => {
+        if (ranking) {
+          return Effect.logInfo("nba_ai_ranking_cache_hit").pipe(
+            Effect.annotateLogs({
+              contextFingerprint: input.contextFingerprint,
+              policyVersion: ranker.policyVersion,
+            }),
+            Effect.as(ranking)
+          );
+        }
+
+        return ranker.rank(input).pipe(
+          Effect.tap((freshRanking) =>
+            Effect.sync(() => {
+              // ponytail: completed results only; add distributed miss deduplication
+              // if concurrent provider calls become measurable.
+              try {
+                waitUntil(
+                  cache.put(
+                    cacheKey,
+                    Response.json(freshRanking, {
+                      headers: {
+                        "Cache-Control":
+                          `public, max-age=${ACTIVE_RANKING_CACHE_TTL_SECONDS}`,
+                      },
+                    })
+                  ).catch(() => undefined)
+                );
+              } catch {
+                // Cache scheduling must never change ranking behavior.
+              }
+            })
+          )
+        );
+      })
+    );
+  },
+});

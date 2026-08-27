@@ -21,6 +21,7 @@ export class TripActionRankingError extends Schema.TaggedError<TripActionRanking
 ) {}
 
 export interface TripActionRankingInput {
+  readonly contextFingerprint: string;
   readonly surface: RecommendationSurface;
   readonly decisions: ReadonlyArray<TripDecision>;
   readonly eligibleActions: ReadonlyArray<TripAction>;

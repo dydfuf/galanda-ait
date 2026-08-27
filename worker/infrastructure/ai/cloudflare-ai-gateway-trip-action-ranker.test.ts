@@ -2,6 +2,7 @@ import { Effect, Exit } from "effect";
 import { describe, expect, it } from "vitest";
 import type { TripActionRankingInput } from "../../../src/core/ports/trip-action-ranker.ts";
 import {
+  makeCachedTripActionRanker,
   makeCloudflareAiGatewayTripActionRanker,
   type CloudflareAiGatewayRankerConfig,
   type CloudflareAiGatewayRankerTelemetry,
@@ -17,6 +18,7 @@ const config: CloudflareAiGatewayRankerConfig = {
 };
 
 const input: TripActionRankingInput = {
+  contextFingerprint: "context-fingerprint-1",
   surface: "FIRST_PLAN",
   decisions: [
     { id: "TRAVEL_ROUTE", status: "INCOMPLETE" },
@@ -175,5 +177,44 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
 
     expect(Exit.isFailure(exit)).toBe(true);
     expect(JSON.stringify(exit)).toContain("TIMEOUT");
+  });
+
+  it("동일 fingerprint의 ranking을 재사용하고 stale fingerprint는 다시 조회한다", async () => {
+    let providerCalls = 0;
+    const pendingWrites: Promise<unknown>[] = [];
+    const entries = new Map<string, Response>();
+    const cache = {
+      match: async (request: RequestInfo | URL) =>
+        entries.get(new Request(request).url)?.clone(),
+      put: async (request: RequestInfo | URL, response: Response) => {
+        entries.set(new Request(request).url, response.clone());
+      },
+    } satisfies Pick<Cache, "match" | "put">;
+    const provider = makeCloudflareAiGatewayTripActionRanker(
+      config,
+      async () => {
+        providerCalls += 1;
+        return responseWithOutput({
+          primaryActionId: "INVITE_MEMBER",
+          alternativeActionIds: ["DEFINE_ROUTE"],
+          reasonCode: "INVITE_TRAVEL_COMPANION",
+        });
+      }
+    );
+    const ranker = makeCachedTripActionRanker(
+      provider,
+      cache,
+      (promise) => pendingWrites.push(promise)
+    );
+
+    await Effect.runPromise(ranker.rank(input));
+    await Promise.all(pendingWrites);
+    await Effect.runPromise(ranker.rank(input));
+    await Effect.runPromise(ranker.rank({
+      ...input,
+      contextFingerprint: "context-fingerprint-2",
+    }));
+
+    expect(providerCalls).toBe(2);
   });
 });

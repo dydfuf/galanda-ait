@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   PlanIdSchema,
   RevisionSchema,
@@ -11,12 +11,14 @@ import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import {
   TripActionRanker,
   TripActionRankingError,
+  type TripActionRankerService,
 } from "../../ports/trip-action-ranker.ts";
 import { createTestIdGenerator } from "../../../infrastructure/id-generator.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
 import { recommendNextTripAction } from "../recommend-next-trip-action.ts";
 
 const hostId = UserIdSchema.make("host-1");
+const memberId = UserIdSchema.make("member-1");
 const room: TripRoom = {
   id: TripIdSchema.make("trip-1"),
   title: "도쿄 여행",
@@ -24,6 +26,16 @@ const room: TripRoom = {
   revision: RevisionSchema.make(3),
   members: [{ id: hostId, name: "Host", role: "HOST" }],
   plans: [],
+};
+const roomWithPlan: TripRoom = {
+  ...room,
+  plans: [{
+    id: PlanIdSchema.make("plan-1"),
+    title: "첫 여행안",
+    status: "VOTING",
+    places: [],
+    voteCount: 0,
+  }],
 };
 
 const layerFor = (value: TripRoom) => Layer.mergeAll(
@@ -49,6 +61,10 @@ const draftCommand = {
     accommodation: false,
     transport: false,
   },
+};
+const planHomeCommand = {
+  tripId: room.id,
+  surface: "PLAN_HOME" as const,
 };
 
 describe("recommendNextTripAction", () => {
@@ -93,16 +109,19 @@ describe("recommendNextTripAction", () => {
     expect(revised.contextFingerprint).not.toBe(first.contextFingerprint);
   });
 
-  it("주입된 ranker의 eligible ranking을 적용한다", async () => {
+  it("ambiguous context에서만 주입된 ranker의 eligible ranking을 적용한다", async () => {
     const result = await Effect.runPromise(
-      recommendNextTripAction(draftCommand).pipe(
+      recommendNextTripAction(planHomeCommand).pipe(
         Effect.provide(Layer.merge(
-          layerFor(room),
+          layerFor(roomWithPlan),
           Layer.succeed(TripActionRanker, {
             policyVersion: "nba-ai-test-v1",
             rank: () => Effect.succeed({
               primaryActionId: "INVITE_MEMBER",
-              alternativeActionIds: ["DEFINE_ROUTE"],
+              alternativeActionIds: [
+                "PROPOSE_ALTERNATIVE",
+                "GIVE_OPINION",
+              ],
               reasonCode: "INVITE_TRAVEL_COMPANION",
             }),
           })
@@ -116,11 +135,31 @@ describe("recommendNextTripAction", () => {
     });
   });
 
-  it("ranker 실패 시 deterministic RULE recommendation으로 fallback한다", async () => {
+  it("deterministic first-plan context에서는 ranker를 호출하지 않는다", async () => {
+    const rank = vi.fn<TripActionRankerService["rank"]>(
+      () => Effect.die("ranker must not be called")
+    );
     const result = await Effect.runPromise(
       recommendNextTripAction(draftCommand).pipe(
         Effect.provide(Layer.merge(
           layerFor(room),
+          Layer.succeed(TripActionRanker, {
+            policyVersion: "nba-ai-test-v1",
+            rank,
+          })
+        ))
+      )
+    );
+
+    expect(result.source).toBe("RULE");
+    expect(rank).not.toHaveBeenCalled();
+  });
+
+  it("ranker 실패 시 deterministic RULE recommendation으로 fallback한다", async () => {
+    const result = await Effect.runPromise(
+      recommendNextTripAction(planHomeCommand).pipe(
+        Effect.provide(Layer.merge(
+          layerFor(roomWithPlan),
           Layer.succeed(TripActionRanker, {
             policyVersion: "nba-ai-test-v1",
             rank: () => Effect.fail(
@@ -133,21 +172,69 @@ describe("recommendNextTripAction", () => {
 
     expect(result).toMatchObject({
       source: "RULE",
-      primary: { actionId: "DEFINE_ROUTE" },
+      primary: { actionId: "PROPOSE_ALTERNATIVE" },
     });
   });
 
-  it("첫 plan이 생긴 뒤 도착한 draft snapshot을 stale state로 거절한다", async () => {
-    const withPlan: TripRoom = {
+  it("decision status가 달라지면 eligible set이 같아도 fingerprint를 분리한다", async () => {
+    const plans = [
+      {
+        ...roomWithPlan.plans[0]!,
+        memberOpinions: [{
+          userId: hostId,
+          userName: "Host",
+          reaction: "LIKE" as const,
+        }],
+      },
+      {
+        ...roomWithPlan.plans[0]!,
+        id: PlanIdSchema.make("plan-2"),
+        memberOpinions: [{
+          userId: hostId,
+          userName: "Host",
+          reaction: "LIKE" as const,
+        }],
+      },
+    ];
+    const incompleteFeedbackRoom: TripRoom = {
       ...room,
-      plans: [{
-        id: PlanIdSchema.make("plan-1"),
-        title: "첫 여행안",
-        status: "VOTING",
-        places: [],
-        voteCount: 0,
-      }],
+      members: [
+        ...room.members,
+        { id: memberId, name: "Member", role: "MEMBER" },
+      ],
+      plans,
     };
+    const completeFeedbackRoom: TripRoom = {
+      ...incompleteFeedbackRoom,
+      plans: [
+        plans[0]!,
+        {
+          ...plans[1]!,
+          memberOpinions: [
+            ...plans[1]!.memberOpinions!,
+            { userId: memberId, userName: "Member", reaction: "OKAY" as const },
+          ],
+        },
+      ],
+    };
+
+    const incomplete = await Effect.runPromise(
+      recommendNextTripAction(planHomeCommand).pipe(
+        Effect.provide(layerFor(incompleteFeedbackRoom))
+      )
+    );
+    const complete = await Effect.runPromise(
+      recommendNextTripAction(planHomeCommand).pipe(
+        Effect.provide(layerFor(completeFeedbackRoom))
+      )
+    );
+
+    expect(incomplete.rankingInput.eligibleActions.map(({ actionId }) => actionId))
+      .toEqual(complete.rankingInput.eligibleActions.map(({ actionId }) => actionId));
+    expect(incomplete.contextFingerprint).not.toBe(complete.contextFingerprint);
+  });
+
+  it("첫 plan이 생긴 뒤 도착한 draft snapshot을 stale state로 거절한다", async () => {
     const exit = await Effect.runPromiseExit(
       recommendNextTripAction({
         tripId: room.id,
@@ -158,7 +245,7 @@ describe("recommendNextTripAction", () => {
           accommodation: true,
           transport: true,
         },
-      }).pipe(Effect.provide(layerFor(withPlan)))
+      }).pipe(Effect.provide(layerFor(roomWithPlan)))
     );
 
     expect(Exit.isFailure(exit)).toBe(true);
