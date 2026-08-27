@@ -4,7 +4,8 @@
 
 RAON-238은 provider-neutral `TripActionRanker` port와 Cloudflare AI Gateway +
 OpenAI Responses API adapter를 제공한다. Recommendation route는
-`AI_RECOMMENDATION_MODE=active`일 때만 adapter를 주입한다. First Plan 진행 단계처럼
+`AI_RECOMMENDATION_MODE=active`이고 승인된 policy version이 일치할 때만
+adapter를 주입한다. First Plan 진행 단계처럼
 deterministic primary가 있는 context는 active mode에서도 provider를 호출하지 않고,
 등록된 plan 이후 복수 collaboration action이 있는 context만 AI ranking을 사용한다.
 다만 RAON-239의 active rollout gate가 `NO-GO`인 동안에는 승인된 policy version이
