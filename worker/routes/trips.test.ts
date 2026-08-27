@@ -27,6 +27,10 @@ const shadowEnv = {
   AI_GATEWAY_ID: "gateway-id",
   AI_GATEWAY_TOKEN: "gateway-token",
 } as AppEnv["Bindings"];
+const activeEnv = {
+  ...shadowEnv,
+  AI_RECOMMENDATION_MODE: "active",
+} as AppEnv["Bindings"];
 const hostId = UserIdSchema.make("host-1");
 const plan: TripPlan = {
   id: PlanIdSchema.make("plan-1"),
@@ -744,6 +748,75 @@ describe("Trip API vertical slice", () => {
 
     expect(invalidResponse.status).toBe(400);
     expect(invalid.calls).toEqual([]);
+  });
+
+  it("active mode는 ambiguous Trip Room action에만 AI ranking을 적용한다", async () => {
+    const providerFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({
+        output: [{
+          content: [{
+            type: "output_text",
+            text: JSON.stringify({
+              primaryActionId: "INVITE_MEMBER",
+              alternativeActionIds: [
+                "PROPOSE_ALTERNATIVE",
+                "GIVE_OPINION",
+              ],
+              reasonCode: "INVITE_TRAVEL_COMPANION",
+            }),
+          }],
+        }],
+        usage: { input_tokens: 12, output_tokens: 8, total_tokens: 20 },
+      })
+    );
+    const { app } = makeApp([[rowValues(roomWithPlan)]]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({ surface: "PLAN_HOME" }),
+      }),
+      activeEnv
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      primary: { actionId: "INVITE_MEMBER" },
+      alternatives: [
+        { actionId: "PROPOSE_ALTERNATIVE" },
+        { actionId: "GIVE_OPINION" },
+      ],
+      source: "AI",
+    });
+    expect(providerFetch).toHaveBeenCalledOnce();
+  });
+
+  it("active mode에서도 deterministic first-plan은 provider 없이 RULE을 반환한다", async () => {
+    const providerFetch = vi.spyOn(globalThis, "fetch");
+    const { app } = makeApp([[rowValues(room)]]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: {
+            basic: true,
+            route: false,
+            accommodation: false,
+            transport: false,
+          },
+        }),
+      }),
+      activeEnv
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      primary: { actionId: "DEFINE_ROUTE" },
+      source: "RULE",
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
   });
 
   it("shadow ranking은 RULE 응답 뒤 waitUntil에서만 실행한다", async () => {

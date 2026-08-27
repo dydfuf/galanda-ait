@@ -3,9 +3,10 @@
 ## 현재 활성화 경계
 
 RAON-238은 provider-neutral `TripActionRanker` port와 Cloudflare AI Gateway +
-OpenAI Responses API adapter를 제공한다. Production recommendation route에는 아직
-adapter layer를 주입하지 않으므로 응답은 계속 `RULE`이다. Shadow 실행은 RAON-239,
-사용자 응답에 AI ranking을 반영하는 active 전환은 RAON-240에서 각각 다룬다.
+OpenAI Responses API adapter를 제공한다. Recommendation route는
+`AI_RECOMMENDATION_MODE=active`일 때만 adapter를 주입한다. First Plan 진행 단계처럼
+deterministic primary가 있는 context는 active mode에서도 provider를 호출하지 않고,
+등록된 plan 이후 복수 collaboration action이 있는 context만 AI ranking을 사용한다.
 
 ## Worker 설정
 
@@ -28,6 +29,22 @@ canonical account ID key다. `CLOUDFLARE_ACCOUNT_ID`는 사용하지 않는다.
 Unified Billing을 사용하면 `OPENAI_API_KEY`를 Worker에 주입하지 않는다. 실제 model,
 gateway ID, account ID와 credential은 staging/production 사이에서 재사용하지 않는다.
 
+Model ID는 코드에 고정하지 않는다. 모델을 바꾸면 cache identity와 관측 구간이
+분리되도록 `AI_RECOMMENDATION_POLICY_VERSION`도 함께 변경한다. Active 설정이
+불완전하면 endpoint는 provider error를 노출하지 않고 `RULE`로 동작한다.
+
+## Active 안정성
+
+- Context fingerprint는 trip revision, actor role/capability scope, surface, draft completion,
+  rule/model policy version과 eligible action set을 포함한다.
+- 동일 fingerprint의 검증된 ranking은 Workers Cache API에서 5분간 재사용한다.
+- Trip revision 또는 policy version이 바뀌면 cache key도 바뀌므로 이전 ranking은
+  현재 recommendation에 적용되지 않는다.
+- Cache miss의 동시 요청은 각각 provider를 호출할 수 있다. 실제 중복 비용이
+  관측될 때만 Durable Object 등 분산 suppression을 추가한다.
+- Kill switch는 `AI_RECOMMENDATION_MODE=shadow|off` 전환이며 Worker vars로 active
+  반영을 중단할 수 있다.
+
 ## Privacy와 비용 제어
 
 - Adapter 입력은 surface, decision status, eligible action ID/reason code만 포함한다.
@@ -45,5 +62,5 @@ gateway ID, account ID와 credential은 staging/production 사이에서 재사�
 
 Adapter는 payload 없이 provider, model, policy version, token 수, latency, HTTP status,
 failure reason을 structured Worker log에 남긴다. Timeout, network/HTTP error, schema
-failure, eligible-set 위반은 recommendation use case에서 즉시 deterministic `RULE`
-결과로 fallback하며 provider retry chain은 실행하지 않는다.
+failure, action 누락을 포함한 eligible-set 위반은 recommendation use case에서 즉시
+deterministic `RULE` 결과로 fallback하며 provider retry chain은 실행하지 않는다.

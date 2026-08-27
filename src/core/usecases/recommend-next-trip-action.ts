@@ -2,6 +2,7 @@ import { Effect, Option } from "effect";
 import {
   getRoomActor,
   requireRoomMember,
+  type RoomRole,
 } from "../domain/auth-guards.ts";
 import {
   NotFoundError,
@@ -22,6 +23,7 @@ import {
 } from "../domain/trip-action.ts";
 import {
   applyTripActionRanking,
+  isAiRankingNeeded,
   resolveEligibleTripActions,
 } from "../domain/trip-action-resolver.ts";
 import {
@@ -56,8 +58,10 @@ export interface NextTripActionRecommendation {
 }
 
 interface RecommendationFingerprintInput {
-  readonly policyVersion: string;
+  readonly rulePolicyVersion: string;
+  readonly rankingPolicyVersion?: string;
   readonly tripRevision: Revision;
+  readonly actorCapabilityScope: RoomRole;
   readonly surface: RecommendationSurface;
   readonly draft?: PlanPublishCompletion & {
     readonly conflict?: TripRecommendationConflict;
@@ -69,8 +73,10 @@ const createRecommendationContextFingerprint = async (
   input: RecommendationFingerprintInput
 ): Promise<string> => {
   const bytes = new TextEncoder().encode(JSON.stringify({
-    policyVersion: input.policyVersion,
+    rulePolicyVersion: input.rulePolicyVersion,
+    rankingPolicyVersion: input.rankingPolicyVersion ?? null,
     tripRevision: input.tripRevision,
+    actorCapabilityScope: input.actorCapabilityScope,
     surface: input.surface,
     draftState: input.draft
       ? [
@@ -81,7 +87,7 @@ const createRecommendationContextFingerprint = async (
           input.draft.conflict ?? null,
         ]
       : null,
-    eligibleActionSet: input.eligibleActionIds,
+    eligibleActionSet: [...input.eligibleActionIds].sort(),
   }));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(
@@ -147,24 +153,41 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       );
     }
 
-    let rankedActions = actions;
-    let source: RecommendationSource = "RULE";
-    let policyVersion = NBA_RULE_POLICY_VERSION;
+    const ranker = yield* Effect.serviceOption(TripActionRanker);
+    const activeRanker =
+      Option.isSome(ranker) && isAiRankingNeeded(context, actions)
+        ? ranker.value
+        : undefined;
+    const contextFingerprint = yield* Effect.promise(() =>
+      createRecommendationContextFingerprint({
+        rulePolicyVersion: NBA_RULE_POLICY_VERSION,
+        rankingPolicyVersion: activeRanker?.policyVersion,
+        tripRevision: room.revision,
+        actorCapabilityScope: actor.role,
+        surface: command.surface,
+        draft: command.draft,
+        eligibleActionIds: actions.map(({ actionId }) => actionId),
+      })
+    );
     const rankingInput = {
+      contextFingerprint,
       surface: command.surface,
       decisions: resolveTripDecisions(context),
       eligibleActions: actions,
     } satisfies TripActionRankingInput;
-    const ranker = yield* Effect.serviceOption(TripActionRanker);
-    if (Option.isSome(ranker)) {
-      const ranking = yield* ranker.value.rank(rankingInput).pipe(
+
+    let rankedActions = actions;
+    let source: RecommendationSource = "RULE";
+    let policyVersion = NBA_RULE_POLICY_VERSION;
+    if (activeRanker) {
+      const ranking = yield* activeRanker.rank(rankingInput).pipe(
         Effect.map(Option.some),
         Effect.catch((error) =>
           Effect.logWarning("nba_ai_ranker_fallback").pipe(
             Effect.annotateLogs({
               reason: error.reason,
               surface: command.surface,
-              policyVersion: ranker.value.policyVersion,
+              policyVersion: activeRanker.policyVersion,
             }),
             Effect.as(Option.none())
           )
@@ -175,13 +198,13 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
         if (applied?.[0]) {
           rankedActions = applied;
           source = "AI";
-          policyVersion = ranker.value.policyVersion;
+          policyVersion = activeRanker.policyVersion;
         } else {
           yield* Effect.logWarning("nba_ai_ranker_fallback").pipe(
             Effect.annotateLogs({
               reason: "INVALID_OUTPUT",
               surface: command.surface,
-              policyVersion: ranker.value.policyVersion,
+              policyVersion: activeRanker.policyVersion,
             })
           );
         }
@@ -192,15 +215,6 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
 
     const ids = yield* IdGenerator;
     const recommendationId = yield* ids.recommendationId;
-    const contextFingerprint = yield* Effect.promise(() =>
-      createRecommendationContextFingerprint({
-        policyVersion,
-        tripRevision: room.revision,
-        surface: command.surface,
-        draft: command.draft,
-        eligibleActionIds: actions.map(({ actionId }) => actionId),
-      })
-    );
     const event = {
       eventName: "nba_recommendation_generated" as const,
       recommendationId,

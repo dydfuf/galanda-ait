@@ -17,7 +17,10 @@ import type { IdGenerator } from "../../src/core/ports/id-generator.ts";
 import type { InviteRepository } from "../../src/core/ports/invite-repository.ts";
 import type { SessionService } from "../../src/core/ports/session.ts";
 import type { TripRoomRepository } from "../../src/core/ports/trip-room-repository.ts";
-import type { TripActionRankerService } from "../../src/core/ports/trip-action-ranker.ts";
+import {
+  TripActionRanker,
+  type TripActionRankerService,
+} from "../../src/core/ports/trip-action-ranker.ts";
 import type { ConfirmedItineraryRepository } from "../../src/core/ports/confirmed-itinerary-repository.ts";
 import {
   CreateRoomInputSchema,
@@ -63,7 +66,10 @@ import {
   joinTripByInvite,
   revokeTripInvite,
 } from "../../src/core/usecases/invite.ts";
-import { makeCloudflareAiGatewayTripActionRanker } from "../infrastructure/ai/cloudflare-ai-gateway-trip-action-ranker.ts";
+import {
+  makeCachedTripActionRanker,
+  makeCloudflareAiGatewayTripActionRanker,
+} from "../infrastructure/ai/cloudflare-ai-gateway-trip-action-ranker.ts";
 
 const TripParamsSchema = Schema.Struct({ tripId: TripIdSchema });
 const PublicInviteParamsSchema = Schema.Struct({ inviteToken: Schema.String });
@@ -116,6 +122,45 @@ const toRecommendNextActionResponse = (
   source: recommendation.source,
   contextFingerprint: recommendation.contextFingerprint,
 });
+
+const makeConfiguredTripActionRanker = (
+  c: HonoContext<AppEnv>
+): TripActionRankerService =>
+  makeCloudflareAiGatewayTripActionRanker({
+    accountId: c.env.AI_GATEWAY_ACCOUNT_ID ?? "",
+    gatewayId: c.env.AI_GATEWAY_ID ?? "",
+    gatewayToken: c.env.AI_GATEWAY_TOKEN ?? "",
+    model: c.env.AI_RECOMMENDATION_MODEL ?? "",
+    policyVersion: c.env.AI_RECOMMENDATION_POLICY_VERSION ?? "",
+    timeoutMs: Number(c.env.AI_RECOMMENDATION_TIMEOUT_MS),
+    openAiApiKey: c.env.OPENAI_API_KEY,
+  });
+
+const makeActiveTripActionRanker = (
+  c: HonoContext<AppEnv>
+): TripActionRankerService | undefined => {
+  if ((c.env.AI_RECOMMENDATION_MODE?.trim() ?? "off") !== "active") {
+    return undefined;
+  }
+
+  try {
+    const ranker = makeConfiguredTripActionRanker(c);
+    return typeof caches === "undefined"
+      ? ranker
+      : makeCachedTripActionRanker(
+          ranker,
+          caches.default,
+          (promise) => c.executionCtx.waitUntil(promise)
+        );
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: "nba_active_configuration_invalid",
+      requestId: c.var.requestId,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return undefined;
+  }
+};
 
 const runShadowRanking = (
   recommendation: NextTripActionRecommendation,
@@ -180,15 +225,7 @@ const scheduleShadowRanking = (
     return;
   }
 
-  const ranker = makeCloudflareAiGatewayTripActionRanker({
-    accountId: c.env.AI_GATEWAY_ACCOUNT_ID ?? "",
-    gatewayId: c.env.AI_GATEWAY_ID ?? "",
-    gatewayToken: c.env.AI_GATEWAY_TOKEN ?? "",
-    model: c.env.AI_RECOMMENDATION_MODEL ?? "",
-    policyVersion: c.env.AI_RECOMMENDATION_POLICY_VERSION ?? "",
-    timeoutMs: Number(c.env.AI_RECOMMENDATION_TIMEOUT_MS),
-    openAiApiKey: c.env.OPENAI_API_KEY,
-  });
+  const ranker = makeConfiguredTripActionRanker(c);
   c.executionCtx.waitUntil(runShadowRanking(
     recommendation,
     ranker,
@@ -312,12 +349,18 @@ tripsRoute.post(
   effectValidator("json", RecommendNextActionRequestSchema, strictInput),
   (c) => {
     const startedAt = Date.now();
+    const recommendation = recommendNextTripAction({
+      tripId: c.req.valid("param").tripId,
+      ...c.req.valid("json"),
+    });
+    const activeRanker = makeActiveTripActionRanker(c);
     return runTripEffect(
       c,
-      recommendNextTripAction({
-        tripId: c.req.valid("param").tripId,
-        ...c.req.valid("json"),
-      }),
+      activeRanker
+        ? recommendation.pipe(
+            Effect.provideService(TripActionRanker, activeRanker)
+          )
+        : recommendation,
       undefined,
       (recommendation, context) => {
         try {

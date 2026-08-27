@@ -1,5 +1,5 @@
 import { Effect, Exit, Layer } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   PlanIdSchema,
   RevisionSchema,
@@ -11,6 +11,7 @@ import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import {
   TripActionRanker,
   TripActionRankingError,
+  type TripActionRankerService,
 } from "../../ports/trip-action-ranker.ts";
 import { createTestIdGenerator } from "../../../infrastructure/id-generator.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
@@ -24,6 +25,16 @@ const room: TripRoom = {
   revision: RevisionSchema.make(3),
   members: [{ id: hostId, name: "Host", role: "HOST" }],
   plans: [],
+};
+const roomWithPlan: TripRoom = {
+  ...room,
+  plans: [{
+    id: PlanIdSchema.make("plan-1"),
+    title: "첫 여행안",
+    status: "VOTING",
+    places: [],
+    voteCount: 0,
+  }],
 };
 
 const layerFor = (value: TripRoom) => Layer.mergeAll(
@@ -49,6 +60,10 @@ const draftCommand = {
     accommodation: false,
     transport: false,
   },
+};
+const planHomeCommand = {
+  tripId: room.id,
+  surface: "PLAN_HOME" as const,
 };
 
 describe("recommendNextTripAction", () => {
@@ -93,16 +108,19 @@ describe("recommendNextTripAction", () => {
     expect(revised.contextFingerprint).not.toBe(first.contextFingerprint);
   });
 
-  it("주입된 ranker의 eligible ranking을 적용한다", async () => {
+  it("ambiguous context에서만 주입된 ranker의 eligible ranking을 적용한다", async () => {
     const result = await Effect.runPromise(
-      recommendNextTripAction(draftCommand).pipe(
+      recommendNextTripAction(planHomeCommand).pipe(
         Effect.provide(Layer.merge(
-          layerFor(room),
+          layerFor(roomWithPlan),
           Layer.succeed(TripActionRanker, {
             policyVersion: "nba-ai-test-v1",
             rank: () => Effect.succeed({
               primaryActionId: "INVITE_MEMBER",
-              alternativeActionIds: ["DEFINE_ROUTE"],
+              alternativeActionIds: [
+                "PROPOSE_ALTERNATIVE",
+                "GIVE_OPINION",
+              ],
               reasonCode: "INVITE_TRAVEL_COMPANION",
             }),
           })
@@ -116,11 +134,31 @@ describe("recommendNextTripAction", () => {
     });
   });
 
-  it("ranker 실패 시 deterministic RULE recommendation으로 fallback한다", async () => {
+  it("deterministic first-plan context에서는 ranker를 호출하지 않는다", async () => {
+    const rank = vi.fn<TripActionRankerService["rank"]>(
+      () => Effect.die("ranker must not be called")
+    );
     const result = await Effect.runPromise(
       recommendNextTripAction(draftCommand).pipe(
         Effect.provide(Layer.merge(
           layerFor(room),
+          Layer.succeed(TripActionRanker, {
+            policyVersion: "nba-ai-test-v1",
+            rank,
+          })
+        ))
+      )
+    );
+
+    expect(result.source).toBe("RULE");
+    expect(rank).not.toHaveBeenCalled();
+  });
+
+  it("ranker 실패 시 deterministic RULE recommendation으로 fallback한다", async () => {
+    const result = await Effect.runPromise(
+      recommendNextTripAction(planHomeCommand).pipe(
+        Effect.provide(Layer.merge(
+          layerFor(roomWithPlan),
           Layer.succeed(TripActionRanker, {
             policyVersion: "nba-ai-test-v1",
             rank: () => Effect.fail(
@@ -133,21 +171,11 @@ describe("recommendNextTripAction", () => {
 
     expect(result).toMatchObject({
       source: "RULE",
-      primary: { actionId: "DEFINE_ROUTE" },
+      primary: { actionId: "PROPOSE_ALTERNATIVE" },
     });
   });
 
   it("첫 plan이 생긴 뒤 도착한 draft snapshot을 stale state로 거절한다", async () => {
-    const withPlan: TripRoom = {
-      ...room,
-      plans: [{
-        id: PlanIdSchema.make("plan-1"),
-        title: "첫 여행안",
-        status: "VOTING",
-        places: [],
-        voteCount: 0,
-      }],
-    };
     const exit = await Effect.runPromiseExit(
       recommendNextTripAction({
         tripId: room.id,
@@ -158,7 +186,7 @@ describe("recommendNextTripAction", () => {
           accommodation: true,
           transport: true,
         },
-      }).pipe(Effect.provide(layerFor(withPlan)))
+      }).pipe(Effect.provide(layerFor(roomWithPlan)))
     );
 
     expect(Exit.isFailure(exit)).toBe(true);
