@@ -113,6 +113,7 @@ const main = async () => {
           totalLatencyMs: telemetry.totalLatencyMs,
           inputTokens: telemetry.inputTokens,
           outputTokens: telemetry.outputTokens,
+          totalTokens: telemetry.totalTokens,
           estimatedCostUsd:
             (telemetry.inputTokens * price.inputUsdPerMillionTokens +
               telemetry.outputTokens * price.outputUsdPerMillionTokens) /

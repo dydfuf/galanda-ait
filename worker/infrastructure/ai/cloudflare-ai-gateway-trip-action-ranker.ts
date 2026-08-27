@@ -64,7 +64,12 @@ const isTimeout = (error: unknown): boolean =>
 
 const decodeRanking = async (
   response: Response,
-  eligibleActions: TripActionRankingInput["eligibleActions"]
+  eligibleActions: TripActionRankingInput["eligibleActions"],
+  onUsage: (usage: {
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly totalTokens: number;
+  }) => void
 ): Promise<{
   readonly ranking: TripActionRanking;
   readonly inputTokens: number;
@@ -75,6 +80,12 @@ const decodeRanking = async (
     const body = await Schema.decodeUnknownPromise(OpenAiResponseSchema)(
       await response.json()
     );
+    const usage = {
+      inputTokens: body.usage?.input_tokens ?? 0,
+      outputTokens: body.usage?.output_tokens ?? 0,
+      totalTokens: body.usage?.total_tokens ?? 0,
+    };
+    onUsage(usage);
     const outputText = body.output
       .flatMap(({ content }) => content ?? [])
       .find(({ type, text }) => type === "output_text" && text)?.text;
@@ -88,9 +99,7 @@ const decodeRanking = async (
 
     return {
       ranking,
-      inputTokens: body.usage?.input_tokens ?? 0,
-      outputTokens: body.usage?.output_tokens ?? 0,
-      totalTokens: body.usage?.total_tokens ?? 0,
+      ...usage,
     };
   } catch (error) {
     throw error instanceof TripActionRankingError ? error : invalidOutput();
@@ -137,6 +146,13 @@ export const makeCloudflareAiGatewayTripActionRanker = (
     rank: (input) => {
       const startedAt = Date.now();
       if (!input.eligibleActions[0]) return Effect.fail(invalidOutput());
+      const attempt = {
+        firstResponseLatencyMs: 0,
+        statusCode: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+      };
       const eligibleActionIds = input.eligibleActions.map(({ actionId }) => actionId);
       const eligibleReasonCodes = [
         ...new Set(input.eligibleActions.map(({ reasonCode }) => reasonCode)),
@@ -203,6 +219,8 @@ export const makeCloudflareAiGatewayTripActionRanker = (
             }),
           });
           const firstResponseLatencyMs = Date.now() - startedAt;
+          attempt.firstResponseLatencyMs = firstResponseLatencyMs;
+          attempt.statusCode = response.status;
           if (!response.ok) {
             throw new TripActionRankingError({
               reason: "PROVIDER_ERROR",
@@ -211,7 +229,15 @@ export const makeCloudflareAiGatewayTripActionRanker = (
           }
 
           return {
-            ...(await decodeRanking(response, input.eligibleActions)),
+            ...(await decodeRanking(
+              response,
+              input.eligibleActions,
+              ({ inputTokens, outputTokens, totalTokens }) => {
+                attempt.inputTokens = inputTokens;
+                attempt.outputTokens = outputTokens;
+                attempt.totalTokens = totalTokens;
+              }
+            )),
             firstResponseLatencyMs,
             statusCode: response.status,
           };
@@ -269,13 +295,13 @@ export const makeCloudflareAiGatewayTripActionRanker = (
             provider: "openai",
             model,
             policyVersion,
-            firstResponseLatencyMs: 0,
+            firstResponseLatencyMs: attempt.firstResponseLatencyMs,
             totalLatencyMs,
             configuredTimeoutMs: config.timeoutMs,
-            statusCode: error.statusCode ?? 0,
-            inputTokens: 0,
-            outputTokens: 0,
-            totalTokens: 0,
+            statusCode: error.statusCode ?? attempt.statusCode,
+            inputTokens: attempt.inputTokens,
+            outputTokens: attempt.outputTokens,
+            totalTokens: attempt.totalTokens,
             failure: error.reason,
           });
           return Effect.logWarning("nba_ai_ranker_failed").pipe(
@@ -284,11 +310,11 @@ export const makeCloudflareAiGatewayTripActionRanker = (
               model,
               policyVersion,
               latencyMs: totalLatencyMs,
-              providerFirstResponseLatencyMs: 0,
+              providerFirstResponseLatencyMs: attempt.firstResponseLatencyMs,
               providerTotalLatencyMs: totalLatencyMs,
               configuredTimeoutMs: config.timeoutMs,
               failure: error.reason,
-              statusCode: error.statusCode ?? 0,
+              statusCode: error.statusCode ?? attempt.statusCode,
             })
           );
         }),

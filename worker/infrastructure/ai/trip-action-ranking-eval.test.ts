@@ -26,6 +26,7 @@ const candidate = (
       totalLatencyMs: reverse ? 25 : 20,
       inputTokens: 10,
       outputTokens: 5,
+      totalTokens: 15,
       estimatedCostUsd: 0.001,
     };
   },
@@ -55,6 +56,7 @@ describe("Trip action ranking golden eval", () => {
         p95TotalLatencyMs: 20,
         inputTokens: 80,
         outputTokens: 40,
+        totalTokens: 120,
         estimatedCostPerRecommendationUsd: 0.001,
       },
     });
@@ -85,5 +87,37 @@ describe("Trip action ranking golden eval", () => {
     await expect(runTripActionRankingEval([candidate("only")])).rejects.toThrow(
       "At least two ranking candidates are required"
     );
+  });
+
+  it("실패 attempt의 latency·usage·cost도 reliability 지표에 포함한다", async () => {
+    const failedCandidate: TripActionRankingEvalCandidate = {
+      id: "invalid-output",
+      rank: async () => ({
+        failure: "INVALID_OUTPUT",
+        firstResponseLatencyMs: 80,
+        totalLatencyMs: 100,
+        inputTokens: 20,
+        outputTokens: 10,
+        totalTokens: 30,
+        estimatedCostUsd: 0.004,
+      }),
+    };
+
+    const report = await runTripActionRankingEval([
+      candidate("success"),
+      failedCandidate,
+    ]);
+
+    expect(report.candidates[1]?.metrics).toMatchObject({
+      invokedCases: 8,
+      completedCases: 0,
+      schemaFailureRate: 1,
+      p95FirstResponseLatencyMs: 80,
+      p95TotalLatencyMs: 100,
+      inputTokens: 160,
+      outputTokens: 80,
+      totalTokens: 240,
+      estimatedCostPerRecommendationUsd: 0.004,
+    });
   });
 });

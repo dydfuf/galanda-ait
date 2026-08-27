@@ -135,6 +135,31 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
     expect(JSON.stringify(exit)).toContain(reason);
   });
 
+  it("ranking validation failure에도 provider telemetry를 보존한다", async () => {
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
+    const ranker = makeCloudflareAiGatewayTripActionRanker(
+      { ...config, onTelemetry: (event) => telemetry.push(event) },
+      async () => responseWithOutput({ primaryActionId: "DEFINE_ROUTE" })
+    );
+    const exit = await Effect.runPromiseExit(ranker.rank(input));
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(JSON.stringify(exit)).toContain("INVALID_OUTPUT");
+    expect(telemetry).toEqual([
+      expect.objectContaining({
+        status: "FAILED",
+        statusCode: 200,
+        inputTokens: 12,
+        outputTokens: 8,
+        totalTokens: 20,
+      }),
+    ]);
+    expect(telemetry[0]?.firstResponseLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(telemetry[0]?.totalLatencyMs).toBeGreaterThanOrEqual(
+      telemetry[0]?.firstResponseLatencyMs ?? 0
+    );
+  });
+
   it("설정된 latency budget이 지나면 TIMEOUT을 반환한다", async () => {
     const ranker = makeCloudflareAiGatewayTripActionRanker(
       { ...config, timeoutMs: 5 },

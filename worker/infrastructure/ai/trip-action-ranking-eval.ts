@@ -41,6 +41,7 @@ export interface TripActionRankingEvalOutcome {
   readonly totalLatencyMs: number;
   readonly inputTokens: number;
   readonly outputTokens: number;
+  readonly totalTokens: number;
   readonly estimatedCostUsd: number;
 }
 
@@ -401,6 +402,7 @@ export const runTripActionRankingEval = async (
         totalLatencyMs: outcome.totalLatencyMs,
         inputTokens: outcome.inputTokens,
         outputTokens: outcome.outputTokens,
+        totalTokens: outcome.totalTokens,
         estimatedCostUsd: outcome.estimatedCostUsd,
       });
     }
@@ -442,32 +444,36 @@ export const runTripActionRankingEval = async (
           completed.length
         ),
         p50FirstResponseLatencyMs: percentile(
-          completed.map(({ firstResponseLatencyMs }) => firstResponseLatencyMs ?? 0),
+          invoked.map(({ firstResponseLatencyMs }) => firstResponseLatencyMs ?? 0),
           0.5
         ),
         p95FirstResponseLatencyMs: percentile(
-          completed.map(({ firstResponseLatencyMs }) => firstResponseLatencyMs ?? 0),
+          invoked.map(({ firstResponseLatencyMs }) => firstResponseLatencyMs ?? 0),
           0.95
         ),
         p50TotalLatencyMs: percentile(
-          completed.map(({ totalLatencyMs }) => totalLatencyMs ?? 0),
+          invoked.map(({ totalLatencyMs }) => totalLatencyMs ?? 0),
           0.5
         ),
         p95TotalLatencyMs: percentile(
-          completed.map(({ totalLatencyMs }) => totalLatencyMs ?? 0),
+          invoked.map(({ totalLatencyMs }) => totalLatencyMs ?? 0),
           0.95
         ),
-        inputTokens: completed.reduce(
+        inputTokens: invoked.reduce(
           (sum, item) => sum + (item.inputTokens ?? 0),
           0
         ),
-        outputTokens: completed.reduce(
+        outputTokens: invoked.reduce(
           (sum, item) => sum + (item.outputTokens ?? 0),
+          0
+        ),
+        totalTokens: invoked.reduce(
+          (sum, item) => sum + (item.totalTokens ?? 0),
           0
         ),
         estimatedCostPerRecommendationUsd: invoked.length === 0
           ? 0
-          : completed.reduce(
+          : invoked.reduce(
               (sum, item) => sum + (item.estimatedCostUsd ?? 0),
               0
             ) /
