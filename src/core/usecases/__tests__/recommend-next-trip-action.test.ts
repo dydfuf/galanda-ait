@@ -8,6 +8,10 @@ import {
 } from "../../domain/ids.ts";
 import type { TripRoom } from "../../domain/room.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
+import {
+  TripActionRanker,
+  TripActionRankingError,
+} from "../../ports/trip-action-ranker.ts";
 import { createTestIdGenerator } from "../../../infrastructure/id-generator.ts";
 import { createLocalSessionLayer } from "../../../infrastructure/local/local-session.ts";
 import { recommendNextTripAction } from "../recommend-next-trip-action.ts";
@@ -36,19 +40,20 @@ const layerFor = (value: TripRoom) => Layer.mergeAll(
   createTestIdGenerator({ recommendationId: "recommendation-test-001" })
 );
 
+const draftCommand = {
+  tripId: room.id,
+  surface: "FIRST_PLAN" as const,
+  draft: {
+    basic: true,
+    route: false,
+    accommodation: false,
+    transport: false,
+  },
+};
+
 describe("recommendNextTripAction", () => {
   it("minimal draft fact를 deterministic RULE recommendation으로 변환한다", async () => {
-    const command = {
-      tripId: room.id,
-      surface: "FIRST_PLAN" as const,
-      draft: {
-        basic: true,
-        route: false,
-        accommodation: false,
-        transport: false,
-      },
-    };
-    const program = recommendNextTripAction(command).pipe(
+    const program = recommendNextTripAction(draftCommand).pipe(
       Effect.provide(layerFor(room))
     );
 
@@ -71,14 +76,14 @@ describe("recommendNextTripAction", () => {
 
     const changed = await Effect.runPromise(
       recommendNextTripAction({
-        ...command,
-        draft: { ...command.draft, route: true },
+        ...draftCommand,
+        draft: { ...draftCommand.draft, route: true },
       }).pipe(Effect.provide(layerFor(room)))
     );
     expect(changed.contextFingerprint).not.toBe(first.contextFingerprint);
 
     const revised = await Effect.runPromise(
-      recommendNextTripAction(command).pipe(
+      recommendNextTripAction(draftCommand).pipe(
         Effect.provide(layerFor({
           ...room,
           revision: RevisionSchema.make(4),
@@ -86,6 +91,50 @@ describe("recommendNextTripAction", () => {
       )
     );
     expect(revised.contextFingerprint).not.toBe(first.contextFingerprint);
+  });
+
+  it("주입된 ranker의 eligible ranking을 적용한다", async () => {
+    const result = await Effect.runPromise(
+      recommendNextTripAction(draftCommand).pipe(
+        Effect.provide(Layer.merge(
+          layerFor(room),
+          Layer.succeed(TripActionRanker, {
+            policyVersion: "nba-ai-test-v1",
+            rank: () => Effect.succeed({
+              primaryActionId: "INVITE_MEMBER",
+              alternativeActionIds: ["DEFINE_ROUTE"],
+              reasonCode: "INVITE_TRAVEL_COMPANION",
+            }),
+          })
+        ))
+      )
+    );
+
+    expect(result).toMatchObject({
+      source: "AI",
+      primary: { actionId: "INVITE_MEMBER" },
+    });
+  });
+
+  it("ranker 실패 시 deterministic RULE recommendation으로 fallback한다", async () => {
+    const result = await Effect.runPromise(
+      recommendNextTripAction(draftCommand).pipe(
+        Effect.provide(Layer.merge(
+          layerFor(room),
+          Layer.succeed(TripActionRanker, {
+            policyVersion: "nba-ai-test-v1",
+            rank: () => Effect.fail(
+              new TripActionRankingError({ reason: "TIMEOUT" })
+            ),
+          })
+        ))
+      )
+    );
+
+    expect(result).toMatchObject({
+      source: "RULE",
+      primary: { actionId: "DEFINE_ROUTE" },
+    });
   });
 
   it("첫 plan이 생긴 뒤 도착한 draft snapshot을 stale state로 거절한다", async () => {

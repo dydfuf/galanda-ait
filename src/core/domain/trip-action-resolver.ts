@@ -1,5 +1,9 @@
 import type { RoomActor } from "./auth-guards.ts";
-import type { TripAction, TripActionId } from "./trip-action.ts";
+import type {
+  TripAction,
+  TripActionId,
+  TripActionRanking,
+} from "./trip-action.ts";
 import {
   resolveTripDecisions,
   type DecisionId,
@@ -84,6 +88,24 @@ export const rankTripActionsDeterministically = (
   [...eligibleActions].sort(
     (left, right) => priority[left.actionId] - priority[right.actionId]
   );
+
+export const applyTripActionRanking = (
+  eligibleActions: ReadonlyArray<TripAction>,
+  ranking: TripActionRanking
+): ReadonlyArray<TripAction> | undefined => {
+  const byId = new Map(eligibleActions.map((action) => [action.actionId, action]));
+  const actionIds = [ranking.primaryActionId, ...ranking.alternativeActionIds];
+  if (new Set(actionIds).size !== actionIds.length) return undefined;
+
+  const ranked: TripAction[] = [];
+  for (const actionId of actionIds) {
+    const action = byId.get(actionId);
+    if (!action) return undefined;
+    ranked.push(action);
+  }
+
+  return ranked[0]?.reasonCode === ranking.reasonCode ? ranked : undefined;
+};
 
 export const resolveEligibleTripActions = (
   context: TripDecisionContext,
