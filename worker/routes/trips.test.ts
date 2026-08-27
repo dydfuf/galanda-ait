@@ -1,5 +1,5 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ParticipantIdSchema,
   PlanIdSchema,
@@ -18,6 +18,15 @@ import {
 
 const baseUrl = "https://galanda.test";
 const env = {} as AppEnv["Bindings"];
+const shadowEnv = {
+  AI_RECOMMENDATION_MODE: "shadow",
+  AI_RECOMMENDATION_MODEL: "test-model",
+  AI_RECOMMENDATION_POLICY_VERSION: "nba-ai-test-v1",
+  AI_RECOMMENDATION_TIMEOUT_MS: "100",
+  AI_GATEWAY_ACCOUNT_ID: "account-id",
+  AI_GATEWAY_ID: "gateway-id",
+  AI_GATEWAY_TOKEN: "gateway-token",
+} as AppEnv["Bindings"];
 const hostId = UserIdSchema.make("host-1");
 const plan: TripPlan = {
   id: PlanIdSchema.make("plan-1"),
@@ -180,6 +189,17 @@ const request = (path: string, init?: RequestInit) =>
     ...init,
     headers: init?.body ? { "content-type": "application/json" } : undefined,
   });
+
+const makeExecutionContext = () => {
+  const promises: Promise<unknown>[] = [];
+  const executionCtx = {
+    waitUntil: (promise: Promise<unknown>) => promises.push(promise),
+    passThroughOnException: () => undefined,
+  } as unknown as ExecutionContext;
+  return { executionCtx, promises };
+};
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("Trip API vertical slice", () => {
   it("list/detail/create/update를 Hono → Effect → Drizzle 경계로 실행한다", async () => {
@@ -724,6 +744,109 @@ describe("Trip API vertical slice", () => {
 
     expect(invalidResponse.status).toBe(400);
     expect(invalid.calls).toEqual([]);
+  });
+
+  it("shadow ranking은 RULE 응답 뒤 waitUntil에서만 실행한다", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    let resolveProvider: ((response: Response) => void) | undefined;
+    const providerFetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      () => new Promise<Response>((resolve) => {
+        resolveProvider = resolve;
+      })
+    );
+    const { app } = makeApp([[rowValues(room)]]);
+    const { executionCtx, promises } = makeExecutionContext();
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: {
+            basic: true,
+            route: false,
+            accommodation: false,
+            transport: false,
+          },
+        }),
+      }),
+      shadowEnv,
+      executionCtx
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = await response.json();
+    expect(responseBody).toMatchObject({
+      primary: { actionId: "DEFINE_ROUTE" },
+      source: "RULE",
+    });
+    expect(responseBody).not.toHaveProperty("rankingInput");
+    expect(promises).toHaveLength(1);
+    await vi.waitFor(() => expect(providerFetch).toHaveBeenCalledOnce());
+    resolveProvider?.(Response.json({
+      output: [{
+        content: [{
+          type: "output_text",
+          text: JSON.stringify({
+            primaryActionId: "INVITE_MEMBER",
+            alternativeActionIds: ["DEFINE_ROUTE"],
+            reasonCode: "INVITE_TRAVEL_COMPANION",
+          }),
+        }],
+      }],
+      usage: { input_tokens: 12, output_tokens: 8, total_tokens: 20 },
+    }));
+    await Promise.all(promises);
+
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+      message: "nba_shadow_completed",
+      annotations: expect.objectContaining({
+        ruleActionId: "DEFINE_ROUTE",
+        shadowActionId: "INVITE_MEMBER",
+        disagreed: true,
+      }),
+    }));
+    providerFetch.mockRestore();
+    log.mockRestore();
+  });
+
+  it("shadow provider 실패가 recommendation 성공을 바꾸지 않는다", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const providerFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 503 })
+    );
+    const { app } = makeApp([[rowValues(room)]]);
+    const { executionCtx, promises } = makeExecutionContext();
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: {
+            basic: true,
+            route: false,
+            accommodation: false,
+            transport: false,
+          },
+        }),
+      }),
+      shadowEnv,
+      executionCtx
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      primary: { actionId: "DEFINE_ROUTE" },
+      source: "RULE",
+    });
+    await Promise.all(promises);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+      message: "nba_shadow_failed",
+      annotations: expect.objectContaining({ failure: "PROVIDER_ERROR" }),
+    }));
+    providerFetch.mockRestore();
+    log.mockRestore();
   });
 
   it("revision insert 실패 시 itinerary CAS를 rollback한다", async () => {

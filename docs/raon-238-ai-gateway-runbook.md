@@ -16,9 +16,12 @@ AI_RECOMMENDATION_MODE=off|shadow|active
 AI_RECOMMENDATION_MODEL=<OpenAI model id>
 AI_RECOMMENDATION_POLICY_VERSION=v1
 AI_RECOMMENDATION_TIMEOUT_MS=700
-CLOUDFLARE_ACCOUNT_ID=<account id>
+AI_GATEWAY_ACCOUNT_ID=<account id>
 AI_GATEWAY_ID=<gateway id>
 ```
+
+`AI_GATEWAY_ACCOUNT_ID`는 Worker runtime과 `pnpm eval:nba`가 함께 사용하는
+canonical account ID key다. `CLOUDFLARE_ACCOUNT_ID`는 사용하지 않는다.
 
 `AI_GATEWAY_TOKEN`은 Worker secret으로 관리한다. OpenAI key를 request에 직접
 전달하는 BYOK 환경만 `OPENAI_API_KEY` secret을 추가한다. Gateway Stored Keys 또는
