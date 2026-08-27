@@ -1,6 +1,6 @@
 import type { Context as HonoContext } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Logger } from "effect";
 import type { AppEnv } from "../app.ts";
 import { type RequestScope, RequestScopeService } from "./request-scope.ts";
 import { mapErrorToResponse } from "./api-error.ts";
@@ -30,13 +30,15 @@ export async function runEffect<A, E>(
   };
 
   const program = effect.pipe(
+    Effect.annotateLogs({ requestId }),
     Effect.provideService(RequestScopeService, requestScope),
     Effect.provide(
       SessionServiceLiveFromUserSession(
         options?.session ?? c.var.authSession ?? null,
         options?.sessionError ?? c.var.authSessionError
       )
-    )
+    ),
+    Effect.provide(Logger.layer([Logger.consoleStructured]))
   );
 
   const exit = await Effect.runPromiseExit(program);

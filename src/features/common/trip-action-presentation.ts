@@ -1,14 +1,4 @@
-import {
-  isRoomConfirmed,
-  type RoomActor,
-} from "../../core/domain/auth-guards.ts";
 import type { TripActionId } from "../../core/domain/trip-action.ts";
-import { isPlanConfirmable } from "../../core/domain/confirmed-itinerary.ts";
-import type {
-  TripDecisionContext,
-  TripRecommendationConflict,
-} from "../../core/domain/trip-decision.ts";
-import type { PlanPublishInput, TripRoom } from "../../core/domain/room.ts";
 import type { PlanEditorSection } from "../plan-editor/plan-editor-section.ts";
 
 export interface TripActionPresentation {
@@ -79,38 +69,3 @@ export const tripActionPresentation: Record<TripActionId, TripActionPresentation
     route: (tripId) => `/trips/${tripId}/itinerary`,
   },
 };
-
-export const toTripRoomDecisionContext = (
-  room: TripRoom,
-  actor: RoomActor,
-): TripDecisionContext => {
-  const opinionParticipantIds = new Set(
-    room.plans.flatMap((plan) =>
-      (plan.memberOpinions ?? []).map(({ userId }) => userId)
-    )
-  );
-
-  return {
-    planCount: room.plans.length,
-    memberCount: room.members.length,
-    opinionParticipantCount: opinionParticipantIds.size,
-    actorHasOpinion: actor.member
-      ? opinionParticipantIds.has(actor.member.id)
-      : false,
-    isConfirmed: isRoomConfirmed(room),
-    confirmablePlanCount: room.plans.filter((plan) =>
-      isPlanConfirmable(room, plan)
-    ).length,
-  };
-};
-
-export const toFirstPlanDecisionContext = (
-  room: TripRoom,
-  actor: RoomActor,
-  firstPlanDraft: PlanPublishInput,
-  conflict?: TripRecommendationConflict,
-): TripDecisionContext => ({
-  ...toTripRoomDecisionContext(room, actor),
-  firstPlanDraft,
-  conflict,
-});

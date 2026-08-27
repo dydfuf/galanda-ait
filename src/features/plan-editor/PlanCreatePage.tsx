@@ -21,7 +21,8 @@ import {
 } from "../common/error-message.ts";
 import { getRoomActor, isRoomConfirmed } from "../../core/domain/auth-guards.ts";
 import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
-import { toFirstPlanDecisionContext } from "../common/trip-action-presentation.ts";
+import { toFirstPlanDecisionContext } from "../../core/domain/trip-decision.ts";
+import { getPlanPublishCompletion } from "../../core/domain/room.ts";
 
 const pageContainerStyle = css`
   padding: 16px 20px var(--app-cta-space, 112px);
@@ -188,7 +189,7 @@ export function PlanCreatePage(): JSX.Element {
         toFirstPlanDecisionContext(
           room,
           actor,
-          editor,
+          getPlanPublishCompletion(editor),
           editor.draftConflict ? "DRAFT" : undefined,
         ),
         actor,

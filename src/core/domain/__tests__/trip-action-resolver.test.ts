@@ -6,7 +6,11 @@ import {
   TripIdSchema,
   UserIdSchema,
 } from "../ids.ts";
-import type { PlanPublishInput, TripRoom } from "../room.ts";
+import {
+  getPlanPublishCompletion,
+  type PlanPublishInput,
+  type TripRoom,
+} from "../room.ts";
 import { resolveEligibleTripActions } from "../trip-action-resolver.ts";
 import type { TripDecisionContext } from "../trip-decision.ts";
 
@@ -101,7 +105,7 @@ describe("deterministic Trip action resolver", () => {
     ["accommodation searching and transport not checked", completeDraft, "PUBLISH_FIRST_PLAN"],
   ] as const)("%s → %s", (_name, firstPlanDraft, expected) => {
     const actions = resolveEligibleTripActions(
-      context({ firstPlanDraft }),
+      context({ firstPlanCompletion: getPlanPublishCompletion(firstPlanDraft) }),
       host
     );
 
@@ -119,7 +123,12 @@ describe("deterministic Trip action resolver", () => {
 
   it("route가 미완료면 숙소와 교통 action을 열지 않는다", () => {
     const actions = actionIds(resolveEligibleTripActions(
-      context({ firstPlanDraft: { title: "서울", baseHeadcount: 2 } }),
+      context({
+        firstPlanCompletion: getPlanPublishCompletion({
+          title: "서울",
+          baseHeadcount: 2,
+        }),
+      }),
       host
     ));
 

@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import { getRoomActor } from "../../core/domain/auth-guards.ts";
 import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
 import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
-import type { TripRoom } from "../../core/domain/room.ts";
 import {
   toFirstPlanDecisionContext,
   toTripRoomDecisionContext,
-  tripActionPresentation,
-} from "./trip-action-presentation.ts";
+} from "../../core/domain/trip-decision.ts";
+import { getPlanPublishCompletion } from "../../core/domain/room.ts";
+import type { TripRoom } from "../../core/domain/room.ts";
+import { tripActionPresentation } from "./trip-action-presentation.ts";
 
 const room: TripRoom = {
   id: TripIdSchema.make("trip-1"),
@@ -22,13 +23,17 @@ describe("trip action journey adapter (RAON-236)", () => {
   it("first-plan draft와 Trip Room을 같은 NBA action taxonomy로 연결한다", () => {
     const actor = getRoomActor(room, UserIdSchema.make("host-1"));
     const firstPlanAction = resolveEligibleTripActions(
-      toFirstPlanDecisionContext(room, actor, {
-        title: "첫 여행안",
-        baseHeadcount: 1,
-        routes: [],
-        accommodations: [],
-        transports: [],
-      }),
+      toFirstPlanDecisionContext(
+        room,
+        actor,
+        getPlanPublishCompletion({
+          title: "첫 여행안",
+          baseHeadcount: 1,
+          routes: [],
+          accommodations: [],
+          transports: [],
+        }),
+      ),
       actor,
     )[0];
 

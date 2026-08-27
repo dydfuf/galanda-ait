@@ -3,6 +3,10 @@ import { Hono, type Context as HonoContext } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { RepositoryError } from "../../src/core/domain/errors.ts";
 import {
+  RecommendNextActionRequestSchema,
+  type RecommendNextActionResponse,
+} from "../../src/contracts/recommendation.ts";
+import {
   PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
@@ -36,6 +40,10 @@ import {
 } from "../../src/core/usecases/save-plan.ts";
 import { submitOpinion } from "../../src/core/usecases/submit-opinion.ts";
 import { updateTripRoom } from "../../src/core/usecases/update-room.ts";
+import {
+  recommendNextTripAction,
+  type NextTripActionRecommendation,
+} from "../../src/core/usecases/recommend-next-trip-action.ts";
 import { IdGeneratorLive } from "../../src/infrastructure/id-generator.ts";
 import { InviteRepositoryLive } from "../../src/infrastructure/persistence/drizzle/invite-repository.ts";
 import { Database } from "../../src/infrastructure/persistence/drizzle/database.ts";
@@ -90,6 +98,19 @@ const OpinionRequestSchema = Schema.Struct({
   expectedRevision: ExpectedRevisionSchema,
 });
 const strictInput = { onExcessProperty: "error" } as const;
+
+const toRecommendNextActionResponse = (
+  recommendation: NextTripActionRecommendation
+): RecommendNextActionResponse => ({
+  recommendationId: recommendation.recommendationId,
+  primary: {
+    actionId: recommendation.primary.actionId,
+    reasonCode: recommendation.primary.reasonCode,
+  },
+  alternatives: recommendation.alternatives.map(({ actionId }) => ({ actionId })),
+  source: recommendation.source,
+  contextFingerprint: recommendation.contextFingerprint,
+});
 
 type TripRequirements =
   | RequestScopeService
@@ -193,6 +214,20 @@ tripsRoute.post(
         c.req.valid("param").tripId,
         c.req.valid("json").expectedRevision
       )
+    )
+);
+
+tripsRoute.post(
+  "/:tripId/recommendations/next",
+  effectValidator("param", TripParamsSchema),
+  effectValidator("json", RecommendNextActionRequestSchema, strictInput),
+  (c) =>
+    runTripEffect(
+      c,
+      recommendNextTripAction({
+        tripId: c.req.valid("param").tripId,
+        ...c.req.valid("json"),
+      }).pipe(Effect.map(toRecommendNextActionResponse))
     )
 );
 

@@ -10,10 +10,8 @@ import {
 } from "../../core/domain/auth-guards.ts";
 import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
 import type { TripActionId } from "../../core/domain/trip-action.ts";
-import {
-  toTripRoomDecisionContext,
-  tripActionPresentation,
-} from "../common/trip-action-presentation.ts";
+import { toTripRoomDecisionContext } from "../../core/domain/trip-decision.ts";
+import { tripActionPresentation } from "../common/trip-action-presentation.ts";
 
 export interface PlanOpinionCounts {
   readonly likeCount: number;

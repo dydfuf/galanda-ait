@@ -1,7 +1,12 @@
 import { Schema } from "effect";
 import {
-  getPlanPublishCompletion,
-  type PlanPublishInput,
+  isRoomConfirmed,
+  type RoomActor,
+} from "./auth-guards.ts";
+import { isPlanConfirmable } from "./confirmed-itinerary.ts";
+import {
+  type PlanPublishCompletion,
+  type TripRoom,
 } from "./room.ts";
 
 export const DecisionIdSchema = Schema.Literals([
@@ -43,8 +48,43 @@ export interface TripDecisionContext {
   readonly isConfirmed: boolean;
   readonly confirmablePlanCount: number;
   readonly conflict?: TripRecommendationConflict;
-  readonly firstPlanDraft?: PlanPublishInput;
+  readonly firstPlanCompletion?: PlanPublishCompletion;
 }
+
+export const toTripRoomDecisionContext = (
+  room: TripRoom,
+  actor: RoomActor,
+): TripDecisionContext => {
+  const opinionParticipantIds = new Set(
+    room.plans.flatMap((plan) =>
+      (plan.memberOpinions ?? []).map(({ userId }) => userId)
+    )
+  );
+
+  return {
+    planCount: room.plans.length,
+    memberCount: room.members.length,
+    opinionParticipantCount: opinionParticipantIds.size,
+    actorHasOpinion: actor.member
+      ? opinionParticipantIds.has(actor.member.id)
+      : false,
+    isConfirmed: isRoomConfirmed(room),
+    confirmablePlanCount: room.plans.filter((plan) =>
+      isPlanConfirmable(room, plan)
+    ).length,
+  };
+};
+
+export const toFirstPlanDecisionContext = (
+  room: TripRoom,
+  actor: RoomActor,
+  firstPlanCompletion?: PlanPublishCompletion,
+  conflict?: TripRecommendationConflict,
+): TripDecisionContext => ({
+  ...toTripRoomDecisionContext(room, actor),
+  firstPlanCompletion,
+  conflict,
+});
 
 export const resolveTripDecisions = (
   context: TripDecisionContext
@@ -53,8 +93,8 @@ export const resolveTripDecisions = (
     return DecisionIdSchema.literals.map((id) => ({ id, status: "BLOCKED" }));
   }
 
-  const completion = context.firstPlanDraft
-    ? getPlanPublishCompletion(context.firstPlanDraft)
+  const completion = context.firstPlanCompletion
+    ? context.firstPlanCompletion
     : {
         basic: context.planCount > 0,
         route: context.planCount > 0,
