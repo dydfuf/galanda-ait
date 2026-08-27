@@ -7,6 +7,8 @@ OpenAI Responses API adapter를 제공한다. Recommendation route는
 `AI_RECOMMENDATION_MODE=active`일 때만 adapter를 주입한다. First Plan 진행 단계처럼
 deterministic primary가 있는 context는 active mode에서도 provider를 호출하지 않고,
 등록된 plan 이후 복수 collaboration action이 있는 context만 AI ranking을 사용한다.
+다만 RAON-239의 active rollout gate가 `NO-GO`인 동안에는 승인된 policy version이
+없으므로 실제 사용자 응답은 계속 `RULE`이다.
 
 ## Worker 설정
 
@@ -16,6 +18,7 @@ deterministic primary가 있는 context는 active mode에서도 provider를 호�
 AI_RECOMMENDATION_MODE=off|shadow|active
 AI_RECOMMENDATION_MODEL=<OpenAI model id>
 AI_RECOMMENDATION_POLICY_VERSION=v1
+AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION=<approved policy version>
 AI_RECOMMENDATION_TIMEOUT_MS=700
 AI_GATEWAY_ACCOUNT_ID=<account id>
 AI_GATEWAY_ID=<gateway id>
@@ -30,13 +33,19 @@ Unified Billing을 사용하면 `OPENAI_API_KEY`를 Worker에 주입하지 않�
 gateway ID, account ID와 credential은 staging/production 사이에서 재사용하지 않는다.
 
 Model ID는 코드에 고정하지 않는다. 모델을 바꾸면 cache identity와 관측 구간이
-분리되도록 `AI_RECOMMENDATION_POLICY_VERSION`도 함께 변경한다. Active 설정이
-불완전하면 endpoint는 provider error를 노출하지 않고 `RULE`로 동작한다.
+분리되도록 `AI_RECOMMENDATION_POLICY_VERSION`도 함께 변경한다. `active`는
+`AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION`이 현재 policy version과
+일치할 때만 허용되며, 승인 값이 없거나 설정이 불완전하면 endpoint는 provider
+error를 노출하지 않고 `RULE`로 동작한다. 승인 값은 RAON-239의 live eval과
+모델/비용 검토가 끝난 뒤에만 주입한다.
 
 ## Active 안정성
 
-- Context fingerprint는 trip revision, actor role/capability scope, surface, draft completion,
-  rule/model policy version과 eligible action set을 포함한다.
+- Context fingerprint는 trip ID, trip revision, actor role/capability scope, surface,
+  draft completion, rule/model policy version, decision status와 eligible action/reason
+  set을 포함한다.
+- 응답의 `tripRevision`은 recommendation 계산 시점의 room revision이다. 클라이언트는
+  현재 room revision과 비교해 stale recommendation을 적용하지 않는다.
 - 동일 fingerprint의 검증된 ranking은 Workers Cache API에서 5분간 재사용한다.
 - Trip revision 또는 policy version이 바뀌면 cache key도 바뀌므로 이전 ranking은
   현재 recommendation에 적용되지 않는다.

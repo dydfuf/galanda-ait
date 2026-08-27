@@ -54,10 +54,19 @@ describe("recommendation HTTP contract", () => {
       },
       alternatives: [{ actionId: "INVITE_MEMBER" }],
       source: "RULE",
+      policyVersion: "nba-rule-v1",
+      tripRevision: 3,
       contextFingerprint: "fingerprint",
     };
 
-    expect(Result.isSuccess(decode(response))).toBe(true);
+    const decoded = decode(response);
+    expect(Result.isSuccess(decoded)).toBe(true);
+    expect(decoded).toMatchObject({
+      success: {
+        policyVersion: "nba-rule-v1",
+        tripRevision: 3,
+      },
+    });
     expect(Result.isFailure(decode({
       ...response,
       provider: "example-provider",

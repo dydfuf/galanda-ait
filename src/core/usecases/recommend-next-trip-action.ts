@@ -19,7 +19,6 @@ import {
   type RecommendationSource,
   type RecommendationSurface,
   type TripAction,
-  type TripActionId,
 } from "../domain/trip-action.ts";
 import {
   applyTripActionRanking,
@@ -53,11 +52,14 @@ export interface NextTripActionRecommendation {
   readonly primary: TripAction;
   readonly alternatives: ReadonlyArray<TripAction>;
   readonly source: RecommendationSource;
+  readonly policyVersion: string;
+  readonly tripRevision: Revision;
   readonly contextFingerprint: string;
   readonly rankingInput: TripActionRankingInput;
 }
 
 interface RecommendationFingerprintInput {
+  readonly tripId: TripId;
   readonly rulePolicyVersion: string;
   readonly rankingPolicyVersion?: string;
   readonly tripRevision: Revision;
@@ -66,7 +68,10 @@ interface RecommendationFingerprintInput {
   readonly draft?: PlanPublishCompletion & {
     readonly conflict?: TripRecommendationConflict;
   };
-  readonly eligibleActionIds: ReadonlyArray<TripActionId>;
+  readonly decisions: ReturnType<typeof resolveTripDecisions>;
+  readonly eligibleActions: ReadonlyArray<
+    Pick<TripAction, "actionId" | "decisionId" | "reasonCode">
+  >;
 }
 
 const createRecommendationContextFingerprint = async (
@@ -75,6 +80,7 @@ const createRecommendationContextFingerprint = async (
   const bytes = new TextEncoder().encode(JSON.stringify({
     rulePolicyVersion: input.rulePolicyVersion,
     rankingPolicyVersion: input.rankingPolicyVersion ?? null,
+    tripId: input.tripId,
     tripRevision: input.tripRevision,
     actorCapabilityScope: input.actorCapabilityScope,
     surface: input.surface,
@@ -87,7 +93,10 @@ const createRecommendationContextFingerprint = async (
           input.draft.conflict ?? null,
         ]
       : null,
-    eligibleActionSet: [...input.eligibleActionIds].sort(),
+    decisions: input.decisions,
+    eligibleActions: [...input.eligibleActions].sort((left, right) =>
+      left.actionId.localeCompare(right.actionId)
+    ),
   }));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(
@@ -158,21 +167,29 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       Option.isSome(ranker) && isAiRankingNeeded(context, actions)
         ? ranker.value
         : undefined;
+    const decisions = resolveTripDecisions(context);
+    const eligibleActions = actions.map(({ actionId, decisionId, reasonCode }) => ({
+      actionId,
+      decisionId,
+      reasonCode,
+    }));
     const contextFingerprint = yield* Effect.promise(() =>
       createRecommendationContextFingerprint({
+        tripId: command.tripId,
         rulePolicyVersion: NBA_RULE_POLICY_VERSION,
         rankingPolicyVersion: activeRanker?.policyVersion,
         tripRevision: room.revision,
         actorCapabilityScope: actor.role,
         surface: command.surface,
         draft: command.draft,
-        eligibleActionIds: actions.map(({ actionId }) => actionId),
+        decisions,
+        eligibleActions,
       })
     );
     const rankingInput = {
       contextFingerprint,
       surface: command.surface,
-      decisions: resolveTripDecisions(context),
+      decisions,
       eligibleActions: actions,
     } satisfies TripActionRankingInput;
 
@@ -232,6 +249,8 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       primary,
       alternatives: rankedActions.slice(1),
       source,
+      policyVersion,
+      tripRevision: room.revision,
       contextFingerprint,
       rankingInput,
     } satisfies NextTripActionRecommendation;

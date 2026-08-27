@@ -29,6 +29,7 @@ export interface AiRecommendationBindings {
   readonly AI_RECOMMENDATION_MODE?: string;
   readonly AI_RECOMMENDATION_MODEL?: string;
   readonly AI_RECOMMENDATION_POLICY_VERSION?: string;
+  readonly AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION?: string;
   readonly AI_RECOMMENDATION_TIMEOUT_MS?: string;
   readonly AI_GATEWAY_ACCOUNT_ID?: string;
   readonly AI_GATEWAY_ID?: string;

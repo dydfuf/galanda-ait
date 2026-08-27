@@ -18,6 +18,7 @@ import { createLocalSessionLayer } from "../../../infrastructure/local/local-ses
 import { recommendNextTripAction } from "../recommend-next-trip-action.ts";
 
 const hostId = UserIdSchema.make("host-1");
+const memberId = UserIdSchema.make("member-1");
 const room: TripRoom = {
   id: TripIdSchema.make("trip-1"),
   title: "도쿄 여행",
@@ -173,6 +174,64 @@ describe("recommendNextTripAction", () => {
       source: "RULE",
       primary: { actionId: "PROPOSE_ALTERNATIVE" },
     });
+  });
+
+  it("decision status가 달라지면 eligible set이 같아도 fingerprint를 분리한다", async () => {
+    const plans = [
+      {
+        ...roomWithPlan.plans[0]!,
+        memberOpinions: [{
+          userId: hostId,
+          userName: "Host",
+          reaction: "LIKE" as const,
+        }],
+      },
+      {
+        ...roomWithPlan.plans[0]!,
+        id: PlanIdSchema.make("plan-2"),
+        memberOpinions: [{
+          userId: hostId,
+          userName: "Host",
+          reaction: "LIKE" as const,
+        }],
+      },
+    ];
+    const incompleteFeedbackRoom: TripRoom = {
+      ...room,
+      members: [
+        ...room.members,
+        { id: memberId, name: "Member", role: "MEMBER" },
+      ],
+      plans,
+    };
+    const completeFeedbackRoom: TripRoom = {
+      ...incompleteFeedbackRoom,
+      plans: [
+        plans[0]!,
+        {
+          ...plans[1]!,
+          memberOpinions: [
+            ...plans[1]!.memberOpinions!,
+            { userId: memberId, userName: "Member", reaction: "OKAY" as const },
+          ],
+        },
+      ],
+    };
+
+    const incomplete = await Effect.runPromise(
+      recommendNextTripAction(planHomeCommand).pipe(
+        Effect.provide(layerFor(incompleteFeedbackRoom))
+      )
+    );
+    const complete = await Effect.runPromise(
+      recommendNextTripAction(planHomeCommand).pipe(
+        Effect.provide(layerFor(completeFeedbackRoom))
+      )
+    );
+
+    expect(incomplete.rankingInput.eligibleActions.map(({ actionId }) => actionId))
+      .toEqual(complete.rankingInput.eligibleActions.map(({ actionId }) => actionId));
+    expect(incomplete.contextFingerprint).not.toBe(complete.contextFingerprint);
   });
 
   it("첫 plan이 생긴 뒤 도착한 draft snapshot을 stale state로 거절한다", async () => {

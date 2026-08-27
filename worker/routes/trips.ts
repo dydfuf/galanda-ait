@@ -120,6 +120,8 @@ const toRecommendNextActionResponse = (
   },
   alternatives: recommendation.alternatives.map(({ actionId }) => ({ actionId })),
   source: recommendation.source,
+  policyVersion: recommendation.policyVersion,
+  tripRevision: recommendation.tripRevision,
   contextFingerprint: recommendation.contextFingerprint,
 });
 
@@ -140,6 +142,18 @@ const makeActiveTripActionRanker = (
   c: HonoContext<AppEnv>
 ): TripActionRankerService | undefined => {
   if ((c.env.AI_RECOMMENDATION_MODE?.trim() ?? "off") !== "active") {
+    return undefined;
+  }
+
+  const policyVersion = c.env.AI_RECOMMENDATION_POLICY_VERSION?.trim() ?? "";
+  const approvedPolicyVersion =
+    c.env.AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION?.trim() ?? "";
+  if (!policyVersion || approvedPolicyVersion !== policyVersion) {
+    console.warn(JSON.stringify({
+      message: "nba_active_rollout_not_approved",
+      requestId: c.var.requestId,
+      policyVersion: policyVersion || undefined,
+    }));
     return undefined;
   }
 

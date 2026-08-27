@@ -30,6 +30,7 @@ const shadowEnv = {
 const activeEnv = {
   ...shadowEnv,
   AI_RECOMMENDATION_MODE: "active",
+  AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION: "nba-ai-test-v1",
 } as AppEnv["Bindings"];
 const hostId = UserIdSchema.make("host-1");
 const plan: TripPlan = {
@@ -687,6 +688,8 @@ describe("Trip API vertical slice", () => {
         reasonCode: "DEFINE_TRAVEL_ROUTE",
       },
       source: "RULE",
+      policyVersion: "nba-rule-v1",
+      tripRevision: 3,
     });
     expect(valid.calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
       "select",
@@ -787,8 +790,30 @@ describe("Trip API vertical slice", () => {
         { actionId: "GIVE_OPINION" },
       ],
       source: "AI",
+      policyVersion: "nba-ai-test-v1",
+      tripRevision: 3,
     });
     expect(providerFetch).toHaveBeenCalledOnce();
+  });
+
+  it("active rollout 승인 없이는 AI를 호출하지 않고 RULE을 반환한다", async () => {
+    const providerFetch = vi.spyOn(globalThis, "fetch");
+    const { app } = makeApp([[rowValues(roomWithPlan)]]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({ surface: "PLAN_HOME" }),
+      }),
+      { ...activeEnv, AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION: undefined }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      primary: { actionId: "PROPOSE_ALTERNATIVE" },
+      source: "RULE",
+    });
+    expect(providerFetch).not.toHaveBeenCalled();
   });
 
   it("active mode에서도 deterministic first-plan은 provider 없이 RULE을 반환한다", async () => {
