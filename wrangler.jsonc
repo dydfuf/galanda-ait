@@ -4,6 +4,9 @@
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-22",
   "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -13,6 +16,9 @@
   "env": {
     "staging": {
       "workers_dev": true,
+      "observability": {
+        "enabled": true
+      },
       "vars": {
         "BETTER_AUTH_URL": "https://galanda-staging.88dydfuf.workers.dev"
       },

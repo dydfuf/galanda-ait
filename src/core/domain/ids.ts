@@ -11,6 +11,11 @@ export const ItineraryIdSchema = Schema.String.pipe(
 );
 export type ItineraryId = typeof ItineraryIdSchema.Type;
 
+export const RecommendationIdSchema = Schema.String.pipe(
+  Schema.brand("RecommendationId")
+);
+export type RecommendationId = typeof RecommendationIdSchema.Type;
+
 export const ParticipantIdSchema = Schema.String.pipe(
   Schema.brand("ParticipantId")
 );

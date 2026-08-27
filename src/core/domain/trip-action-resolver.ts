@@ -100,7 +100,7 @@ export const resolveEligibleTripActions = (
   const eligible: TripAction[] = [];
 
   if (actor.can("plan:create")) {
-    if (context.firstPlanDraft) {
+    if (context.firstPlanCompletion) {
       if (decisions.get("PLAN_IDENTITY") === "INCOMPLETE") {
         eligible.push(actions.EDIT_PLAN_BASIC);
       }

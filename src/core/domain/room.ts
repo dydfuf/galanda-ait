@@ -181,12 +181,13 @@ export type PlanPublishInput = Pick<
   | "transports"
 >;
 
-export interface PlanPublishCompletion {
-  readonly basic: boolean;
-  readonly route: boolean;
-  readonly accommodation: boolean;
-  readonly transport: boolean;
-}
+export const PlanPublishCompletionSchema = Schema.Struct({
+  basic: Schema.Boolean,
+  route: Schema.Boolean,
+  accommodation: Schema.Boolean,
+  transport: Schema.Boolean,
+});
+export type PlanPublishCompletion = typeof PlanPublishCompletionSchema.Type;
 
 interface PlanPublishInspection {
   readonly completion: PlanPublishCompletion;

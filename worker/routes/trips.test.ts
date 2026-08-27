@@ -1,5 +1,5 @@
 import { drizzle, type NodePgClient } from "drizzle-orm/node-postgres";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ParticipantIdSchema,
   PlanIdSchema,
@@ -635,6 +635,72 @@ describe("Trip API vertical slice", () => {
 
     expect(response.status).toBe(400);
     expect(calls).toEqual([]);
+  });
+
+  it("NBA next-action API가 rule recommendation만 반환하고 draft 원문을 거부한다", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const valid = makeApp([[rowValues(room)]]);
+    const response = await valid.app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: {
+            basic: true,
+            route: false,
+            accommodation: false,
+            transport: false,
+          },
+        }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      primary: {
+        actionId: "DEFINE_ROUTE",
+        reasonCode: "DEFINE_TRAVEL_ROUTE",
+      },
+      source: "RULE",
+    });
+    expect(valid.calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
+      "select",
+    ]);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+      message: "nba_impression",
+      annotations: expect.objectContaining({
+        eventName: "nba_impression",
+        source: "RULE",
+        actionId: "DEFINE_ROUTE",
+        reasonCode: "DEFINE_TRAVEL_ROUTE",
+        surface: "FIRST_PLAN",
+        policyVersion: "nba-rule-v1",
+        requestId: expect.any(String),
+      }),
+    }));
+    log.mockRestore();
+
+    const invalid = makeApp([]);
+    const invalidResponse = await invalid.app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: {
+            basic: true,
+            route: false,
+            accommodation: false,
+            transport: false,
+            title: "서버로 전송하면 안 되는 원문",
+          },
+        }),
+      }),
+      env
+    );
+
+    expect(invalidResponse.status).toBe(400);
+    expect(invalid.calls).toEqual([]);
   });
 
   it("revision insert 실패 시 itinerary CAS를 rollback한다", async () => {
