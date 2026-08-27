@@ -15,7 +15,6 @@ import type {
 } from "../domain/ids.ts";
 import {
   NBA_RULE_POLICY_VERSION,
-  type RecommendationLifecycleEvent,
   type RecommendationSurface,
   type TripAction,
   type TripActionId,
@@ -24,6 +23,7 @@ import { resolveEligibleTripActions } from "../domain/trip-action-resolver.ts";
 import {
   toFirstPlanDecisionContext,
   toTripRoomDecisionContext,
+  type TripRecommendationConflict,
 } from "../domain/trip-decision.ts";
 import type { PlanPublishCompletion } from "../domain/room.ts";
 import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
@@ -34,7 +34,9 @@ import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 export interface RecommendNextTripActionCommand {
   readonly tripId: TripId;
   readonly surface: RecommendationSurface;
-  readonly draft?: PlanPublishCompletion;
+  readonly draft?: PlanPublishCompletion & {
+    readonly conflict?: TripRecommendationConflict;
+  };
 }
 
 export interface NextTripActionRecommendation {
@@ -48,7 +50,9 @@ export interface NextTripActionRecommendation {
 interface RecommendationFingerprintInput {
   readonly tripRevision: Revision;
   readonly surface: RecommendationSurface;
-  readonly draft?: PlanPublishCompletion;
+  readonly draft?: PlanPublishCompletion & {
+    readonly conflict?: TripRecommendationConflict;
+  };
   readonly eligibleActionIds: ReadonlyArray<TripActionId>;
 }
 
@@ -65,6 +69,7 @@ const createRecommendationContextFingerprint = async (
           input.draft.route,
           input.draft.accommodation,
           input.draft.transport,
+          input.draft.conflict ?? null,
         ]
       : null,
     eligibleActionSet: input.eligibleActionIds,
@@ -109,7 +114,19 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
 
     const actor = getRoomActor(room, session.participantIds);
     const context = command.surface === "FIRST_PLAN"
-      ? toFirstPlanDecisionContext(room, actor, command.draft)
+      ? toFirstPlanDecisionContext(
+          room,
+          actor,
+          command.draft
+            ? {
+                basic: command.draft.basic,
+                route: command.draft.route,
+                accommodation: command.draft.accommodation,
+                transport: command.draft.transport,
+              }
+            : undefined,
+          command.draft?.conflict
+        )
       : toTripRoomDecisionContext(room, actor);
     const actions = resolveEligibleTripActions(context, actor);
     const primary = actions[0];
@@ -132,8 +149,8 @@ export const recommendNextTripAction = Effect.fn("recommendNextTripAction")(
       })
     );
     const source = "RULE" as const;
-    const event: RecommendationLifecycleEvent = {
-      eventName: "nba_impression",
+    const event = {
+      eventName: "nba_recommendation_generated" as const,
       recommendationId,
       source,
       actionId: primary.actionId,

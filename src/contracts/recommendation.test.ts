@@ -24,6 +24,7 @@ describe("recommendation HTTP contract", () => {
         route: false,
         accommodation: false,
         transport: false,
+        conflict: "DRAFT",
       },
     }))).toBe(true);
     expect(Result.isFailure(decode({

@@ -668,9 +668,9 @@ describe("Trip API vertical slice", () => {
       "select",
     ]);
     expect(log).toHaveBeenCalledWith(expect.objectContaining({
-      message: "nba_impression",
+      message: "nba_recommendation_generated",
       annotations: expect.objectContaining({
-        eventName: "nba_impression",
+        eventName: "nba_recommendation_generated",
         source: "RULE",
         actionId: "DEFINE_ROUTE",
         reasonCode: "DEFINE_TRAVEL_ROUTE",
@@ -680,6 +680,29 @@ describe("Trip API vertical slice", () => {
       }),
     }));
     log.mockRestore();
+
+    const conflicting = makeApp([[rowValues(room)]]);
+    const conflictResponse = await conflicting.app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: {
+            basic: true,
+            route: true,
+            accommodation: true,
+            transport: true,
+            conflict: "DRAFT",
+          },
+        }),
+      }),
+      env
+    );
+
+    expect(conflictResponse.status).toBe(409);
+    await expect(conflictResponse.json()).resolves.toMatchObject({
+      error: { code: "STATE_CONFLICT" },
+    });
 
     const invalid = makeApp([]);
     const invalidResponse = await invalid.app.fetch(

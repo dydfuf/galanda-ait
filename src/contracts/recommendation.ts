@@ -7,8 +7,12 @@ import {
 } from "../core/domain/trip-action.ts";
 import { RecommendationIdSchema } from "../core/domain/ids.ts";
 import { PlanPublishCompletionSchema } from "../core/domain/room.ts";
+import { TripRecommendationConflictSchema } from "../core/domain/trip-decision.ts";
 
-export const DraftRecommendationSnapshotSchema = PlanPublishCompletionSchema;
+export const DraftRecommendationSnapshotSchema = Schema.Struct({
+  ...PlanPublishCompletionSchema.fields,
+  conflict: Schema.optional(TripRecommendationConflictSchema),
+});
 export type DraftRecommendationSnapshot =
   typeof DraftRecommendationSnapshotSchema.Type;
 

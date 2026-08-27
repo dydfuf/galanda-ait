@@ -115,4 +115,23 @@ describe("recommendNextTripAction", () => {
     expect(Exit.isFailure(exit)).toBe(true);
     expect(JSON.stringify(exit)).toContain("StateConflictError");
   });
+
+  it("draft conflict가 있으면 완료 fact와 무관하게 recommendation을 만들지 않는다", async () => {
+    const exit = await Effect.runPromiseExit(
+      recommendNextTripAction({
+        tripId: room.id,
+        surface: "FIRST_PLAN",
+        draft: {
+          basic: true,
+          route: true,
+          accommodation: true,
+          transport: true,
+          conflict: "DRAFT",
+        },
+      }).pipe(Effect.provide(layerFor(room)))
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(JSON.stringify(exit)).toContain("StateConflictError");
+  });
 });
