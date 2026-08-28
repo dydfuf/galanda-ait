@@ -15,7 +15,10 @@ import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
 import type { PlanEditorSection } from "../plan-editor-section.ts";
 import { tripActionPresentation } from "../../common/trip-action-presentation.ts";
-import { NextActionRecommendation } from "../../common/NextActionRecommendation.tsx";
+import {
+  NextActionRecommendation,
+  NextActionRecommendationPending,
+} from "../../common/NextActionRecommendation.tsx";
 import type { RecommendationActionContext } from "../../common/recommendation.ts";
 import { AccommodationSection } from "./AccommodationSection.tsx";
 import { BasicInfoSection } from "./BasicInfoSection.tsx";
@@ -36,6 +39,7 @@ interface PlanEditorSectionsProps {
   readonly isFirstPlan?: boolean;
   readonly recommendedActionId?: TripActionId;
   readonly recommendation?: RecommendNextActionResponse;
+  readonly isRecommendationPending?: boolean;
   readonly onRecommendationAction?: (context: RecommendationActionContext) => void;
   readonly onRecommendationDismiss?: (recommendationId: string) => void;
   readonly onOpenSection: (section: PlanEditorSection) => void;
@@ -106,6 +110,7 @@ export function PlanEditorSections({
   isFirstPlan = false,
   recommendedActionId,
   recommendation,
+  isRecommendationPending = false,
   onRecommendationAction,
   onRecommendationDismiss,
   onOpenSection,
@@ -200,6 +205,9 @@ export function PlanEditorSections({
             onDismiss={onRecommendationDismiss}
             className="mx-0"
           />
+        )}
+        {isFirstPlanGuide && isRecommendationPending && (
+          <NextActionRecommendationPending className="mx-0" />
         )}
         <MobileList aria-label="여행안 편집 항목" className="mb-5">
           <SummaryRow

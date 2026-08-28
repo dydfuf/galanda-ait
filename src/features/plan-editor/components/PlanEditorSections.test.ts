@@ -171,6 +171,36 @@ describe("PlanEditorSections", () => {
     expect(html).not.toContain("nba-rule-v1");
   });
 
+  it("첫 여행안 recommendation loading은 편집 목록을 막지 않고 primary를 만들지 않는다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [],
+      accommodations: [],
+      transports: [],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      tripId: "trip-1",
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      isRecommendationPending: true,
+      recommendedActionId: "DEFINE_ROUTE",
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("여행 상태에 맞는 다음 행동을 확인하고 있어요.");
+    expect(html).toContain("여행안 편집 항목");
+    expect(html).not.toContain("여행 경로 정하기</button>");
+  });
+
   it("숙소 찾는 중은 domain에서 완료로 취급한다", () => {
     const editor = {
       title: "첫 여행",

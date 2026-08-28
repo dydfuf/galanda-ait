@@ -208,6 +208,31 @@ describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
 });
 
 describe("PlanHomePage regression contract (RAON-229)", () => {
+  it("recommendation loading 중에는 기존 primary를 먼저 노출하지 않는다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(1)));
+    mockUseRecommendation.mockReturnValue(
+      ({
+        data: undefined,
+        isPending: true,
+        isLoading: true,
+        isError: false,
+        error: null,
+      }) as unknown as UseQueryResult<RecommendNextActionResponse | null, Error>,
+    );
+
+    const { container } = renderPage();
+
+    expect(screen.getByRole("region", { name: "다음으로 하면 좋은 일" }))
+      .toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("여행 상태에 맞는 다음 행동을 확인하고 있어요."))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새 여행안 제안하기" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "제안된 여행안" })).toBeInTheDocument();
+    expect(hasStickyCtaSpace(container)).toBe(false);
+  });
+
   it("추천은 진행 상태 뒤에 compact하게 노출되고 건너뛰면 기존 primary로 복귀한다", () => {
     mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
     mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(2)));

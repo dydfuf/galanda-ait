@@ -28,7 +28,10 @@ import { DecisionSummarySection } from "./components/DecisionSummarySection.tsx"
 import { resolvePlanHomeCta, toTripRoomViewModel } from "./plan-home-view-model.ts";
 import { getRoomActor } from "../../core/domain/auth-guards.ts";
 import { tripActionPresentation } from "../common/trip-action-presentation.ts";
-import { NextActionRecommendation } from "../common/NextActionRecommendation.tsx";
+import {
+  NextActionRecommendation,
+  NextActionRecommendationPending,
+} from "../common/NextActionRecommendation.tsx";
 import { useNextTripActionRecommendation } from "../common/use-next-trip-action-recommendation.ts";
 import {
   trackRecommendationEvent,
@@ -153,6 +156,8 @@ export function PlanHomePage() {
       dismissedRecommendationId
     ? undefined
     : recommendationQuery.data;
+  const isRecommendationPending = actor.isMember && recommendationQuery.isPending;
+  const hasRecommendationSurface = Boolean(recommendation) || isRecommendationPending;
 
   const runRecommendationAction = async (
     context: RecommendationActionContext,
@@ -215,7 +220,7 @@ export function PlanHomePage() {
   // 후보 0개의 create-first는 empty state 안에서만 렌더한다.
   // sticky BottomAction과 경쟁시키면 primary가 두 개가 된다 (RAON-228 계약).
   const showBottomPrimary =
-    plans.length > 0 && cta.primaryKind !== null && !recommendation;
+    plans.length > 0 && cta.primaryKind !== null && !hasRecommendationSurface;
 
   return (
     <PageBody withBottomAction={showBottomPrimary}>
@@ -246,6 +251,7 @@ export function PlanHomePage() {
           onDismiss={setDismissedRecommendationId}
         />
       )}
+      {isRecommendationPending && <NextActionRecommendationPending />}
 
       <section aria-labelledby="plan-candidates-heading" className="pt-1">
         <PlanCandidatesHeader
@@ -266,8 +272,8 @@ export function PlanHomePage() {
                 ? "첫 여행안을 만들어 친구들과 함께 골라보세요."
                 : "여행 참여자가 첫 여행안을 만들면 여기에 표시돼요."
             }
-            actionText={recommendation ? undefined : cta.primaryLabel ?? undefined}
-            onAction={recommendation || !cta.primaryKind ? undefined : runPrimaryCta}
+            actionText={hasRecommendationSurface ? undefined : cta.primaryLabel ?? undefined}
+            onAction={hasRecommendationSurface || !cta.primaryKind ? undefined : runPrimaryCta}
           />
         ) : (
           <ul

@@ -706,6 +706,7 @@ describe("Trip API vertical slice", () => {
         requestId: expect.any(String),
       }),
     }));
+
     log.mockRestore();
 
     const conflicting = makeApp([[rowValues(room)]]);
@@ -786,6 +787,22 @@ describe("Trip API vertical slice", () => {
         requestId: expect.any(String),
       }),
     }));
+
+    const logCount = log.mock.calls.length;
+    const mismatched = makeApp([[rowValues(room)]]);
+    const mismatchedResponse = await mismatched.app.fetch(
+      request("/api/trips/trip-1/recommendations/events", {
+        method: "POST",
+        body: JSON.stringify({
+          ...event,
+          eventName: "nba_alternative_selected",
+          actionId: "COMPARE_PLANS",
+        }),
+      }),
+      env,
+    );
+    expect(mismatchedResponse.status).toBe(422);
+    expect(log.mock.calls).toHaveLength(logCount);
     log.mockRestore();
 
     const invalid = makeApp([]);

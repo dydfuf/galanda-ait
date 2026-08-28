@@ -16,6 +16,32 @@ import {
   type RecommendationActionContext,
 } from "./recommendation.ts";
 
+const recommendationCardClassName =
+  "mx-(--app-inline-padding) mb-5 min-w-0 rounded-2xl border border-border bg-muted/45 p-4";
+
+export function NextActionRecommendationPending({
+  className,
+}: {
+  readonly className?: string;
+}): JSX.Element {
+  return (
+    <section
+      aria-busy="true"
+      aria-label="다음으로 하면 좋은 일"
+      aria-live="polite"
+      className={cn(recommendationCardClassName, className)}
+    >
+      <div className="flex items-center gap-2 text-primary">
+        <Sparkles aria-hidden="true" className="size-4 shrink-0" />
+        <h2 className="text-sm font-bold">다음으로 하면 좋은 일</h2>
+      </div>
+      <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+        여행 상태에 맞는 다음 행동을 확인하고 있어요.
+      </p>
+    </section>
+  );
+}
+
 interface NextActionRecommendationProps {
   readonly tripId: string;
   readonly surface: RecommendationSurface;
@@ -62,10 +88,7 @@ export function NextActionRecommendation({
   return (
     <section
       aria-labelledby={titleId}
-      className={cn(
-        "mx-(--app-inline-padding) mb-5 min-w-0 rounded-2xl border border-border bg-muted/45 p-4",
-        className,
-      )}
+      className={cn(recommendationCardClassName, className)}
     >
       <div className="flex items-center gap-2 text-primary">
         <Sparkles aria-hidden="true" className="size-4 shrink-0" />

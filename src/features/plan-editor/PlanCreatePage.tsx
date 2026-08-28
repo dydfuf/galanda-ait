@@ -255,6 +255,7 @@ export function PlanCreatePage(): JSX.Element {
       dismissedRecommendationId
     ? undefined
     : recommendationQuery.data ?? undefined;
+  const isRecommendationPending = isFirstPlan && recommendationQuery.isPending;
   const recommendedActionId = recommendation?.primary.actionId ?? deterministicActionId;
 
   const runRecommendationAction = async (
@@ -296,6 +297,7 @@ export function PlanCreatePage(): JSX.Element {
         isFirstPlan={isFirstPlan}
         recommendedActionId={recommendedActionId}
         recommendation={recommendation}
+        isRecommendationPending={isRecommendationPending}
         onRecommendationAction={(context) => void runRecommendationAction(context)}
         onRecommendationDismiss={setDismissedRecommendationId}
         onOpenSection={openSection}
@@ -305,6 +307,7 @@ export function PlanCreatePage(): JSX.Element {
       {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
       {!section &&
         !editor.draftConflict &&
+        !isRecommendationPending &&
         !recommendation && (
           <BottomAction
             accessory={

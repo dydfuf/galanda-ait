@@ -5,6 +5,7 @@ import type {
   TripActionId,
 } from "../../core/domain/trip-action.ts";
 import { TripIdSchema } from "../../core/domain/ids.ts";
+import { reasonCodeForAction } from "../../core/domain/trip-action-resolver.ts";
 import { recordRecommendationLifecycleEvent } from "../../app/api-client.ts";
 
 export interface RecommendationActionContext {
@@ -35,7 +36,7 @@ export const trackRecommendationEvent = (
     recommendationId: recommendation.recommendationId,
     source: recommendation.source,
     actionId,
-    reasonCode: recommendation.primary.reasonCode,
+    reasonCode: reasonCodeForAction(actionId),
     surface,
     policyVersion: recommendation.policyVersion,
     contextFingerprint: recommendation.contextFingerprint,
