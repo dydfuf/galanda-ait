@@ -27,6 +27,14 @@ import { TripSummarySection } from "./components/TripSummarySection.tsx";
 import { DecisionSummarySection } from "./components/DecisionSummarySection.tsx";
 import { resolvePlanHomeCta, toTripRoomViewModel } from "./plan-home-view-model.ts";
 import { getRoomActor } from "../../core/domain/auth-guards.ts";
+import { tripActionPresentation } from "../common/trip-action-presentation.ts";
+import { NextActionRecommendation } from "../common/NextActionRecommendation.tsx";
+import { useNextTripActionRecommendation } from "../common/use-next-trip-action-recommendation.ts";
+import {
+  trackRecommendationEvent,
+  type RecommendationActionContext,
+} from "../common/recommendation.ts";
+import { shareTripInvite } from "../invite/share-trip-invite.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -37,6 +45,10 @@ export function PlanHomePage() {
 
   const [isComparePickerOpen, setIsComparePickerOpen] = useState(false);
   const [selectedCompareIds, setSelectedCompareIds] = useState<ReadonlyArray<string>>([]);
+  const [compareRecommendation, setCompareRecommendation] =
+    useState<RecommendationActionContext>();
+  const [dismissedRecommendationId, setDismissedRecommendationId] =
+    useState<string>();
 
   const {
     isError: isSessionError,
@@ -52,6 +64,12 @@ export function PlanHomePage() {
     error,
     refetch: refetchRoom,
   } = useTripRoomRawQuery(tripId);
+  const recommendationQuery = useNextTripActionRecommendation(
+    tripId,
+    { surface: "PLAN_HOME" },
+    rawRoom?.revision,
+    Boolean(rawRoom && session),
+  );
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -102,26 +120,77 @@ export function PlanHomePage() {
     });
   };
 
-  const openComparePicker = (): void => {
+  const openComparePicker = (
+    recommendation?: RecommendationActionContext,
+  ): void => {
     if (plans.length === 2) {
-      navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`);
+      navigate(`/trips/${tripId}/plans/compare?left=${plans[0].id}&right=${plans[1].id}`, {
+        state: recommendation ? { nbaRecommendation: recommendation } : undefined,
+      });
       return;
     }
     // 3개 이상이면 명시적 선택을 위해 Drawer를 열어요. 초기값은 비워두고 사용자가 직접 고르게 해요.
     setIsComparePickerOpen(true);
+    setCompareRecommendation(recommendation);
   };
 
   const handleCompareConfirm = (): void => {
     if (selectedCompareIds.length !== 2) return;
     const [left, right] = selectedCompareIds as [string, string];
     setIsComparePickerOpen(false);
-    navigate(`/trips/${tripId}/plans/compare?left=${left}&right=${right}`);
+    navigate(`/trips/${tripId}/plans/compare?left=${left}&right=${right}`, {
+      state: compareRecommendation
+        ? { nbaRecommendation: compareRecommendation }
+        : undefined,
+    });
   };
 
   // CTA 노출은 서버 use case와 동일한 도메인 RBAC/NBA 계약을 따른다.
   const actor = getRoomActor(rawRoom, session?.participantIds);
   const canCreatePlan = actor.can("plan:create");
   const cta = resolvePlanHomeCta(rawRoom, actor);
+  const recommendation = recommendationQuery.data?.recommendationId ===
+      dismissedRecommendationId
+    ? undefined
+    : recommendationQuery.data;
+
+  const runRecommendationAction = async (
+    context: RecommendationActionContext,
+  ): Promise<void> => {
+    if (context.actionId === "INVITE_MEMBER") {
+      const outcome = await shareTripInvite(tripId);
+      if (outcome === "shared" || outcome === "copied") {
+        trackRecommendationEvent(
+          tripId,
+          context.recommendation,
+          context.surface,
+          "nba_action_completed",
+          context.actionId,
+        );
+      }
+      return;
+    }
+    if (context.actionId === "GIVE_OPINION") {
+      const target = plans.find((plan) => !plan.myReaction) ?? plans[0];
+      if (target) {
+        navigate(`/trips/${tripId}/plans/${target.id}`, {
+          state: { nbaRecommendation: context },
+        });
+      }
+      return;
+    }
+    if (
+      context.actionId === "COMPARE_PLANS" ||
+      context.actionId === "CONFIRM_PLAN"
+    ) {
+      openComparePicker(context);
+      return;
+    }
+    navigate(tripActionPresentation[context.actionId].route(tripId), {
+      replace: context.actionId === "VIEW_ITINERARY",
+      state: { nbaRecommendation: context },
+    });
+  };
 
   const runPrimaryCta = (): void => {
     if (!cta.primaryKind) return;
@@ -145,7 +214,8 @@ export function PlanHomePage() {
 
   // 후보 0개의 create-first는 empty state 안에서만 렌더한다.
   // sticky BottomAction과 경쟁시키면 primary가 두 개가 된다 (RAON-228 계약).
-  const showBottomPrimary = plans.length > 0 && cta.primaryKind !== null;
+  const showBottomPrimary =
+    plans.length > 0 && cta.primaryKind !== null && !recommendation;
 
   return (
     <PageBody withBottomAction={showBottomPrimary}>
@@ -167,10 +237,23 @@ export function PlanHomePage() {
         memberCount={room.memberCount}
       />
 
+      {recommendation && (
+        <NextActionRecommendation
+          tripId={tripId}
+          surface="PLAN_HOME"
+          recommendation={recommendation}
+          onAction={(context) => void runRecommendationAction(context)}
+          onDismiss={setDismissedRecommendationId}
+        />
+      )}
+
       <section aria-labelledby="plan-candidates-heading" className="pt-1">
         <PlanCandidatesHeader
           candidateCount={room.candidateCount}
-          showNewProposalAction={cta.showNewProposalEntry}
+          showNewProposalAction={
+            cta.showNewProposalEntry &&
+            recommendation?.primary.actionId !== "PROPOSE_ALTERNATIVE"
+          }
           onNewProposalAction={proposeNewPlan}
         />
 
@@ -183,8 +266,8 @@ export function PlanHomePage() {
                 ? "첫 여행안을 만들어 친구들과 함께 골라보세요."
                 : "여행 참여자가 첫 여행안을 만들면 여기에 표시돼요."
             }
-            actionText={cta.primaryLabel ?? undefined}
-            onAction={cta.primaryKind ? runPrimaryCta : undefined}
+            actionText={recommendation ? undefined : cta.primaryLabel ?? undefined}
+            onAction={recommendation || !cta.primaryKind ? undefined : runPrimaryCta}
           />
         ) : (
           <ul

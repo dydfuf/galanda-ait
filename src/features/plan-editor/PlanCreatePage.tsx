@@ -23,6 +23,14 @@ import { getRoomActor, isRoomConfirmed } from "../../core/domain/auth-guards.ts"
 import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
 import { toFirstPlanDecisionContext } from "../../core/domain/trip-decision.ts";
 import { getPlanPublishCompletion } from "../../core/domain/room.ts";
+import { useNextTripActionRecommendation } from "../common/use-next-trip-action-recommendation.ts";
+import {
+  getRecommendationActionContext,
+  trackRecommendationEvent,
+  type RecommendationActionContext,
+} from "../common/recommendation.ts";
+import { tripActionPresentation } from "../common/trip-action-presentation.ts";
+import { shareTripInvite } from "../invite/share-trip-invite.ts";
 
 const pageContainerStyle = css`
   padding: 16px 20px var(--app-cta-space, 112px);
@@ -71,6 +79,12 @@ export function PlanCreatePage(): JSX.Element {
   const createPlanMutation = useCreatePlanMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeRecommendation, setActiveRecommendation] =
+    useState<RecommendationActionContext | undefined>(() =>
+      getRecommendationActionContext(location.state),
+    );
+  const [dismissedRecommendationId, setDismissedRecommendationId] =
+    useState<string>();
 
   // 복제 원본 플랜 찾기
   const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
@@ -80,6 +94,20 @@ export function PlanCreatePage(): JSX.Element {
     undefined,
     cloneFromPlan,
     session?.participantId
+  );
+  const draftCompletion = getPlanPublishCompletion(editor);
+  const isFirstPlan = Boolean(!cloneFromPlan && room?.plans.length === 0);
+  const recommendationQuery = useNextTripActionRecommendation(
+    tripId,
+    {
+      surface: "FIRST_PLAN",
+      draft: {
+        ...draftCompletion,
+        conflict: editor.draftConflict ? "DRAFT" : undefined,
+      },
+    },
+    room?.revision,
+    isFirstPlan && !editor.draftConflict,
   );
 
   if (Result.isFailure(validated)) {
@@ -121,7 +149,9 @@ export function PlanCreatePage(): JSX.Element {
     );
   }
 
-  const handleSubmit = async (): Promise<void> => {
+  const handleSubmit = async (
+    recommendation = activeRecommendation,
+  ): Promise<void> => {
     if (!editor.validation.isValid || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -147,6 +177,18 @@ export function PlanCreatePage(): JSX.Element {
       editor.discardDraft();
       const createdPlan = updatedRoom.plans[updatedRoom.plans.length - 1];
       if (createdPlan) {
+        if (
+          recommendation?.actionId === "PUBLISH_FIRST_PLAN" ||
+          recommendation?.actionId === "PROPOSE_ALTERNATIVE"
+        ) {
+          trackRecommendationEvent(
+            tripId,
+            recommendation.recommendation,
+            recommendation.surface,
+            "nba_action_completed",
+            recommendation.actionId,
+          );
+        }
         navigate(`/trips/${tripId}/plans/${createdPlan.id}`, { replace: true });
       }
     } catch (err: unknown) {
@@ -175,6 +217,21 @@ export function PlanCreatePage(): JSX.Element {
     });
   };
   const completeSection = (): void => {
+    if (
+      section &&
+      draftCompletion[section] &&
+      activeRecommendation &&
+      tripActionPresentation[activeRecommendation.actionId].section === section
+    ) {
+      trackRecommendationEvent(
+        tripId,
+        activeRecommendation.recommendation,
+        activeRecommendation.surface,
+        "nba_action_completed",
+        activeRecommendation.actionId,
+      );
+      setActiveRecommendation(undefined);
+    }
     if ((location.state as { fromEditorSummary?: boolean } | null)?.fromEditorSummary) {
       navigate(-1);
     } else {
@@ -182,19 +239,50 @@ export function PlanCreatePage(): JSX.Element {
     }
   };
 
-  const isFirstPlan = !cloneFromPlan && room.plans.length === 0;
   const actor = getRoomActor(room, session.participantIds);
-  const recommendedActionId = isFirstPlan
+  const deterministicActionId = isFirstPlan
     ? resolveEligibleTripActions(
         toFirstPlanDecisionContext(
           room,
           actor,
-          getPlanPublishCompletion(editor),
+          draftCompletion,
           editor.draftConflict ? "DRAFT" : undefined,
         ),
         actor,
       )[0]?.actionId
     : undefined;
+  const recommendation = recommendationQuery.data?.recommendationId ===
+      dismissedRecommendationId
+    ? undefined
+    : recommendationQuery.data ?? undefined;
+  const recommendedActionId = recommendation?.primary.actionId ?? deterministicActionId;
+
+  const runRecommendationAction = async (
+    context: RecommendationActionContext,
+  ): Promise<void> => {
+    if (context.actionId === "INVITE_MEMBER") {
+      const outcome = await shareTripInvite(tripId);
+      if (outcome === "shared" || outcome === "copied") {
+        trackRecommendationEvent(
+          tripId,
+          context.recommendation,
+          context.surface,
+          "nba_action_completed",
+          context.actionId,
+        );
+      }
+      return;
+    }
+    if (context.actionId === "PUBLISH_FIRST_PLAN") {
+      await handleSubmit(context);
+      return;
+    }
+    const nextSection = tripActionPresentation[context.actionId].section;
+    if (nextSection) {
+      setActiveRecommendation(context);
+      openSection(nextSection);
+    }
+  };
 
   return (
     <div css={pageContainerStyle}>
@@ -204,47 +292,53 @@ export function PlanCreatePage(): JSX.Element {
         isEditMode={false}
         isCloneMode={Boolean(cloneFromPlan)}
         cloneTitle={cloneFromPlan?.title}
+        tripId={tripId}
         isFirstPlan={isFirstPlan}
         recommendedActionId={recommendedActionId}
+        recommendation={recommendation}
+        onRecommendationAction={(context) => void runRecommendationAction(context)}
+        onRecommendationDismiss={setDismissedRecommendationId}
         onOpenSection={openSection}
         onCompleteSection={completeSection}
       />
 
       {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
-      {!section && !editor.draftConflict && (
-        <BottomAction
-          accessory={
-            editor.validation.firstError || errorMsg ? (
-              <>
-                {editor.validation.firstError && (
-                  <ValidationBanner
-                    firstError={editor.validation.firstError}
-                    errorCount={editor.validation.errorCount}
-                  />
-                )}
-                {errorMsg && (
-                  <span css={errorMessageStyle} role="alert">
-                    {errorMsg}
-                  </span>
-                )}
-              </>
-            ) : undefined
-          }
-        >
-          <Button
-            type="button"
-            size="xl"
-            disabled={!editor.validation.isValid || isSubmitting}
-            onClick={() => void handleSubmit()}
+      {!section &&
+        !editor.draftConflict &&
+        !recommendation && (
+          <BottomAction
+            accessory={
+              editor.validation.firstError || errorMsg ? (
+                <>
+                  {editor.validation.firstError && (
+                    <ValidationBanner
+                      firstError={editor.validation.firstError}
+                      errorCount={editor.validation.errorCount}
+                    />
+                  )}
+                  {errorMsg && (
+                    <span css={errorMessageStyle} role="alert">
+                      {errorMsg}
+                    </span>
+                  )}
+                </>
+              ) : undefined
+            }
           >
-            {isSubmitting
-              ? "등록 중..."
-              : cloneFromPlan
-                ? "대안 여행안 제안하기"
-                : "여행안 제안 등록"}
-          </Button>
-        </BottomAction>
-      )}
+            <Button
+              type="button"
+              size="xl"
+              disabled={!editor.validation.isValid || isSubmitting}
+              onClick={() => void handleSubmit()}
+            >
+              {isSubmitting
+                ? "등록 중..."
+                : cloneFromPlan
+                  ? "대안 여행안 제안하기"
+                  : "여행안 제안 등록"}
+            </Button>
+          </BottomAction>
+        )}
     </div>
   );
 }

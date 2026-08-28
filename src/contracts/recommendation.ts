@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import {
+  RecommendationLifecycleEventSchema,
   RecommendationReasonSchema,
   RecommendationSourceSchema,
   RecommendationSurfaceSchema,
@@ -42,3 +43,8 @@ export const RecommendNextActionResponseSchema = Schema.Struct({
 });
 export type RecommendNextActionResponse =
   typeof RecommendNextActionResponseSchema.Type;
+
+export const RecordRecommendationLifecycleEventRequestSchema =
+  RecommendationLifecycleEventSchema;
+export type RecordRecommendationLifecycleEventRequest =
+  typeof RecordRecommendationLifecycleEventRequestSchema.Type;

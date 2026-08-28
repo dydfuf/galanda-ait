@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -27,6 +27,10 @@ import {
   toItineraryViewModel,
   type ItineraryItem,
 } from "./itinerary-view-model.ts";
+import {
+  getRecommendationActionContext,
+  trackRecommendationEvent,
+} from "../common/recommendation.ts";
 
 /** 뷰모델의 TDS 시절 상태 색 이름을 semantic badge variant로 옮겨요. */
 const statusVariant = {
@@ -39,6 +43,7 @@ const statusVariant = {
 export function ItineraryPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
@@ -58,6 +63,27 @@ export function ItineraryPage(): JSX.Element {
   const [conflictNotice, setConflictNotice] = useState<string>();
   const [drawerConflictNotice, setDrawerConflictNotice] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+  const completedRecommendationId = useRef<string>();
+  const recommendationAction = getRecommendationActionContext(location.state);
+
+  useEffect(() => {
+    if (
+      recommendationAction?.actionId === "VIEW_ITINERARY" &&
+      itineraryState?.status === "CONFIRMED" &&
+      completedRecommendationId.current !==
+        recommendationAction.recommendation.recommendationId
+    ) {
+      completedRecommendationId.current =
+        recommendationAction.recommendation.recommendationId;
+      trackRecommendationEvent(
+        tripId,
+        recommendationAction.recommendation,
+        recommendationAction.surface,
+        "nba_action_completed",
+        recommendationAction.actionId,
+      );
+    }
+  }, [itineraryState, recommendationAction, tripId]);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;

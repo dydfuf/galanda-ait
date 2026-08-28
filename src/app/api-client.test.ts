@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   InviteTokenSchema,
   PlanIdSchema,
+  RecommendationIdSchema,
   RevisionSchema,
   TripIdSchema,
   UserIdSchema,
@@ -19,6 +20,8 @@ import {
   getTrips,
   issueTripInvite,
   joinInvite,
+  recommendNextTripAction,
+  recordRecommendationLifecycleEvent,
   signInAnonymously,
   submitTripPlanOpinion,
   updateTrip,
@@ -38,6 +41,54 @@ const jsonResponse = (body: unknown, status = 200) =>
   });
 
 describe("API client", () => {
+  it("추천 조회와 lifecycle 이벤트를 같은 recommendationId로 전송한다", async () => {
+    const tripId = TripIdSchema.make("trip-1");
+    const recommendationId = RecommendationIdSchema.make("recommendation-1");
+    const recommendation = {
+      recommendationId,
+      primary: {
+        actionId: "COMPARE_PLANS" as const,
+        reasonCode: "COMPARE_PLAN_OPTIONS" as const,
+      },
+      alternatives: [{ actionId: "GIVE_OPINION" as const }],
+      source: "AI" as const,
+      policyVersion: "nba-ai-v1",
+      tripRevision: RevisionSchema.make(3),
+      contextFingerprint: "fingerprint",
+    };
+    const calls: Array<{ readonly input: RequestInfo | URL; readonly init?: RequestInit }> = [];
+    const responses = [jsonResponse(recommendation), jsonResponse({ accepted: true })];
+    globalThis.fetch = async (input, init) => {
+      calls.push({ input, init });
+      return responses.shift() ?? jsonResponse(null, 500);
+    };
+
+    await expect(recommendNextTripAction(tripId, { surface: "PLAN_HOME" }))
+      .resolves.toEqual(recommendation);
+    await recordRecommendationLifecycleEvent(tripId, {
+      eventName: "nba_accept",
+      recommendationId,
+      source: "AI",
+      actionId: "COMPARE_PLANS",
+      reasonCode: "COMPARE_PLAN_OPTIONS",
+      surface: "PLAN_HOME",
+      policyVersion: "nba-ai-v1",
+      contextFingerprint: "fingerprint",
+    });
+
+    expect(calls.map(({ input }) => input)).toEqual([
+      "/api/trips/trip-1/recommendations/next",
+      "/api/trips/trip-1/recommendations/events",
+    ]);
+    expect(JSON.parse(calls[0].init?.body as string)).toEqual({ surface: "PLAN_HOME" });
+    expect(JSON.parse(calls[1].init?.body as string)).toMatchObject({
+      eventName: "nba_accept",
+      recommendationId: "recommendation-1",
+      actionId: "COMPARE_PLANS",
+    });
+    expect(calls[1].init?.keepalive).toBe(true);
+  });
+
   it("anonymous sign-in을 JSON 요청으로 전송한다", async () => {
     let request: RequestInit | undefined;
     globalThis.fetch = async (_input, init) => {
