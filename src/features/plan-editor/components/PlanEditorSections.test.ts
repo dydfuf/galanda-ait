@@ -10,6 +10,7 @@ import {
   RevisionConflictChoice,
 } from "./PlanEditorSections.tsx";
 import { RouteCitySection } from "./RouteCitySection.tsx";
+import { RecommendationIdSchema, RevisionSchema } from "../../../core/domain/ids.ts";
 
 describe("PlanEditorSections", () => {
   it("draft 저장 상태별 문구를 구분한다", () => {
@@ -119,6 +120,85 @@ describe("PlanEditorSections", () => {
     }));
     expect(fallbackHtml).toContain("첫 여행안을 만들어볼까요?");
     expect(fallbackHtml).not.toContain("다음으로 추천");
+  });
+
+  it("첫 여행안 Journey Hub는 추천·대안·건너뛰기를 기존 section 목록 앞에 둔다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [],
+      accommodations: [],
+      transports: [],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      tripId: "trip-1",
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      recommendedActionId: "DEFINE_ROUTE",
+      recommendation: {
+        recommendationId: RecommendationIdSchema.make("recommendation-1"),
+        primary: {
+          actionId: "DEFINE_ROUTE",
+          reasonCode: "DEFINE_TRAVEL_ROUTE",
+        },
+        alternatives: [{ actionId: "INVITE_MEMBER" }],
+        source: "RULE",
+        policyVersion: "nba-rule-v1",
+        tripRevision: RevisionSchema.make(1),
+        contextFingerprint: "fingerprint",
+      },
+      onRecommendationAction: () => undefined,
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("다음으로 하면 좋은 일");
+    expect(html).toContain("방문 도시와 날짜를 정하면 다음 계획을 이어갈 수 있어요.");
+    expect(html).toContain("여행 경로 정하기");
+    expect(html).toContain("대신 친구 초대하기");
+    expect(html).toContain("지금은 건너뛰기");
+    expect(html.indexOf("다음으로 하면 좋은 일")).toBeLessThan(
+      html.indexOf("여행안 편집 항목"),
+    );
+    expect(html).not.toContain("RULE");
+    expect(html).not.toContain("nba-rule-v1");
+  });
+
+  it("첫 여행안 recommendation loading은 편집 목록을 막지 않고 primary를 만들지 않는다", () => {
+    const editor = {
+      title: "첫 여행",
+      baseHeadcount: 2,
+      routes: [],
+      accommodations: [],
+      transports: [],
+      costSummary: { hasCost: false, baseHeadcount: 2 },
+      draftConflict: false,
+      draftSaveStatus: "IDLE",
+      clearDraft: () => undefined,
+    } as unknown as ReturnType<typeof usePlanEditorState>;
+
+    const html = renderToStaticMarkup(createElement(PlanEditorSections, {
+      editor,
+      tripId: "trip-1",
+      isEditMode: false,
+      isCloneMode: false,
+      isFirstPlan: true,
+      isRecommendationPending: true,
+      recommendedActionId: "DEFINE_ROUTE",
+      onOpenSection: () => undefined,
+      onCompleteSection: () => undefined,
+    }));
+
+    expect(html).toContain("여행 상태에 맞는 다음 행동을 확인하고 있어요.");
+    expect(html).toContain("여행안 편집 항목");
+    expect(html).not.toContain("여행 경로 정하기</button>");
   });
 
   it("숙소 찾는 중은 domain에서 완료로 취급한다", () => {

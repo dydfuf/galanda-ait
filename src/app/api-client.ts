@@ -26,6 +26,11 @@ import {
   ConfirmedItineraryResponseSchema,
 } from "../contracts/itinerary.ts";
 import type { ItineraryItemPatch } from "../core/domain/confirmed-itinerary.ts";
+import {
+  RecommendNextActionResponseSchema,
+  type RecommendNextActionRequest,
+  type RecordRecommendationLifecycleEventRequest,
+} from "../contracts/recommendation.ts";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -117,6 +122,27 @@ export const getTrip = (tripId: TripId, signal?: AbortSignal) =>
   requestJson(tripPath(tripId), TripRoomSchema, {
     signal,
   });
+
+export const recommendNextTripAction = (
+  tripId: TripId,
+  input: RecommendNextActionRequest,
+  signal?: AbortSignal,
+) =>
+  requestJson(
+    `${tripPath(tripId)}/recommendations/next`,
+    RecommendNextActionResponseSchema,
+    { method: "POST", body: JSON.stringify(input), signal },
+  );
+
+export const recordRecommendationLifecycleEvent = (
+  tripId: TripId,
+  input: RecordRecommendationLifecycleEventRequest,
+) =>
+  requestJson(
+    `${tripPath(tripId)}/recommendations/events`,
+    Schema.Struct({ accepted: Schema.Literal(true) }),
+    { method: "POST", body: JSON.stringify(input), keepalive: true },
+  );
 
 export const getTripItinerary = (tripId: TripId, signal?: AbortSignal) =>
   requestJson(`${tripPath(tripId)}/itinerary`, ItineraryStateResponseSchema, {

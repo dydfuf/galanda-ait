@@ -706,6 +706,7 @@ describe("Trip API vertical slice", () => {
         requestId: expect.any(String),
       }),
     }));
+
     log.mockRestore();
 
     const conflicting = makeApp([[rowValues(room)]]);
@@ -751,6 +752,82 @@ describe("Trip API vertical slice", () => {
 
     expect(invalidResponse.status).toBe(400);
     expect(invalid.calls).toEqual([]);
+  });
+
+  it("NBA lifecycle 이벤트는 여행 참여자만 기록하고 입력을 strict validation한다", async () => {
+    const event = {
+      eventName: "nba_accept",
+      recommendationId: "recommendation-1",
+      source: "RULE",
+      actionId: "DEFINE_ROUTE",
+      reasonCode: "DEFINE_TRAVEL_ROUTE",
+      surface: "FIRST_PLAN",
+      policyVersion: "nba-rule-v1",
+      contextFingerprint: "fingerprint",
+    };
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const member = makeApp([[rowValues(room)]]);
+
+    const response = await member.app.fetch(
+      request("/api/trips/trip-1/recommendations/events", {
+        method: "POST",
+        body: JSON.stringify(event),
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ accepted: true });
+    expect(member.calls).toHaveLength(1);
+    expect(log).toHaveBeenCalledWith(expect.objectContaining({
+      message: "nba_accept",
+      annotations: expect.objectContaining({
+        recommendationId: "recommendation-1",
+        actionId: "DEFINE_ROUTE",
+        requestId: expect.any(String),
+      }),
+    }));
+
+    const logCount = log.mock.calls.length;
+    const mismatched = makeApp([[rowValues(room)]]);
+    const mismatchedResponse = await mismatched.app.fetch(
+      request("/api/trips/trip-1/recommendations/events", {
+        method: "POST",
+        body: JSON.stringify({
+          ...event,
+          eventName: "nba_alternative_selected",
+          actionId: "COMPARE_PLANS",
+        }),
+      }),
+      env,
+    );
+    expect(mismatchedResponse.status).toBe(422);
+    expect(log.mock.calls).toHaveLength(logCount);
+    log.mockRestore();
+
+    const invalid = makeApp([]);
+    const invalidResponse = await invalid.app.fetch(
+      request("/api/trips/trip-1/recommendations/events", {
+        method: "POST",
+        body: JSON.stringify({ ...event, model: "must-not-be-recorded" }),
+      }),
+      env,
+    );
+    expect(invalidResponse.status).toBe(400);
+    expect(invalid.calls).toEqual([]);
+
+    const stranger = makeApp(
+      [[rowValues(room)]],
+      { id: "stranger-1", name: "Stranger" },
+    );
+    const strangerResponse = await stranger.app.fetch(
+      request("/api/trips/trip-1/recommendations/events", {
+        method: "POST",
+        body: JSON.stringify(event),
+      }),
+      env,
+    );
+    expect(strangerResponse.status).toBe(404);
   });
 
   it("active mode는 ambiguous Trip Room action에만 AI ranking을 적용한다", async () => {

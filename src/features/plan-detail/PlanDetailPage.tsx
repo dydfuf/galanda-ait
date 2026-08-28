@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
 import { toast } from "sonner";
 import { useTripRoomDetailQuery } from "./queries.ts";
@@ -45,6 +45,10 @@ import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { BookingRiskSummary } from "./components/BookingRiskSummary.tsx";
 import { DetailTimeline } from "./components/DetailTimeline.tsx";
 import { OpinionBottomSheet, type ReactionType } from "./components/OpinionBottomSheet.tsx";
+import {
+  getRecommendationActionContext,
+  trackRecommendationEvent,
+} from "../common/recommendation.ts";
 
 type PlanSheet = "cost" | "details" | "actions" | null;
 
@@ -57,6 +61,7 @@ const getPlanBadgeVariant = (
 export function PlanDetailPage(): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const validated = decodeRouteParams(PlanParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
   const planId = Result.isSuccess(validated) ? validated.success.planId : "";
@@ -70,6 +75,23 @@ export function PlanDetailPage(): JSX.Element {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [conflictNotice, setConflictNotice] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+  const openedRecommendationId = useRef<string>();
+  const recommendationAction = getRecommendationActionContext(location.state);
+
+  useEffect(() => {
+    if (
+      recommendationAction?.actionId === "GIVE_OPINION" &&
+      room &&
+      !room.isConfirmed &&
+      room.plans.some((plan) => plan.id === planId) &&
+      openedRecommendationId.current !==
+        recommendationAction.recommendation.recommendationId
+    ) {
+      openedRecommendationId.current =
+        recommendationAction.recommendation.recommendationId;
+      setIsOpinionSheetOpen(true);
+    }
+  }, [planId, recommendationAction, room]);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행안 경로입니다." />;
@@ -142,6 +164,16 @@ export function PlanDetailPage(): JSX.Element {
       });
       setIsOpinionSheetOpen(false);
       toast("의견을 저장했어요.");
+      if (recommendationAction?.actionId === "GIVE_OPINION") {
+        trackRecommendationEvent(
+          tripId,
+          recommendationAction.recommendation,
+          recommendationAction.surface,
+          "nba_action_completed",
+          recommendationAction.actionId,
+        );
+        navigate(location.pathname, { replace: true, state: null });
+      }
     } catch (err: unknown) {
       if (isRevisionConflict(err) || isStateConflict(err)) {
         setIsResolvingConflict(true);

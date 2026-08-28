@@ -6,6 +6,7 @@ import {
 import {
   RecommendNextActionRequestSchema,
   RecommendNextActionResponseSchema,
+  RecordRecommendationLifecycleEventRequestSchema,
 } from "./recommendation.ts";
 
 const strictInput = { onExcessProperty: "error" } as const;
@@ -84,5 +85,25 @@ describe("recommendation HTTP contract", () => {
       "nba_skip",
       "nba_action_completed",
     ]);
+  });
+
+  it("lifecycle event는 provider/model 원문 없이 allowlist field만 받는다", () => {
+    const decode = Schema.decodeUnknownResult(
+      RecordRecommendationLifecycleEventRequestSchema,
+      strictInput,
+    );
+    const event = {
+      eventName: "nba_action_completed",
+      recommendationId: "recommendation-1",
+      source: "AI",
+      actionId: "COMPARE_PLANS",
+      reasonCode: "COMPARE_PLAN_OPTIONS",
+      surface: "PLAN_HOME",
+      policyVersion: "nba-ai-v1",
+      contextFingerprint: "fingerprint",
+    };
+
+    expect(Result.isSuccess(decode(event))).toBe(true);
+    expect(Result.isFailure(decode({ ...event, model: "private-model" }))).toBe(true);
   });
 });

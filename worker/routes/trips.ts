@@ -4,6 +4,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { RepositoryError } from "../../src/core/domain/errors.ts";
 import {
   RecommendNextActionRequestSchema,
+  RecordRecommendationLifecycleEventRequestSchema,
   type RecommendNextActionResponse,
 } from "../../src/contracts/recommendation.ts";
 import {
@@ -48,6 +49,7 @@ import {
   recommendNextTripAction,
   type NextTripActionRecommendation,
 } from "../../src/core/usecases/recommend-next-trip-action.ts";
+import { recordRecommendationLifecycleEvent } from "../../src/core/usecases/record-recommendation-lifecycle-event.ts";
 import { IdGeneratorLive } from "../../src/infrastructure/id-generator.ts";
 import { InviteRepositoryLive } from "../../src/infrastructure/persistence/drizzle/invite-repository.ts";
 import { Database } from "../../src/infrastructure/persistence/drizzle/database.ts";
@@ -394,6 +396,24 @@ tripsRoute.post(
       }
     );
   }
+);
+
+tripsRoute.post(
+  "/:tripId/recommendations/events",
+  effectValidator("param", TripParamsSchema),
+  effectValidator(
+    "json",
+    RecordRecommendationLifecycleEventRequestSchema,
+    strictInput,
+  ),
+  (c) =>
+    runTripEffect(
+      c,
+      recordRecommendationLifecycleEvent(
+        c.req.valid("param").tripId,
+        c.req.valid("json"),
+      ),
+    ),
 );
 
 tripsRoute.get(

@@ -68,6 +68,10 @@ const actions = {
   },
 } as const satisfies Record<TripActionId, TripAction>;
 
+export const reasonCodeForAction = (
+  actionId: TripActionId,
+): TripAction["reasonCode"] => actions[actionId].reasonCode;
+
 const priority: Record<TripActionId, number> = {
   VIEW_ITINERARY: 0,
   EDIT_PLAN_BASIC: 1,

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Result } from "effect";
 import { decodeRouteParams, CompareQuerySchema, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -35,6 +35,10 @@ import {
   getCompareConfirmState,
 } from "./plan-compare-view-model.ts";
 import { ConfirmPlanSummaryView } from "./components/ConfirmPlanSummaryView.tsx";
+import {
+  getRecommendationActionContext,
+  trackRecommendationEvent,
+} from "../common/recommendation.ts";
 
 const getPlanBadgeVariant = (
   planTag: string,
@@ -45,6 +49,7 @@ export function PlanComparePage() {
   const params = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const tripValidated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(tripValidated) ? tripValidated.success.tripId : "";
@@ -62,6 +67,34 @@ export function PlanComparePage() {
   const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<"left" | "right" | null>(null);
+  const completedRecommendationId = useRef<string>();
+  const recommendationAction = getRecommendationActionContext(location.state);
+  const isComparisonReady = Boolean(
+    room &&
+    Result.isSuccess(queryValidated) &&
+    leftParam !== rightParam &&
+    room.plans.some((plan) => plan.id === queryValidated.success.left) &&
+    room.plans.some((plan) => plan.id === queryValidated.success.right),
+  );
+
+  useEffect(() => {
+    if (
+      recommendationAction?.actionId === "COMPARE_PLANS" &&
+      isComparisonReady &&
+      completedRecommendationId.current !==
+        recommendationAction.recommendation.recommendationId
+    ) {
+      completedRecommendationId.current =
+        recommendationAction.recommendation.recommendationId;
+      trackRecommendationEvent(
+        tripId,
+        recommendationAction.recommendation,
+        recommendationAction.surface,
+        "nba_action_completed",
+        recommendationAction.actionId,
+      );
+    }
+  }, [isComparisonReady, recommendationAction, tripId]);
 
   if (Result.isFailure(tripValidated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -143,6 +176,15 @@ export function PlanComparePage() {
         planId: selectedPlan.id,
         revision: room.revision,
       });
+      if (recommendationAction?.actionId === "CONFIRM_PLAN") {
+        trackRecommendationEvent(
+          tripId,
+          recommendationAction.recommendation,
+          recommendationAction.surface,
+          "nba_action_completed",
+          recommendationAction.actionId,
+        );
+      }
       navigate(`/trips/${tripId}/itinerary`, { replace: true });
     } catch (err: unknown) {
       setIsConfirmSheetOpen(false);
@@ -388,7 +430,11 @@ export function PlanComparePage() {
                       const nextRight = pickerTarget === "right" ? plan.id : right;
                       setPickerTarget(null);
                       setSelectedPlanId(null);
-                      navigate(`/trips/${tripId}/plans/compare?left=${nextLeft}&right=${nextRight}`);
+                      navigate(`/trips/${tripId}/plans/compare?left=${nextLeft}&right=${nextRight}`, {
+                        state: recommendationAction
+                          ? { nbaRecommendation: recommendationAction }
+                          : undefined,
+                      });
                     }}
                   >
                     <ItemTitle>{plan.title}</ItemTitle>

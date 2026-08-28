@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { UseQueryResult } from "@tanstack/react-query";
 
-import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
+import { PlanIdSchema, RecommendationIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
 import type { TripRoom, UserSession } from "../../core/domain/room.ts";
+import type { RecommendNextActionResponse } from "../../contracts/recommendation.ts";
 
 vi.mock("../plan-detail/queries.ts", () => ({
   useTripRoomRawQuery: vi.fn<(roomId: string) => UseQueryResult<TripRoom, Error>>(),
@@ -13,13 +14,29 @@ vi.mock("../plan-detail/queries.ts", () => ({
 vi.mock("../../hooks/useSession.ts", () => ({
   useSessionQuery: vi.fn<() => UseQueryResult<UserSession | null, Error>>(),
 }));
+vi.mock("../common/use-next-trip-action-recommendation.ts", () => ({
+  useNextTripActionRecommendation: vi.fn<() => object>(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+  })),
+}));
 
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
+import { useNextTripActionRecommendation } from "../common/use-next-trip-action-recommendation.ts";
 import { PlanHomePage } from "./PlanHomePage.tsx";
 
 const mockUseSessionQuery = vi.mocked(useSessionQuery);
 const mockUseTripRoomRawQuery = vi.mocked(useTripRoomRawQuery);
+const mockUseRecommendation = vi.mocked(useNextTripActionRecommendation);
+
+beforeEach(() => {
+  mockUseRecommendation.mockReturnValue(
+    toQueryResult<RecommendNextActionResponse | null>(null),
+  );
+});
 
 const memberSession: UserSession = {
   participantId: UserIdSchema.make("user-local-me"),
@@ -191,6 +208,74 @@ describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
 });
 
 describe("PlanHomePage regression contract (RAON-229)", () => {
+  it("recommendation loading 중에는 기존 primary를 먼저 노출하지 않는다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(1)));
+    mockUseRecommendation.mockReturnValue(
+      ({
+        data: undefined,
+        isPending: true,
+        isLoading: true,
+        isError: false,
+        error: null,
+      }) as unknown as UseQueryResult<RecommendNextActionResponse | null, Error>,
+    );
+
+    const { container } = renderPage();
+
+    expect(screen.getByRole("region", { name: "다음으로 하면 좋은 일" }))
+      .toHaveAttribute("aria-busy", "true");
+    expect(screen.getByText("여행 상태에 맞는 다음 행동을 확인하고 있어요."))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "새 여행안 제안하기" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "제안된 여행안" })).toBeInTheDocument();
+    expect(hasStickyCtaSpace(container)).toBe(false);
+  });
+
+  it("추천은 진행 상태 뒤에 compact하게 노출되고 건너뛰면 기존 primary로 복귀한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(2)));
+    mockUseRecommendation.mockReturnValue(toQueryResult({
+      recommendationId: RecommendationIdSchema.make("recommendation-1"),
+      primary: {
+        actionId: "GIVE_OPINION",
+        reasonCode: "SHARE_PLAN_OPINION",
+      },
+      alternatives: [{ actionId: "COMPARE_PLANS" }],
+      source: "AI",
+      policyVersion: "nba-ai-v1",
+      tripRevision: RevisionSchema.make(1),
+      contextFingerprint: "fingerprint",
+    }));
+
+    const { container } = renderPage();
+
+    const decisionSection = screen.getByRole("region", { name: "진행 상태" });
+    const recommendationSection = screen.getByRole("region", {
+      name: "다음으로 하면 좋은 일",
+    });
+    const candidatesSection = screen.getByRole("region", { name: "여행안" });
+    expect(
+      decisionSection.compareDocumentPosition(recommendationSection) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      recommendationSection.compareDocumentPosition(candidatesSection) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "여행안에 의견 남기기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "대신 여행안 비교하기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "여행안 비교하기" })).not.toBeInTheDocument();
+    expect(hasStickyCtaSpace(container)).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "지금은 건너뛰기" }));
+
+    expect(screen.queryByRole("region", { name: "다음으로 하면 좋은 일" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "여행안 비교하기" })).toBeInTheDocument();
+    expect(hasStickyCtaSpace(container)).toBe(true);
+  });
+
   it("여행 정보 → 진행 상태 → 여행안과 카드 accessible name 순서를 고정한다", () => {
     const room: TripRoom = {
       ...baseRoom,

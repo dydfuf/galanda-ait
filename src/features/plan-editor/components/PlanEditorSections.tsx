@@ -1,5 +1,6 @@
 import { formatCostRangeText } from "../../../core/calculations/plan-cost.ts";
 import type { TripActionId } from "../../../core/domain/trip-action.ts";
+import type { RecommendNextActionResponse } from "../../../contracts/recommendation.ts";
 import {
   getPlanPublishCompletion,
   getStayNightCount,
@@ -14,6 +15,11 @@ import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
 import type { PlanEditorSection } from "../plan-editor-section.ts";
 import { tripActionPresentation } from "../../common/trip-action-presentation.ts";
+import {
+  NextActionRecommendation,
+  NextActionRecommendationPending,
+} from "../../common/NextActionRecommendation.tsx";
+import type { RecommendationActionContext } from "../../common/recommendation.ts";
 import { AccommodationSection } from "./AccommodationSection.tsx";
 import { BasicInfoSection } from "./BasicInfoSection.tsx";
 import { DiffBanner } from "./DiffBanner.tsx";
@@ -29,8 +35,13 @@ interface PlanEditorSectionsProps {
   readonly isEditMode: boolean;
   readonly isCloneMode: boolean;
   readonly cloneTitle?: string;
+  readonly tripId?: string;
   readonly isFirstPlan?: boolean;
   readonly recommendedActionId?: TripActionId;
+  readonly recommendation?: RecommendNextActionResponse;
+  readonly isRecommendationPending?: boolean;
+  readonly onRecommendationAction?: (context: RecommendationActionContext) => void;
+  readonly onRecommendationDismiss?: (recommendationId: string) => void;
   readonly onOpenSection: (section: PlanEditorSection) => void;
   readonly onCompleteSection: () => void;
 }
@@ -95,8 +106,13 @@ export function PlanEditorSections({
   isEditMode,
   isCloneMode,
   cloneTitle,
+  tripId,
   isFirstPlan = false,
   recommendedActionId,
+  recommendation,
+  isRecommendationPending = false,
+  onRecommendationAction,
+  onRecommendationDismiss,
   onOpenSection,
   onCompleteSection,
 }: PlanEditorSectionsProps): JSX.Element {
@@ -179,6 +195,19 @@ export function PlanEditorSections({
             title="여행안 구성"
             description="항목을 하나씩 열어 내용을 정리해주세요."
           />
+        )}
+        {isFirstPlanGuide && tripId && recommendation && onRecommendationAction && (
+          <NextActionRecommendation
+            tripId={tripId}
+            surface="FIRST_PLAN"
+            recommendation={recommendation}
+            onAction={onRecommendationAction}
+            onDismiss={onRecommendationDismiss}
+            className="mx-0"
+          />
+        )}
+        {isFirstPlanGuide && isRecommendationPending && (
+          <NextActionRecommendationPending className="mx-0" />
         )}
         <MobileList aria-label="여행안 편집 항목" className="mb-5">
           <SummaryRow
