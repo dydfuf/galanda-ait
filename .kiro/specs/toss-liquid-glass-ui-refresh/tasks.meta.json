@@ -2,23 +2,23 @@
   "pbtResults": {
     "5.2 `trip-room-navigation.test.ts`에 Correctness Property 2를 구현한다": {
       "status": "passed",
-      "lastRunTimestamp": 1787923987551
+      "lastRunTimestamp": 1787924727593
     },
     "7.3 `src/features/plan-home/__tests__/plan-home-view-model.test.ts`에 Correctness Property 5를 구현한다": {
       "status": "passed",
-      "lastRunTimestamp": 1787923995678
+      "lastRunTimestamp": 1787924736721
     },
     "7.2 `src/features/plan-home/plan-home-cta.property.test.ts`에 Correctness Property 1을 구현한다": {
       "status": "passed",
-      "lastRunTimestamp": 1787923991540
+      "lastRunTimestamp": 1787924731854
     },
     "9.2 `src/features/plan-detail/__tests__/plan-price.property.test.ts`에 Correctness Property 3을 구현한다": {
       "status": "passed",
-      "lastRunTimestamp": 1787923999657
+      "lastRunTimestamp": 1787924740338
     },
     "10.3 `ItineraryEditPage.test.ts`에 Correctness Property 4를 구현한다": {
       "status": "passed",
-      "lastRunTimestamp": 1787924003702
+      "lastRunTimestamp": 1787924746298
     }
   },
   "executionHistory": {

@@ -26,6 +26,12 @@ vi.mock("../../hooks/useSession.ts", () => ({
 vi.mock("./mutations.ts", () => ({
   useCreatePlanMutation: vi.fn(),
 }));
+vi.mock("../common/use-next-trip-action-recommendation.ts", () => ({
+  useNextTripActionRecommendation: vi.fn(() => ({
+    data: null,
+    isPending: false,
+  })),
+}));
 
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
