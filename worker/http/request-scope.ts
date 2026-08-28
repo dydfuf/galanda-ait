@@ -3,6 +3,8 @@ import type { UserSession } from "../../src/core/domain/room.ts";
 
 export interface RequestScope {
   readonly requestId: string;
+  readonly httpMethod: string;
+  readonly httpRoute: string;
   readonly session?: UserSession | null;
 }
 
