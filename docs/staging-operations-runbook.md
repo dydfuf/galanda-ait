@@ -55,6 +55,18 @@ query cache를 임의로 다시 켜지 않는다. Better Auth session, authoriza
 
 TLS `require`는 encrypted connection과 WebPKI server certificate 검증을 유지한다. `sslmode=disable`, 인증서 검증 우회, 평문 연결은 금지한다.
 
+## Request correlation과 log privacy
+
+Worker는 모든 응답에 `x-request-id`를 반환한다. upstream ID는 영문자, 숫자,
+`.`, `_`, `:`, `-`로만 구성된 128자 이하 값만 보존하며, 그 외에는 새 UUID를
+발급한다.
+
+Cloudflare invocation log는 실제 URL에 invite token 같은 path capability를 남길
+수 있으므로 `wrangler.jsonc`에서 비활성화한다. 대신 API 요청마다
+`http_request_completed` 구조화 로그를 한 건 기록한다. 이 로그에는 request ID,
+method, 실제 parameter 값이 제거된 route template, status, duration만 포함한다.
+query, cookie, authorization header, 사용자 이름/email은 추가하지 않는다.
+
 비밀값 없이 실제 설정을 확인한다.
 
 ```bash

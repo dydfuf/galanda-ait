@@ -1,4 +1,5 @@
 import type { Context as HonoContext } from "hono";
+import { routePath } from "hono/route";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { Effect, Exit, Logger } from "effect";
 import type { AppEnv } from "../app.ts";
@@ -24,13 +25,17 @@ export async function runEffect<A, E>(
   options?: RunEffectOptions<A>
 ): Promise<Response> {
   const requestId = c.var.requestId ?? crypto.randomUUID();
+  const httpMethod = c.req.method;
+  const httpRoute = routePath(c, -1);
   const requestScope: RequestScope = {
     requestId,
+    httpMethod,
+    httpRoute,
     session: options?.session ?? c.var.authSession,
   };
 
   const program = effect.pipe(
-    Effect.annotateLogs({ requestId }),
+    Effect.annotateLogs({ requestId, httpMethod, httpRoute }),
     Effect.provideService(RequestScopeService, requestScope),
     Effect.provide(
       SessionServiceLiveFromUserSession(

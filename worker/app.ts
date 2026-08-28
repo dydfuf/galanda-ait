@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { routePath } from "hono/route";
 import { makeBetterAuth, type BetterAuthEnv } from "./infrastructure/auth/better-auth.ts";
 import {
   authSessionMiddleware,
@@ -48,6 +49,18 @@ export interface AppDependencies {
   readonly withDatabase?: WithDatabase;
 }
 
+const requestIdPattern = /^[A-Za-z0-9._:-]{1,128}$/;
+
+const resolveRequestId = (candidates: ReadonlyArray<string | undefined>): string => {
+  for (const candidate of candidates) {
+    if (candidate !== undefined) {
+      return requestIdPattern.test(candidate) ? candidate : crypto.randomUUID();
+    }
+  }
+
+  return crypto.randomUUID();
+};
+
 export function createApp(dependencies: AppDependencies = {}) {
   const app = new Hono<AppEnv>();
   const databaseMiddleware = dependencies.withDatabase
@@ -62,19 +75,38 @@ export function createApp(dependencies: AppDependencies = {}) {
       : authSessionMiddleware;
 
   app.use("*", async (c, next) => {
-    const upstreamId =
-      c.req.header("x-request-id") ||
-      c.req.header("cf-ray") ||
-      c.req.header("x-correlation-id");
-    const requestId =
-      upstreamId && upstreamId.trim().length > 0
-        ? upstreamId.trim()
-        : crypto.randomUUID();
+    const requestId = resolveRequestId([
+      c.req.header("x-request-id"),
+      c.req.header("cf-ray"),
+      c.req.header("x-correlation-id"),
+    ]);
+    const startedAt = performance.now();
 
     c.set("requestId", requestId);
     c.header("x-request-id", requestId);
-    await next();
-    c.header("x-request-id", requestId);
+    try {
+      await next();
+    } finally {
+      c.header("x-request-id", requestId);
+      if (c.req.path === "/api" || c.req.path.startsWith("/api/")) {
+        try {
+          const record = JSON.stringify({
+            event: "http_request_completed",
+            requestId,
+            method: c.req.method,
+            route: routePath(c, -1),
+            status: c.res.status,
+            durationMs: Math.round(performance.now() - startedAt),
+          });
+
+          if (c.res.status >= 500) console.error(record);
+          else if (c.res.status >= 400) console.warn(record);
+          else console.log(record);
+        } catch {
+          // Observability must never change request behavior.
+        }
+      }
+    }
   });
 
   app.use("/api/*", databaseMiddleware);
