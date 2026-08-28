@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,16 +10,57 @@ interface BottomActionProps {
   readonly className?: string;
 }
 
+const BOTTOM_ACTION_HEIGHT_PROPERTY = "--app-bottom-action-height";
+
 /**
  * 화면 하단 고정 CTA shell이에요.
  *
  * - `env(safe-area-inset-bottom)`을 반영해요 (`--safe-bottom`).
- * - 본문이 CTA에 가려지지 않도록, 이 컴포넌트를 쓰는 화면은 본문에
- *   `pb-(--app-cta-space)` 여백 계약을 지켜야 해요 (`PageBody withBottomAction`).
+ * - 실제 높이를 document root의 `--app-bottom-action-height`로 공유해요.
+ * - 본문이 CTA에 가려지지 않도록, 이 컴포넌트를 쓰는 화면은
+ *   `PageBody withBottomAction` 여백 계약을 지켜야 해요.
  */
-export function BottomAction({ accessory, children, className }: BottomActionProps) {
+export function BottomAction({
+  accessory,
+  children,
+  className,
+}: BottomActionProps) {
+  const actionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const action = actionRef.current;
+    if (!action) return;
+
+    const root = action.ownerDocument.documentElement;
+    const updateHeight = (height: number) => {
+      root.style.setProperty(
+        BOTTOM_ACTION_HEIGHT_PROPERTY,
+        Number.isFinite(height) && height > 0
+          ? `${Math.ceil(height)}px`
+          : "var(--app-cta-space)",
+      );
+    };
+    let observer: ResizeObserver | undefined;
+
+    updateHeight(action.getBoundingClientRect().height);
+
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(([entry]) => {
+        const borderBoxHeight = entry?.borderBoxSize?.[0]?.blockSize;
+        updateHeight(borderBoxHeight ?? action.getBoundingClientRect().height);
+      });
+      observer.observe(action);
+    }
+
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty(BOTTOM_ACTION_HEIGHT_PROPERTY);
+    };
+  }, []);
+
   return (
     <div
+      ref={actionRef}
       data-galanda-surface="chrome"
       className={cn(
         "fixed inset-x-0 bottom-0 z-30 border-t px-5 pt-2 pb-[calc(12px+var(--safe-bottom))]",

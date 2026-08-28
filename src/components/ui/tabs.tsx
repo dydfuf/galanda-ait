@@ -37,16 +37,25 @@ const tabsListVariants = cva(
   },
 );
 
+type TabsListProps = TabsPrimitive.List.Props &
+  VariantProps<typeof tabsListVariants> & {
+    /** 상위 shell이 chrome을 소유할 때 `none`으로 중복 surface를 막아요. */
+    readonly surface?: "chrome" | "none";
+  };
+
 function TabsList({
   className,
   variant = "default",
+  surface = "chrome",
   ...props
-}: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
+}: TabsListProps) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      data-galanda-surface={variant === "chrome" ? "chrome" : undefined}
+      data-galanda-surface={
+        variant === "chrome" && surface === "chrome" ? "chrome" : undefined
+      }
       className={cn(tabsListVariants({ variant }), className)}
       {...props}
     />

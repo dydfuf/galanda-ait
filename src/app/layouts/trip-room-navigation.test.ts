@@ -75,9 +75,12 @@ function assertWithCounterexample(
 }
 
 describe("Trip Room mode navigation", () => {
-  it("derives the mode from the URL and builds safe section paths", () => {
+  it("derives the mode from canonical and trailing-slash URLs", () => {
     expect(getTripRoomSection("/trips/trip-1/plans")).toBe("plans");
+    expect(getTripRoomSection("/trips/trip-1/plans/")).toBe("plans");
     expect(getTripRoomSection("/trips/trip-1/itinerary")).toBe("itinerary");
+    expect(getTripRoomSection("/trips/trip-1/itinerary/")).toBe("itinerary");
+    expect(getTripRoomSection("/trips/trip-1/itinerary///")).toBe("itinerary");
     expect(getTripRoomSectionPath("trip-1", "itinerary")).toBe(
       "/trips/trip-1/itinerary",
     );
@@ -86,26 +89,23 @@ describe("Trip Room mode navigation", () => {
     );
   });
 
-  it("resolves the Web PageHeader title from the current Trip Room route", () => {
-    expect(getTripRoomNavigationTitle("/trips/trip-1/plans")).toBe("여행방");
-    expect(getTripRoomNavigationTitle("/trips/trip-1/itinerary")).toBe(
-      "여행방",
-    );
-    expect(getTripRoomNavigationTitle("/trips/trip-1/itinerary/edit")).toBe(
-      "일정 수정",
-    );
-    expect(getTripRoomNavigationTitle("/trips/trip-1/plans/new/basic")).toBe(
-      "새 여행안",
-    );
-    expect(getTripRoomNavigationTitle("/trips/trip-1/plans/compare")).toBe(
-      "여행안 비교",
-    );
-    expect(getTripRoomNavigationTitle("/trips/trip-1/plans/plan-1/edit")).toBe(
-      "여행안 수정",
-    );
-    expect(getTripRoomNavigationTitle("/trips/trip-1/plans/plan-1")).toBe(
-      "여행안 상세",
-    );
+  it.each([
+    ["/trips/trip-1/plans", "여행방"],
+    ["/trips/trip-1/plans/", "여행방"],
+    ["/trips/trip-1/itinerary", "여행방"],
+    ["/trips/trip-1/itinerary/", "여행방"],
+    ["/trips/trip-1/itinerary/edit", "일정 수정"],
+    ["/trips/trip-1/itinerary/edit/", "일정 수정"],
+    ["/trips/trip-1/plans/new/basic", "새 여행안"],
+    ["/trips/trip-1/plans/new/basic/", "새 여행안"],
+    ["/trips/trip-1/plans/compare", "여행안 비교"],
+    ["/trips/trip-1/plans/compare/", "여행안 비교"],
+    ["/trips/trip-1/plans/plan-1/edit", "여행안 수정"],
+    ["/trips/trip-1/plans/plan-1/edit/", "여행안 수정"],
+    ["/trips/trip-1/plans/plan-1", "여행안 상세"],
+    ["/trips/trip-1/plans/plan-1/", "여행안 상세"],
+  ])("resolves the Web PageHeader title for %s", (pathname, expected) => {
+    expect(getTripRoomNavigationTitle(pathname)).toBe(expected);
   });
 });
 

@@ -122,6 +122,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  scroll-padding-bottom: var(--app-bottom-action-height, 0px);
+}
+
 html,
 body,
 #root {

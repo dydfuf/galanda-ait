@@ -82,7 +82,9 @@ describe("Page chrome geometry contracts", () => {
     expect(header).toHaveStyle({ paddingTop: "64px" });
   });
 
-  it("centers PageBody in the 720px content column and reserves scrollable CTA clearance", () => {
+  it("centers PageBody and reserves the larger of its fallback or measured CTA clearance", () => {
+    const dynamicClearance =
+      "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]";
     const { rerender } = render(
       <PageBody data-testid="page-body" withBottomAction>
         <button type="button">마지막 본문 행동</button>
@@ -94,9 +96,12 @@ describe("Page chrome geometry contracts", () => {
     expect(body.className).toContain("mx-auto");
     expect(body.className).toContain("w-full");
     expect(body.className).toContain("max-w-(--content-max-width)");
-    expect(body.className).toContain("pb-(--app-cta-space)");
-    expect(body.className).toContain("scroll-pb-(--app-cta-space)");
+    expect(body.className).toContain(dynamicClearance);
+    expect(body.className).not.toContain("scroll-pb-");
     expect(body.className).not.toContain("pb-(--app-page-padding-bottom)");
+    expect(indexCss).toMatch(
+      /html\s*\{\s*scroll-padding-bottom:\s*var\(--app-bottom-action-height,\s*0px\);\s*\}/,
+    );
     expect(
       screen.getByRole("button", { name: "마지막 본문 행동" }),
     ).toBeInTheDocument();
@@ -105,8 +110,7 @@ describe("Page chrome geometry contracts", () => {
 
     body = screen.getByTestId("page-body");
     expect(body.className).toContain("pb-(--app-page-padding-bottom)");
-    expect(body.className).not.toContain("pb-(--app-cta-space)");
-    expect(body.className).not.toContain("scroll-pb-(--app-cta-space)");
+    expect(body.className).not.toContain(dynamicClearance);
   });
 
   it("fixes BottomAction to the viewport and places its accessory above the actions with one safe-bottom application", () => {
@@ -145,5 +149,147 @@ describe("Page chrome geometry contracts", () => {
     );
 
     expect(countOccurrences(container.innerHTML, "var(--safe-bottom)")).toBe(1);
+  });
+
+  it("publishes a static document fallback when ResizeObserver is unavailable", () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "ResizeObserver",
+    );
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+
+    try {
+      const { unmount } = render(
+        <BottomAction accessory={<p>두 줄 이상의 안내 메시지</p>}>
+          <Button>계속</Button>
+        </BottomAction>,
+      );
+
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--app-bottom-action-height",
+        ),
+      ).toBe("var(--app-cta-space)");
+
+      unmount();
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--app-bottom-action-height",
+        ),
+      ).toBe("");
+    } finally {
+      document.documentElement.style.removeProperty(
+        "--app-bottom-action-height",
+      );
+      if (originalDescriptor) {
+        Object.defineProperty(globalThis, "ResizeObserver", originalDescriptor);
+      } else {
+        Reflect.deleteProperty(globalThis, "ResizeObserver");
+      }
+    }
+  });
+
+  it("publishes legacy and modern observer heights and clears them on unmount", () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "ResizeObserver",
+    );
+    let resizeCallback: ResizeObserverCallback | undefined;
+    let observedElement: Element | undefined;
+    let disconnected = false;
+
+    class ResizeObserverMock implements ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+      }
+
+      observe(target: Element) {
+        observedElement = target;
+      }
+
+      unobserve() {}
+
+      disconnect() {
+        disconnected = true;
+      }
+    }
+
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      writable: true,
+      value: ResizeObserverMock,
+    });
+
+    try {
+      const { container, unmount } = render(
+        <BottomAction
+          accessory={
+            <p>
+              다른 사용자의 변경 사항을 반영했습니다. 내용을 다시 확인한 뒤
+              저장해 주세요.
+            </p>
+          }
+        >
+          <Button>다시 저장</Button>
+        </BottomAction>,
+      );
+      const actionChrome = container.querySelector<HTMLElement>(
+        '[data-galanda-surface="chrome"]',
+      );
+
+      expect(observedElement).toBe(actionChrome);
+      Object.defineProperty(actionChrome, "getBoundingClientRect", {
+        configurable: true,
+        value: () => ({ height: 152 }) as DOMRect,
+      });
+      resizeCallback?.(
+        [
+          {
+            borderBoxSize: undefined,
+          } as unknown as ResizeObserverEntry,
+        ],
+        undefined as unknown as ResizeObserver,
+      );
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--app-bottom-action-height",
+        ),
+      ).toBe("152px");
+
+      resizeCallback?.(
+        [
+          {
+            borderBoxSize: [{ blockSize: 184, inlineSize: 320 }],
+          } as unknown as ResizeObserverEntry,
+        ],
+        undefined as unknown as ResizeObserver,
+      );
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--app-bottom-action-height",
+        ),
+      ).toBe("184px");
+
+      unmount();
+      expect(disconnected).toBe(true);
+      expect(
+        document.documentElement.style.getPropertyValue(
+          "--app-bottom-action-height",
+        ),
+      ).toBe("");
+    } finally {
+      document.documentElement.style.removeProperty(
+        "--app-bottom-action-height",
+      );
+      if (originalDescriptor) {
+        Object.defineProperty(globalThis, "ResizeObserver", originalDescriptor);
+      } else {
+        Reflect.deleteProperty(globalThis, "ResizeObserver");
+      }
+    }
   });
 });

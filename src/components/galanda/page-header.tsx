@@ -19,6 +19,8 @@ interface PageHeaderProps {
   readonly bordered?: boolean;
   readonly safeTop?: boolean;
   readonly topInset?: number;
+  /** 상위 shell이 chrome을 소유할 때 `none`으로 중복 surface를 막아요. */
+  readonly surface?: "chrome" | "none";
   readonly className?: string;
 }
 
@@ -35,11 +37,12 @@ export function PageHeader({
   bordered = false,
   safeTop = true,
   topInset,
+  surface = "chrome",
   className,
 }: PageHeaderProps) {
   return (
     <header
-      data-galanda-surface="chrome"
+      data-galanda-surface={surface === "chrome" ? "chrome" : undefined}
       style={topInset === undefined ? undefined : { paddingTop: topInset }}
       className={cn(
         "w-full",

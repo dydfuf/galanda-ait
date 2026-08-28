@@ -21,7 +21,7 @@ describe("Tabs", () => {
     expect(tabList.className).toContain("bg-muted");
   });
 
-  it("opts only the chrome variant into the common chrome surface", () => {
+  it("opts only the standalone chrome variant into the common chrome surface", () => {
     render(
       <Tabs defaultValue="plans">
         <TabsList variant="chrome" aria-label="여행방 화면">
@@ -35,8 +35,40 @@ describe("Tabs", () => {
     expect(tabList).toHaveAttribute("data-variant", "chrome");
     expect(tabList).toHaveAttribute("data-galanda-surface", "chrome");
     expect(tabList.className).not.toContain("bg-muted");
-    expect(screen.getByRole("tab", { name: "계획" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "계획" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+  });
+
+  it("lets a containing shell own the chrome surface", () => {
+    render(
+      <div data-galanda-surface="chrome">
+        <Tabs defaultValue="plans">
+          <TabsList
+            variant="chrome"
+            surface="none"
+            aria-label="포함된 여행방 화면"
+          >
+            <TabsTrigger value="plans">계획</TabsTrigger>
+            <TabsTrigger value="itinerary">일정</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>,
+    );
+
+    const tabList = screen.getByRole("tablist", {
+      name: "포함된 여행방 화면",
+    });
+    expect(tabList).toHaveAttribute("data-variant", "chrome");
+    expect(tabList).not.toHaveAttribute("data-galanda-surface");
+    expect(
+      document.querySelectorAll('[data-galanda-surface="chrome"]'),
+    ).toHaveLength(1);
   });
 
   it("provides a 44px target and lets long labels reflow", () => {

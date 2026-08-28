@@ -100,7 +100,12 @@ export function TripRoomTabLayout() {
 
   const modeSwitcher = (
     <Tabs value={selectedTab} onValueChange={handleTabChange}>
-      <TabsList variant="chrome" aria-label="여행방 화면" className="w-40">
+      <TabsList
+        variant="chrome"
+        surface="none"
+        aria-label="여행방 화면"
+        className="w-40"
+      >
         <TabsTrigger value="plans">계획</TabsTrigger>
         <TabsTrigger value="itinerary">일정</TabsTrigger>
       </TabsList>
@@ -110,10 +115,13 @@ export function TripRoomTabLayout() {
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
       {showWebNavigation ? (
-        <div className="sticky top-0 z-20">
+        <div
+          data-galanda-surface="chrome"
+          className="sticky top-0 z-20 border-b"
+        >
           <PageHeader
-            bordered
             safeTop
+            surface="none"
             title={getTripRoomNavigationTitle(location.pathname)}
             back={{ onClick: () => void goBack() }}
             action={shareAction}

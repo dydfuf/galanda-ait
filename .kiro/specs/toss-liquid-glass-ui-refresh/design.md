@@ -81,6 +81,7 @@ UI refresh는 React 아래의 presentation과 platform integration만 수정한�
 
 - sticky 여부는 기존처럼 호출 화면이 결정한다.
 - surface는 기본 opaque fallback이며 지원 환경에서 glass로 강화한다.
+- header와 mode tab이 같은 chrome block에 포함되면 상위 shell만 surface를 소유하고 `PageHeader surface="none"`을 사용한다.
 - web에서는 `safeTop`만 적용한다.
 - AIT 여행방 shell에서는 `topInset`만 적용하고 `safeTop=false`를 유지한다.
 - 내부 content grid는 `max-width: 720px`, 중앙 정렬, 좌우 각 최소 44px action slot을 사용한다.
@@ -90,13 +91,15 @@ UI refresh는 React 아래의 presentation과 platform integration만 수정한�
 
 - 모바일에서 fixed, 데스크톱에서도 viewport 하단 chrome이되 내부 action 열만 최대 720px로 제한한다.
 - `--safe-bottom`을 footer padding에 한 번 적용한다.
-- `PageBody withBottomAction`은 action 실제 최대 높이와 safe area를 포함한 `--app-cta-space` 및 `scroll-padding-bottom`을 제공한다.
+- `ResizeObserver`가 accessory와 zoom을 포함한 실제 높이를 `--app-bottom-action-height`로 올리고, `PageBody withBottomAction`은 104px fallback과 실제 높이 + 16px 중 큰 clearance를 제공한다.
+- document scrolling element의 `scroll-padding-bottom`도 실제 action 높이를 사용한다.
 - accessory(validation/conflict/help)는 CTA 바로 위 같은 chrome 안에 표시한다.
 - glass는 shell에만 적용하며 button 자체는 불투명한 primary/secondary surface를 유지한다.
 
 #### `Mode_Tab`
 
 - `TabsList`에 제품 chrome 전용 variant(예: `variant="chrome"`)를 추가한다.
+- standalone mode tab은 자체 surface를 소유하지만, 상위 header shell 안에서는 `surface="none"`으로 중복 elevation을 막는다.
 - 이 variant만 glass token을 소비한다. 여행 목록의 content filter tab은 opaque 기본 variant를 유지한다.
 - 각 `TabsTrigger`는 최소 44px 높이와 충분한 너비를 가지며 Base UI의 `aria-selected`/active state를 유지한다.
 - AIT에서도 native navigation 아래 web content로 남는다.
@@ -105,7 +108,7 @@ UI refresh는 React 아래의 presentation과 platform integration만 수정한�
 
 - 기본 content column을 `width:100%`, `max-width:720px`, `margin-inline:auto`로 통일한다.
 - route가 header를 갖지 않을 때만 `safeTop`을 소유한다.
-- `withBottomAction`일 때 마지막 focusable item이 CTA 위까지 올라오도록 padding과 scroll padding을 함께 설정한다.
+- `withBottomAction`일 때 마지막 focusable item이 CTA 위까지 올라오도록 실제 측정 높이에 따른 padding을 설정한다. scroll padding은 실제 document scrolling element가 소유한다.
 - state나 form component를 remount하지 않으므로 viewport 변경 시 사용자 입력과 query state가 유지된다.
 
 #### `PageState`
