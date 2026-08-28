@@ -20,12 +20,15 @@ export function PlanCandidatesHeader({
   onNewProposalAction,
 }: PlanCandidatesHeaderProps) {
   return (
-    <div className="flex items-center justify-between gap-3 px-(--app-inline-padding) pb-2">
-      <div className="flex min-w-0 items-baseline gap-1.5">
-        <h2 id="plan-candidates-heading" className="text-[15px] font-bold leading-none text-foreground">
+    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 px-(--app-inline-padding) pb-3">
+      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h2
+          id="plan-candidates-heading"
+          className="min-w-0 text-lg leading-snug font-bold text-foreground [overflow-wrap:anywhere]"
+        >
           여행안
         </h2>
-        <span className="whitespace-nowrap text-[12px] leading-none text-muted-foreground">
+        <span className="whitespace-nowrap text-sm leading-relaxed text-muted-foreground">
           후보 {candidateCount}개
         </span>
       </div>
@@ -34,11 +37,10 @@ export function PlanCandidatesHeader({
           type="button"
           variant="secondary"
           size="sm"
-          className="shrink-0"
+          className="ml-auto max-w-full shrink-0 whitespace-normal"
           onClick={onNewProposalAction}
         >
-          <Plus aria-hidden="true" />
-          새 여행안 제안하기
+          <Plus aria-hidden="true" />새 여행안 제안하기
         </Button>
       )}
     </div>

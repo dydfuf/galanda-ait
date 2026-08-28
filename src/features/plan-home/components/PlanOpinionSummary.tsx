@@ -13,8 +13,8 @@ export function Pill({ className, children }: { readonly className?: string; rea
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5",
-        "text-[11px] font-medium text-foreground-muted whitespace-nowrap",
+        "inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1",
+        "text-sm font-medium text-foreground-muted whitespace-nowrap",
         className,
       )}
     >
@@ -48,10 +48,12 @@ export function PlanOpinionSummary({ opinions, myReaction }: PlanOpinionSummaryP
   const isEmpty = entries.length === 0 && !myReactionLabel;
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5 gap-y-1 border-t border-border pt-3 text-[12px] leading-normal">
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5 gap-y-1 border-t border-border pt-3 text-sm leading-relaxed">
       {isEmpty ? (
         // 의견이 하나도 없으면 한 문장만 남긴다 – 매달린 구분자나 중복된 "내 의견 없음"을 만들지 않는다.
-        <span className="min-w-0 break-words text-foreground-muted">아직 의견이 없어요</span>
+        <span className="min-w-0 break-words text-foreground-muted">
+          아직 의견이 없어요
+        </span>
       ) : (
         <>
           {entries.map(({ key, label, Icon, count }) => (
@@ -71,7 +73,9 @@ export function PlanOpinionSummary({ opinions, myReaction }: PlanOpinionSummaryP
            * ml-auto는 여유가 있을 때만 "왼쪽=남들 / 오른쪽=나" 공간 구분을 주고 wrap되면 자연히 무력화된다.
            */}
           <Pill className="ml-auto border border-border-strong bg-background font-semibold text-foreground">
-            {myReactionLabel ? `내 의견 ${myReactionLabel}` : "내 의견 아직 없음"}
+            {myReactionLabel
+              ? `내 의견 ${myReactionLabel}`
+              : "내 의견 아직 없음"}
           </Pill>
         </>
       )}

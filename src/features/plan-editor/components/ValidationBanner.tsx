@@ -1,10 +1,14 @@
 import { css } from "@emotion/react";
 
 const bannerStyle = css`
-  background-color: var(--destructive-muted);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  box-sizing: border-box;
+  padding: 12px 16px;
   border: 1px solid var(--destructive-border);
   border-radius: 12px;
-  padding: 12px 16px;
+  background-color: var(--destructive-muted);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -12,10 +16,12 @@ const bannerStyle = css`
 `;
 
 const textStyle = css`
-  font-size: 13px;
-  font-weight: 600;
+  min-width: 0;
   color: var(--destructive-strong);
-  line-height: 1.4;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 `;
 
 interface ValidationBannerProps {

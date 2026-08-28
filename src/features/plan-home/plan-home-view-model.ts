@@ -37,6 +37,11 @@ export interface PlanSummaryData {
   readonly isConfirmed: boolean;
 }
 
+/** Plan Home은 optional 차이 요약도 누락시키지 않고 명시적인 미정 문구로 투영한다. */
+export interface PlanHomePlanSummaryData extends PlanSummaryData {
+  readonly differenceSummaryText: string;
+}
+
 export interface TripRoomViewModel {
   readonly id: string;
   readonly title: string;
@@ -57,7 +62,7 @@ export interface TripRoomViewModel {
   readonly totalOpinionCount: number;
   readonly participatedMemberCount: number;
   readonly isConfirmed: boolean;
-  readonly plans: ReadonlyArray<PlanSummaryData>;
+  readonly plans: ReadonlyArray<PlanHomePlanSummaryData>;
 }
 
 export const getTripListStatusText = (
@@ -161,63 +166,73 @@ export const toTripRoomViewModel = (
     decisionSubText = "마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.";
   }
 
-  const plans: ReadonlyArray<PlanSummaryData> = room.plans.map((p, idx) => {
-    const isPlanConfirmed = isDomainPlanConfirmed(room, p);
-    const isBasic = idx === 0;
-    const resolvable = hasResolvablePlanAuthor(room, p);
-    const authorName = resolvable
-      ? (p.authorName ??
-        room.members.find((m) => m.id === p.authorId)?.name ??
-        "작성자 미확인")
-      : "작성자 미확인";
-    const range = getPlanDateRange(p);
-    const nights = getPlanNightCount(p);
-    const days = nights > 0 ? nights + 1 : 0;
+  const plans: ReadonlyArray<PlanHomePlanSummaryData> = room.plans.map(
+    (p, idx) => {
+      const isPlanConfirmed = isDomainPlanConfirmed(room, p);
+      const isBasic = idx === 0;
+      const resolvable = hasResolvablePlanAuthor(room, p);
+      const authorName = resolvable
+        ? (p.authorName ??
+          room.members.find((m) => m.id === p.authorId)?.name ??
+          "작성자 미확인")
+        : "작성자 미확인";
+      const range = getPlanDateRange(p);
+      const nights = getPlanNightCount(p);
+      const days = nights > 0 ? nights + 1 : 0;
+      const differenceSummaryText = p.differenceSummary?.trim()
+        ? p.differenceSummary
+        : "핵심 차이 미정";
 
-    const likeCount = p.memberOpinions
-      ? p.memberOpinions.filter((m) => m.reaction === "LIKE").length
-      : p.voteCount;
-    const okayCount = p.memberOpinions
-      ? p.memberOpinions.filter((m) => m.reaction === "OKAY").length
-      : 0;
-    const hardCount = p.memberOpinions
-      ? p.memberOpinions.filter((m) => m.reaction === "HARD").length
-      : 0;
+      const likeCount = p.memberOpinions
+        ? p.memberOpinions.filter((m) => m.reaction === "LIKE").length
+        : p.voteCount;
+      const okayCount = p.memberOpinions
+        ? p.memberOpinions.filter((m) => m.reaction === "OKAY").length
+        : 0;
+      const hardCount = p.memberOpinions
+        ? p.memberOpinions.filter((m) => m.reaction === "HARD").length
+        : 0;
 
-    const isAuthor = isPlanAuthor(room, p, currentUserIds);
-    const canManage = canManagePlan(room, p, currentUserIds);
+      const isAuthor = isPlanAuthor(room, p, currentUserIds);
+      const canManage = canManagePlan(room, p, currentUserIds);
 
-    // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
-    const myOpinion = currentUserIds
-      ? p.memberOpinions?.find((opinion) =>
-          typeof currentUserIds === "string"
-            ? opinion.userId === currentUserIds
-            : currentUserIds.includes(opinion.userId)
-        )
-      : undefined;
+      // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
+      const myOpinion = currentUserIds
+        ? p.memberOpinions?.find((opinion) =>
+            typeof currentUserIds === "string"
+              ? opinion.userId === currentUserIds
+              : currentUserIds.includes(opinion.userId),
+          )
+        : undefined;
 
-    return {
-      id: p.id,
-      title: p.title,
-      planTag: isPlanConfirmed ? "CONFIRMED" : isBasic ? "BASIC" : "ALTERNATIVE",
-      planTagLabel: isBasic ? "기본안" : `대안 ${idx}`,
-      period: range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정",
-      nights,
-      days,
-      differenceSummary: p.differenceSummary,
-      authorId: p.authorId,
-      authorName,
-      isAuthor,
-      canManage,
-      opinions: {
-        likeCount,
-        okayCount,
-        hardCount,
-      },
-      myReaction: myOpinion?.reaction,
-      isConfirmed: isPlanConfirmed,
-    };
-  });
+      return {
+        id: p.id,
+        title: p.title,
+        planTag: isPlanConfirmed
+          ? "CONFIRMED"
+          : isBasic
+            ? "BASIC"
+            : "ALTERNATIVE",
+        planTagLabel: isBasic ? "기본안" : `대안 ${idx}`,
+        period: range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정",
+        nights,
+        days,
+        differenceSummary: p.differenceSummary,
+        differenceSummaryText,
+        authorId: p.authorId,
+        authorName,
+        isAuthor,
+        canManage,
+        opinions: {
+          likeCount,
+          okayCount,
+          hardCount,
+        },
+        myReaction: myOpinion?.reaction,
+        isConfirmed: isPlanConfirmed,
+      };
+    },
+  );
 
   const displayDate = getTripRoomDisplayDate(room);
   const candidateCount = room.plans.length;

@@ -70,6 +70,48 @@
   --primary-border: #82b6ff;
   --primary-border-weak: #b8d7ff;
   --destructive-border: #fecdd3;
+
+  /*
+   * UI refresh 역할 토큰.
+   * Content Surface는 항상 불투명하고, Common Chrome/Overlay만 아래의
+   * active surface와 filter 변수를 통해 progressive enhancement를 사용해요.
+   */
+  --surface-content: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-chrome-opaque: #ffffff;
+  --surface-chrome-glass: rgba(255, 255, 255, 0.88);
+  --surface-chrome: var(--surface-chrome-opaque);
+  --surface-overlay-opaque: #ffffff;
+  --surface-overlay-glass: rgba(255, 255, 255, 0.92);
+  --surface-overlay: var(--surface-overlay-opaque);
+  --border-chrome: #8b95a1;
+  --border-overlay: #8b95a1;
+  --elevation-chrome: 0 8px 24px rgba(25, 31, 40, 0.12);
+  --elevation-overlay: 0 20px 48px rgba(25, 31, 40, 0.18);
+  --blur-chrome: 16px;
+  --blur-overlay: 24px;
+  --saturation-chrome: 1.15;
+  --chrome-backdrop-filter: none;
+  --overlay-backdrop-filter: none;
+
+  --motion-duration-instant: 0ms;
+  --motion-duration-fast: 100ms;
+  --motion-duration-standard: 200ms;
+  --motion-duration-overlay: 280ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-decelerate: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --touch-target-min: 44px;
+  --content-max-width: 720px;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  :root {
+    --surface-chrome: var(--surface-chrome-glass);
+    --surface-overlay: var(--surface-overlay-glass);
+    --chrome-backdrop-filter: blur(var(--blur-chrome)) saturate(var(--saturation-chrome));
+    --overlay-backdrop-filter: blur(var(--blur-overlay)) saturate(var(--saturation-chrome));
+  }
 }
 
 /*
@@ -80,24 +122,50 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--background);
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
+html {
+  scroll-padding-bottom: var(--app-bottom-action-height, 0px);
 }
 
+html,
+body,
 #root {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: var(--adaptiveBackground);
+  background-color: var(--background);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+#root {
   display: flex;
   flex-direction: column;
   position: relative;
   overflow-x: hidden;
+}
+
+[data-galanda-surface="content"] {
+  background-color: var(--surface-content);
+}
+
+[data-galanda-surface="chrome"] {
+  background-color: var(--surface-chrome);
+  border-color: var(--border-chrome);
+  box-shadow: var(--elevation-chrome);
+  -webkit-backdrop-filter: var(--chrome-backdrop-filter);
+  backdrop-filter: var(--chrome-backdrop-filter);
+}
+
+[data-galanda-surface="overlay"] {
+  background-color: var(--surface-overlay);
+  border-color: var(--border-overlay);
+  box-shadow: var(--elevation-overlay);
+  -webkit-backdrop-filter: var(--overlay-backdrop-filter);
+  backdrop-filter: var(--overlay-backdrop-filter);
 }
 
 button, input, textarea, select {
@@ -139,6 +207,35 @@ button, input, textarea, select {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: var(--motion-duration-instant);
+    --motion-duration-standard: var(--motion-duration-instant);
+    --motion-duration-overlay: var(--motion-duration-instant);
+  }
+
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-delay: var(--motion-duration-instant) !important;
+    animation-duration: var(--motion-duration-instant) !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: var(--motion-duration-instant) !important;
+    transition-duration: var(--motion-duration-instant) !important;
+  }
+
+  [data-slot="spinner"],
+  .animate-spin {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--sans);
@@ -156,10 +253,18 @@ button, input, textarea, select {
   --color-info: var(--info);
   --color-info-muted: var(--info-muted);
   --color-surface-subtle: var(--surface-subtle);
+  --color-surface-content: var(--surface-content);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-chrome: var(--surface-chrome);
+  --color-surface-chrome-opaque: var(--surface-chrome-opaque);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-overlay-opaque: var(--surface-overlay-opaque);
   --color-foreground-muted: var(--foreground-muted);
   --color-foreground-subtle: var(--foreground-subtle);
   --color-border-strong: var(--border-strong);
   --color-border-stronger: var(--border-stronger);
+  --color-border-chrome: var(--border-chrome);
+  --color-border-overlay: var(--border-overlay);
   --color-primary-muted: var(--primary-muted);
   --color-primary-border: var(--primary-border);
   --color-primary-border-weak: var(--primary-border-weak);
@@ -178,6 +283,16 @@ button, input, textarea, select {
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --shadow-chrome: var(--elevation-chrome);
+  --shadow-overlay: var(--elevation-overlay);
+  --blur-galanda-chrome: var(--blur-chrome);
+  --blur-galanda-overlay: var(--blur-overlay);
+  --ease-standard: var(--motion-ease-standard);
+  --ease-decelerate: var(--motion-ease-decelerate);
+  --spacing-touch-target: var(--touch-target-min);
+  --container-content: var(--content-max-width);
+  --default-transition-duration: var(--motion-duration-standard);
+  --default-transition-timing-function: var(--motion-ease-standard);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

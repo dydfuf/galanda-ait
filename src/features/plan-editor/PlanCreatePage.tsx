@@ -1,16 +1,29 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { css } from "@emotion/react";
-import { useLocation, useParams, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useParams,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { Result } from "effect";
-import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
+import {
+  decodeRouteParams,
+  TripParamsSchema,
+} from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { PageBody } from "@/components/galanda/page-body.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Spinner } from "@/components/ui/spinner.tsx";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
-import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
+import {
+  isPlanEditorSection,
+  type PlanEditorSection,
+} from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useCreatePlanMutation } from "./mutations.ts";
 import {
@@ -19,7 +32,10 @@ import {
   toRevisionConflictMessage,
   toUserMessage,
 } from "../common/error-message.ts";
-import { getRoomActor, isRoomConfirmed } from "../../core/domain/auth-guards.ts";
+import {
+  getRoomActor,
+  isRoomConfirmed,
+} from "../../core/domain/auth-guards.ts";
 import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
 import { toFirstPlanDecisionContext } from "../../core/domain/trip-decision.ts";
 import { getPlanPublishCompletion } from "../../core/domain/room.ts";
@@ -32,15 +48,6 @@ import {
 import { tripActionPresentation } from "../common/trip-action-presentation.ts";
 import { shareTripInvite } from "../invite/share-trip-invite.ts";
 
-const pageContainerStyle = css`
-  padding: 16px 20px var(--app-cta-space, 112px);
-  max-width: 640px;
-  width: 100%;
-  min-width: 0;
-  margin: 0 auto;
-  box-sizing: border-box;
-`;
-
 const loadingContainerStyle = css`
   padding: 40px 20px;
   text-align: center;
@@ -51,7 +58,7 @@ const loadingContainerStyle = css`
 /** 고정 CTA 위(topAccessory)에 놓이므로 문단이 아닌 인라인 요소로 렌더링해요. */
 const errorMessageStyle = css`
   display: block;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--destructive-strong);
   margin: 8px 0 0 0;
   text-align: center;
@@ -64,12 +71,19 @@ export function PlanCreatePage(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const cloneFromPlanId = searchParams.get("cloneFrom");
-  const section = isPlanEditorSection(params.section) ? params.section : undefined;
+  const section = isPlanEditorSection(params.section)
+    ? params.section
+    : undefined;
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
-  const { data: room, isLoading, isError, refetch } = useTripRoomRawQuery(tripId);
+  const {
+    data: room,
+    isLoading,
+    isError,
+    refetch,
+  } = useTripRoomRawQuery(tripId);
   const {
     data: session,
     isLoading: isSessionLoading,
@@ -77,14 +91,15 @@ export function PlanCreatePage(): JSX.Element {
     error: sessionError,
   } = useSessionQuery();
   const createPlanMutation = useCreatePlanMutation();
+  const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeRecommendation, setActiveRecommendation] =
-    useState<RecommendationActionContext | undefined>(() =>
-      getRecommendationActionContext(location.state),
-    );
+  const [activeRecommendation, setActiveRecommendation] = useState<
+    RecommendationActionContext | undefined
+  >(() => getRecommendationActionContext(location.state));
   const [dismissedRecommendationId, setDismissedRecommendationId] =
     useState<string>();
+  const isSubmitPending = isSubmitting || createPlanMutation.isPending;
 
   // 복제 원본 플랜 찾기
   const cloneFromPlan = room?.plans.find((p) => p.id === cloneFromPlanId);
@@ -93,7 +108,7 @@ export function PlanCreatePage(): JSX.Element {
     room,
     undefined,
     cloneFromPlan,
-    session?.participantId
+    session?.participantId,
   );
   const draftCompletion = getPlanPublishCompletion(editor);
   const isFirstPlan = Boolean(!cloneFromPlan && room?.plans.length === 0);
@@ -115,7 +130,9 @@ export function PlanCreatePage(): JSX.Element {
   }
 
   if (isLoading || isSessionLoading) {
-    return <div css={loadingContainerStyle}>여행방 정보를 불러오는 중입니다...</div>;
+    return (
+      <div css={loadingContainerStyle}>여행방 정보를 불러오는 중입니다...</div>
+    );
   }
 
   if (isError || !room) {
@@ -131,9 +148,11 @@ export function PlanCreatePage(): JSX.Element {
     return (
       <RouteErrorFallback
         title="로그인 정보를 확인할 수 없습니다"
-        message={isSessionError
-          ? toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")
-          : "여행안을 작성하려면 로그인이 필요합니다."}
+        message={
+          isSessionError
+            ? toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")
+            : "여행안을 작성하려면 로그인이 필요합니다."
+        }
       />
     );
   }
@@ -144,7 +163,9 @@ export function PlanCreatePage(): JSX.Element {
         title="확정된 여행에서는 여행안을 만들 수 없습니다"
         message="확정 이후 변경은 확정 일정에서 진행해주세요."
         actionText="확정 일정 보기"
-        onAction={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+        onAction={() =>
+          navigate(`/trips/${tripId}/itinerary`, { replace: true })
+        }
       />
     );
   }
@@ -152,8 +173,15 @@ export function PlanCreatePage(): JSX.Element {
   const handleSubmit = async (
     recommendation = activeRecommendation,
   ): Promise<void> => {
-    if (!editor.validation.isValid || isSubmitting) return;
+    if (
+      !editor.validation.isValid ||
+      isSubmitPending ||
+      isSubmittingRef.current
+    ) {
+      return;
+    }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -195,18 +223,28 @@ export function PlanCreatePage(): JSX.Element {
       // 비로그인·권한 부족 등 작성 실패 사유를 화면에 그대로 전달한다
       if (isRevisionConflict(err) || isStateConflict(err)) {
         const refreshed = await refetch();
-        setIsSubmitting(false);
         if (refreshed.isError || !refreshed.data) {
-          setErrorMsg("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
+          setErrorMsg(
+            "최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.",
+          );
         } else if (isRevisionConflict(err)) {
           setErrorMsg(toRevisionConflictMessage(err));
         } else if (!isRoomConfirmed(refreshed.data)) {
-          setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
+          setErrorMsg(
+            toUserMessage(
+              err,
+              "여행안을 등록하지 못했어요. 다시 시도해주세요.",
+            ),
+          );
         }
       } else {
-        setIsSubmitting(false);
-        setErrorMsg(toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."));
+        setErrorMsg(
+          toUserMessage(err, "여행안을 등록하지 못했어요. 다시 시도해주세요."),
+        );
       }
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -232,7 +270,10 @@ export function PlanCreatePage(): JSX.Element {
       );
       setActiveRecommendation(undefined);
     }
-    if ((location.state as { fromEditorSummary?: boolean } | null)?.fromEditorSummary) {
+    if (
+      (location.state as { fromEditorSummary?: boolean } | null)
+        ?.fromEditorSummary
+    ) {
       navigate(-1);
     } else {
       navigate(`${editorBasePath}${location.search}`, { replace: true });
@@ -251,12 +292,13 @@ export function PlanCreatePage(): JSX.Element {
         actor,
       )[0]?.actionId
     : undefined;
-  const recommendation = recommendationQuery.data?.recommendationId ===
-      dismissedRecommendationId
-    ? undefined
-    : recommendationQuery.data ?? undefined;
+  const recommendation =
+    recommendationQuery.data?.recommendationId === dismissedRecommendationId
+      ? undefined
+      : (recommendationQuery.data ?? undefined);
   const isRecommendationPending = isFirstPlan && recommendationQuery.isPending;
-  const recommendedActionId = recommendation?.primary.actionId ?? deterministicActionId;
+  const recommendedActionId =
+    recommendation?.primary.actionId ?? deterministicActionId;
 
   const runRecommendationAction = async (
     context: RecommendationActionContext,
@@ -286,7 +328,10 @@ export function PlanCreatePage(): JSX.Element {
   };
 
   return (
-    <div css={pageContainerStyle}>
+    <PageBody
+      withBottomAction={!editor.draftConflict}
+      className="max-w-[640px] px-(--app-inline-padding)"
+    >
       <PlanEditorSections
         editor={editor}
         section={section}
@@ -298,7 +343,9 @@ export function PlanCreatePage(): JSX.Element {
         recommendedActionId={recommendedActionId}
         recommendation={recommendation}
         isRecommendationPending={isRecommendationPending}
-        onRecommendationAction={(context) => void runRecommendationAction(context)}
+        onRecommendationAction={(context) =>
+          void runRecommendationAction(context)
+        }
         onRecommendationDismiss={setDismissedRecommendationId}
         onOpenSection={openSection}
         onCompleteSection={completeSection}
@@ -331,10 +378,13 @@ export function PlanCreatePage(): JSX.Element {
             <Button
               type="button"
               size="xl"
-              disabled={!editor.validation.isValid || isSubmitting}
+              aria-busy={isSubmitPending || undefined}
+              aria-live="polite"
+              disabled={!editor.validation.isValid || isSubmitPending}
               onClick={() => void handleSubmit()}
             >
-              {isSubmitting
+              {isSubmitPending && <Spinner aria-hidden="true" />}
+              {isSubmitPending
                 ? "등록 중..."
                 : cloneFromPlan
                   ? "대안 여행안 제안하기"
@@ -342,6 +392,6 @@ export function PlanCreatePage(): JSX.Element {
             </Button>
           </BottomAction>
         )}
-    </div>
+    </PageBody>
   );
 }

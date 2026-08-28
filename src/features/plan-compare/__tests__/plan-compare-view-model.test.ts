@@ -323,3 +323,64 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
     expect(difference?.deltaText).toBeUndefined();
   });
 });
+
+
+describe("responsive compare data contract", (): void => {
+  it("요청된 left/right 순서와 source 값을 바꾸지 않고 비교 행에 투영한다", (): void => {
+    const plans = toPlanDetailViewModel(makeRoom(), HOST_ID).plans;
+    const basic = plans.find((plan) => plan.id === "plan-basic");
+    const alternative = plans.find((plan) => plan.id === "plan-alt");
+    if (!basic || !alternative) {
+      throw new Error("fixture에 비교할 두 여행안이 있어야 한다");
+    }
+
+    const [schedule] = buildPlanCompareDifferences(alternative, basic);
+
+    expect(schedule).toMatchObject({
+      kind: "SCHEDULE",
+      leftPlanLabel: alternative.planTagLabel,
+      leftValue: expect.stringContaining("일정 미정"),
+      rightPlanLabel: basic.planTagLabel,
+      rightValue: expect.stringContaining("제주시 2박"),
+    });
+  });
+
+  it("미입력 가격은 미정으로, 명시적인 0원은 알려진 값으로 구분한다", (): void => {
+    const unknownPlan = toPlanDetailViewModel(makeRoom(), HOST_ID).plans.find(
+      (plan) => plan.id === "plan-alt",
+    );
+    if (!unknownPlan) throw new Error("fixture에 plan-alt가 있어야 한다");
+
+    const zeroPlan = {
+      ...unknownPlan,
+      planTagLabel: "대안 2",
+      groupCostText: "그룹 총액 0원",
+      perPersonCostText: "4명 기준 1인 0원",
+      costSummary: {
+        ...unknownPlan.costSummary,
+        hasCost: true,
+        minTotal: 0,
+        maxTotal: 0,
+        minPerPerson: 0,
+        maxPerPerson: 0,
+        unpricedCount: 0,
+      },
+    };
+
+    const costDifference = buildPlanCompareDifferences(
+      unknownPlan,
+      zeroPlan,
+    ).find((difference) => difference.kind === "COST");
+    const unknownSummary = buildConfirmPlanSummary(unknownPlan);
+    const zeroSummary = buildConfirmPlanSummary(zeroPlan);
+
+    expect(costDifference?.leftValue).toBe("예상 경비 미정");
+    expect(costDifference?.leftValue).not.toContain("0원");
+    expect(costDifference?.rightValue).toBe("1인 0원");
+    expect(costDifference?.rightValue).not.toContain("미정");
+    expect(unknownSummary.groupCostText).toBe("예상 경비 미정");
+    expect(unknownSummary.perPersonCostText).toBe("1인 예상 경비 미정");
+    expect(zeroSummary.groupCostText).toBe("그룹 총액 0원");
+    expect(zeroSummary.perPersonCostText).toBe("4명 기준 1인 0원");
+  });
+});

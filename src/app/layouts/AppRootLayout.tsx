@@ -7,9 +7,11 @@ const containerStyle = css`
   min-height: 100vh;
   min-height: 100dvh;
   background-color: var(--background);
+  color: var(--foreground);
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow-x: hidden;
 `;
 
 export function AppRootLayout() {

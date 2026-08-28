@@ -19,6 +19,8 @@ interface PageHeaderProps {
   readonly bordered?: boolean;
   readonly safeTop?: boolean;
   readonly topInset?: number;
+  /** 상위 shell이 chrome을 소유할 때 `none`으로 중복 surface를 막아요. */
+  readonly surface?: "chrome" | "none";
   readonly className?: string;
 }
 
@@ -35,22 +37,24 @@ export function PageHeader({
   bordered = false,
   safeTop = true,
   topInset,
+  surface = "chrome",
   className,
 }: PageHeaderProps) {
   return (
     <header
+      data-galanda-surface={surface === "chrome" ? "chrome" : undefined}
       style={topInset === undefined ? undefined : { paddingTop: topInset }}
       className={cn(
-        // 설치형 PWA(viewport-fit=cover)에서 notch/상태 표시줄과 겹치지 않게 상단 safe-area를 확보해요.
-        "w-full bg-background",
-        safeTop && "pt-(--safe-top)",
+        "w-full",
+        // 명시적인 native inset이 있으면 Web safe-area를 더하지 않아요.
+        safeTop && topInset === undefined && "pt-(--safe-top)",
         sticky && "sticky top-0 z-20",
-        bordered && "border-b",
+        (bordered || sticky) && "border-b",
         className,
       )}
     >
-      <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center px-2">
-        <div className="flex justify-start">
+      <div className="mx-auto grid h-14 w-full max-w-(--content-max-width) grid-cols-[minmax(var(--touch-target-min),1fr)_minmax(0,auto)_minmax(var(--touch-target-min),1fr)] items-center px-2">
+        <div className="flex min-w-(--touch-target-min) justify-start">
           {back && (
             <Button
               type="button"
@@ -67,11 +71,13 @@ export function PageHeader({
         {center ? (
           <div className="min-w-0 px-1">{center}</div>
         ) : (
-          <div className="truncate px-1 text-center text-base font-semibold text-foreground">
+          <div className="min-w-0 truncate px-1 text-center text-base font-semibold text-foreground">
             {title}
           </div>
         )}
-        <div className="flex justify-end pr-1">{action}</div>
+        <div className="flex min-w-(--touch-target-min) justify-end">
+          {action}
+        </div>
       </div>
     </header>
   );

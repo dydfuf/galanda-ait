@@ -1,162 +1,194 @@
 import { css } from "@emotion/react";
 import { getStayNightCount, type CityStay } from "../../../core/domain/room.ts";
 import { RouteRail } from "../../common/RouteRail.tsx";
+import { PLAN_EDITOR_SECTION_PRESENTATION } from "../plan-editor-section.ts";
 
 const cardStyle = css`
-  background-color: var(--background);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--border);
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background-color: var(--surface-content);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  @media (min-width: 390px) {
+    padding: 20px;
+  }
 `;
 
 const sectionHeaderStyle = css`
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 `;
 
 const sectionTitleStyle = css`
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--foreground);
+  min-width: 0;
   margin: 0;
+  color: var(--foreground);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 `;
 
 const nightsStatusBadgeStyle = (isMatch: boolean) => css`
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background-color: ${isMatch ? "var(--info-muted)" : "var(--destructive-muted)"};
-  color: ${isMatch ? "var(--info)" : "var(--destructive-strong)"};
   max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background-color: ${isMatch
+    ? "var(--info-muted)"
+    : "var(--destructive-muted)"};
+  color: ${isMatch ? "var(--info)" : "var(--destructive-strong)"};
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.4;
-  text-align: right;
+  text-align: left;
+  overflow-wrap: anywhere;
 `;
 
 const previewBoxStyle = css`
-  background-color: var(--surface-subtle);
+  min-width: 0;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 12px 14px;
-  min-width: 0;
+  background-color: var(--surface-subtle);
 `;
 
 const previewLabelStyle = css`
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--foreground-subtle);
-  margin-bottom: 6px;
   display: block;
+  margin-bottom: 8px;
+  color: var(--foreground-muted);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
 `;
 
 const cityListStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 `;
 
 const cityRowStyle = css`
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--surface-subtle);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  background-color: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  min-width: 0;
+  gap: 12px;
 `;
 
 const cityRowHeaderStyle = css`
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
+  gap: 8px;
 `;
 
 const cityIndexStyle = css`
-  font-size: 13px;
+  min-width: 0;
+  margin: 0;
+  color: var(--foreground-muted);
+  font-size: 18px;
   font-weight: 700;
-  color: var(--foreground-subtle);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 `;
 
 const inputStyle = css`
   width: 100%;
   min-width: 0;
+  min-height: var(--touch-target-min);
   box-sizing: border-box;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--border-strong);
-  font-size: 14px;
+  border-radius: 10px;
   outline: none;
-  background-color: var(--background);
+  background-color: var(--surface-content);
   color: var(--foreground);
+  font-size: 16px;
+  line-height: 1.5;
+  transition: border-color var(--motion-duration-fast)
+    var(--motion-ease-standard);
 
-  &:focus {
+  &:focus-visible {
     border-color: var(--primary);
   }
 `;
 
 const dateGridStyle = css`
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
-  min-width: 0;
+  gap: 12px;
 
   @media (min-width: 390px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 `;
 
-const dateFieldStyle = css`
+const fieldStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+  gap: 8px;
 
   label {
-    font-size: 12px;
+    color: var(--foreground-muted);
+    font-size: 16px;
     font-weight: 600;
-    color: var(--foreground-subtle);
+    line-height: 1.5;
   }
 `;
 
 const deleteCityBtnStyle = css`
-  background: none;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  flex: 0 0 var(--touch-target-min);
+  padding: 0;
   border: none;
-  color: var(--border-stronger);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--foreground-muted);
   font-size: 16px;
   cursor: pointer;
-  padding: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  transition:
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard);
 
   &:hover {
+    background-color: var(--destructive-muted);
     color: var(--destructive);
   }
 `;
 
 const addCityButtonStyle = css`
+  width: 100%;
+  min-height: var(--touch-target-min);
   padding: 10px 14px;
   border: 1px dashed var(--primary-border);
-  background-color: var(--info-muted);
   border-radius: 10px;
+  background-color: var(--info-muted);
   color: var(--info);
+  font-size: 16px;
   font-weight: 600;
-  font-size: 13px;
+  line-height: 1.5;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--motion-duration-fast)
+    var(--motion-ease-standard);
 
   &:hover {
     background-color: var(--primary-muted);
@@ -185,30 +217,36 @@ export function RouteCitySection({
   const isNightMatched = routes.length > 0 && currentTotalNights === totalTripNights;
 
   return (
-    <section css={cardStyle}>
+    <section css={cardStyle} data-galanda-surface="content">
       <div css={sectionHeaderStyle}>
-        <h2 css={sectionTitleStyle}>날짜와 도시 체류 배분</h2>
+        <h2 css={sectionTitleStyle}>
+          {PLAN_EDITOR_SECTION_PRESENTATION.route.sectionHeading}
+        </h2>
         <span css={nightsStatusBadgeStyle(isNightMatched)}>
           {routes.length === 0
             ? "도시 입력 필요"
             : isNightMatched
-            ? `총 ${totalTripNights}박 배분 완료`
-            : `${currentTotalNights}박 / ${totalTripNights}박 (${totalTripNights - currentTotalNights > 0 ? `${totalTripNights - currentTotalNights}박 부족` : `${currentTotalNights - totalTripNights}박 초과`})`}
+              ? `총 ${totalTripNights}박 배분 완료`
+              : `${currentTotalNights}박 / ${totalTripNights}박 (${totalTripNights - currentTotalNights > 0 ? `${totalTripNights - currentTotalNights}박 부족` : `${currentTotalNights - totalTripNights}박 초과`})`}
         </span>
       </div>
 
-      {/* 실시간 압축 경로 레일 미리보기 */}
       <div css={previewBoxStyle}>
         <span css={previewLabelStyle}>경로 미리보기</span>
-        <RouteRail route={routes.map((stay) => ({ city: stay.city, nights: Math.max(0, getStayNightCount(stay)) }))} differenceSummary={differenceSummary} />
+        <RouteRail
+          route={routes.map((stay) => ({
+            city: stay.city,
+            nights: Math.max(0, getStayNightCount(stay)),
+          }))}
+          differenceSummary={differenceSummary}
+        />
       </div>
 
-      {/* 도시 목록 입력 및 박수 조절 */}
       <div css={cityListStyle}>
         {routes.map((stay, idx) => (
           <div key={idx} css={cityRowStyle}>
             <div css={cityRowHeaderStyle}>
-              <span css={cityIndexStyle}>도시 {idx + 1}</span>
+              <h3 css={cityIndexStyle}>도시 {idx + 1}</h3>
               {routes.length > 1 && (
                 <button
                   type="button"
@@ -220,32 +258,39 @@ export function RouteCitySection({
                 </button>
               )}
             </div>
-            <input
-              type="text"
-              aria-label={`도시 ${idx + 1} 이름`}
-              placeholder={`도시 ${idx + 1} 이름`}
-              value={stay.city}
-              onChange={(e) => onUpdateCity(idx, { city: e.target.value })}
-              css={inputStyle}
-            />
+            <div css={fieldStyle}>
+              <label htmlFor={`route-${idx}-city`}>도시 이름</label>
+              <input
+                id={`route-${idx}-city`}
+                type="text"
+                placeholder={`도시 ${idx + 1} 이름`}
+                value={stay.city}
+                onChange={(e) => onUpdateCity(idx, { city: e.target.value })}
+                css={inputStyle}
+              />
+            </div>
             <div css={dateGridStyle}>
-              <div css={dateFieldStyle}>
+              <div css={fieldStyle}>
                 <label htmlFor={`route-${idx}-arrival`}>도착일</label>
                 <input
                   id={`route-${idx}-arrival`}
                   type="date"
                   value={stay.arrivalDate}
-                  onChange={(e) => onUpdateCity(idx, { arrivalDate: e.target.value })}
+                  onChange={(e) =>
+                    onUpdateCity(idx, { arrivalDate: e.target.value })
+                  }
                   css={inputStyle}
                 />
               </div>
-              <div css={dateFieldStyle}>
+              <div css={fieldStyle}>
                 <label htmlFor={`route-${idx}-departure`}>출발일</label>
                 <input
                   id={`route-${idx}-departure`}
                   type="date"
                   value={stay.departureDate}
-                  onChange={(e) => onUpdateCity(idx, { departureDate: e.target.value })}
+                  onChange={(e) =>
+                    onUpdateCity(idx, { departureDate: e.target.value })
+                  }
                   css={inputStyle}
                 />
               </div>

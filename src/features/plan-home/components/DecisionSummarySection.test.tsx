@@ -74,4 +74,39 @@ describe("DecisionSummarySection (RAON-225)", () => {
     expect(screen.queryByText(baseProps.statusText)).not.toBeInTheDocument();
     expect(screen.queryByText(/참여/)).not.toBeInTheDocument();
   });
+
+  it("상태 → 설명 → 참여 집계 순서를 유지하고 상태 변경 문구만 live announcement로 제공한다", () => {
+    render(
+      <DecisionSummarySection
+        {...baseProps}
+        badgeText="의견 수집 중"
+        badgeVariant="info"
+      />,
+    );
+
+    const region = screen.getByRole("region", { name: "진행 상태" });
+    const heading = screen.getByRole("heading", {
+      level: 2,
+      name: "진행 상태",
+    });
+    const status = screen.getByText(baseProps.statusText);
+    const description = screen.getByText(baseProps.subText);
+    const aggregate = screen.getByText(/참여 3\/4명 · 의견 4개/);
+
+    expect(heading).toHaveAttribute("id", "decision-status-heading");
+    expect(region).toHaveAttribute(
+      "aria-labelledby",
+      "decision-status-heading",
+    );
+    expect(status).toHaveAttribute("aria-live", "polite");
+    expect(description).not.toHaveAttribute("aria-live");
+    expect(
+      status.compareDocumentPosition(description) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      description.compareDocumentPosition(aggregate) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });

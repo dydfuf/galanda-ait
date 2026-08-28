@@ -1,123 +1,206 @@
 import { css } from "@emotion/react";
-import { getStayNightCount, type AccommodationSnapshot, type BookingStatus, type CityStay } from "../../../core/domain/room.ts";
+import {
+  getStayNightCount,
+  type AccommodationSnapshot,
+  type BookingStatus,
+  type CityStay,
+} from "../../../core/domain/room.ts";
+import { PLAN_EDITOR_SECTION_PRESENTATION } from "../plan-editor-section.ts";
 
 const cardStyle = css`
-  background-color: var(--background);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 16px;
+  margin-bottom: 20px;
   border: 1px solid var(--border);
-  margin-bottom: 16px;
+  border-radius: 16px;
+  background-color: var(--surface-content);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+
+  @media (min-width: 390px) {
+    padding: 20px;
+  }
 `;
 
 const sectionTitleStyle = css`
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--foreground);
   margin: 0;
+  color: var(--foreground);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
 `;
 
-const accItemStyle = css`
-  background-color: var(--surface-subtle);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+const itemListStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
 `;
 
+const accItemStyle = css`
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background-color: var(--surface-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+`;
+
 const accHeaderStyle = css`
+  min-width: 0;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
 `;
 
 const accCityBadgeStyle = css`
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--info);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
   background-color: var(--info-muted);
-  padding: 4px 8px;
-  border-radius: 6px;
+  color: var(--info);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 `;
 
-const fieldRowStyle = css`
+const fieldStyle = css`
+  min-width: 0;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: center;
 `;
 
 const fieldLabelStyle = css`
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--foreground-muted);
-  margin-bottom: 4px;
   display: block;
+  color: var(--foreground-muted);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
 `;
 
 const inputStyle = css`
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-strong);
-  font-size: 13px;
-  outline: none;
-  background-color: var(--background);
-  color: var(--foreground);
+  min-width: 0;
+  min-height: var(--touch-target-min);
   box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  outline: none;
+  background-color: var(--surface-content);
+  color: var(--foreground);
+  font-size: 16px;
+  line-height: 1.5;
+  transition: border-color var(--motion-duration-fast)
+    var(--motion-ease-standard);
 
-  &:focus {
+  &:focus-visible {
     border-color: var(--primary);
   }
 `;
 
 const selectStyle = css`
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  box-sizing: border-box;
   padding: 10px 12px;
-  border-radius: 8px;
   border: 1px solid var(--border-strong);
-  font-size: 13px;
+  border-radius: 10px;
   outline: none;
-  background-color: var(--background);
+  background-color: var(--surface-content);
   color: var(--foreground);
+  font-size: 16px;
+  line-height: 1.5;
+
+  &:focus-visible {
+    border-color: var(--primary);
+  }
 `;
 
 const checkboxLabelStyle = css`
+  min-height: var(--touch-target-min);
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 10px;
   color: var(--foreground-muted);
+  font-size: 16px;
+  line-height: 1.5;
   cursor: pointer;
+
+  input {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    accent-color: var(--primary);
+  }
+`;
+
+const responsiveGridStyle = css`
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+
+  @media (min-width: 390px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 `;
 
 const removeBtnStyle = css`
-  background: none;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: 8px 10px;
   border: none;
-  color: var(--border-stronger);
-  font-size: 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--foreground-muted);
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard);
 
   &:hover {
+    background-color: var(--destructive-muted);
     color: var(--destructive);
   }
 `;
 
 const addAccButtonStyle = css`
+  width: 100%;
+  min-height: var(--touch-target-min);
   padding: 10px 14px;
   border: 1px dashed var(--primary-border);
-  background-color: var(--info-muted);
   border-radius: 10px;
+  background-color: var(--info-muted);
   color: var(--info);
+  font-size: 16px;
   font-weight: 600;
-  font-size: 13px;
+  line-height: 1.5;
   cursor: pointer;
+  transition: background-color var(--motion-duration-fast)
+    var(--motion-ease-standard);
 
   &:hover {
     background-color: var(--primary-muted);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
@@ -150,16 +233,18 @@ export function AccommodationSection({
   };
 
   return (
-    <section css={cardStyle}>
-      <h2 css={sectionTitleStyle}>숙소 체류 구간</h2>
+    <section css={cardStyle} data-galanda-surface="content">
+      <h2 css={sectionTitleStyle}>
+        {PLAN_EDITOR_SECTION_PRESENTATION.accommodation.sectionHeading}
+      </h2>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div css={itemListStyle}>
         {accommodations.map((acc, idx) => (
           <div key={acc.id} css={accItemStyle}>
             <div css={accHeaderStyle}>
-              <span css={accCityBadgeStyle}>
+              <h3 css={accCityBadgeStyle}>
                 구간 {idx + 1} · {acc.city} ({acc.nights}박)
-              </span>
+              </h3>
               {accommodations.length > 1 && (
                 <button
                   type="button"
@@ -172,7 +257,7 @@ export function AccommodationSection({
               )}
             </div>
 
-            <div>
+            <div css={fieldStyle}>
               <label css={fieldLabelStyle} htmlFor={`${acc.id}-hotel-name`}>
                 숙소명 / 호텔명
               </label>
@@ -181,29 +266,32 @@ export function AccommodationSection({
                 type="text"
                 placeholder="예: 그랜드 조선 호텔 제주"
                 value={acc.hotelName}
-                onChange={(e) => onUpdate(acc.id, { hotelName: e.target.value, isSearching: false })}
+                onChange={(e) =>
+                  onUpdate(acc.id, {
+                    hotelName: e.target.value,
+                    isSearching: false,
+                  })
+                }
                 css={inputStyle}
               />
             </div>
 
-            <div css={fieldRowStyle}>
-              <label css={checkboxLabelStyle}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(acc.isSearching)}
-                  onChange={(e) =>
-                    onUpdate(acc.id, {
-                      isSearching: e.target.checked,
-                      hotelName: e.target.checked ? "" : acc.hotelName,
-                    })
-                  }
-                />
-                숙소 찾는 중 (미정)
-              </label>
-            </div>
+            <label css={checkboxLabelStyle}>
+              <input
+                type="checkbox"
+                checked={Boolean(acc.isSearching)}
+                onChange={(e) =>
+                  onUpdate(acc.id, {
+                    isSearching: e.target.checked,
+                    hotelName: e.target.checked ? "" : acc.hotelName,
+                  })
+                }
+              />
+              숙소 찾는 중 (미정)
+            </label>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div>
+            <div css={responsiveGridStyle}>
+              <div css={fieldStyle}>
                 <label css={fieldLabelStyle} htmlFor={`${acc.id}-price-min`}>
                   예상 최소 금액(원)
                 </label>
@@ -215,16 +303,20 @@ export function AccommodationSection({
                   min="0"
                   value={acc.priceRange?.min ?? ""}
                   onChange={(e) => {
-                    if (!e.target.value) return onUpdate(acc.id, { priceRange: undefined });
+                    if (!e.target.value)
+                      return onUpdate(acc.id, { priceRange: undefined });
                     const min = Number(e.target.value);
                     onUpdate(acc.id, {
-                      priceRange: { min, max: Math.max(min, acc.priceRange?.max ?? min) },
+                      priceRange: {
+                        min,
+                        max: Math.max(min, acc.priceRange?.max ?? min),
+                      },
                     });
                   }}
                   css={inputStyle}
                 />
               </div>
-              <div>
+              <div css={fieldStyle}>
                 <label css={fieldLabelStyle} htmlFor={`${acc.id}-price-max`}>
                   예상 최대 금액(원)
                 </label>
@@ -236,10 +328,14 @@ export function AccommodationSection({
                   min="0"
                   value={acc.priceRange?.max ?? ""}
                   onChange={(e) => {
-                    if (!e.target.value) return onUpdate(acc.id, { priceRange: undefined });
+                    if (!e.target.value)
+                      return onUpdate(acc.id, { priceRange: undefined });
                     const max = Number(e.target.value);
                     onUpdate(acc.id, {
-                      priceRange: { min: Math.min(acc.priceRange?.min ?? max, max), max },
+                      priceRange: {
+                        min: Math.min(acc.priceRange?.min ?? max, max),
+                        max,
+                      },
                     });
                   }}
                   css={inputStyle}
@@ -247,17 +343,23 @@ export function AccommodationSection({
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div>
-                <label css={fieldLabelStyle} htmlFor={`${acc.id}-booking-status`}>
+            <div css={responsiveGridStyle}>
+              <div css={fieldStyle}>
+                <label
+                  css={fieldLabelStyle}
+                  htmlFor={`${acc.id}-booking-status`}
+                >
                   예약 상태
                 </label>
                 <select
                   id={`${acc.id}-booking-status`}
                   value={acc.bookingStatus}
-                  onChange={(e) => onUpdate(acc.id, { bookingStatus: e.target.value as BookingStatus })}
+                  onChange={(e) =>
+                    onUpdate(acc.id, {
+                      bookingStatus: e.target.value as BookingStatus,
+                    })
+                  }
                   css={selectStyle}
-                  style={{ width: "100%" }}
                 >
                   <option value="AVAILABLE">예약 가능</option>
                   <option value="NEED_CHECK">확인 필요</option>
@@ -266,7 +368,7 @@ export function AccommodationSection({
                 </select>
               </div>
 
-              <div>
+              <div css={fieldStyle}>
                 <label css={fieldLabelStyle} htmlFor={`${acc.id}-booking-url`}>
                   예약 링크 (선택)
                 </label>
@@ -275,7 +377,9 @@ export function AccommodationSection({
                   type="url"
                   placeholder="https://"
                   value={acc.bookingUrl || ""}
-                  onChange={(e) => onUpdate(acc.id, { bookingUrl: e.target.value })}
+                  onChange={(e) =>
+                    onUpdate(acc.id, { bookingUrl: e.target.value })
+                  }
                   css={inputStyle}
                 />
               </div>
@@ -283,7 +387,14 @@ export function AccommodationSection({
           </div>
         ))}
 
-        <button type="button" disabled={routes.length === 0 || accommodations.length >= routes.length} onClick={handleAddNew} css={addAccButtonStyle}>
+        <button
+          type="button"
+          disabled={
+            routes.length === 0 || accommodations.length >= routes.length
+          }
+          onClick={handleAddNew}
+          css={addAccButtonStyle}
+        >
           + 숙소 구간 추가
         </button>
       </div>

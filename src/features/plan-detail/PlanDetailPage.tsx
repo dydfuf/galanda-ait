@@ -50,8 +50,6 @@ import {
   trackRecommendationEvent,
 } from "../common/recommendation.ts";
 
-type PlanSheet = "cost" | "details" | "actions" | null;
-
 const getPlanBadgeVariant = (
   isConfirmed: boolean,
   planTag: string
@@ -71,8 +69,10 @@ export function PlanDetailPage(): JSX.Element {
   const submitOpinionMutation = useSubmitOpinionMutation();
   const deletePlanMutation = useDeletePlanMutation();
   const [isOpinionSheetOpen, setIsOpinionSheetOpen] = useState(false);
-  const [sheet, setSheet] = useState<PlanSheet>(null);
+  const [isManagementDrawerOpen, setIsManagementDrawerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [opinionError, setOpinionError] = useState<string>();
+  const [deleteError, setDeleteError] = useState<string>();
   const [conflictNotice, setConflictNotice] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
   const openedRecommendationId = useRef<string>();
@@ -131,11 +131,12 @@ export function PlanDetailPage(): JSX.Element {
     );
   }
 
-  const isConfirmed = plan.id === room.confirmedPlanId;
-  const isRoomConfirmed = room.isConfirmed;
-  const canChangeOpinion = !isRoomConfirmed;
+  const isConfirmed = plan.isConfirmed;
+  const canChangeOpinion = room.canSubmitOpinion;
   const canManage = Boolean(plan.canManage);
-  // 표시 순서와 한글 label은 REACTION_DISPLAY가 단일 출처다. 이 화면의 조합 문구는 그대로 유지한다.
+  const hasBottomAction = isConfirmed || canChangeOpinion;
+  const durationText =
+    plan.days > 0 ? `${plan.nights}박 ${plan.days}일` : "기간 미정";
   const opinionCounts: Record<ReactionType, number> = {
     LIKE: plan.opinions.likeCount,
     OKAY: plan.opinions.okayCount,
@@ -145,15 +146,36 @@ export function PlanDetailPage(): JSX.Element {
     ({ key, label }) => `${label} ${opinionCounts[key]}`
   ).join(" · ");
   const myReactionLabel = getReactionLabel(plan.myReaction);
-  const myOpinionSummary = myReactionLabel ? `내 의견: ${myReactionLabel}` : "아직 내 의견이 없어요";
+  const myOpinionSummary = myReactionLabel
+    ? `내 의견: ${myReactionLabel}`
+    : canChangeOpinion
+      ? "아직 내 의견이 없어요"
+      : "의견을 열람할 수 있어요";
+
+  const openOpinionSheet = (): void => {
+    if (
+      !canChangeOpinion ||
+      submitOpinionMutation.isPending ||
+      isResolvingConflict
+    )
+      return;
+    setOpinionError(undefined);
+    setIsOpinionSheetOpen(true);
+  };
 
   const handleOpinionSubmit = async (
     reaction: ReactionType,
     reason?: string
   ): Promise<void> => {
-    if (submitOpinionMutation.isPending || isResolvingConflict) return;
+    if (
+      !canChangeOpinion ||
+      submitOpinionMutation.isPending ||
+      isResolvingConflict
+    )
+      return;
 
     setConflictNotice(undefined);
+    setOpinionError(undefined);
     try {
       await submitOpinionMutation.mutateAsync({
         roomId: room.id,
@@ -178,23 +200,31 @@ export function PlanDetailPage(): JSX.Element {
       if (isRevisionConflict(err) || isStateConflict(err)) {
         setIsResolvingConflict(true);
         const refreshed = await refetch();
-        if (isStateConflict(err)) setIsOpinionSheetOpen(false);
         if (refreshed.isError || !refreshed.data) {
-          toast("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
-        } else if (isRevisionConflict(err)) {
-          setConflictNotice(toRevisionConflictMessage(err));
+          setOpinionError(
+            "최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.",
+          );
+        } else if (isStateConflict(err)) {
+          setIsOpinionSheetOpen(false);
+          setConflictNotice(
+            toUserMessage(err, "현재 여행 상태에서는 의견을 바꿀 수 없어요."),
+          );
+        } else {
+          setOpinionError(toRevisionConflictMessage(err));
         }
         setIsResolvingConflict(false);
       } else {
-        toast(toUserMessage(err, "의견을 등록하지 못했습니다."));
+        setOpinionError(toUserMessage(err, "의견을 등록하지 못했습니다."));
       }
     }
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
-    if (deletePlanMutation.isPending || isResolvingConflict) return;
+    if (!canManage || deletePlanMutation.isPending || isResolvingConflict)
+      return;
 
     setConflictNotice(undefined);
+    setDeleteError(undefined);
     try {
       await deletePlanMutation.mutateAsync({
         roomId: room.id,
@@ -204,52 +234,69 @@ export function PlanDetailPage(): JSX.Element {
       setIsDeleteConfirmOpen(false);
       navigate(`/trips/${tripId}/plans`, { replace: true });
     } catch (err: unknown) {
-      setIsDeleteConfirmOpen(false);
       if (isRevisionConflict(err) || isStateConflict(err)) {
         setIsResolvingConflict(true);
         const refreshed = await refetch();
         if (refreshed.isError || !refreshed.data) {
-          toast("최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.");
-        } else if (isRevisionConflict(err)) {
-          setConflictNotice(toRevisionConflictMessage(err));
+          setDeleteError(
+            "최신 여행 상태를 불러오지 못했습니다. 다시 시도해주세요.",
+          );
+        } else if (isStateConflict(err)) {
+          setIsDeleteConfirmOpen(false);
+          setConflictNotice(
+            toUserMessage(
+              err,
+              "현재 여행 상태에서는 이 여행안을 삭제할 수 없어요.",
+            ),
+          );
+        } else {
+          setDeleteError(toRevisionConflictMessage(err));
         }
         setIsResolvingConflict(false);
       } else {
-        toast(toUserMessage(err, "여행안 삭제에 실패했습니다."));
+        setDeleteError(toUserMessage(err, "여행안 삭제에 실패했습니다."));
       }
     }
   };
 
   return (
-    <PageBody withBottomAction className="mx-auto box-border w-full max-w-[640px] px-5">
-      {/* 헤더: 여행안 제목 + 태그/메타 + 관리 action */}
-      <div className="flex items-start justify-between gap-3 py-2">
-        <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="text-[22px] leading-tight font-bold text-foreground">{plan.title}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={getPlanBadgeVariant(isConfirmed, plan.planTag)}>
-              {isConfirmed ? "확정안" : plan.planTagLabel}
-            </Badge>
-            <span className="text-[13px] text-muted-foreground">
-              제안자 {plan.authorName} · {plan.period} · {plan.nights}박 {plan.days}일
-            </span>
+    <PageBody withBottomAction={hasBottomAction}>
+      <header className="bg-surface-content px-(--app-inline-padding) pb-5">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <h1 className="min-w-0 text-2xl leading-tight font-bold text-foreground [overflow-wrap:anywhere]">
+              {plan.title}
+            </h1>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge variant={getPlanBadgeVariant(isConfirmed, plan.planTag)}>
+                {isConfirmed ? "확정안" : plan.planTagLabel}
+              </Badge>
+              <span className="min-w-0 text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+                제안자 {plan.authorName} · {plan.period} · {durationText}
+              </span>
+            </div>
           </div>
+          {canManage && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="shrink-0 text-primary"
+              onClick={() => setIsManagementDrawerOpen(true)}
+            >
+              더보기
+            </Button>
+          )}
         </div>
-        {canManage && (
-          <Button
-            type="button"
-            variant="ghost"
-            className="shrink-0 text-primary"
-            onClick={() => setSheet("actions")}
-          >
-            더보기
-          </Button>
-        )}
-      </div>
+      </header>
 
       {conflictNotice && (
-        <section className="mb-4 rounded-xl border border-warning-border bg-warning-muted p-4" role="alert">
-          <p className="text-sm leading-normal text-foreground">{conflictNotice}</p>
+        <section
+          className="mx-(--app-inline-padding) mb-4 rounded-xl border border-warning-border bg-warning-muted p-4"
+          role="alert"
+        >
+          <p className="text-base leading-relaxed text-foreground">
+            {conflictNotice}
+          </p>
           <Button
             type="button"
             size="sm"
@@ -262,66 +309,137 @@ export function PlanDetailPage(): JSX.Element {
         </section>
       )}
 
-      <section className="flex flex-col gap-4 px-1 pt-1 pb-5" aria-label="여행안 요약">
-        <RouteRail route={plan.route} differenceSummary={plan.differenceSummary} />
+      <SectionHeader
+        title="여행안 요약"
+        description="제안된 경로와 다른 안과의 차이를 확인하세요."
+      />
+      <section
+        className="flex min-w-0 flex-col gap-4 bg-surface-content px-(--app-inline-padding) pb-5"
+        aria-label="여행안 요약 내용"
+      >
+        {plan.route.length > 0 ? (
+          <RouteRail
+            route={plan.route}
+            differenceSummary={plan.differenceSummary}
+          />
+        ) : (
+          <p className="text-base leading-relaxed text-muted-foreground">
+            경로 미정
+          </p>
+        )}
         {plan.proposalReason && (
-          <p className="text-sm leading-normal text-muted-foreground">“{plan.proposalReason}”</p>
+          <blockquote className="min-w-0 border-l-2 border-primary-border pl-3 text-base leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+            “{plan.proposalReason}”
+          </blockquote>
         )}
       </section>
 
-      <MobileList aria-label="여행안 핵심 정보">
+      <SectionHeader
+        title="예상 경비"
+        description="입력된 가격만 합산하며 미정 항목은 별도로 표시해요."
+      />
+      <MobileList aria-label="예상 경비 상세" className="bg-surface-content">
         <MobileListItem
-          chevron
-          className="px-2"
-          onClick={() => setSheet("cost")}
-          aria-label={`예상 경비, ${plan.perPersonCostText}`}
           trailing={
-            <span className="max-w-[150px] text-right text-[13px] font-bold whitespace-normal text-secondary-foreground">
+            <span className="text-right text-base font-bold text-foreground">
+              {plan.groupCostText}
+            </span>
+          }
+        >
+          <ItemTitle>그룹 예상액</ItemTitle>
+          <ItemDescription>
+            숙소와 교통에 입력된 그룹 금액 합계예요.
+          </ItemDescription>
+        </MobileListItem>
+        <MobileListItem
+          trailing={
+            <span className="text-right text-base font-bold text-foreground">
               {plan.perPersonCostText}
             </span>
           }
         >
-          <ItemTitle>예상 경비</ItemTitle>
-          <ItemDescription>{plan.groupCostText}</ItemDescription>
+          <ItemTitle>1인 예상 참고액</ItemTitle>
+          <ItemDescription>
+            여행안의 기준 인원으로 나눈 금액이에요.
+          </ItemDescription>
         </MobileListItem>
+        {plan.costSummary.unpricedCount > 0 && (
+          <MobileListItem
+            trailing={
+              <Badge variant="warning">
+                {plan.costSummary.unpricedCount}건 미정
+              </Badge>
+            }
+          >
+            <ItemTitle>가격 확인 상태</ItemTitle>
+            <ItemDescription>
+              가격이 없는 항목은 합계에 포함하지 않았어요.
+            </ItemDescription>
+          </MobileListItem>
+        )}
+      </MobileList>
 
+      <SectionHeader
+        title="숙소·교통"
+        description="예약 상태와 입력된 상세 정보를 일정 순서로 확인하세요."
+      />
+      <div className="bg-surface-content">
         <BookingRiskSummary
           items={plan.bookingRisks}
           hasDetails={plan.timelineItems.length > 0}
-          onClick={() => setSheet("details")}
         />
+        <DetailTimeline items={plan.timelineItems} />
+      </div>
 
+      <SectionHeader
+        title="참여자 의견"
+        description={
+          canChangeOpinion
+            ? "내 의견은 언제든 다시 저장할 수 있어요."
+            : "현재 의견 현황을 확인하세요."
+        }
+      />
+      <MobileList aria-label="참여자 의견" className="bg-surface-content">
         <MobileListItem
           chevron={canChangeOpinion}
-          className="px-2"
-          onClick={canChangeOpinion ? () => setIsOpinionSheetOpen(true) : undefined}
+          onClick={canChangeOpinion ? openOpinionSheet : undefined}
           aria-label={`참여자 의견, ${opinionSummary}. ${myOpinionSummary}`}
           trailing={
-            <span className="max-w-[150px] text-right text-[13px] whitespace-normal text-muted-foreground">
-              {opinionSummary}
-            </span>
+            <div className="flex max-w-full flex-wrap justify-end gap-1">
+              {REACTION_DISPLAY.map(({ key, label }) => (
+                <Badge key={key} variant="neutral">
+                  {label} {opinionCounts[key]}
+                </Badge>
+              ))}
+            </div>
           }
         >
           <div aria-live="polite" className="flex min-w-0 flex-col gap-1">
-            <ItemTitle>참여자 의견</ItemTitle>
+            <ItemTitle>의견 현황</ItemTitle>
             <ItemDescription>{myOpinionSummary}</ItemDescription>
           </div>
         </MobileListItem>
       </MobileList>
 
-      {!isRoomConfirmed && (
+      {room.canCreatePlan && (
         <>
-          <SectionHeader className="px-0" title="다른 행동" />
-          <MobileList aria-label="여행안 보조 작업" className="mb-6">
+          <SectionHeader title="다른 행동" />
+          <MobileList
+            aria-label="여행안 보조 작업"
+            className="mb-6 bg-surface-content"
+          >
             <MobileListItem
               chevron
-              className="px-2"
-              onClick={() => navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)}
+              onClick={() =>
+                navigate(`/trips/${tripId}/plans/new?cloneFrom=${plan.id}`)
+              }
             >
               <ItemTitle className="font-normal text-secondary-foreground">
                 다른 구성으로 제안하기
               </ItemTitle>
-              <ItemDescription>이 여행안을 복제해 새 대안을 만들어요.</ItemDescription>
+              <ItemDescription>
+                이 여행안을 복제해 새 대안을 만들어요.
+              </ItemDescription>
             </MobileListItem>
           </MobileList>
         </>
@@ -332,141 +450,148 @@ export function PlanDetailPage(): JSX.Element {
           <Button
             type="button"
             size="xl"
-            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+            onClick={() =>
+              navigate(`/trips/${tripId}/itinerary`, { replace: true })
+            }
           >
             확정 일정 보기
           </Button>
         </BottomAction>
-      ) : isRoomConfirmed ? null : (
+      ) : canChangeOpinion ? (
         <BottomAction>
           <Button
             type="button"
             size="xl"
             disabled={submitOpinionMutation.isPending || isResolvingConflict}
-            onClick={() => setIsOpinionSheetOpen(true)}
+            aria-busy={submitOpinionMutation.isPending || isResolvingConflict}
+            onClick={openOpinionSheet}
           >
             {plan.myReaction ? "내 의견 수정하기" : "내 의견 남기기"}
           </Button>
         </BottomAction>
-      )}
+      ) : null}
 
-      {/* 예상 경비 / 숙소·교통 상세 / 관리 Drawer */}
       <Drawer
-        open={sheet !== null}
+        open={isManagementDrawerOpen}
         onOpenChange={(open) => {
-          if (!open) setSheet(null);
+          if (!open && (deletePlanMutation.isPending || isResolvingConflict))
+            return;
+          setIsManagementDrawerOpen(open);
         }}
         showSwipeHandle
-        // 숙소·교통 상세만 기존 expand 동작(84vh → 94vh)을 유지해요.
-        snapPoints={sheet === "details" ? [0.84, 0.94] : undefined}
-        defaultSnapPoint={sheet === "details" ? 0.84 : undefined}
       >
-        {/*
-          확장이 없던 sheet는 기존 maxHeight 60vh 상한을 유지해요.
-          Drawer 내부의 data-variant sizing 유틸리티보다 우선해야 해서 important를 써요.
-        */}
-        <DrawerContent className={sheet === "details" ? undefined : "max-h-[60vh]!"}>
+        <DrawerContent className="max-h-[60vh]!">
           <DrawerHeader>
             <DrawerTitle className="text-left text-[17px] font-bold">
-              {sheet === "actions" ? "여행안 관리" : sheet === "cost" ? "예상 경비" : "숙소·교통 상세"}
+              여행안 관리
             </DrawerTitle>
             <DrawerDescription className="text-left">
-              {sheet === "actions"
-                ? "작성자만 여행안을 관리할 수 있어요."
-                : sheet === "cost"
-                  ? "여행안에 기록한 예상 비용 스냅샷이에요."
-                  : "숙소·교통 예약 정보와 확인 상태를 살펴보세요."}
+              이 여행안을 관리할 권한이 있는 참여자만 수정하거나 삭제할 수
+              있어요.
             </DrawerDescription>
           </DrawerHeader>
-
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {sheet === "actions" ? (
-              <MobileList aria-label="여행안 관리" className="pb-2">
-                <MobileListItem
-                  chevron
-                  onClick={() => {
-                    setSheet(null);
-                    navigate(`/trips/${tripId}/plans/${plan.id}/edit`);
-                  }}
-                >
-                  <ItemTitle>여행안 수정</ItemTitle>
-                  <ItemDescription>작성한 내용을 고쳐요.</ItemDescription>
-                </MobileListItem>
-                <MobileListItem
-                  onClick={() => {
-                    setSheet(null);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                  aria-label="여행안 삭제"
-                >
-                  <ItemTitle className="text-destructive-strong">여행안 삭제</ItemTitle>
-                  <ItemDescription>삭제 전 한 번 더 확인해요.</ItemDescription>
-                </MobileListItem>
-              </MobileList>
-            ) : sheet === "cost" ? (
-              <MobileList aria-label="예상 경비 상세" className="pb-2">
-                <MobileListItem
-                  trailing={
-                    <span className="text-[15px] font-bold text-foreground">
-                      {plan.groupCostText}
-                    </span>
-                  }
-                >
-                  <p className="text-[15px] text-foreground">그룹 총액</p>
-                </MobileListItem>
-                <MobileListItem
-                  trailing={
-                    <span className="text-[15px] font-bold text-foreground">
-                      {plan.perPersonCostText}
-                    </span>
-                  }
-                >
-                  <p className="text-[15px] text-foreground">1인 예상 참고액</p>
-                </MobileListItem>
-              </MobileList>
-            ) : (
-              <DetailTimeline items={plan.timelineItems} />
-            )}
+          <div className="min-h-0 flex-1 overflow-y-auto bg-surface-raised">
+            <MobileList aria-label="여행안 관리" className="pb-2">
+              <MobileListItem
+                chevron
+                onClick={() => {
+                  setIsManagementDrawerOpen(false);
+                  navigate(`/trips/${tripId}/plans/${plan.id}/edit`);
+                }}
+              >
+                <ItemTitle>여행안 수정</ItemTitle>
+                <ItemDescription>작성한 내용을 고쳐요.</ItemDescription>
+              </MobileListItem>
+              <MobileListItem
+                onClick={() => {
+                  setDeleteError(undefined);
+                  setIsManagementDrawerOpen(false);
+                  setIsDeleteConfirmOpen(true);
+                }}
+                aria-label="여행안 삭제"
+              >
+                <ItemTitle className="text-destructive-strong">
+                  여행안 삭제
+                </ItemTitle>
+                <ItemDescription>삭제 전 결과를 확인해요.</ItemDescription>
+              </MobileListItem>
+            </MobileList>
           </div>
-
           <DrawerFooter>
-            <Button type="button" size="xl" onClick={() => setSheet(null)}>
+            <Button
+              type="button"
+              size="xl"
+              variant="secondary"
+              onClick={() => setIsManagementDrawerOpen(false)}
+            >
               닫기
             </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
 
-      {/* 여행안 삭제 confirm */}
-      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+      <AlertDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && (deletePlanMutation.isPending || isResolvingConflict))
+            return;
+          setIsDeleteConfirmOpen(open);
+          if (!open) setDeleteError(undefined);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>여행안을 삭제할까요?</AlertDialogTitle>
             <AlertDialogDescription>
-              '{plan.title}' 여행안과 작성한 내용이 삭제됩니다.
+              ‘{plan.title}’ 여행안과 작성한 내용이 영구 삭제되며 되돌릴 수
+              없어요.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && (
+            <p
+              role="alert"
+              className="text-base leading-relaxed text-destructive-strong"
+            >
+              {deleteError}
+            </p>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletePlanMutation.isPending || isResolvingConflict}>취소</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={deletePlanMutation.isPending || isResolvingConflict}
+            >
+              취소
+            </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={deletePlanMutation.isPending || isResolvingConflict}
+              aria-busy={deletePlanMutation.isPending || isResolvingConflict}
               onClick={() => void handleConfirmDelete()}
             >
-              {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}
+              {deletePlanMutation.isPending || isResolvingConflict
+                ? "삭제 중..."
+                : "영구 삭제하기"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <OpinionBottomSheet
-        isOpen={isOpinionSheetOpen}
-        onClose={() => setIsOpinionSheetOpen(false)}
-        initialReaction={plan.myReaction as ReactionType | undefined}
-        initialReason={plan.myOpinionReason ?? ""}
-        isSubmitting={submitOpinionMutation.isPending || isResolvingConflict}
-        onSubmit={(reaction, reason) => void handleOpinionSubmit(reaction, reason)}
-      />
+      {canChangeOpinion && (
+        <OpinionBottomSheet
+          isOpen={isOpinionSheetOpen}
+          onClose={() => {
+            if (submitOpinionMutation.isPending || isResolvingConflict) return;
+            setIsOpinionSheetOpen(false);
+            setOpinionError(undefined);
+          }}
+          initialReaction={plan.myReaction as ReactionType | undefined}
+          initialReason={plan.myOpinionReason ?? ""}
+          errorMessage={opinionError}
+          isSubmitting={submitOpinionMutation.isPending || isResolvingConflict}
+          onSubmit={(reaction, reason) =>
+            void handleOpinionSubmit(reaction, reason)
+          }
+        />
+      )}
     </PageBody>
   );
 }

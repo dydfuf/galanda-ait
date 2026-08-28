@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { Result } from "effect";
-import { decodeRouteParams, CompareQuerySchema, TripParamsSchema } from "../../app/routes/route-params.ts";
+import {
+  CompareQuerySchema,
+  decodeRouteParams,
+  TripParamsSchema,
+} from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import {
   isRevisionConflict,
@@ -13,7 +22,10 @@ import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
-import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import {
+  MobileList,
+  MobileListItem,
+} from "@/components/galanda/mobile-list.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -42,8 +54,9 @@ import {
 
 const getPlanBadgeVariant = (
   planTag: string,
-  isConfirmed: boolean
-): "info" | "success" | "neutral" => (isConfirmed ? "success" : planTag === "BASIC" ? "info" : "neutral");
+  isConfirmed: boolean,
+): "info" | "success" | "neutral" =>
+  isConfirmed ? "success" : planTag === "BASIC" ? "info" : "neutral";
 
 export function PlanComparePage() {
   const params = useParams();
@@ -52,7 +65,9 @@ export function PlanComparePage() {
   const location = useLocation();
 
   const tripValidated = decodeRouteParams(TripParamsSchema, params);
-  const tripId = Result.isSuccess(tripValidated) ? tripValidated.success.tripId : "";
+  const tripId = Result.isSuccess(tripValidated)
+    ? tripValidated.success.tripId
+    : "";
   const leftParam = searchParams.get("left");
   const rightParam = searchParams.get("right");
   const queryValidated = decodeRouteParams(CompareQuerySchema, {
@@ -60,13 +75,21 @@ export function PlanComparePage() {
     right: rightParam,
   });
 
-  const { data: room, isLoading, isError, error, refetch } = useTripRoomDetailQuery(tripId);
+  const {
+    data: room,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
-  const [pickerTarget, setPickerTarget] = useState<"left" | "right" | null>(null);
+  const [pickerTarget, setPickerTarget] = useState<"left" | "right" | null>(
+    null,
+  );
   const completedRecommendationId = useRef<string>();
   const recommendationAction = getRecommendationActionContext(location.state);
   const isComparisonReady = Boolean(
@@ -101,14 +124,21 @@ export function PlanComparePage() {
   }
 
   if (isLoading) {
-    return <PageState status="loading" message="비교 정보를 불러오는 중이에요." />;
+    return (
+      <PageState status="loading" message="비교 정보를 불러오는 중이에요." />
+    );
   }
 
   if (isError || !room) {
     return (
       <RouteErrorFallback
         title="여행 정보를 찾을 수 없습니다"
-        message={toUserMessage(error, "요청한 여행방의 정보를 불러올 수 없습니다.")}
+        message={toUserMessage(
+          error,
+          "요청한 여행방의 정보를 불러올 수 없습니다.",
+        )}
+        actionText="다시 시도"
+        onAction={() => void refetch()}
       />
     );
   }
@@ -148,11 +178,14 @@ export function PlanComparePage() {
     confirmedPlanTitle: room.confirmedPlanTitle,
   });
   const isSelectionLocked = confirmState.kind === "LOCKED";
-  const confirmedInPair = [leftPlan, rightPlan].find((plan) => plan.id === room.confirmedPlanId);
+  const confirmedInPair = [leftPlan, rightPlan].find(
+    (plan) => plan.id === room.confirmedPlanId,
+  );
   const currentSelectedId = isSelectionLocked
     ? confirmedInPair?.id
-    : selectedPlanId ?? leftPlan.id;
-  const selectedPlan = currentSelectedId === rightPlan.id ? rightPlan : leftPlan;
+    : (selectedPlanId ?? leftPlan.id);
+  const selectedPlan =
+    currentSelectedId === rightPlan.id ? rightPlan : leftPlan;
   const differences = buildPlanCompareDifferences(leftPlan, rightPlan);
   const pageSubtitle =
     confirmState.kind === "LOCKED"
@@ -162,7 +195,14 @@ export function PlanComparePage() {
         : "두 여행안의 핵심 구성이 같아요. 마음에 드는 안을 선택하세요.";
 
   const openConfirmSheet = (): void => {
-    if (!canSubmitConfirm({ state: confirmState, isPending: confirmPlanMutation.isPending || isResolvingConflict })) return;
+    if (
+      !canSubmitConfirm({
+        state: confirmState,
+        isPending: confirmPlanMutation.isPending || isResolvingConflict,
+      })
+    ) {
+      return;
+    }
     setIsConfirmSheetOpen(true);
   };
 
@@ -192,34 +232,44 @@ export function PlanComparePage() {
         setIsResolvingConflict(true);
         const refreshed = await refetch();
         if (refreshed.isError || !refreshed.data) {
-          setConfirmError("최신 여행 상태를 불러오지 못했어요. 다시 시도해주세요.");
+          setConfirmError(
+            "최신 여행 상태를 불러오지 못했어요. 다시 시도해주세요.",
+          );
         } else if (isRevisionConflict(err)) {
           setConfirmError(toRevisionConflictMessage(err));
         }
         setIsResolvingConflict(false);
       } else {
-        setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요."));
+        setConfirmError(
+          toUserMessage(
+            err,
+            "일정을 확정하지 못했어요. 잠시 후 다시 시도해주세요.",
+          ),
+        );
       }
     }
   };
 
   return (
-    <PageBody withBottomAction={confirmState.kind !== "VIEW_ONLY"} className="mx-auto max-w-[640px]">
+    <PageBody withBottomAction={confirmState.kind !== "VIEW_ONLY"}>
       <PageTitle title="어떤 여행안이 더 좋나요?" description={pageSubtitle} />
 
       {confirmState.kind === "LOCKED" && (
-        <section aria-label="확정 상태" className="mb-6 px-(--app-inline-padding)">
-          <div className="flex items-start gap-2.5 py-2">
+        <section
+          aria-label="확정 상태"
+          className="mb-6 px-(--app-inline-padding)"
+        >
+          <div className="flex min-w-0 items-start gap-2.5 py-2">
             <Badge variant="success" className="mt-0.5 shrink-0">
               확정됨
             </Badge>
             <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-[15px] font-bold text-foreground">
+              <p className="text-base leading-relaxed font-bold text-foreground [overflow-wrap:anywhere]">
                 {confirmState.confirmedPlanTitle
                   ? `'${confirmState.confirmedPlanTitle}'(으)로 일정이 확정되었어요.`
                   : "이미 일정이 확정된 여행이에요."}
               </p>
-              <p className="text-[13px] text-muted-foreground">
+              <p className="text-base leading-relaxed text-muted-foreground">
                 확정 일정에서 날짜별 여행을 확인할 수 있어요.
               </p>
             </div>
@@ -228,14 +278,19 @@ export function PlanComparePage() {
       )}
 
       {confirmState.kind === "VIEW_ONLY" && (
-        <section aria-label="확정 권한 안내" className="mb-6 px-(--app-inline-padding)">
-          <div className="flex items-start gap-2.5 py-2">
+        <section
+          aria-label="확정 권한 안내"
+          className="mb-6 px-(--app-inline-padding)"
+        >
+          <div className="flex min-w-0 items-start gap-2.5 py-2">
             <Badge variant="info" className="mt-0.5 shrink-0">
               참여자
             </Badge>
             <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-[15px] font-bold text-foreground">여행안 확정은 방장이 진행해요.</p>
-              <p className="text-[13px] text-muted-foreground">
+              <p className="text-base leading-relaxed font-bold text-foreground">
+                여행안 확정은 방장이 진행해요.
+              </p>
+              <p className="text-base leading-relaxed text-muted-foreground">
                 비교 결과를 보고 마음에 드는 안을 선택해보세요.
               </p>
             </div>
@@ -246,17 +301,19 @@ export function PlanComparePage() {
       <SectionHeader
         title="여행안 선택"
         description={
-          isSelectionLocked ? "확정된 여행안은 다시 선택할 수 없어요." : "아래 선택이 마지막 확정 버튼에 반영돼요."
+          isSelectionLocked
+            ? "확정된 여행안은 다시 선택할 수 없어요."
+            : "아래 선택이 마지막 확정 버튼에 반영돼요."
         }
       />
 
       {room.plans.length > 2 && !isSelectionLocked && (
-        <div className="mb-4 flex gap-2 px-(--app-inline-padding)">
+        <div className="mb-4 flex min-w-0 gap-2 px-(--app-inline-padding)">
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="flex-1"
+            className="min-w-0 flex-1 whitespace-normal"
             aria-label="왼쪽 비교 대상 바꾸기"
             onClick={() => setPickerTarget("left")}
           >
@@ -266,7 +323,7 @@ export function PlanComparePage() {
             type="button"
             size="sm"
             variant="outline"
-            className="flex-1"
+            className="min-w-0 flex-1 whitespace-normal"
             aria-label="오른쪽 비교 대상 바꾸기"
             onClick={() => setPickerTarget("right")}
           >
@@ -280,47 +337,64 @@ export function PlanComparePage() {
         className="mb-7 gap-0 divide-y divide-border"
         value={currentSelectedId ?? ""}
         onValueChange={(value) => {
-          if (!isSelectionLocked && typeof value === "string") setSelectedPlanId(value);
+          if (!isSelectionLocked && typeof value === "string") {
+            setSelectedPlanId(value);
+          }
         }}
         disabled={isSelectionLocked}
       >
         {[leftPlan, rightPlan].map((plan) => {
           const isSelected = currentSelectedId === plan.id;
-          const planVariant = getPlanBadgeVariant(plan.planTag, plan.isConfirmed);
+          const planVariant = getPlanBadgeVariant(
+            plan.planTag,
+            plan.isConfirmed,
+          );
+          const optionLabelId = `plan-compare-option-${plan.id}`;
 
           return (
             <label
               key={plan.id}
               className={
-                "flex! w-full items-start gap-3 px-(--app-inline-padding) py-3.5 " +
+                "flex! min-w-0 w-full items-start gap-3 px-(--app-inline-padding) py-3.5 " +
                 (isSelectionLocked
                   ? "opacity-70"
                   : "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted")
               }
             >
+              <span id={optionLabelId} className="sr-only">
+                {plan.title} 선택
+              </span>
               <RadioGroupItem
                 value={plan.id}
-                aria-label={`${plan.title} 선택`}
+                aria-labelledby={optionLabelId}
                 className="mt-1 size-5"
               />
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div>
-                  <Badge variant={isSelected ? (plan.isConfirmed ? "success-solid" : planVariant === "info" ? "info-solid" : "neutral-solid") : planVariant}>
-                    {plan.isConfirmed ? "확정안" : plan.planTagLabel}
-                  </Badge>
-                </div>
-                <span className="min-w-0 text-[17px] font-bold break-keep text-foreground">
+              <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+                <Badge
+                  variant={
+                    isSelected
+                      ? plan.isConfirmed
+                        ? "success-solid"
+                        : planVariant === "info"
+                          ? "info-solid"
+                          : "neutral-solid"
+                      : planVariant
+                  }
+                >
+                  {plan.isConfirmed ? "확정안" : plan.planTagLabel}
+                </Badge>
+                <span className="min-w-0 text-lg leading-snug font-bold text-foreground [overflow-wrap:anywhere]">
                   {plan.title}
                 </span>
-                <span className="text-[13px] text-muted-foreground">
+                <span className="min-w-0 text-base leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
                   {plan.authorName} 제안{isSelected ? " · 현재 선택" : ""}
                 </span>
-              </div>
-              <div className="flex max-w-[132px] shrink-0 flex-col items-end gap-1">
-                <span className="text-right text-[13px] text-muted-foreground">
+                <span className="min-w-0 text-base leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
                   {plan.perPersonCostText}
                 </span>
-                {isSelectionLocked && isSelected && <Badge variant="success">확정 결과</Badge>}
+                {isSelectionLocked && isSelected && (
+                  <Badge variant="success">확정 결과</Badge>
+                )}
               </div>
             </label>
           );
@@ -340,27 +414,31 @@ export function PlanComparePage() {
         <MobileList aria-label="여행안이 다른 항목" className="mb-7">
           {differences.map((difference) => (
             <MobileListItem key={difference.kind}>
-              <ItemTitle>{difference.label}</ItemTitle>
-              <div className="flex flex-col gap-2 pt-1.5">
-                <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-start gap-2">
-                  <span className="text-xs leading-relaxed font-bold text-muted-foreground">
+              <h3 className="text-base font-semibold text-foreground">
+                {difference.label}
+              </h3>
+              <div className="flex min-w-0 flex-col gap-3 pt-1.5">
+                <div className="flex min-w-0 flex-col items-start gap-1">
+                  <span className="text-base leading-relaxed font-bold text-muted-foreground">
                     {difference.leftPlanLabel}
                   </span>
-                  <span className="min-w-0 text-[13px] break-words text-secondary-foreground">
+                  <span className="min-w-0 text-base leading-relaxed text-secondary-foreground [overflow-wrap:anywhere]">
                     {difference.leftValue}
                   </span>
                 </div>
-                <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-start gap-2">
-                  <span className="text-xs leading-relaxed font-bold text-muted-foreground">
+                <div className="flex min-w-0 flex-col items-start gap-1">
+                  <span className="text-base leading-relaxed font-bold text-muted-foreground">
                     {difference.rightPlanLabel}
                   </span>
-                  <span className="min-w-0 text-[13px] break-words text-secondary-foreground">
+                  <span className="min-w-0 text-base leading-relaxed text-secondary-foreground [overflow-wrap:anywhere]">
                     {difference.rightValue}
                   </span>
                 </div>
               </div>
               {difference.deltaText && (
-                <span className="pt-1 text-xs font-bold text-info">{difference.deltaText}</span>
+                <span className="pt-1 text-base leading-relaxed font-bold text-info">
+                  {difference.deltaText}
+                </span>
               )}
             </MobileListItem>
           ))}
@@ -368,8 +446,12 @@ export function PlanComparePage() {
       ) : (
         <MobileList aria-label="여행안이 같은 항목" className="mb-7">
           <MobileListItem trailing={<Badge variant="success">차이 없음</Badge>}>
-            <ItemTitle>핵심 구성은 같아요</ItemTitle>
-            <ItemDescription>같은 항목은 접어두고 선택만 쉽게 했어요.</ItemDescription>
+            <h3 className="text-base font-semibold text-foreground">
+              핵심 구성은 같아요
+            </h3>
+            <ItemDescription className="text-base">
+              같은 항목은 접어두고 선택만 쉽게 했어요.
+            </ItemDescription>
           </MobileListItem>
         </MobileList>
       )}
@@ -379,7 +461,9 @@ export function PlanComparePage() {
           <Button
             type="button"
             size="xl"
-            onClick={() => navigate(`/trips/${tripId}/itinerary`, { replace: true })}
+            onClick={() =>
+              navigate(`/trips/${tripId}/itinerary`, { replace: true })
+            }
           >
             확정 일정 보기
           </Button>
@@ -390,7 +474,10 @@ export function PlanComparePage() {
         <BottomAction
           accessory={
             confirmError ? (
-              <span role="alert" className="block text-center text-[13px] leading-relaxed text-destructive-strong">
+              <span
+                role="alert"
+                className="block text-center text-base leading-relaxed text-destructive-strong"
+              >
                 {confirmError}
               </span>
             ) : undefined
@@ -400,6 +487,11 @@ export function PlanComparePage() {
             type="button"
             size="xl"
             disabled={confirmPlanMutation.isPending || isResolvingConflict}
+            aria-busy={
+              confirmPlanMutation.isPending || isResolvingConflict
+                ? "true"
+                : undefined
+            }
             onClick={openConfirmSheet}
           >
             {confirmPlanMutation.isPending
@@ -409,56 +501,77 @@ export function PlanComparePage() {
         </BottomAction>
       )}
 
-      {/* 비교 대상 변경 Drawer: 3개 이상일 때 명시적 2개 선택 */}
-      <Drawer open={pickerTarget !== null} onOpenChange={(open) => { if (!open) setPickerTarget(null); }} showSwipeHandle>
+      <Drawer
+        open={pickerTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setPickerTarget(null);
+        }}
+        showSwipeHandle
+      >
         <DrawerContent>
           <DrawerHeader>
             <DrawerTitle className="text-left text-[17px] font-bold">
-              {pickerTarget === "left" ? "왼쪽 여행안 선택" : "오른쪽 여행안 선택"}
+              {pickerTarget === "left"
+                ? "왼쪽 여행안 선택"
+                : "오른쪽 여행안 선택"}
             </DrawerTitle>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <MobileList aria-label="비교 대상 후보">
               {room.plans
-                .filter((plan) => pickerTarget === "left" ? plan.id !== right : plan.id !== left)
+                .filter((plan) =>
+                  pickerTarget === "left"
+                    ? plan.id !== right
+                    : plan.id !== left,
+                )
                 .map((plan) => (
                   <MobileListItem
                     key={plan.id}
                     aria-label={`${plan.title} 선택`}
                     onClick={() => {
                       const nextLeft = pickerTarget === "left" ? plan.id : left;
-                      const nextRight = pickerTarget === "right" ? plan.id : right;
+                      const nextRight =
+                        pickerTarget === "right" ? plan.id : right;
                       setPickerTarget(null);
                       setSelectedPlanId(null);
-                      navigate(`/trips/${tripId}/plans/compare?left=${nextLeft}&right=${nextRight}`, {
-                        state: recommendationAction
-                          ? { nbaRecommendation: recommendationAction }
-                          : undefined,
-                      });
+                      navigate(
+                        `/trips/${tripId}/plans/compare?left=${nextLeft}&right=${nextRight}`,
+                        {
+                          state: recommendationAction
+                            ? { nbaRecommendation: recommendationAction }
+                            : undefined,
+                        },
+                      );
                     }}
                   >
                     <ItemTitle>{plan.title}</ItemTitle>
-                    <ItemDescription>
-                      {plan.planTagLabel} · {plan.authorName} 제안 · {plan.nights}박 {plan.days}일
+                    <ItemDescription className="text-base">
+                      {plan.planTagLabel} · {plan.authorName} 제안 ·{" "}
+                      {plan.nights}박 {plan.days}일
                     </ItemDescription>
                   </MobileListItem>
                 ))}
             </MobileList>
           </div>
           <DrawerFooter>
-            <Button type="button" size="xl" variant="secondary" onClick={() => setPickerTarget(null)}>
+            <Button
+              type="button"
+              size="xl"
+              variant="secondary"
+              onClick={() => setPickerTarget(null)}
+            >
               닫기
             </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
 
-      {/* 확정 요약 Drawer: 날짜/경로/비용/주의 항목을 다시 읽고 확정해요. */}
       <Drawer
         open={isConfirmSheetOpen}
         onOpenChange={(open) => {
-          // 확정 요청 중에는 실수로 닫히지 않게 유지해요.
-          if (!open && !confirmPlanMutation.isPending && !isResolvingConflict) setIsConfirmSheetOpen(false);
+          if (!open && !confirmPlanMutation.isPending && !isResolvingConflict) {
+            setIsConfirmSheetOpen(false);
+          }
         }}
         showSwipeHandle
       >
@@ -469,7 +582,9 @@ export function PlanComparePage() {
             </DrawerTitle>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
-            <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(selectedPlan)} />
+            <ConfirmPlanSummaryView
+              summary={buildConfirmPlanSummary(selectedPlan)}
+            />
           </div>
           <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
             <Button
@@ -485,6 +600,11 @@ export function PlanComparePage() {
               type="button"
               size="xl"
               disabled={confirmPlanMutation.isPending || isResolvingConflict}
+              aria-busy={
+                confirmPlanMutation.isPending || isResolvingConflict
+                  ? "true"
+                  : undefined
+              }
               onClick={() => void handleConfirmSubmit()}
             >
               {confirmPlanMutation.isPending ? "확정 중..." : "확정하기"}

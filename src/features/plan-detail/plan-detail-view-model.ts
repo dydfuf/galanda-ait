@@ -12,6 +12,7 @@ import {
   hasResolvablePlanAuthor,
   isPlanAuthor,
   canMutatePlan,
+  isPlanConfirmed as isDomainPlanConfirmed,
   isRoomConfirmed,
   getRoomActor,
   type ParticipantIdentity,
@@ -58,6 +59,8 @@ export interface PlanDetailViewModel {
   /** 세션 사용자의 방 내 역할. 방장 전용 동작(확정 등) 노출 판단에 사용해요. */
   readonly viewerRole: RoomRole;
   readonly isViewerHost: boolean;
+  readonly canSubmitOpinion: boolean;
+  readonly canCreatePlan: boolean;
   readonly isConfirmed: boolean;
   readonly confirmedPlanId?: string;
   readonly confirmedPlanTitle?: string;
@@ -66,18 +69,43 @@ export interface PlanDetailViewModel {
   readonly plans: ReadonlyArray<DetailedPlanViewModel>;
 }
 
+interface BookingConfirmationInput {
+  readonly status: BookingStatus;
+  readonly confirmedBy?: string;
+  readonly confirmedAt?: string;
+  readonly isSearching?: boolean;
+}
+
+const formatBookingConfirmation = ({
+  status,
+  confirmedBy,
+  confirmedAt,
+  isSearching = false,
+}: BookingConfirmationInput): string => {
+  if (status === "NOT_CHECKED" || isSearching) {
+    return "아직 예약 상태를 확인하지 않았어요";
+  }
+
+  const confirmation = [confirmedBy, confirmedAt].filter(
+    (value): value is string => Boolean(value?.trim()),
+  );
+  return confirmation.length > 0
+    ? `${confirmation.join(" · ")} 확인`
+    : "확인 기록 미정";
+};
+
 export const toPlanDetailViewModel = (
   room: TripRoom,
   currentUserIds?: ParticipantIdentity
 ): PlanDetailViewModel => {
   const confirmed = getConfirmedPlan(room);
-  const isConfirmed = isRoomConfirmed(room);
+  const roomConfirmed = isRoomConfirmed(room);
   const viewer = getRoomActor(room, currentUserIds);
 
   let decisionStatusText = "여행안을 고르고 있어요";
   let decisionSubText = "후보 여행안을 살펴보고 의견을 남겨보세요.";
 
-  if (isConfirmed && confirmed) {
+  if (roomConfirmed && confirmed) {
     decisionStatusText = `'${confirmed.title}'(으)로 일정을 확정했어요`;
     decisionSubText = "확정된 일정은 [일정] 탭에서 날짜별로 확인할 수 있어요.";
   } else if (room.plans.length === 0) {
@@ -88,231 +116,275 @@ export const toPlanDetailViewModel = (
     decisionSubText = "의견을 남기거나 새로운 대안을 제안해보세요.";
   } else {
     decisionStatusText = `${room.members.length}명 중 의견을 모으고 있어요`;
-    decisionSubText = "마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.";
+    decisionSubText =
+      "마음에 드는 여행안을 비교하고 가장 좋은 안을 골라보세요.";
   }
 
-  const baseMembers = room.members.length > 0 ? room.members.length : 1;
+  const plans: ReadonlyArray<DetailedPlanViewModel> = room.plans.map(
+    (p, idx) => {
+      const isPlanConfirmed = isDomainPlanConfirmed(room, p);
+      const isBasic = idx === 0;
+      const resolvable = hasResolvablePlanAuthor(room, p);
+      const authorName = resolvable
+        ? (p.authorName ??
+          room.members.find((member) => member.id === p.authorId)?.name ??
+          "작성자 미확인")
+        : "작성자 미확인";
+      const enteredHeadcount =
+        p.baseHeadcount ??
+        (room.members.length > 0 ? room.members.length : undefined);
 
-  const plans: ReadonlyArray<DetailedPlanViewModel> = room.plans.map((p, idx) => {
-    const isPlanConfirmed = p.id === room.confirmedPlanId;
-    const isBasic = idx === 0;
-    const resolvable = hasResolvablePlanAuthor(room, p);
-    const authorName = resolvable
-      ? (p.authorName ??
-        room.members.find((m) => m.id === p.authorId)?.name ??
-        "작성자 미확인")
-      : "작성자 미확인";
-    const headcount = p.baseHeadcount ?? baseMembers;
+      // 입력된 route만 투영한다. legacy places나 여행 목적지에서 임의 숙박 수를 만들지 않는다.
+      const route = (p.routes ?? []).map((stay) => ({
+        city: stay.city,
+        nights: getStayNightCount(stay),
+      }));
 
-    const route =
-      p.routes && p.routes.length > 0
-        ? p.routes.map((r) => ({ city: r.city, nights: getStayNightCount(r) }))
-        : p.places.length > 0
-          ? p.places.slice(0, 3).map((place, pIdx) => ({
-              city: place.name.split(" ")[0] || room.destination,
-              nights: pIdx === 0 ? 1 : 2,
-            }))
-          : [{ city: room.destination, nights: 1 }];
+      const range = getPlanDateRange(p);
+      const nights = getPlanNightCount(p);
+      const days = nights > 0 ? nights + 1 : 0;
 
-    const range = getPlanDateRange(p);
-    const nights = getPlanNightCount(p);
-    const days = nights > 0 ? nights + 1 : 0;
-
-    // 비용 계산
-    const costSummary = calculatePlanCost(p.accommodations, p.transports, headcount);
-    const groupCostText = costSummary.hasCost
-      ? `${costSummary.unpricedCount > 0 ? "확인된 그룹 금액" : "그룹 총액"} ${formatCostRangeText(costSummary.minTotal, costSummary.maxTotal, costSummary.unpricedCount)}`
-      : "예상 경비 미정";
-    const perPersonCostText = costSummary.hasCost
-      ? `${headcount}명 기준 1인 ${formatCostRangeText(costSummary.minPerPerson, costSummary.maxPerPerson, costSummary.unpricedCount)}`
-      : "비용 미정";
-
-    const accommodations = p.accommodations ?? [];
-    const transports = p.transports ?? [];
-
-    // 예약 위험 요약 (PL-02 2번 섹션)
-    const bookingRisks: BookingRiskItem[] = [];
-    const addBookingRisk = ({
-      status,
-      message,
-      confirmedBy,
-      confirmedAt,
-      isSearching = false,
-    }: {
-      readonly status: BookingStatus;
-      readonly message: string;
-      readonly confirmedBy?: string;
-      readonly confirmedAt?: string;
-      readonly isSearching?: boolean;
-    }): void => {
-      if (status === "AVAILABLE" && !isSearching) return;
-
-      const isUnchecked = status === "NOT_CHECKED" || isSearching;
-      bookingRisks.push({
-        level: status === "FULL" ? "DANGER" : "WARNING",
-        message,
-        snapshotInfo: isUnchecked
-          ? "아직 예약 상태를 확인하지 않았어요"
-          : `${confirmedBy ?? authorName} · ${confirmedAt ?? "최근"} 확인`,
-      });
-    };
-
-    for (const acc of accommodations) {
-      const isUnchecked = acc.bookingStatus === "NOT_CHECKED" || acc.isSearching;
-      addBookingRisk({
-        status: acc.bookingStatus,
-        isSearching: acc.isSearching,
-        message:
-          acc.bookingStatus === "FULL"
-            ? `${acc.city} 숙소(${acc.hotelName})가 현재 만실 상태예요`
-            : isUnchecked
-              ? `${acc.city} 숙소(${acc.hotelName}) 예약 상태를 아직 확인하지 않았어요`
-              : `${acc.city} 숙소(${acc.hotelName}) 잔여 객실 확인이 필요해요`,
-        confirmedBy: acc.confirmedBy,
-        confirmedAt: acc.confirmedAt,
-      });
-    }
-
-    for (const trans of transports) {
-      addBookingRisk({
-        status: trans.bookingStatus,
-        message:
-          trans.bookingStatus === "FULL"
-            ? `${trans.fromCity} → ${trans.toCity} 교통편이 매진/불가 상태예요`
-            : trans.bookingStatus === "NOT_CHECKED"
-              ? `${trans.fromCity} → ${trans.toCity} 교통 예약 상태를 아직 확인하지 않았어요`
-              : `${trans.fromCity} → ${trans.toCity} 교통 예약 확인이 필요해요`,
-        confirmedBy: trans.confirmedBy,
-        confirmedAt: trans.confirmedAt,
-      });
-    }
-
-    // 타임라인 아이템 (체류 + 이동 구간)
-    const timelineItems: TimelineItem[] = [];
-    const timelineLength = Math.max(accommodations.length, transports.length);
-    for (let i = 0; i < timelineLength; i++) {
-      const acc = accommodations[i];
-      if (acc) {
-        const stayStatus =
-          acc.bookingStatus === "NOT_CHECKED" || acc.isSearching
-            ? "SEARCHING"
-            : acc.bookingStatus;
-
-        timelineItems.push({
-          type: "STAY",
-          stay: {
-            id: acc.id,
-            city: acc.city,
-            period: acc.period,
-            nights: acc.nights,
-            hotelName: acc.hotelName,
-            priceText: acc.priceRange
-              ? `그룹 총액 ${formatCostRangeText(acc.priceRange.min, acc.priceRange.max)} (${headcount}명 기준)`
-              : "가격 미정",
-            bookingStatus: stayStatus,
-            confirmedInfo: `${acc.confirmedBy ?? authorName} · ${acc.confirmedAt ?? "최근 확인"}`,
-            bookingUrl: acc.bookingUrl,
-          },
-        });
-      }
-
-      const trans = transports[i];
-      if (trans) {
-        const transStatus = trans.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : trans.bookingStatus;
-
-        timelineItems.push({
-          type: "TRANSPORT",
-          transport: {
-            id: trans.id,
-            fromCity: trans.fromCity,
-            toCity: trans.toCity,
-            mode: trans.mode,
-            hasTransfer: trans.hasTransfer,
-            durationText: trans.durationText,
-            priceText: trans.priceRange
-              ? `그룹 총액 ${formatCostRangeText(trans.priceRange.min, trans.priceRange.max)}`
-              : "가격 미정",
-            bookingStatus: transStatus,
-            confirmedInfo: `${trans.confirmedBy ?? authorName} · ${trans.confirmedAt ?? "최근 확인"}`,
-            bookingUrl: trans.bookingUrl,
-          },
-        });
-      }
-    }
-
-    // 구성원 의견 목록
-    const privateOpinions = p.memberOpinions ?? [];
-    const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> =
-      privateOpinions.map(
-        ({ userId, userName, reaction }: PublicPlanMemberOpinion) => ({
-          userId,
-          userName,
-          reaction,
-        })
+      const costSummary = calculatePlanCost(
+        p.accommodations,
+        p.transports,
+        enteredHeadcount ?? 1,
       );
+      const groupCostText = costSummary.hasCost
+        ? `${costSummary.unpricedCount > 0 ? "확인된 그룹 금액" : "그룹 총액"} ${formatCostRangeText(
+            costSummary.minTotal,
+            costSummary.maxTotal,
+            costSummary.unpricedCount,
+          )}`
+        : "가격 미정";
+      const perPersonCostText = costSummary.hasCost
+        ? enteredHeadcount
+          ? `${enteredHeadcount}명 기준 1인 ${formatCostRangeText(
+              costSummary.minPerPerson,
+              costSummary.maxPerPerson,
+              costSummary.unpricedCount,
+            )}`
+          : "기준 인원 미정"
+        : "가격 미정";
 
-    const likeCount = privateOpinions.filter((m) => m.reaction === "LIKE").length;
-    const okayCount = privateOpinions.filter((m) => m.reaction === "OKAY").length;
-    const hardCount = privateOpinions.filter((m) => m.reaction === "HARD").length;
+      const accommodations = p.accommodations ?? [];
+      const transports = p.transports ?? [];
 
-    const isAuthor = isPlanAuthor(room, p, currentUserIds);
-    const canManage = canMutatePlan(room, p, currentUserIds);
+      const bookingRisks: BookingRiskItem[] = [];
+      const addBookingRisk = ({
+        status,
+        message,
+        confirmedBy,
+        confirmedAt,
+        isSearching = false,
+      }: BookingConfirmationInput & { readonly message: string }): void => {
+        if (status === "AVAILABLE" && !isSearching) return;
 
-    // 세션 사용자가 확인되지 않으면 "내 의견"도 존재하지 않는다
-    // (하드코딩된 로컬 사용자 폴백은 남의 의견을 내 것으로 표시하므로 사용하지 않는다)
-    const myOpinion = currentUserIds
-      ? privateOpinions.find((opinion) =>
-          typeof currentUserIds === "string"
-            ? opinion.userId === currentUserIds
-            : currentUserIds.includes(opinion.userId)
-        )
-      : undefined;
+        bookingRisks.push({
+          level: status === "FULL" ? "DANGER" : "WARNING",
+          message,
+          snapshotInfo: formatBookingConfirmation({
+            status,
+            confirmedBy,
+            confirmedAt,
+            isSearching,
+          }),
+        });
+      };
 
-    return {
-      id: p.id,
-      title: p.title,
-      planTag: isPlanConfirmed ? "CONFIRMED" : isBasic ? "BASIC" : "ALTERNATIVE",
-      planTagLabel: isBasic ? "기본안" : `대안 ${idx}`,
-      period: range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정",
-      nights,
-      days,
-      route,
-      costSummary,
-      differenceSummary: p.differenceSummary,
-      groupCostText,
-      perPersonCostText,
-      bookingAlert: bookingRisks[0]?.message,
-      authorId: p.authorId,
-      authorName,
-      isAuthor,
-      canManage,
-      proposalReason: p.proposalReason ?? "",
-      opinions: {
-        likeCount,
-        okayCount,
-        hardCount,
-      },
-      myReaction: myOpinion?.reaction,
-      myOpinionReason: myOpinion?.reaction === "HARD" ? myOpinion.reason : undefined,
-      isConfirmed: isPlanConfirmed,
-      bookingRisks,
-      timelineItems,
-      memberOpinions,
-    };
-  });
+      for (const accommodation of accommodations) {
+        const isUnchecked =
+          accommodation.bookingStatus === "NOT_CHECKED" ||
+          accommodation.isSearching;
+        const hotelName =
+          accommodation.hotelName.trim() ||
+          (accommodation.isSearching ? "숙소 찾는 중" : "숙소 미정");
+        addBookingRisk({
+          status: accommodation.bookingStatus,
+          isSearching: accommodation.isSearching,
+          message:
+            accommodation.bookingStatus === "FULL"
+              ? `${accommodation.city} 숙소(${hotelName})가 현재 만실 상태예요`
+              : isUnchecked
+                ? `${accommodation.city} 숙소(${hotelName}) 예약 상태를 아직 확인하지 않았어요`
+                : `${accommodation.city} 숙소(${hotelName}) 잔여 객실 확인이 필요해요`,
+          confirmedBy: accommodation.confirmedBy,
+          confirmedAt: accommodation.confirmedAt,
+        });
+      }
+
+      for (const transport of transports) {
+        addBookingRisk({
+          status: transport.bookingStatus,
+          message:
+            transport.bookingStatus === "FULL"
+              ? `${transport.fromCity} → ${transport.toCity} 교통편이 매진/불가 상태예요`
+              : transport.bookingStatus === "NOT_CHECKED"
+                ? `${transport.fromCity} → ${transport.toCity} 교통 예약 상태를 아직 확인하지 않았어요`
+                : `${transport.fromCity} → ${transport.toCity} 교통 예약 확인이 필요해요`,
+          confirmedBy: transport.confirmedBy,
+          confirmedAt: transport.confirmedAt,
+        });
+      }
+
+      const timelineItems: TimelineItem[] = [];
+      const timelineLength = Math.max(accommodations.length, transports.length);
+      for (let index = 0; index < timelineLength; index += 1) {
+        const accommodation = accommodations[index];
+        if (accommodation) {
+          const stayStatus =
+            accommodation.bookingStatus === "NOT_CHECKED" ||
+            accommodation.isSearching
+              ? "SEARCHING"
+              : accommodation.bookingStatus;
+
+          timelineItems.push({
+            type: "STAY",
+            stay: {
+              id: accommodation.id,
+              city: accommodation.city,
+              period: accommodation.period.trim() || "숙박 일정 미정",
+              nights: accommodation.nights,
+              hotelName:
+                accommodation.hotelName.trim() ||
+                (accommodation.isSearching ? "숙소 찾는 중" : "숙소 미정"),
+              priceText: accommodation.priceRange
+                ? `그룹 총액 ${formatCostRangeText(
+                    accommodation.priceRange.min,
+                    accommodation.priceRange.max,
+                  )}${enteredHeadcount ? ` (${enteredHeadcount}명 기준)` : ""}`
+                : "가격 미정",
+              bookingStatus: stayStatus,
+              confirmedInfo: formatBookingConfirmation({
+                status: accommodation.bookingStatus,
+                confirmedBy: accommodation.confirmedBy,
+                confirmedAt: accommodation.confirmedAt,
+                isSearching: accommodation.isSearching,
+              }),
+              bookingUrl: accommodation.bookingUrl,
+            },
+          });
+        }
+
+        const transport = transports[index];
+        if (transport) {
+          const transportStatus =
+            transport.bookingStatus === "NOT_CHECKED"
+              ? "SEARCHING"
+              : transport.bookingStatus;
+
+          timelineItems.push({
+            type: "TRANSPORT",
+            transport: {
+              id: transport.id,
+              fromCity: transport.fromCity,
+              toCity: transport.toCity,
+              mode: transport.mode.trim() || "교통수단 미정",
+              hasTransfer: transport.hasTransfer,
+              durationText: transport.durationText.trim() || "소요 시간 미정",
+              priceText: transport.priceRange
+                ? `그룹 총액 ${formatCostRangeText(
+                    transport.priceRange.min,
+                    transport.priceRange.max,
+                  )}`
+                : "가격 미정",
+              bookingStatus: transportStatus,
+              confirmedInfo: formatBookingConfirmation({
+                status: transport.bookingStatus,
+                confirmedBy: transport.confirmedBy,
+                confirmedAt: transport.confirmedAt,
+              }),
+              bookingUrl: transport.bookingUrl,
+            },
+          });
+        }
+      }
+
+      const privateOpinions = p.memberOpinions ?? [];
+      const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> =
+        privateOpinions.map(
+          ({ userId, userName, reaction }: PublicPlanMemberOpinion) => ({
+            userId,
+            userName,
+            reaction,
+          }),
+        );
+
+      const likeCount = privateOpinions.filter(
+        (member) => member.reaction === "LIKE",
+      ).length;
+      const okayCount = privateOpinions.filter(
+        (member) => member.reaction === "OKAY",
+      ).length;
+      const hardCount = privateOpinions.filter(
+        (member) => member.reaction === "HARD",
+      ).length;
+
+      const isAuthor = isPlanAuthor(room, p, currentUserIds);
+      const canManage = canMutatePlan(room, p, currentUserIds);
+
+      const myOpinion = currentUserIds
+        ? privateOpinions.find((opinion) =>
+            typeof currentUserIds === "string"
+              ? opinion.userId === currentUserIds
+              : currentUserIds.includes(opinion.userId),
+          )
+        : undefined;
+
+      return {
+        id: p.id,
+        title: p.title,
+        planTag: isPlanConfirmed
+          ? "CONFIRMED"
+          : isBasic
+            ? "BASIC"
+            : "ALTERNATIVE",
+        planTagLabel: isBasic ? "기본안" : `대안 ${idx}`,
+        period: range ? `${range.startDate} ~ ${range.endDate}` : "일정 미정",
+        nights,
+        days,
+        route,
+        costSummary,
+        differenceSummary: p.differenceSummary,
+        groupCostText,
+        perPersonCostText,
+        bookingAlert: bookingRisks[0]?.message,
+        authorId: p.authorId,
+        authorName,
+        isAuthor,
+        canManage,
+        proposalReason: p.proposalReason ?? "",
+        opinions: {
+          likeCount,
+          okayCount,
+          hardCount,
+        },
+        myReaction: myOpinion?.reaction,
+        myOpinionReason:
+          myOpinion?.reaction === "HARD" ? myOpinion.reason : undefined,
+        isConfirmed: isPlanConfirmed,
+        bookingRisks,
+        timelineItems,
+        memberOpinions,
+      };
+    },
+  );
 
   const displayDate = getTripRoomDisplayDate(room);
   return {
     id: room.id,
     title: room.title,
     destination: room.destination,
-    period: displayDate ? `${displayDate.startDate} ~ ${displayDate.endDate}` : "일정 미정",
+    period: displayDate
+      ? `${displayDate.startDate} ~ ${displayDate.endDate}`
+      : "일정 미정",
     memberCount: room.members.length,
-    memberNames: room.members.map((m) => m.name).join(", "),
+    memberNames: room.members.map((member) => member.name).join(", "),
     revision: room.revision,
     viewerRole: viewer.role,
     isViewerHost: viewer.isHost,
-    isConfirmed,
+    canSubmitOpinion: !roomConfirmed && viewer.can("opinion:submit"),
+    canCreatePlan: !roomConfirmed && viewer.can("plan:create"),
+    isConfirmed: roomConfirmed,
     confirmedPlanId: room.confirmedPlanId,
     confirmedPlanTitle: confirmed?.title,
     decisionStatusText,

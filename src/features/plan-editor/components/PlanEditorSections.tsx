@@ -13,7 +13,10 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import type { usePlanEditorState } from "../hooks/usePlanEditorState.ts";
-import type { PlanEditorSection } from "../plan-editor-section.ts";
+import {
+  PLAN_EDITOR_SECTION_PRESENTATION,
+  type PlanEditorSection,
+} from "../plan-editor-section.ts";
 import { tripActionPresentation } from "../../common/trip-action-presentation.ts";
 import {
   NextActionRecommendation,
@@ -91,11 +94,13 @@ function SummaryRow({
     <MobileListItem
       chevron
       onClick={onClick}
-      className="px-2"
+      className="px-3"
       trailing={<Badge variant={complete ? "info" : "neutral"}>{status}</Badge>}
     >
-      <ItemTitle>{title}</ItemTitle>
-      <ItemDescription>{summary}</ItemDescription>
+      <ItemTitle className="text-base leading-snug">{title}</ItemTitle>
+      <ItemDescription className="text-base leading-relaxed">
+        {summary}
+      </ItemDescription>
     </MobileListItem>
   );
 }
@@ -175,43 +180,54 @@ export function PlanEditorSections({
         />
 
         {isCloneMode && editor.diffFromOriginal && cloneTitle && (
-          <DiffBanner diff={editor.diffFromOriginal} originalTitle={cloneTitle} />
+          <DiffBanner
+            diff={editor.diffFromOriginal}
+            originalTitle={cloneTitle}
+          />
         )}
 
         {isFirstPlanGuide ? (
-          <div className="px-0 pb-2">
-            <PageTitle
-              className="px-0"
+          <div className="px-0 pb-3">
+            <SectionHeader
+              className="px-0 pt-0 [&_p]:text-base"
               title="첫 여행안을 만들어볼까요?"
               description={`필수 정보 ${completedCount}/4 완료 · 항목을 하나씩 열어 정리해주세요.`}
             />
-            <p className="pt-2 text-[13px] leading-relaxed text-muted-foreground">
-              아직 예약하지 않았어도 괜찮아요. 정하지 못한 숙소/교통은 찾는 중·확인 전으로 남길 수 있어요.
+            <p className="pt-2 text-base leading-relaxed text-muted-foreground">
+              아직 예약하지 않았어도 괜찮아요. 정하지 못한 숙소/교통은 찾는
+              중·확인 전으로 남길 수 있어요.
             </p>
           </div>
         ) : (
           <SectionHeader
-            className="px-0"
+            className="px-0 [&_p]:text-base"
             title="여행안 구성"
             description="항목을 하나씩 열어 내용을 정리해주세요."
           />
         )}
-        {isFirstPlanGuide && tripId && recommendation && onRecommendationAction && (
-          <NextActionRecommendation
-            tripId={tripId}
-            surface="FIRST_PLAN"
-            recommendation={recommendation}
-            onAction={onRecommendationAction}
-            onDismiss={onRecommendationDismiss}
-            className="mx-0"
-          />
-        )}
+        {isFirstPlanGuide &&
+          tripId &&
+          recommendation &&
+          onRecommendationAction && (
+            <NextActionRecommendation
+              tripId={tripId}
+              surface="FIRST_PLAN"
+              recommendation={recommendation}
+              onAction={onRecommendationAction}
+              onDismiss={onRecommendationDismiss}
+              className="mx-0"
+            />
+          )}
         {isFirstPlanGuide && isRecommendationPending && (
           <NextActionRecommendationPending className="mx-0" />
         )}
-        <MobileList aria-label="여행안 편집 항목" className="mb-5">
+        <MobileList
+          aria-label="여행안 편집 항목"
+          className="mb-5 overflow-hidden rounded-2xl border border-border bg-surface-content"
+          data-galanda-surface="content"
+        >
           <SummaryRow
-            title="기본 정보"
+            title={PLAN_EDITOR_SECTION_PRESENTATION.basic.summaryTitle}
             summary={editor.title.trim() || "여행안 이름을 입력해주세요."}
             status={
               isFirstPlanGuide && nextRecommended === "basic" && !basicComplete
@@ -224,10 +240,17 @@ export function PlanEditorSections({
             onClick={() => onOpenSection("basic")}
           />
           <SummaryRow
-            title="여행 경로"
-            summary={editor.routes.length > 0
-              ? editor.routes.map((route) => `${route.city || "도시 미정"} ${Math.max(0, getStayNightCount(route))}박`).join(" · ")
-              : "방문 도시와 날짜를 정해주세요."}
+            title={PLAN_EDITOR_SECTION_PRESENTATION.route.summaryTitle}
+            summary={
+              editor.routes.length > 0
+                ? editor.routes
+                    .map(
+                      (route) =>
+                        `${route.city || "도시 미정"} ${Math.max(0, getStayNightCount(route))}박`,
+                    )
+                    .join(" · ")
+                : "방문 도시와 날짜를 정해주세요."
+            }
             status={
               isFirstPlanGuide && nextRecommended === "route" && !routeComplete
                 ? "다음으로 추천"
@@ -241,12 +264,16 @@ export function PlanEditorSections({
             onClick={() => onOpenSection("route")}
           />
           <SummaryRow
-            title="숙소"
-            summary={accommodationEmpty
-              ? "아직 추가하지 않았어요"
-              : `${editor.accommodations.length}곳`}
+            title={PLAN_EDITOR_SECTION_PRESENTATION.accommodation.summaryTitle}
+            summary={
+              accommodationEmpty
+                ? "아직 추가하지 않았어요"
+                : `${editor.accommodations.length}곳`
+            }
             status={
-              isFirstPlanGuide && nextRecommended === "accommodation" && !accommodationComplete
+              isFirstPlanGuide &&
+              nextRecommended === "accommodation" &&
+              !accommodationComplete
                 ? "다음으로 추천"
                 : !accommodationComplete
                   ? accommodationEmpty
@@ -258,12 +285,18 @@ export function PlanEditorSections({
             onClick={() => onOpenSection("accommodation")}
           />
           <SummaryRow
-            title="교통"
-            summary={transportEmpty
-              ? "아직 추가하지 않았어요"
-              : editor.transports.map((item) => item.mode.trim() || "교통편 확인 전").join(" · ")}
+            title={PLAN_EDITOR_SECTION_PRESENTATION.transport.summaryTitle}
+            summary={
+              transportEmpty
+                ? "아직 추가하지 않았어요"
+                : editor.transports
+                    .map((item) => item.mode.trim() || "교통편 확인 전")
+                    .join(" · ")
+            }
             status={
-              isFirstPlanGuide && nextRecommended === "transport" && !transportComplete
+              isFirstPlanGuide &&
+              nextRecommended === "transport" &&
+              !transportComplete
                 ? "다음으로 추천"
                 : !transportComplete
                   ? transportEmpty
@@ -275,11 +308,15 @@ export function PlanEditorSections({
             onClick={() => onOpenSection("transport")}
           />
           <MobileListItem
-            className="px-2"
-            trailing={<span className="text-[15px] font-bold text-foreground">{perPersonCost}</span>}
+            className="px-3"
+            trailing={
+              <span className="text-base font-bold text-foreground">
+                {perPersonCost}
+              </span>
+            }
           >
-            <ItemTitle>예상 비용</ItemTitle>
-            <ItemDescription>
+            <ItemTitle className="text-base leading-snug">예상 비용</ItemTitle>
+            <ItemDescription className="text-base leading-relaxed">
               {editor.costSummary.baseHeadcount}명 기준 1인 예상 참고액
             </ItemDescription>
           </MobileListItem>
@@ -292,19 +329,15 @@ export function PlanEditorSections({
     <>
       <PageTitle
         className="px-0"
-        title={
-          section === "basic"
-            ? "기본 정보"
-            : section === "route"
-              ? "여행 경로"
-              : section === "accommodation"
-                ? "숙소"
-                : "교통"
-        }
+        title={PLAN_EDITOR_SECTION_PRESENTATION[section].summaryTitle}
         description="입력한 내용은 임시안에 자동 저장돼요."
       />
 
-      <form className="pb-(--app-cta-space)" onSubmit={(event) => event.preventDefault()}>
+      <form
+        className="min-w-0 bg-surface-content pb-(--app-cta-space)"
+        data-galanda-surface="content"
+        onSubmit={(event) => event.preventDefault()}
+      >
         {section === "basic" && (
           <BasicInfoSection
             title={editor.title}

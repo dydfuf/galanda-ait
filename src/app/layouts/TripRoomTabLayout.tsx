@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { shareTripInvite } from "../../features/invite/share-trip-invite.ts";
 import {
+  getTripRoomNavigationTitle,
   getTripRoomSection,
   getTripRoomSectionPath,
 } from "./trip-room-navigation.ts";
@@ -25,7 +26,8 @@ export function TripRoomTabLayout() {
   );
   const accessoryRegistrationId = useRef(0);
   const isCurrentAccessoryRegistration = useCallback(
-    (registrationId: number) => registrationId === accessoryRegistrationId.current,
+    (registrationId: number) =>
+      registrationId === accessoryRegistrationId.current,
     [],
   );
 
@@ -83,9 +85,27 @@ export function TripRoomTabLayout() {
   const showWebNavigation = !platformNavigation;
   const showShareAction = showWebNavigation || failedAccessoryTripId === tripId;
 
+  const shareAction = showShareAction ? (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-lg"
+      aria-label="여행 초대 링크 공유"
+      className="text-primary"
+      onClick={() => void shareTripInvite(tripId)}
+    >
+      <Share2 className="size-5" />
+    </Button>
+  ) : undefined;
+
   const modeSwitcher = (
     <Tabs value={selectedTab} onValueChange={handleTabChange}>
-      <TabsList aria-label="여행방 화면" className="h-9 w-40">
+      <TabsList
+        variant="chrome"
+        surface="none"
+        aria-label="여행방 화면"
+        className="w-40"
+      >
         <TabsTrigger value="plans">계획</TabsTrigger>
         <TabsTrigger value="itinerary">일정</TabsTrigger>
       </TabsList>
@@ -94,29 +114,33 @@ export function TripRoomTabLayout() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
-      <PageHeader
-        sticky
-        bordered
-        safeTop={showWebNavigation}
-        topInset={platformNavigation ? platformTopInset : undefined}
-        className={platformNavigation ? "z-[5]" : undefined}
-        center={modeSwitcher}
-        back={showWebNavigation ? { onClick: () => void goBack() } : undefined}
-        action={
-          showShareAction ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-lg"
-              aria-label="여행 초대 링크 공유"
-              className="text-primary"
-              onClick={() => void shareTripInvite(tripId)}
-            >
-              <Share2 className="size-5" />
-            </Button>
-          ) : undefined
-        }
-      />
+      {showWebNavigation ? (
+        <div
+          data-galanda-surface="chrome"
+          className="sticky top-0 z-20 border-b"
+        >
+          <PageHeader
+            safeTop
+            surface="none"
+            title={getTripRoomNavigationTitle(location.pathname)}
+            back={{ onClick: () => void goBack() }}
+            action={shareAction}
+          />
+          <div className="mx-auto flex w-full max-w-(--content-max-width) justify-center px-2 pb-2">
+            {modeSwitcher}
+          </div>
+        </div>
+      ) : (
+        <PageHeader
+          sticky
+          bordered
+          safeTop={false}
+          topInset={platformTopInset}
+          className="z-[5]"
+          center={modeSwitcher}
+          action={shareAction}
+        />
+      )}
 
       {/* 탭 내부 페이지 렌더링 */}
       <main className="flex flex-1 flex-col">

@@ -253,7 +253,7 @@ export function PlanHomePage() {
       )}
       {isRecommendationPending && <NextActionRecommendationPending />}
 
-      <section aria-labelledby="plan-candidates-heading" className="pt-1">
+      <section aria-labelledby="plan-candidates-heading" className="pt-5">
         <PlanCandidatesHeader
           candidateCount={room.candidateCount}
           showNewProposalAction={
@@ -277,12 +277,15 @@ export function PlanHomePage() {
           />
         ) : (
           <ul
-            className="flex list-none flex-col gap-3 px-(--app-inline-padding)"
+            className="flex list-none flex-col gap-3 px-(--app-inline-padding) pb-4"
             aria-label="제안된 여행안"
           >
             {plans.map((plan) => (
               <li key={plan.id} className="min-w-0 list-none">
-                <PlanDecisionCard plan={plan} to={`/trips/${tripId}/plans/${plan.id}`} />
+                <PlanDecisionCard
+                  plan={plan}
+                  to={`/trips/${tripId}/plans/${plan.id}`}
+                />
               </li>
             ))}
           </ul>
@@ -298,10 +301,16 @@ export function PlanHomePage() {
       )}
 
       {/* 3개 이상일 때 명시적 2개 선택 Drawer */}
-      <Drawer open={isComparePickerOpen} onOpenChange={setIsComparePickerOpen} showSwipeHandle>
+      <Drawer
+        open={isComparePickerOpen}
+        onOpenChange={setIsComparePickerOpen}
+        showSwipeHandle
+      >
         <DrawerContent>
           <DrawerHeader>
-            <DrawerTitle className="text-left text-[17px] font-bold">비교할 여행안 2개 선택</DrawerTitle>
+            <DrawerTitle className="text-left text-lg font-bold">
+              비교할 여행안 2개 선택
+            </DrawerTitle>
             <DrawerDescription className="text-left">
               {selectedCompareIds.length === 2
                 ? "선택한 2개의 여행안을 비교해요."
@@ -309,7 +318,10 @@ export function PlanHomePage() {
             </DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <MobileList aria-label="비교 대상 선택">
+            <MobileList
+              aria-label="비교 대상 선택"
+              className="bg-surface-content"
+            >
               {plans.map((plan) => {
                 const isSelected = selectedCompareIds.includes(plan.id);
                 const selectedIndex = selectedCompareIds.indexOf(plan.id);
@@ -333,13 +345,20 @@ export function PlanHomePage() {
                     }
                     trailing={
                       isSelected ? (
-                        <Badge variant="info-solid">선택 {selectedIndex + 1}</Badge>
+                        <Badge variant="info-solid">
+                          선택 {selectedIndex + 1}
+                        </Badge>
                       ) : undefined
                     }
                   >
-                    <ItemTitle className="line-clamp-1">{plan.title}</ItemTitle>
-                    <ItemDescription>
-                      {plan.planTagLabel} · {plan.authorName} 제안 · {plan.nights}박 {plan.days}일
+                    <ItemTitle className="min-w-0 [overflow-wrap:anywhere]">
+                      {plan.title}
+                    </ItemTitle>
+                    <ItemDescription className="min-w-0 text-base [overflow-wrap:anywhere]">
+                      {plan.planTagLabel} · {plan.authorName} 제안 ·{" "}
+                      {plan.days > 0
+                        ? `${plan.nights}박 ${plan.days}일`
+                        : "일정 미정"}
                     </ItemDescription>
                   </MobileListItem>
                 );
@@ -347,7 +366,12 @@ export function PlanHomePage() {
             </MobileList>
           </div>
           <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
-            <Button type="button" size="xl" variant="secondary" onClick={() => setIsComparePickerOpen(false)}>
+            <Button
+              type="button"
+              size="xl"
+              variant="secondary"
+              onClick={() => setIsComparePickerOpen(false)}
+            >
               닫기
             </Button>
             <Button

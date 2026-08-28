@@ -267,7 +267,7 @@ export interface ConfirmPlanSummary {
 }
 
 export const buildConfirmPlanSummary = (
-  plan: DetailedPlanViewModel
+  plan: DetailedPlanViewModel,
 ): ConfirmPlanSummary => ({
   planId: plan.id,
   title: plan.title,
@@ -276,12 +276,18 @@ export const buildConfirmPlanSummary = (
     plan.route.length > 0
       ? plan.route
           .map((segment) =>
-            segment.nights > 0 ? `${segment.city} ${segment.nights}박` : `${segment.city} 당일`
+            segment.nights > 0
+              ? `${segment.city} ${segment.nights}박`
+              : `${segment.city} 당일`,
           )
           .join(" → ")
       : "경로 미정",
-  groupCostText: plan.groupCostText,
-  perPersonCostText: plan.perPersonCostText,
+  groupCostText: plan.costSummary.hasCost
+    ? plan.groupCostText
+    : "예상 경비 미정",
+  perPersonCostText: plan.costSummary.hasCost
+    ? plan.perPersonCostText
+    : "1인 예상 경비 미정",
   needCheckMessages: plan.bookingRisks.map((risk) => risk.message),
 });
 

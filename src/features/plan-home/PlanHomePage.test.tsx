@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { UseQueryResult } from "@tanstack/react-query";
 
@@ -99,6 +105,164 @@ const renderPage = () =>
 /** sticky BottomAction이 켜졌는지는 본문 하단 여백 계약(--app-cta-space)으로 간접 확인한다 */
 const hasStickyCtaSpace = (container: HTMLElement): boolean =>
   container.querySelector('[class*="--app-cta-space"]') !== null;
+
+describe("PlanHomePage hierarchy, state, and compare overlay", () => {
+  it("h1 → h2 → h3 순서와 semantic plan list를 유지한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(2)));
+
+    renderPage();
+
+    const headings = screen.getAllByRole("heading");
+    expect(headings.map((heading) => heading.tagName)).toEqual([
+      "H1",
+      "H2",
+      "H2",
+      "H3",
+      "H3",
+    ]);
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      "제주도 힐링 여행",
+      "진행 상태",
+      "여행안",
+      "plan-1 여행안",
+      "plan-2 여행안",
+    ]);
+
+    const planList = screen.getByRole("list", { name: "제안된 여행안" });
+    expect(within(planList).getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("empty state는 성공한 0건 결과와 완료 조건을 알리고 primary를 하나만 제공한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(0)));
+
+    const { container } = renderPage();
+
+    const emptyState = container.querySelector<HTMLElement>(
+      '[data-system-state="empty"]',
+    );
+    expect(emptyState).not.toBeNull();
+    const emptyStatus = within(emptyState as HTMLElement).getByRole("status");
+    expect(
+      within(emptyStatus).getByRole("heading", {
+        level: 2,
+        name: "아직 여행안이 없어요",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(emptyStatus).getByText(
+        "첫 여행안을 만들어 친구들과 함께 골라보세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(emptyState as HTMLElement).getAllByRole("button", {
+        name: "첫 여행안 만들기",
+      }),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole("list", { name: "제안된 여행안" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("room query loading은 다른 content/error state와 배타적인 live status다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn<() => void>(),
+    } as unknown as UseQueryResult<TripRoom, Error>);
+
+    renderPage();
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "계획 정보를 불러오는 중입니다...",
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.queryByRole("list")).not.toBeInTheDocument();
+  });
+
+  it("room query error는 alert와 retry만 제공하고 empty/success content를 만들지 않는다", () => {
+    const refetchRoom = vi.fn<() => void>();
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error("room query failed"),
+      refetch: refetchRoom,
+    } as unknown as UseQueryResult<TripRoom, Error>);
+
+    const { container } = renderPage();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "여행 정보를 찾을 수 없습니다",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(refetchRoom).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[data-system-state="empty"]')).toBeNull();
+    expect(
+      screen.queryByRole("list", { name: "제안된 여행안" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("compare Drawer는 completion condition을 제공하고 focus를 가둔 뒤 Escape에서 opener로 복원한다", async () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(3)));
+
+    renderPage();
+
+    const opener = screen.getByRole("button", { name: "여행안 비교하기" });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "비교할 여행안 2개 선택",
+    });
+    expect(dialog).toHaveAccessibleDescription(
+      "여행안을 0/2개 선택했어요. 하나를 더 선택해주세요.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "선택한 2개 비교하기" }),
+    ).toBeDisabled();
+    expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(dialog).toContainElement(document.activeElement as HTMLElement),
+    );
+
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "plan-1 여행안 선택 안 됨",
+      }),
+    );
+    expect(dialog).toHaveAccessibleDescription(
+      "여행안을 1/2개 선택했어요. 하나를 더 선택해주세요.",
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "plan-2 여행안 선택 안 됨",
+      }),
+    );
+    expect(dialog).toHaveAccessibleDescription(
+      "선택한 2개의 여행안을 비교해요.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "선택한 2개 비교하기" }),
+    ).toBeEnabled();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "비교할 여행안 2개 선택" }),
+      ).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+});
 
 describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
   it("후보 0개 + plan:create 가능자는 '첫 여행안 만들기' 버튼을 정확히 하나만 렌더한다 (empty state 전용)", () => {
