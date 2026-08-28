@@ -79,6 +79,8 @@ describe("runEffect", () => {
           const scope = yield* RequestScopeService;
           return {
             scopeRequestId: scope.requestId,
+            httpMethod: scope.httpMethod,
+            httpRoute: scope.httpRoute,
             hasSession: !!scope.session,
           };
         }),
@@ -98,9 +100,13 @@ describe("runEffect", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       scopeRequestId: string;
+      httpMethod: string;
+      httpRoute: string;
       hasSession: boolean;
     };
     expect(body.scopeRequestId).toBe("test-request-id-999");
+    expect(body.httpMethod).toBe("GET");
+    expect(body.httpRoute).toBe("/scope");
     expect(body.hasSession).toBe(true);
   });
 

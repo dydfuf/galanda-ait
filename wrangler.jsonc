@@ -5,7 +5,15 @@
   "compatibility_date": "2026-08-22",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false
+    },
+    "traces": {
+      "enabled": false
+    }
   },
   "assets": {
     "directory": "./dist",
@@ -17,7 +25,15 @@
     "staging": {
       "workers_dev": true,
       "observability": {
-        "enabled": true
+        "enabled": true,
+        "logs": {
+          "enabled": true,
+          "head_sampling_rate": 1,
+          "invocation_logs": false
+        },
+        "traces": {
+          "enabled": false
+        }
       },
       "vars": {
         "BETTER_AUTH_URL": "https://galanda-staging.88dydfuf.workers.dev"
