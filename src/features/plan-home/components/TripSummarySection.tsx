@@ -5,17 +5,23 @@ interface TripSummarySectionProps {
   readonly memberCount: number;
 }
 
-/**
- * PL-01 여행 정보 섹션이에요.
- * 제목을 가장 강한 정보(h1)로 두고, 기간과 인원을 같은 그룹에 배치해요.
- * C안의 섹션형 그룹화 강조를 위해 상단 패딩은 PageBody와 겹치지 않게 얇게 잡아요.
- */
-export function TripSummarySection({ title, destination, period, memberCount }: TripSummarySectionProps) {
+/** 여행 제목과 서버 aggregate의 요약 값을 불투명한 본문 카드에 표시한다. */
+export function TripSummarySection({
+  title,
+  destination,
+  period,
+  memberCount,
+}: TripSummarySectionProps) {
   return (
-    <section aria-label="여행 정보" className="px-(--app-inline-padding) pt-1 pb-2">
-      <p className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">여행 정보</p>
-      <h1 className="mt-1 text-[22px] leading-tight font-bold text-foreground">{title}</h1>
-      <p className="mt-1 text-[13px] leading-normal text-muted-foreground">
+    <section
+      aria-label="여행 정보"
+      className="mx-(--app-inline-padding) rounded-2xl border border-border bg-surface-raised px-4 py-4"
+    >
+      <p className="text-sm font-semibold text-foreground-muted">여행 정보</p>
+      <h1 className="mt-1 min-w-0 text-[22px] leading-tight font-bold text-foreground [overflow-wrap:anywhere]">
+        {title}
+      </h1>
+      <p className="mt-2 min-w-0 text-base leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
         {destination} · {period} · 참여 {memberCount}명
       </p>
     </section>

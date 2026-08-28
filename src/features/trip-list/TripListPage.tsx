@@ -94,16 +94,24 @@ export function TripListPage() {
           <MobileListItem
             key={room.id}
             chevron
-            aria-label={`${room.title}, ${periodText}, ${statusText}`}
+            aria-label={[room.title, room.destination, periodText, statusText]
+              .filter(Boolean)
+              .join(", ")}
             onClick={() => navigate(getTripEntryPath(room))}
             className="py-4"
           >
-            <ItemTitle className="text-[17px]">{room.title}</ItemTitle>
-            <ItemDescription>
+            <ItemTitle className="w-full min-w-0 flex-wrap text-[17px] [overflow-wrap:anywhere]">
+              {room.title}
+            </ItemTitle>
+            <ItemDescription className="min-w-0 [overflow-wrap:anywhere]">
+              {room.destination && `${room.destination} · `}
               {periodText} · {room.memberCount}명
             </ItemDescription>
             <ItemDescription
-              className={cn("font-medium", room.confirmedPlanId ? "text-success" : "text-info")}
+              className={cn(
+                "font-medium",
+                room.confirmedPlanId ? "text-success" : "text-info",
+              )}
             >
               {statusText}
             </ItemDescription>
@@ -115,17 +123,30 @@ export function TripListPage() {
 
   // 헤더가 없는 최상위 route라 본문이 상단 safe-area를 직접 확보해요(safeTop).
   return (
-    <PageBody safeTop withBottomAction className="mx-auto max-w-[600px]">
-      <PageTitle title="내 여행" description="참여 중인 여행을 한눈에 확인해요." />
+    <PageBody safeTop withBottomAction>
+      <PageTitle
+        title="내 여행"
+        description="참여 중인 여행을 한눈에 확인해요."
+      />
 
-      <div className="mx-6 mt-4 mb-3">
+      <div className="mt-4 mb-3 px-(--app-inline-padding)">
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value === "PAST" ? "PAST" : "ONGOING")}
+          onValueChange={(value) =>
+            setActiveTab(value === "PAST" ? "PAST" : "ONGOING")
+          }
         >
-          <TabsList aria-label="여행 목록 필터" className="h-10 w-full">
-            <TabsTrigger value="ONGOING">진행 중인 여행 ({ongoingRooms.length})</TabsTrigger>
-            <TabsTrigger value="PAST">지난 여행 ({pastRooms.length})</TabsTrigger>
+          <TabsList
+            variant="default"
+            aria-label="여행 목록 필터"
+            className="w-full"
+          >
+            <TabsTrigger value="ONGOING">
+              진행 중인 여행 ({ongoingRooms.length})
+            </TabsTrigger>
+            <TabsTrigger value="PAST">
+              지난 여행 ({pastRooms.length})
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

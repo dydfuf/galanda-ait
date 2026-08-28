@@ -12,6 +12,15 @@ import {
   decodeRouteParams,
   InviteParamsSchema,
 } from "../../app/routes/route-params.ts";
+import { BottomAction } from "../../components/galanda/bottom-action.tsx";
+import {
+  MobileList,
+  MobileListItem,
+} from "../../components/galanda/mobile-list.tsx";
+import { PageBody } from "../../components/galanda/page-body.tsx";
+import { PageState } from "../../components/galanda/page-state.tsx";
+import { PageTitle } from "../../components/galanda/page-title.tsx";
+import { SectionHeader } from "../../components/galanda/section-header.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import {
   Field,
@@ -20,6 +29,7 @@ import {
   FieldLabel,
 } from "../../components/ui/field.tsx";
 import { Input } from "../../components/ui/input.tsx";
+import { Spinner } from "../../components/ui/spinner.tsx";
 import { MAX_NICKNAME_LENGTH } from "../../core/domain/invite.ts";
 import { useSessionQuery, sessionKeys } from "../../hooks/useSession.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
@@ -60,17 +70,23 @@ export function InvitePage(): JSX.Element {
 
   if (Result.isFailure(validated)) {
     return (
-      <RouteErrorFallback
-        title="유효하지 않은 초대장"
-        message="초대 링크가 만료되었거나 올바르지 않습니다."
-      />
+      <main className="flex min-h-dvh flex-1 flex-col">
+        <PageBody safeTop>
+          <RouteErrorFallback
+            title="유효하지 않은 초대장"
+            message="초대 링크가 만료되었거나 올바르지 않습니다."
+          />
+        </PageBody>
+      </main>
     );
   }
 
   if (inviteQuery.isLoading) {
     return (
-      <main className="flex min-h-dvh flex-1 items-center justify-center px-5">
-        <p className="text-sm text-muted-foreground">초대장 정보를 확인하는 중...</p>
+      <main className="flex min-h-dvh flex-1 flex-col">
+        <PageBody safeTop>
+          <PageState status="loading" message="초대장 정보를 확인하는 중..." />
+        </PageBody>
       </main>
     );
   }
@@ -80,27 +96,48 @@ export function InvitePage(): JSX.Element {
       inviteQuery.error instanceof ApiClientError &&
       inviteQuery.error.code === "INVITE_INVALID";
     return (
-      <main className="flex min-h-dvh flex-1 items-center justify-center px-5">
-        <section className="w-full max-w-sm rounded-2xl border bg-background p-6 text-center shadow-sm">
-          <div className="mb-3 text-4xl" aria-hidden="true">⚠️</div>
-          <h1 className="text-xl font-bold">
-            {invalid ? "유효하지 않은 초대장이에요" : "초대장을 확인하지 못했어요"}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {invalid
-              ? "링크가 만료되었거나 폐기되었을 수 있어요."
-              : toUserMessage(inviteQuery.error, "잠시 후 다시 시도해주세요.")}
-          </p>
+      <div className="flex min-h-dvh flex-1 flex-col">
+        <main className="flex flex-1 flex-col">
+          <PageBody safeTop withBottomAction>
+            <PageState
+              status="error"
+              title={
+                invalid
+                  ? "유효하지 않은 초대장이에요"
+                  : "초대장을 확인하지 못했어요"
+              }
+              description={
+                invalid
+                  ? "링크가 만료되었거나 폐기되었을 수 있어요."
+                  : toUserMessage(
+                      inviteQuery.error,
+                      "잠시 후 다시 시도해주세요.",
+                    )
+              }
+            />
+          </PageBody>
+        </main>
+
+        <BottomAction>
           {!invalid && (
-            <Button className="mt-6 w-full" size="lg" onClick={() => void inviteQuery.refetch()}>
+            <Button
+              type="button"
+              size="xl"
+              onClick={() => void inviteQuery.refetch()}
+            >
               다시 확인하기
             </Button>
           )}
-          <Button className="mt-2 w-full" variant="ghost" onClick={() => navigate("/trips", { replace: true })}>
+          <Button
+            type="button"
+            size="xl"
+            variant={invalid ? "default" : "secondary"}
+            onClick={() => navigate("/trips", { replace: true })}
+          >
             내 여행 목록으로 가기
           </Button>
-        </section>
-      </main>
+        </BottomAction>
+      </div>
     );
   }
 
@@ -148,82 +185,159 @@ export function InvitePage(): JSX.Element {
     }
   };
 
+  const completionCondition = sessionQuery.isLoading
+    ? "참여 가능 여부를 확인하고 있어요."
+    : sessionQuery.isError
+      ? "인증 서비스 재확인이 필요해요."
+      : !summary.alreadyJoined && !nicknameIsValid
+        ? "닉네임을 입력해 주세요."
+        : undefined;
+
   return (
-    <main className="flex min-h-dvh flex-1 items-center justify-center px-5 py-8">
-      <section className="w-full max-w-sm rounded-2xl border bg-background p-6 shadow-sm">
-        <div className="text-center">
-          <div className="mb-3 text-4xl" aria-hidden="true">💌</div>
-          <h1 className="text-xl font-bold">{summary.title}에 초대받았어요</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {summary.inviterName}님이 함께 여행하자고 초대했어요.
-          </p>
-        </div>
+    <div className="flex min-h-dvh flex-1 flex-col">
+      <main className="flex flex-1 flex-col">
+        <PageBody safeTop withBottomAction className="flex flex-col">
+          <PageTitle
+            title={`${summary.title}에 초대받았어요`}
+            description={`${summary.inviterName}님이 함께 여행하자고 초대했어요.`}
+          />
 
-        <dl className="my-6 space-y-2 rounded-xl border bg-muted/40 p-4 text-sm">
-          {summary.destination && (
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">목적지</dt>
-              <dd>{summary.destination}</dd>
-            </div>
-          )}
-          {summary.startDate && summary.endDate && (
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">일정</dt>
-              <dd>{summary.startDate} ~ {summary.endDate}</dd>
-            </div>
-          )}
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">참여 인원</dt>
-            <dd>{summary.participantCount}명</dd>
-          </div>
-        </dl>
+          <section>
+            <SectionHeader title="여행 정보" />
+            <MobileList
+              aria-label="초대받은 여행 정보"
+              className="mx-(--app-inline-padding) w-auto overflow-hidden rounded-2xl border bg-surface-content"
+            >
+              {summary.destination && (
+                <MobileListItem
+                  trailing={
+                    <span className="text-base font-medium text-foreground">
+                      {summary.destination}
+                    </span>
+                  }
+                >
+                  <span className="text-base text-foreground-muted">
+                    목적지
+                  </span>
+                </MobileListItem>
+              )}
+              {summary.startDate && summary.endDate && (
+                <MobileListItem
+                  trailing={
+                    <span className="text-base font-medium text-foreground">
+                      {summary.startDate} ~ {summary.endDate}
+                    </span>
+                  }
+                >
+                  <span className="text-base text-foreground-muted">일정</span>
+                </MobileListItem>
+              )}
+              <MobileListItem
+                trailing={
+                  <span className="text-base font-medium text-foreground">
+                    {summary.participantCount}명
+                  </span>
+                }
+              >
+                <span className="text-base text-foreground-muted">
+                  참여 인원
+                </span>
+              </MobileListItem>
+            </MobileList>
+          </section>
 
-        {!summary.alreadyJoined && (
-          <Field data-invalid={Boolean(errorMessage) || undefined}>
-            <FieldLabel htmlFor="invite-nickname">어떤 이름으로 참여할까요?</FieldLabel>
-            <Input
-              id="invite-nickname"
-              autoComplete="nickname"
-              maxLength={MAX_NICKNAME_LENGTH}
-              placeholder="여행에서 사용할 닉네임"
-              value={nickname}
-              onChange={(event) => {
-                setNickname(event.target.value);
-                sessionStorage.setItem(storageKey, event.target.value);
-                setErrorMessage(undefined);
+          {!summary.alreadyJoined && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleJoin();
               }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void handleJoin();
-              }}
-              aria-invalid={Boolean(errorMessage) || undefined}
-              className="h-12 px-4"
-            />
-            {errorMessage ? (
-              <FieldError role="alert">{errorMessage}</FieldError>
-            ) : (
-              <FieldDescription>가입 폼 없이 이 여행에만 사용할 이름이에요.</FieldDescription>
-            )}
-          </Field>
-        )}
+              className="px-(--app-inline-padding) pt-6"
+            >
+              <Field data-invalid={Boolean(errorMessage) || undefined}>
+                <FieldLabel htmlFor="invite-nickname">
+                  어떤 이름으로 참여할까요?
+                </FieldLabel>
+                <Input
+                  id="invite-nickname"
+                  autoComplete="nickname"
+                  maxLength={MAX_NICKNAME_LENGTH}
+                  placeholder="여행에서 사용할 닉네임"
+                  value={nickname}
+                  onChange={(event) => {
+                    setNickname(event.target.value);
+                    sessionStorage.setItem(storageKey, event.target.value);
+                    setErrorMessage(undefined);
+                  }}
+                  aria-invalid={Boolean(errorMessage) || undefined}
+                  className="h-12 rounded-xl px-4"
+                />
+                {errorMessage ? (
+                  <FieldError>{errorMessage}</FieldError>
+                ) : (
+                  <FieldDescription>
+                    가입 폼 없이 이 여행에만 사용할 이름이에요.
+                  </FieldDescription>
+                )}
+              </Field>
+            </form>
+          )}
 
-        {summary.alreadyJoined && errorMessage && (
-          <p className="text-sm text-destructive" role="alert">{errorMessage}</p>
-        )}
-        {sessionQuery.isError && (
-          <div className="text-center">
-            <p className="text-sm text-destructive" role="alert">
-              인증 서비스를 확인하지 못했어요.
+          {summary.alreadyJoined && (
+            <output
+              className="mx-(--app-inline-padding) mt-6 block rounded-xl border border-info/30 bg-info-muted p-4 text-base leading-relaxed text-foreground"
+              aria-live="polite"
+            >
+              이미 이 여행에 참여하고 있어요. 여행방으로 바로 돌아갈 수 있어요.
+            </output>
+          )}
+
+          {summary.alreadyJoined && errorMessage && (
+            <p
+              className="mx-(--app-inline-padding) mt-4 text-base leading-relaxed text-destructive"
+              role="alert"
+            >
+              {errorMessage}
             </p>
-            <Button variant="link" onClick={() => void sessionQuery.refetch()}>
-              다시 시도
-            </Button>
-          </div>
-        )}
+          )}
 
+          {sessionQuery.isError && (
+            <div className="mx-(--app-inline-padding) mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+              <p
+                className="text-base leading-relaxed text-destructive"
+                role="alert"
+              >
+                인증 서비스를 확인하지 못했어요.
+              </p>
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => void sessionQuery.refetch()}
+              >
+                다시 시도
+              </Button>
+            </div>
+          )}
+        </PageBody>
+      </main>
+
+      <BottomAction
+        accessory={
+          completionCondition ? (
+            <p
+              className="text-center text-base leading-relaxed text-foreground-muted"
+              role={sessionQuery.isLoading ? "status" : undefined}
+              aria-live={sessionQuery.isLoading ? "polite" : undefined}
+            >
+              {completionCondition}
+            </p>
+          ) : undefined
+        }
+      >
         <Button
           type="button"
           size="xl"
-          className="mt-6 w-full"
+          aria-busy={isSubmitting || undefined}
           disabled={
             (!summary.alreadyJoined && !nicknameIsValid) ||
             sessionQuery.isLoading ||
@@ -232,6 +346,7 @@ export function InvitePage(): JSX.Element {
           }
           onClick={() => void handleJoin()}
         >
+          {isSubmitting && <Spinner aria-hidden="true" />}
           {isSubmitting
             ? "참여하는 중..."
             : summary.alreadyJoined
@@ -240,13 +355,14 @@ export function InvitePage(): JSX.Element {
         </Button>
         <Button
           type="button"
-          variant="ghost"
-          className="mt-2 w-full"
+          size="xl"
+          variant="secondary"
+          className="flex-none!"
           onClick={() => navigate("/trips", { replace: true })}
         >
           취소
         </Button>
-      </section>
-    </main>
+      </BottomAction>
+    </div>
   );
 }

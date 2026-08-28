@@ -3,42 +3,48 @@ import type { ConfirmPlanSummary } from "../plan-compare-view-model.ts";
 
 const containerStyle = css`
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   padding: 4px 0 8px;
 `;
 
 const planTitleStyle = css`
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--foreground);
+  min-width: 0;
   margin: 0;
+  color: var(--foreground);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 `;
 
 const rowStyle = css`
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  font-size: 14px;
-  line-height: 1.45;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  font-size: 16px;
+  line-height: 1.5;
 `;
 
 const rowLabelStyle = css`
-  flex: 0 0 62px;
   color: var(--foreground-subtle);
   font-weight: 600;
 `;
 
 const rowValueStyle = css`
-  flex: 1;
-  color: var(--secondary-foreground);
+  min-width: 0;
   margin: 0;
-  word-break: keep-all;
+  color: var(--secondary-foreground);
+  overflow-wrap: anywhere;
 `;
 
 const costValueStyle = css`
-  flex: 1;
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
 `;
 
 const costMainStyle = css`
@@ -50,34 +56,38 @@ const costMainStyle = css`
 const costSubStyle = css`
   display: block;
   margin-top: 2px;
-  font-size: 12px;
   color: var(--foreground-subtle);
+  font-size: 16px;
 `;
 
 const needCheckBoxStyle = css`
-  background-color: var(--warning-muted);
+  min-width: 0;
+  padding: 14px;
   border: 1px solid var(--warning-border);
   border-radius: 12px;
-  padding: 12px 14px;
+  background-color: var(--warning-muted);
+  overflow-wrap: anywhere;
 `;
 
 const needCheckTitleStyle = css`
-  font-size: 13px;
-  font-weight: 700;
+  margin: 0 0 8px;
   color: var(--warning);
-  margin: 0 0 6px 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
 `;
 
 const needCheckListStyle = css`
-  margin: 0;
-  padding-left: 18px;
-  list-style: disc;
-  font-size: 13px;
-  color: var(--secondary-foreground);
   display: flex;
+  margin: 0;
+  padding-left: 20px;
   flex-direction: column;
-  gap: 4px;
-  line-height: 1.4;
+  gap: 6px;
+  color: var(--secondary-foreground);
+  font-size: 16px;
+  line-height: 1.5;
+  list-style: disc;
+  overflow-wrap: anywhere;
 `;
 
 interface ConfirmPlanSummaryViewProps {
@@ -90,8 +100,8 @@ interface ConfirmPlanSummaryViewProps {
  */
 export function ConfirmPlanSummaryView({ summary }: ConfirmPlanSummaryViewProps) {
   return (
-    <div css={containerStyle}>
-      <p css={planTitleStyle}>{summary.title}</p>
+    <div css={containerStyle} data-plan-summary-layout="vertical">
+      <h3 css={planTitleStyle}>{summary.title}</h3>
 
       <div css={rowStyle}>
         <span css={rowLabelStyle}>일정</span>

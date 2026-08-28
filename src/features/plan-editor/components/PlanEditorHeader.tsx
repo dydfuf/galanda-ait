@@ -30,23 +30,30 @@ export function PlanEditorHeader({
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
   return (
-    <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-1">
-        <h1 className="text-xl font-bold text-foreground">
-          {isEditMode ? "여행안 수정하기" : isCloneMode ? "복제해 새 대안 제안하기" : "새 여행안 제안하기"}
+    <header
+      className="mb-6 flex min-w-0 flex-wrap items-start justify-between gap-4"
+      data-galanda-surface="content"
+    >
+      <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1.5">
+        <h1 className="min-w-0 text-[22px] leading-tight font-bold text-foreground [overflow-wrap:anywhere]">
+          {isEditMode
+            ? "여행안 수정하기"
+            : isCloneMode
+              ? "복제해 새 대안 제안하기"
+              : "새 여행안 제안하기"}
         </h1>
-        <p className="text-[13px] text-muted-foreground">
+        <p className="min-w-0 text-base leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
           {isEditMode
             ? "작성한 여행안의 세부 조건을 보완합니다."
             : isCloneMode
-            ? "기존 안을 바탕으로 날짜, 도시, 숙소 조건을 바꾼 대안을 만듭니다."
-            : "방문 도시와 숙소/교통 조건을 구성해 친구들과 비교해보세요."}
+              ? "기존 안을 바탕으로 날짜, 도시, 숙소 조건을 바꾼 대안을 만듭니다."
+              : "방문 도시와 숙소/교통 조건을 구성해 친구들과 비교해보세요."}
         </p>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <div className="flex min-w-0 shrink-0 flex-col items-end gap-2">
         <output
-          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs whitespace-nowrap ${
+          className={`flex min-h-(--touch-target-min) max-w-full min-w-0 items-center rounded-lg px-3 py-2 text-base leading-snug font-medium [overflow-wrap:anywhere] ${
             draftSaveStatus === "ERROR"
               ? "bg-destructive-muted text-destructive-strong"
               : "bg-muted text-muted-foreground"
@@ -58,15 +65,17 @@ export function PlanEditorHeader({
           <button
             type="button"
             onClick={() => setIsClearConfirmOpen(true)}
-            className="cursor-pointer p-1 text-xs text-destructive underline hover:opacity-80"
+            className="min-h-(--touch-target-min) min-w-(--touch-target-min) cursor-pointer rounded-lg px-3 py-2 text-base font-medium text-destructive underline underline-offset-4 hover:bg-destructive-muted"
           >
             작성 초기화
           </button>
         )}
       </div>
 
-      {/* 작성 초기화 confirm */}
-      <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+      <AlertDialog
+        open={isClearConfirmOpen}
+        onOpenChange={setIsClearConfirmOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>작성 내용을 초기화할까요?</AlertDialogTitle>

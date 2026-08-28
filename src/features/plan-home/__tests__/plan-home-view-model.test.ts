@@ -39,6 +39,148 @@ const room: TripRoom = {
   confirmedPlanId: undefined,
 };
 
+const PROPERTY_5_SEED = 0x5afe_095;
+const PROPERTY_5_CASE_COUNT = 128;
+
+interface PlanProvenanceCase {
+  readonly plans: TripRoom["plans"];
+}
+
+function createDeterministicGenerator(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}
+
+function generatePlanProvenanceCase(
+  caseIndex: number,
+  next: () => number,
+): PlanProvenanceCase {
+  const planCount = caseIndex % 9;
+  const plans: TripRoom["plans"] = Array.from(
+    { length: planCount },
+    (_, planIndex) => {
+      const optionalVariant = (caseIndex + planIndex) % 4;
+      const member = room.members[Math.floor(next() * room.members.length)];
+      const month = String((planIndex % 9) + 1).padStart(2, "0");
+
+      return {
+        id: PlanIdSchema.make(`property-5-plan-${caseIndex}-${planIndex}`),
+        title: `사용자가 입력한 여행안 ${caseIndex}-${planIndex}-${Math.floor(next() * 1_000_000)}`,
+        status: "DRAFT" as const,
+        places: [],
+        voteCount: Math.floor(next() * 20),
+        ...(optionalVariant === 1 || optionalVariant === 3
+          ? {
+              differenceSummary: `사용자가 입력한 핵심 차이 ${caseIndex}-${planIndex}`,
+            }
+          : {}),
+        ...(optionalVariant === 2 || optionalVariant === 3
+          ? { authorId: member.id, authorName: member.name }
+          : {}),
+        ...(optionalVariant === 3
+          ? {
+              routes: [
+                {
+                  city: `도시 ${caseIndex}-${planIndex}`,
+                  arrivalDate: `2027-${month}-01`,
+                  departureDate: `2027-${month}-03`,
+                },
+              ],
+            }
+          : {}),
+      };
+    },
+  );
+
+  return { plans };
+}
+
+function formatPlanProvenanceCounterexample(
+  caseIndex: number,
+  planCase: PlanProvenanceCase,
+): string {
+  return [
+    `Property 5 counterexample (seed=0x${PROPERTY_5_SEED.toString(16)}, case=${caseIndex})`,
+    JSON.stringify(
+      planCase.plans.map((plan) => ({
+        id: plan.id,
+        title: plan.title,
+        differenceSummary: plan.differenceSummary,
+        authorId: plan.authorId,
+        authorName: plan.authorName,
+        routes: plan.routes,
+      })),
+    ),
+  ].join(", ");
+}
+
+function assertWithCounterexample(
+  counterexample: string,
+  assertion: () => void,
+): void {
+  try {
+    assertion();
+  } catch (error) {
+    if (error instanceof Error) {
+      error.message = `${counterexample}\n${error.message}`;
+    }
+    throw error;
+  }
+}
+
+describe("Plan Home view-model entity provenance", (): void => {
+  // **Validates: Requirements 4.1, 9.12, 11.5**
+  it("Feature: toss-liquid-glass-ui-refresh, Property 5: View-Model Entity Provenance", (): void => {
+    const next = createDeterministicGenerator(PROPERTY_5_SEED);
+
+    for (let caseIndex = 0; caseIndex < PROPERTY_5_CASE_COUNT; caseIndex += 1) {
+      const planCase = generatePlanProvenanceCase(caseIndex, next);
+      const counterexample = formatPlanProvenanceCounterexample(
+        caseIndex,
+        planCase,
+      );
+      const projected = toTripRoomViewModel({
+        ...room,
+        plans: planCase.plans,
+        confirmedPlanId: undefined,
+      });
+
+      assertWithCounterexample(counterexample, () => {
+        expect(projected.plans).toHaveLength(planCase.plans.length);
+        expect(projected.plans.map(({ id, title }) => ({ id, title }))).toEqual(
+          planCase.plans.map(({ id, title }) => ({ id, title })),
+        );
+
+        planCase.plans.forEach((sourcePlan, planIndex) => {
+          const projectedPlan = projected.plans[planIndex];
+
+          expect(projectedPlan.id).toBe(sourcePlan.id);
+          expect(projectedPlan.title).toBe(sourcePlan.title);
+          expect(projectedPlan.differenceSummary).toBe(
+            sourcePlan.differenceSummary,
+          );
+          expect(projectedPlan.differenceSummaryText).toBe(
+            sourcePlan.differenceSummary ?? "핵심 차이 미정",
+          );
+          expect(projectedPlan.authorName).toBe(
+            sourcePlan.authorName ?? "작성자 미확인",
+          );
+
+          const sourceRoute = sourcePlan.routes?.[0];
+          expect(projectedPlan.period).toBe(
+            sourceRoute
+              ? `${sourceRoute.arrivalDate} ~ ${sourceRoute.departureDate}`
+              : "일정 미정",
+          );
+        });
+      });
+    }
+  });
+});
+
 describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
   it("후보 수와 의견 수, 의견 참여 인원을 실제 계산값으로 집계한다", (): void => {
     const twoPlans: TripRoom = {
@@ -147,6 +289,32 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
     expect(vm.totalOpinionCount).toBe(2);
     // legacy plan에는 opinion author가 없으므로 참여자는 집계하지 않는다
     expect(vm.participatedMemberCount).toBe(0);
+  });
+
+  it("source 여행안 순서와 제목을 보존하고 누락된 핵심 차이를 미정으로 표시한다", (): void => {
+    const plans: TripRoom["plans"] = [
+      {
+        ...room.plans[0],
+        id: PlanIdSchema.make("plan-first"),
+        title: "입력한 첫 번째 제목",
+        differenceSummary: "입력한 핵심 차이",
+      },
+      {
+        ...room.plans[0],
+        id: PlanIdSchema.make("plan-second"),
+        title: "입력한 두 번째 제목",
+        differenceSummary: undefined,
+      },
+    ];
+
+    const vm = toTripRoomViewModel({ ...room, plans });
+
+    expect(vm.plans.map(({ id, title }) => ({ id, title }))).toEqual(
+      plans.map(({ id, title }) => ({ id, title })),
+    );
+    expect(
+      vm.plans.map(({ differenceSummaryText }) => differenceSummaryText),
+    ).toEqual(["입력한 핵심 차이", "핵심 차이 미정"]);
   });
 });
 

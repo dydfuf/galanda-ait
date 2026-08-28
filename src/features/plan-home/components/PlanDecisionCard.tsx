@@ -4,11 +4,11 @@ import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 
-import type { PlanSummaryData } from "../plan-home-view-model.ts";
+import type { PlanHomePlanSummaryData } from "../plan-home-view-model.ts";
 import { Pill, PlanOpinionSummary } from "./PlanOpinionSummary.tsx";
 
 interface PlanDecisionCardProps {
-  readonly plan: PlanSummaryData;
+  readonly plan: PlanHomePlanSummaryData;
   readonly to: string;
 }
 
@@ -21,12 +21,13 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   const hasDuration = plan.days > 0;
   const durationLabel = hasDuration ? `${plan.nights}박 ${plan.days}일` : undefined;
   const periodText = plan.period !== "일정 미정" ? plan.period : undefined;
+  const hasDifferenceSummary = Boolean(plan.differenceSummary?.trim());
 
   const cardVariantClass = isConfirmed
-    ? "border-success/30 bg-success-muted/40 hover:border-success/40 hover:bg-success-muted/60 active:bg-success-muted/70"
+    ? "border-success bg-surface-raised hover:border-success hover:bg-muted"
     : plan.planTag === "BASIC"
-      ? "border-info/20 bg-info-muted/30 hover:border-info/30 hover:bg-info-muted/50 active:bg-info-muted/60"
-      : "border-border bg-card hover:border-border-strong hover:bg-muted/40 active:bg-muted/60";
+      ? "border-info bg-surface-raised hover:border-info hover:bg-muted"
+      : "border-border bg-surface-raised hover:border-border-strong hover:bg-muted";
 
   return (
     <Link
@@ -75,17 +76,32 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         {plan.authorName} 제안
       </p>
 
-      {/* 4. differenceSummary 기반 핵심 차이 – 한 단계 낮지만 의견보다 먼저 읽힌다. 없으면 렌더하지 않는다. */}
-      {plan.differenceSummary && (
-        <div className="rounded-xl border border-primary-border-weak bg-primary-muted/40 px-3 py-2.5">
-          <p className="break-words text-[13px] font-semibold leading-relaxed text-info [overflow-wrap:anywhere] line-clamp-2">
-            {plan.differenceSummary}
-          </p>
-        </div>
-      )}
+      {/* 4. 핵심 차이 – 입력값 또는 명시적인 미정 상태를 의견보다 먼저 표시한다. */}
+      <div
+        className={cn(
+          "rounded-xl border px-3 py-2.5",
+          hasDifferenceSummary
+            ? "border-primary-border-weak bg-primary-muted"
+            : "border-border bg-muted",
+        )}
+      >
+        <p
+          className={cn(
+            "break-words text-sm leading-relaxed [overflow-wrap:anywhere] line-clamp-2",
+            hasDifferenceSummary
+              ? "font-semibold text-info"
+              : "text-foreground-muted",
+          )}
+        >
+          {plan.differenceSummaryText}
+        </p>
+      </div>
 
       {/* 5. 의견 요약 / 내 의견 상태 – text 덩어리보다 빠르게 읽히는 경량 구분선 + wrap */}
-      <PlanOpinionSummary opinions={plan.opinions} myReaction={plan.myReaction} />
+      <PlanOpinionSummary
+        opinions={plan.opinions}
+        myReaction={plan.myReaction}
+      />
     </Link>
   );
 }

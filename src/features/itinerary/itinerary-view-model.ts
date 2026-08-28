@@ -7,14 +7,14 @@ export interface ItineraryRouteSegment {
 }
 
 export type ItineraryStatus = "AVAILABLE" | "NEED_CHECK" | "FULL" | "SEARCHING";
-type StatusColor = "green" | "yellow" | "red" | "elephant";
+export type ItineraryStatusTone = "success" | "warning" | "danger" | "neutral";
 
 interface ItineraryItemBase {
   readonly id: string;
   readonly priceText: string;
   readonly bookingStatus: ItineraryStatus;
   readonly statusLabel: string;
-  readonly statusColor: StatusColor;
+  readonly statusTone: ItineraryStatusTone;
   readonly confirmedInfo: string;
   readonly bookingUrl?: string;
   readonly subText: string;
@@ -57,7 +57,7 @@ export interface ItineraryNeedCheckItem {
   readonly snapshotInfo: string;
   readonly status: "NEED_CHECK" | "FULL" | "SEARCHING";
   readonly statusLabel: string;
-  readonly statusColor: "yellow" | "red" | "elephant";
+  readonly statusTone: Exclude<ItineraryStatusTone, "success">;
   readonly dateText: string;
 }
 
@@ -119,35 +119,38 @@ const daysBetween = (start: string, end: string): number =>
       86_400_000
   );
 
+const displayValue = (value: string, fallback: string): string =>
+  value.trim().length > 0 ? value : fallback;
+
 export function getStayStatusBadge(status: ItineraryStatus): {
   readonly label: string;
-  readonly color: StatusColor;
+  readonly tone: ItineraryStatusTone;
 } {
   switch (status) {
     case "AVAILABLE":
-      return { label: "예약 완료", color: "green" };
+      return { label: "예약 완료", tone: "success" };
     case "NEED_CHECK":
-      return { label: "확인 필요", color: "yellow" };
+      return { label: "확인 필요", tone: "warning" };
     case "FULL":
-      return { label: "만실", color: "red" };
+      return { label: "만실", tone: "danger" };
     default:
-      return { label: "확인 전", color: "elephant" };
+      return { label: "확인 전", tone: "neutral" };
   }
 }
 
 export function getTransportStatusBadge(status: ItineraryStatus): {
   readonly label: string;
-  readonly color: StatusColor;
+  readonly tone: ItineraryStatusTone;
 } {
   switch (status) {
     case "AVAILABLE":
-      return { label: "예매 가능", color: "green" };
+      return { label: "예매 가능", tone: "success" };
     case "NEED_CHECK":
-      return { label: "확인 필요", color: "yellow" };
+      return { label: "확인 필요", tone: "warning" };
     case "FULL":
-      return { label: "매진", color: "red" };
+      return { label: "매진", tone: "danger" };
     default:
-      return { label: "확인 전", color: "elephant" };
+      return { label: "확인 전", tone: "neutral" };
   }
 }
 
@@ -165,7 +168,31 @@ export function toItineraryViewModel(
   const lastRoute = snapshot.routes.at(-1)!;
   const nights = daysBetween(firstRoute.arrivalDate, lastRoute.departureDate);
   const needCheckItems: ItineraryNeedCheckItem[] = [];
-  const sections = new Map<string, ItineraryItem[]>();
+  const sections: Array<{
+    readonly id: string;
+    readonly dateStr: string;
+    readonly items: ItineraryItem[];
+  }> = [];
+  const dateSectionOccurrences = new Map<string, number>();
+
+  const appendToDateSection = (dateStr: string, item: ItineraryItem): void => {
+    const currentSection = sections.at(-1);
+    if (currentSection?.dateStr === dateStr) {
+      currentSection.items.push(item);
+      return;
+    }
+
+    const occurrence = (dateSectionOccurrences.get(dateStr) ?? 0) + 1;
+    dateSectionOccurrences.set(dateStr, occurrence);
+    sections.push({
+      id:
+        occurrence === 1
+          ? `section-${dateStr}`
+          : `section-${dateStr}-${occurrence}`,
+      dateStr,
+      items: [item],
+    });
+  };
 
   for (const item of snapshot.items) {
     if (item.type === "STAY") {
@@ -175,34 +202,50 @@ export function toItineraryViewModel(
           ? "SEARCHING"
           : accommodation.bookingStatus;
       const badge = getStayStatusBadge(status);
+      const city = displayValue(accommodation.city, "도시 미정");
+      const hotelName = displayValue(accommodation.hotelName, "숙소 이름 미정");
+      const stayNights = daysBetween(item.date, item.endDate);
       const viewItem: ItineraryStayItem = {
         type: "STAY",
         id: accommodation.id,
-        city: accommodation.city,
-        hotelName: accommodation.hotelName,
-        period: accommodation.period,
+        city,
+        hotelName,
+        period: displayValue(accommodation.period, "숙박 기간 미정"),
         periodText: formatPeriodText(item.date, item.endDate),
-        nights: daysBetween(item.date, item.endDate),
+        nights: stayNights,
         priceText: priceText(accommodation.priceRange),
         bookingStatus: status,
         statusLabel: badge.label,
-        statusColor: badge.color,
-        confirmedInfo: confirmationText(accommodation.confirmedBy, accommodation.confirmedAt),
+        statusTone: badge.tone,
+        confirmedInfo: confirmationText(
+          accommodation.confirmedBy,
+          accommodation.confirmedAt,
+        ),
         bookingUrl: accommodation.bookingUrl,
-        subText: `${daysBetween(item.date, item.endDate)}박 · ${badge.label}`,
+        subText: `${stayNights}박 · ${badge.label}`,
         memo: item.memo,
       };
-      sections.set(item.date, [...(sections.get(item.date) ?? []), viewItem]);
+      appendToDateSection(item.date, viewItem);
       if (status !== "AVAILABLE") {
         needCheckItems.push({
           id: `need-check-stay-${accommodation.id}`,
           itemType: "STAY",
-          title: accommodation.hotelName,
-          message: `${accommodation.city} 숙소 예약 상태를 확인해주세요.`,
+          title: hotelName,
+          message: `${city} 숙소 예약 상태를 확인해주세요.`,
           snapshotInfo: viewItem.confirmedInfo,
-          status: status === "FULL" ? "FULL" : status === "NEED_CHECK" ? "NEED_CHECK" : "SEARCHING",
+          status:
+            status === "FULL"
+              ? "FULL"
+              : status === "NEED_CHECK"
+                ? "NEED_CHECK"
+                : "SEARCHING",
           statusLabel: badge.label,
-          statusColor: status === "FULL" ? "red" : status === "NEED_CHECK" ? "yellow" : "elephant",
+          statusTone:
+            status === "FULL"
+              ? "danger"
+              : status === "NEED_CHECK"
+                ? "warning"
+                : "neutral",
           dateText: item.date,
         });
       }
@@ -213,25 +256,32 @@ export function toItineraryViewModel(
     const status: ItineraryStatus =
       transport.bookingStatus === "NOT_CHECKED" ? "SEARCHING" : transport.bookingStatus;
     const badge = getTransportStatusBadge(status);
+    const fromCity = displayValue(transport.fromCity, "출발지 미정");
+    const toCity = displayValue(transport.toCity, "도착지 미정");
+    const mode = displayValue(transport.mode, "이동 수단 미정");
+    const durationText = displayValue(transport.durationText, "소요 시간 미정");
     const viewItem: ItineraryTransportItem = {
       type: "TRANSPORT",
       id: transport.id,
-      fromCity: transport.fromCity,
-      toCity: transport.toCity,
-      routeTitle: `${transport.fromCity} → ${transport.toCity}`,
-      mode: transport.mode,
+      fromCity,
+      toCity,
+      routeTitle: `${fromCity} → ${toCity}`,
+      mode,
       hasTransfer: transport.hasTransfer,
-      durationText: transport.durationText,
+      durationText,
       priceText: priceText(transport.priceRange),
       bookingStatus: status,
       statusLabel: badge.label,
-      statusColor: badge.color,
-      confirmedInfo: confirmationText(transport.confirmedBy, transport.confirmedAt),
+      statusTone: badge.tone,
+      confirmedInfo: confirmationText(
+        transport.confirmedBy,
+        transport.confirmedAt,
+      ),
       bookingUrl: transport.bookingUrl,
-      subText: `${transport.mode} · ${badge.label}`,
+      subText: `${mode} · ${badge.label}`,
       memo: item.memo,
     };
-    sections.set(item.date, [...(sections.get(item.date) ?? []), viewItem]);
+    appendToDateSection(item.date, viewItem);
     if (status !== "AVAILABLE") {
       needCheckItems.push({
         id: `need-check-transport-${transport.id}`,
@@ -239,9 +289,19 @@ export function toItineraryViewModel(
         title: viewItem.routeTitle,
         message: `${viewItem.routeTitle} 교통 예약 상태를 확인해주세요.`,
         snapshotInfo: viewItem.confirmedInfo,
-        status: status === "FULL" ? "FULL" : status === "NEED_CHECK" ? "NEED_CHECK" : "SEARCHING",
+        status:
+          status === "FULL"
+            ? "FULL"
+            : status === "NEED_CHECK"
+              ? "NEED_CHECK"
+              : "SEARCHING",
         statusLabel: badge.label,
-        statusColor: status === "FULL" ? "red" : status === "NEED_CHECK" ? "yellow" : "elephant",
+        statusTone:
+          status === "FULL"
+            ? "danger"
+            : status === "NEED_CHECK"
+              ? "warning"
+              : "neutral",
         dateText: item.date,
       });
     }
@@ -249,27 +309,31 @@ export function toItineraryViewModel(
 
   return {
     tripId: itinerary.tripId,
-    destination: snapshot.destination,
-    periodText: formatPeriodText(firstRoute.arrivalDate, lastRoute.departureDate),
+    destination: displayValue(snapshot.destination, "여행지 미정"),
+    periodText: formatPeriodText(
+      firstRoute.arrivalDate,
+      lastRoute.departureDate,
+    ),
     confirmedPlanId: itinerary.sourcePlanId,
-    confirmedPlanTitle: snapshot.planTitle,
+    confirmedPlanTitle: displayValue(
+      snapshot.planTitle,
+      "확정 여행안 제목 미정",
+    ),
     nights,
     days: nights + 1,
     route: snapshot.routes.map((route) => ({
-      city: route.city,
+      city: displayValue(route.city, "도시 미정"),
       nights: daysBetween(route.arrivalDate, route.departureDate),
     })),
     differenceSummary: snapshot.differenceSummary,
     needCheckCount: needCheckItems.length,
     hasNeedCheckDanger: needCheckItems.some(({ status }) => status === "FULL"),
     needCheckItems,
-    sections: [...sections.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dateStr, items]) => ({
-        id: `section-${dateStr}`,
-        dateStr,
-        dateHeader: formatKoreanDate(parseYMD(dateStr)!),
-        items,
-      })),
+    sections: sections.map(({ id, dateStr, items }) => ({
+      id,
+      dateStr,
+      dateHeader: formatKoreanDate(parseYMD(dateStr)!),
+      items,
+    })),
   };
 }

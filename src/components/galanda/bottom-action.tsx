@@ -20,13 +20,14 @@ interface BottomActionProps {
 export function BottomAction({ accessory, children, className }: BottomActionProps) {
   return (
     <div
+      data-galanda-surface="chrome"
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 bg-background px-5 pt-2 pb-[calc(12px+var(--safe-bottom))]",
+        "fixed inset-x-0 bottom-0 z-30 border-t px-5 pt-2 pb-[calc(12px+var(--safe-bottom))]",
         className,
       )}
     >
-      <div className="mx-auto flex w-full max-w-[640px] flex-col gap-2">
-        {accessory}
+      <div className="mx-auto flex w-full max-w-(--content-max-width) flex-col gap-2">
+        {accessory && <div className="min-w-0">{accessory}</div>}
         <div className="flex gap-2 *:min-w-0 *:flex-1">{children}</div>
       </div>
     </div>

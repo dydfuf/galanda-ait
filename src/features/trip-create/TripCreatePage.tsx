@@ -50,62 +50,82 @@ export function TripCreatePage() {
   };
 
   const counterText = `(${title.length}/${MAX_TITLE_LENGTH})`;
+  const completionCondition = !isValid
+    ? "여행 이름을 입력해 주세요."
+    : undefined;
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
-      {!platformNavigation && <PageHeader back={{ onClick: () => void goBack() }} />}
+      {!platformNavigation && (
+        <PageHeader
+          title="여행 만들기"
+          back={{ onClick: () => void goBack() }}
+        />
+      )}
 
       <main className="flex flex-1 flex-col">
         <PageBody withBottomAction>
-        <PageTitle
-          title="어떤 여행을 계획하고 있나요?"
-          description="먼저 여행 이름만 정해주세요."
-        />
+          <PageTitle
+            title="어떤 여행을 계획하고 있나요?"
+            description="먼저 여행 이름만 정해주세요."
+          />
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSubmit();
-          }}
-          className="flex flex-col px-(--app-inline-padding) pt-4"
-        >
-          <Field data-invalid={Boolean(errorMsg) || undefined}>
-            <FieldLabel htmlFor="trip-title">여행 이름 *</FieldLabel>
-            <Input
-              id="trip-title"
-              ref={inputRef}
-              placeholder="예: 일본 여행, 2026 제주 힐링"
-              value={title}
-              maxLength={MAX_TITLE_LENGTH}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (errorMsg) setErrorMsg(null);
-              }}
-              aria-invalid={Boolean(errorMsg) || undefined}
-              required
-              className="h-12 rounded-xl px-4"
-            />
-            {errorMsg ? (
-              <FieldError>
-                {errorMsg} {counterText}
-              </FieldError>
-            ) : (
-              <FieldDescription className="text-[13px]">
-                여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요. {counterText}
-              </FieldDescription>
-            )}
-          </Field>
-        </form>
+          <form
+            id="trip-create-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSubmit();
+            }}
+            className="flex flex-col px-(--app-inline-padding) pt-4"
+          >
+            <Field data-invalid={Boolean(errorMsg) || undefined}>
+              <FieldLabel htmlFor="trip-title">여행 이름 *</FieldLabel>
+              <Input
+                id="trip-title"
+                ref={inputRef}
+                placeholder="예: 일본 여행, 2026 제주 힐링"
+                value={title}
+                maxLength={MAX_TITLE_LENGTH}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (errorMsg) setErrorMsg(null);
+                }}
+                aria-describedby="trip-title-help"
+                aria-invalid={Boolean(errorMsg) || undefined}
+                required
+                className="h-12 rounded-xl px-4"
+              />
+              {errorMsg ? (
+                <FieldError id="trip-title-help">
+                  {errorMsg} {counterText}
+                </FieldError>
+              ) : (
+                <FieldDescription id="trip-title-help">
+                  여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.{" "}
+                  {counterText}
+                </FieldDescription>
+              )}
+            </Field>
+          </form>
         </PageBody>
       </main>
 
-      {/* 화면 하단 고정 CTA: 입력 중 키보드가 올라와도 가려지지 않아요. */}
-      <BottomAction>
+      <BottomAction
+        accessory={
+          completionCondition ? (
+            <p className="text-center text-base leading-relaxed text-foreground-muted">
+              {completionCondition}
+            </p>
+          ) : undefined
+        }
+      >
         <Button
-          type="button"
+          type="submit"
+          form="trip-create-form"
           size="xl"
+          aria-busy={createRoomMutation.isPending || undefined}
+          aria-live="polite"
           disabled={!isValid || createRoomMutation.isPending}
-          onClick={() => void handleSubmit()}
         >
           {createRoomMutation.isPending && <Spinner aria-hidden="true" />}
           {createRoomMutation.isPending ? "여행방 만드는 중..." : "여행 만들기"}

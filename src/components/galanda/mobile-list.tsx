@@ -43,37 +43,60 @@ export function MobileListItem({
   className,
   children,
 }: MobileListItemProps) {
-  const interactive = Boolean(onClick || to) && !disabled;
+  const actionable = Boolean(onClick || to);
+  const interactive = actionable && !disabled;
+  const hasLeading = leading !== undefined && leading !== null;
+  const hasTrailing = trailing !== undefined && trailing !== null;
   const render = to ? (
-    <Link to={to} aria-label={ariaLabel} aria-disabled={disabled || undefined} />
+    <Link
+      to={to}
+      aria-label={ariaLabel}
+      aria-disabled={disabled || undefined}
+      onClick={disabled ? (event) => event.preventDefault() : undefined}
+      tabIndex={disabled ? -1 : undefined}
+    />
   ) : onClick ? (
-    <button type="button" onClick={onClick} disabled={disabled} aria-label={ariaLabel} />
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    />
   ) : undefined;
 
   return (
-    <Item
-      render={render}
-      aria-label={render ? undefined : ariaLabel}
-      className={cn(
-        "w-full rounded-none border-x-0 px-(--app-inline-padding) py-3.5 text-left",
-        // TDS가 주입하는 unlayered `a { color }` 전역 스타일을 이겨야 해서 important를 써요.
-        // TDS package 제거(RAON-189) 후에도 무해해요.
-        to && "text-foreground! no-underline!",
-        interactive && "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted",
-        disabled && "opacity-50",
-        className,
-      )}
-    >
-      {leading && <ItemMedia>{leading}</ItemMedia>}
-      <ItemContent>{children}</ItemContent>
-      {(trailing || chevron) && (
-        <ItemActions className="max-w-[45%] shrink-0">
-          {trailing}
-          {chevron && (
-            <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-muted-foreground/60" />
-          )}
-        </ItemActions>
-      )}
-    </Item>
+    <div role="listitem" className="min-w-0">
+      <Item
+        render={render}
+        aria-label={render ? undefined : ariaLabel}
+        className={cn(
+          "min-w-0 w-full rounded-none border-x-0 px-(--app-inline-padding) py-3.5 text-left",
+          // TDS가 주입하는 unlayered `a { color }` 전역 스타일을 이겨야 해서 important를 써요.
+          // TDS package 제거(RAON-189) 후에도 무해해요.
+          to && "text-foreground! no-underline!",
+          actionable && "min-h-(--touch-target-min)",
+          interactive &&
+            "cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted",
+          disabled && "opacity-50",
+          className,
+        )}
+      >
+        {hasLeading && <ItemMedia>{leading}</ItemMedia>}
+        <ItemContent className="min-w-0 [overflow-wrap:anywhere] [&_[data-slot=item-description]]:line-clamp-none [&_[data-slot=item-description]]:min-w-0 [&_[data-slot=item-description]]:[overflow-wrap:anywhere] [&_[data-slot=item-title]]:line-clamp-none [&_[data-slot=item-title]]:min-w-0 [&_[data-slot=item-title]]:w-full [&_[data-slot=item-title]]:flex-wrap [&_[data-slot=item-title]]:[overflow-wrap:anywhere]">
+          {children}
+        </ItemContent>
+        {(hasTrailing || chevron) && (
+          <ItemActions className="min-w-0 max-w-[45%] shrink-0 flex-wrap justify-end text-right [overflow-wrap:anywhere] [&>*]:min-w-0 [&>*]:max-w-full [&>*]:whitespace-normal [&>*]:[overflow-wrap:anywhere]">
+            {trailing}
+            {chevron && (
+              <ChevronRight
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground/60"
+              />
+            )}
+          </ItemActions>
+        )}
+      </Item>
+    </div>
   );
 }

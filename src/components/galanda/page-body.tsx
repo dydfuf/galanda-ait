@@ -24,15 +24,18 @@ export function PageBody({
 }: PageBodyProps) {
   return (
     <div
+      {...props}
+      data-galanda-surface="content"
       className={cn(
-        "min-h-full w-full flex-1",
+        "mx-auto box-border min-h-full w-full max-w-(--content-max-width) min-w-0 flex-1",
+        className,
         safeTop
           ? "pt-[calc(var(--app-page-padding-top)+var(--safe-top))]"
           : "pt-(--app-page-padding-top)",
-        withBottomAction ? "pb-(--app-cta-space)" : "pb-(--app-page-padding-bottom)",
-        className,
+        withBottomAction
+          ? "scroll-pb-(--app-cta-space) pb-(--app-cta-space)"
+          : "pb-(--app-page-padding-bottom)",
       )}
-      {...props}
     />
   );
 }

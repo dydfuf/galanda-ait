@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-import type { PlanSummaryData } from "../plan-home-view-model.ts";
+import type { PlanHomePlanSummaryData } from "../plan-home-view-model.ts";
 import { PlanDecisionCard } from "./PlanDecisionCard.tsx";
 
-const basePlan: PlanSummaryData = {
+const basePlan: PlanHomePlanSummaryData = {
   id: "plan-1",
   title: "기본 여행안",
   planTag: "BASIC",
@@ -14,14 +14,25 @@ const basePlan: PlanSummaryData = {
   period: "2026-12-12 ~ 2026-12-15",
   nights: 3,
   days: 4,
+  differenceSummaryText: "핵심 차이 미정",
   authorName: "민지",
   opinions: { likeCount: 2, okayCount: 1, hardCount: 0 },
   myReaction: undefined,
   isConfirmed: false,
 };
 
-const renderCard = (overrides: Partial<PlanSummaryData> = {}, to = "/trips/t1/plans/plan-1") => {
-  const plan = { ...basePlan, ...overrides } as PlanSummaryData;
+const renderCard = (
+  overrides: Partial<PlanHomePlanSummaryData> = {},
+  to = "/trips/t1/plans/plan-1",
+) => {
+  const plan = {
+    ...basePlan,
+    ...overrides,
+    differenceSummaryText:
+      overrides.differenceSummary?.trim() ||
+      overrides.differenceSummaryText ||
+      basePlan.differenceSummaryText,
+  } as PlanHomePlanSummaryData;
   return render(
     <MemoryRouter>
       <PlanDecisionCard plan={plan} to={to} />
@@ -59,7 +70,7 @@ describe("PlanDecisionCard (RAON-226)", () => {
   });
 
   it("확정안은 success variant로 확정안 텍스트를 표시한다", () => {
-    renderCard({ planTag: "BASIC", planTagLabel: "기본안", isConfirmed: true } as Partial<PlanSummaryData>);
+    renderCard({ planTag: "BASIC", planTagLabel: "기본안", isConfirmed: true });
     expect(screen.getByText("확정안")).toBeInTheDocument();
   });
 
@@ -79,13 +90,15 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(diff.compareDocumentPosition(opinion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("differenceSummary가 없으면 빈 강조 박스를 만들지 않는다", () => {
+  it("differenceSummary가 없으면 빈 값을 만들지 않고 명시적인 미정 문구를 표시한다", () => {
     renderCard({ differenceSummary: undefined });
+
+    expect(screen.getByText("핵심 차이 미정")).toBeInTheDocument();
     expect(screen.queryByText(/오사카/)).not.toBeInTheDocument();
-    // difference 박스용 border-primary-border-weak 클래스를 가진 div가 없어야 한다 – 간접적으로 차이 텍스트 없음 확인
-    // 또한 카드 내부에 difference 관련 요소가 없음을 확인
-    const card = screen.getByRole("link");
-    expect(card.textContent).not.toMatch(/오사카/);
+    const fallback = screen.getByText("핵심 차이 미정");
+    expect(fallback.parentElement?.className).not.toMatch(
+      /border-primary-border-weak/,
+    );
   });
 
   it("카드 전체가 단일 Link surface이며 내부에 nested button/link가 없다", () => {
@@ -141,18 +154,36 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(emptyEl.className).not.toMatch(/text-muted-foreground/);
   });
 
-  it("긴 제목/차이가 line-clamp로 제한되며 break-words/overflow-hidden을 갖는다", () => {
+  it("긴 제목·작성자·차이는 accessible content를 보존하면서 카드 밖 overflow를 막는다", () => {
     const longTitle = "아주 긴 제목 ".repeat(20);
+    const longAuthor = "동명이인을 구분해야 하는 매우 긴 작성자 이름 "
+      .repeat(8)
+      .trim();
     const longDiff = "매우 긴 차이 요약 ".repeat(20);
-    renderCard({ title: longTitle, differenceSummary: longDiff });
+    renderCard({
+      title: longTitle,
+      authorName: longAuthor,
+      differenceSummary: longDiff,
+    });
+
     const titleEl = screen.getByRole("heading", { level: 3 });
     expect(titleEl.className).toMatch(/line-clamp-2/);
     expect(titleEl.className).toMatch(/break-words/);
     expect(titleEl.textContent).toContain("아주 긴 제목");
+
+    const authorEl = screen.getByText(`${longAuthor} 제안`);
+    expect(authorEl.className).toMatch(/break-words/);
+    expect(authorEl.className).toMatch(/line-clamp-1/);
+
     const card = screen.getByRole("link");
     expect(card.className).toMatch(/overflow-hidden/);
-    // difference 박스 내부 p에서 line-clamp-2 확인
-    const diffEl = screen.getByText((content, el) => el?.tagName === "P" && content.includes("매우 긴 차이 요약"));
+    expect(card.className).toMatch(/bg-surface-raised/);
+    expect(card).toHaveAccessibleName(new RegExp(longAuthor.slice(0, 24)));
+
+    const diffEl = screen.getByText(
+      (content, element) =>
+        element?.tagName === "P" && content.includes("매우 긴 차이 요약"),
+    );
     expect(diffEl.className).toMatch(/line-clamp-2/);
   });
 

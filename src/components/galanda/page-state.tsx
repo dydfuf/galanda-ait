@@ -18,18 +18,23 @@ export type PageStateProps =
     } & PageStateAction);
 
 /**
- * 화면 공통 loading / empty / error 상태예요.
- * 기존 PageState(features/common)의 계약을 그대로 유지한 shadcn 구현이에요.
+ * query 결과의 loading / empty / error 상태를 배타적으로 표현해요.
+ * mutation, 권한, revision conflict 같은 feature-owned 의미는 호출자가 결정해요.
  */
 export function PageState(props: PageStateProps) {
   if (props.status === "loading") {
     return (
       <div
-        className="flex min-h-[28vh] flex-col items-center justify-center gap-3 px-(--app-inline-padding) py-12 text-center"
+        data-system-state="loading"
+        className="flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center"
+        role="status"
         aria-live="polite"
+        aria-atomic="true"
       >
-        <Spinner className="size-6 text-primary" aria-hidden="true" />
-        <p className="text-sm text-muted-foreground">{props.message}</p>
+        <Spinner className="size-6 text-info" aria-hidden="true" />
+        <p className="text-base leading-relaxed text-foreground-muted">
+          {props.message}
+        </p>
       </div>
     );
   }
@@ -38,17 +43,37 @@ export function PageState(props: PageStateProps) {
 
   return (
     <div
-      className="flex min-h-[28vh] flex-col items-center justify-center gap-2 px-(--app-inline-padding) py-12 text-center"
-      role={isError ? "alert" : undefined}
+      data-system-state={props.status}
+      className="flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center"
     >
-      <h2 className="text-[17px] font-bold text-foreground">{props.title}</h2>
-      {props.description && (
-        <p className="max-w-80 text-sm leading-normal text-muted-foreground">
-          {props.description}
-        </p>
-      )}
+      <div
+        className="flex max-w-80 flex-col items-center gap-2"
+        role={isError ? "alert" : "status"}
+        aria-live={isError ? undefined : "polite"}
+        aria-atomic="true"
+      >
+        <h2
+          className={
+            isError
+              ? "text-[17px] font-bold leading-snug text-destructive-strong"
+              : "text-[17px] font-bold leading-snug text-foreground"
+          }
+        >
+          {props.title}
+        </h2>
+        {props.description && (
+          <p className="text-base leading-relaxed text-foreground-muted">
+            {props.description}
+          </p>
+        )}
+      </div>
       {props.onAction && (
-        <Button type="button" size="lg" className="mt-2" onClick={props.onAction}>
+        <Button
+          type="button"
+          size="lg"
+          className="text-base"
+          onClick={props.onAction}
+        >
           {props.actionText ?? (isError ? "다시 시도" : "시작하기")}
         </Button>
       )}

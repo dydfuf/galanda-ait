@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { css } from "@emotion/react";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   AlertDialog,
@@ -35,38 +37,29 @@ import {
   usePlanEditorState,
   type PlanEditorFormData,
 } from "./hooks/usePlanEditorState.ts";
-import {
-  PlanEditorSections,
-  RevisionConflictChoice,
-} from "./components/PlanEditorSections.tsx";
+import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
 import { isPlanEditorSection, type PlanEditorSection } from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useUpdatePlanMutation, useDeletePlanMutation } from "./mutations.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
 import { calculatePlanDifference } from "../../core/calculations/plan-diff.ts";
 
-const pageContainerStyle = css`
-  padding: 16px 20px var(--app-cta-space, 112px);
-  max-width: 640px;
-  width: 100%;
-  min-width: 0;
-  margin: 0 auto;
-  box-sizing: border-box;
-`;
-
 const loadingContainerStyle = css`
-  padding: 40px 20px;
+  padding: 40px 0;
   text-align: center;
   color: var(--muted-foreground);
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.5;
 `;
 
 const actionErrorStyle = css`
   display: block;
+  min-width: 0;
   color: var(--destructive-strong);
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.5;
   text-align: center;
+  overflow-wrap: anywhere;
 `;
 
 export function PlanEditPage(): JSX.Element {
@@ -117,7 +110,13 @@ export function PlanEditPage(): JSX.Element {
   }
 
   if (isRoomLoading || isSessionLoading) {
-    return <div css={loadingContainerStyle}>여행안 정보를 불러오는 중입니다...</div>;
+    return (
+      <PageBody className="px-(--app-inline-padding)">
+        <div css={loadingContainerStyle} role="status" aria-live="polite">
+          여행안 정보를 불러오는 중입니다...
+        </div>
+      </PageBody>
+    );
   }
 
   if (isError || !room) {
@@ -302,24 +301,15 @@ export function PlanEditPage(): JSX.Element {
   };
 
   return (
-    <div css={pageContainerStyle}>
+    <PageBody
+      withBottomAction={!editor.draftConflict}
+      className="px-(--app-inline-padding)"
+    >
       {revisionConflict ? (
-        <RevisionConflictChoice
-          message={revisionConflict}
-          onReapply={() => {
-            if (rebasedEditor) editor.replaceFormData(rebasedEditor);
-            setRebasedEditor(undefined);
-            setRevisionConflict(undefined);
-            setIsResolvingConflict(false);
-            setIsSubmitting(false);
-          }}
-          onUseLatest={() => {
-            editor.useLatestPublishedPlan();
-            setRebasedEditor(undefined);
-            setRevisionConflict(undefined);
-            setIsResolvingConflict(false);
-            setIsSubmitting(false);
-          }}
+        <PageTitle
+          className="px-0"
+          title="다른 변경이 먼저 반영됐어요"
+          description="최신 상태를 확인했습니다. 아래에서 반영할 내용을 선택해주세요."
         />
       ) : (
         <PlanEditorSections
@@ -332,8 +322,46 @@ export function PlanEditPage(): JSX.Element {
         />
       )}
 
-      {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
-      {!section && !editor.draftConflict && !revisionConflict && (
+      {revisionConflict ? (
+        <BottomAction
+          accessory={
+            <div
+              className="min-w-0 rounded-xl border border-warning-border bg-warning-muted px-4 py-3 text-base leading-relaxed font-semibold text-foreground [overflow-wrap:anywhere]"
+              role="alert"
+            >
+              {revisionConflict}
+            </div>
+          }
+        >
+          <Button
+            type="button"
+            size="xl"
+            variant="secondary"
+            onClick={() => {
+              if (rebasedEditor) editor.replaceFormData(rebasedEditor);
+              setRebasedEditor(undefined);
+              setRevisionConflict(undefined);
+              setIsResolvingConflict(false);
+              setIsSubmitting(false);
+            }}
+          >
+            내 변경 다시 적용
+          </Button>
+          <Button
+            type="button"
+            size="xl"
+            onClick={() => {
+              editor.useLatestPublishedPlan();
+              setRebasedEditor(undefined);
+              setRevisionConflict(undefined);
+              setIsResolvingConflict(false);
+              setIsSubmitting(false);
+            }}
+          >
+            최신 공개본 사용
+          </Button>
+        </BottomAction>
+      ) : !section && !editor.draftConflict ? (
         <BottomAction
           accessory={
             editor.validation.firstError || actionError ? (
@@ -357,7 +385,7 @@ export function PlanEditPage(): JSX.Element {
             type="button"
             size="xl"
             variant="destructive"
-            disabled={isSubmitting}
+            disabled={isSubmitting || deletePlanMutation.isPending}
             onClick={() => setIsDeleteConfirmOpen(true)}
           >
             삭제하기
@@ -365,16 +393,20 @@ export function PlanEditPage(): JSX.Element {
           <Button
             type="button"
             size="xl"
+            aria-busy={updatePlanMutation.isPending || isResolvingConflict}
             disabled={!editor.validation.isValid || isSubmitting}
             onClick={() => void handleSubmit()}
           >
             {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
           </Button>
         </BottomAction>
-      )}
+      ) : null}
 
       {/* 여행안 삭제 confirm */}
-      <AlertDialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+      <AlertDialog
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>여행안을 삭제할까요?</AlertDialogTitle>
@@ -383,10 +415,13 @@ export function PlanEditPage(): JSX.Element {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletePlanMutation.isPending}>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletePlanMutation.isPending}>
+              취소
+            </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              disabled={deletePlanMutation.isPending}
+              aria-busy={deletePlanMutation.isPending}
+              disabled={isSubmitting || deletePlanMutation.isPending}
               onClick={() => void handleConfirmDelete()}
             >
               {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}
@@ -394,6 +429,6 @@ export function PlanEditPage(): JSX.Element {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageBody>
   );
 }

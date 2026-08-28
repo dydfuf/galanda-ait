@@ -150,6 +150,43 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     expect(plan.bookingRisks[0]?.level).toBe(bookingStatus === "FULL" ? "DANGER" : "WARNING");
     }
   );
+
+  it("숙소 찾는 중은 AVAILABLE 기록보다 확인 전 의미를 우선한다", (): void => {
+    const searchingRoom: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          accommodations: [
+            {
+              id: "stay-searching",
+              city: "도쿄",
+              period: "2026-09-01 ~ 2026-09-02",
+              nights: 1,
+              hotelName: "",
+              isSearching: true,
+              bookingStatus: "AVAILABLE",
+            },
+          ],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(searchingRoom, undefined).plans[0];
+
+    expect(plan.bookingRisks).toEqual([
+      {
+        level: "WARNING",
+        message: "도쿄 숙소(숙소 찾는 중) 예약 상태를 아직 확인하지 않았어요",
+        snapshotInfo: "아직 예약 상태를 확인하지 않았어요",
+      },
+    ]);
+    expect(plan.timelineItems[0]?.stay).toMatchObject({
+      bookingStatus: "SEARCHING",
+      hotelName: "숙소 찾는 중",
+      confirmedInfo: "아직 예약 상태를 확인하지 않았어요",
+    });
+  });
 });
 
 describe("toPlanDetailViewModel 작성자 미확인 (RAON-153)", (): void => {
@@ -223,5 +260,202 @@ describe("toPlanDetailViewModel 작성자 미확인 (RAON-153)", (): void => {
 
     const memberVm = toPlanDetailViewModel(roomWithStale, UserIdSchema.make("user-bob"));
     expect(memberVm.plans[0].canManage).toBe(false);
+  });
+});
+
+
+describe("toPlanDetailViewModel 가격과 입력 provenance", (): void => {
+  const accommodationWithoutPrice = {
+    id: "stay-1",
+    city: "제주",
+    period: "2026-09-01 ~ 2026-09-02",
+    nights: 1,
+    hotelName: "제주 호텔",
+    bookingStatus: "NOT_CHECKED" as const,
+  };
+  const transportWithoutPrice = {
+    id: "transport-1",
+    fromCity: "서울",
+    toCity: "제주",
+    mode: "항공",
+    hasTransfer: false,
+    durationText: "1시간",
+    bookingStatus: "NOT_CHECKED" as const,
+  };
+
+  it("모든 가격이 없으면 0원이 아니라 가격 미정으로 표시한다", (): void => {
+    const unknownPriceRoom: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          accommodations: [accommodationWithoutPrice],
+          transports: [transportWithoutPrice],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(
+      unknownPriceRoom,
+      UserIdSchema.make("user-bob"),
+    ).plans[0];
+
+    expect(plan.costSummary.hasCost).toBe(false);
+    expect(plan.costSummary.unpricedCount).toBe(2);
+    expect(plan.groupCostText).toBe("가격 미정");
+    expect(plan.perPersonCostText).toBe("가격 미정");
+    expect(
+      plan.timelineItems.map(
+        (item) => item.stay?.priceText ?? item.transport?.priceText,
+      ),
+    ).toEqual(["가격 미정", "가격 미정"]);
+  });
+
+  it("명시적으로 입력한 0원은 가격 미정과 구분한다", (): void => {
+    const zeroPriceRoom: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          accommodations: [
+            { ...accommodationWithoutPrice, priceRange: { min: 0, max: 0 } },
+          ],
+          transports: [],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(
+      zeroPriceRoom,
+      UserIdSchema.make("user-bob"),
+    ).plans[0];
+
+    expect(plan.costSummary.hasCost).toBe(true);
+    expect(plan.costSummary.unpricedCount).toBe(0);
+    expect(plan.groupCostText).toBe("그룹 총액 0원");
+    expect(plan.perPersonCostText).toBe("2명 기준 1인 0원");
+    expect(plan.groupCostText).not.toContain("가격 미정");
+  });
+
+  it("입력 가격과 미정 가격이 섞이면 확인 금액과 미정 건수를 함께 표시한다", (): void => {
+    const mixedPriceRoom: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          accommodations: [
+            {
+              ...accommodationWithoutPrice,
+              priceRange: { min: 100_000, max: 120_000 },
+            },
+          ],
+          transports: [transportWithoutPrice],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(
+      mixedPriceRoom,
+      UserIdSchema.make("user-bob"),
+    ).plans[0];
+
+    expect(plan.groupCostText).toContain("10만원 ~ 12만원");
+    expect(plan.groupCostText).toContain("가격 미정 1건 별도");
+    expect(plan.perPersonCostText).toContain("가격 미정 1건 별도");
+  });
+
+  it("route가 없을 때 legacy 장소나 목적지로 경로와 숙박 수를 만들지 않는다", (): void => {
+    const legacyPlaceRoom: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          routes: undefined,
+          places: [
+            {
+              id: "place-1",
+              name: "제주 바다",
+              category: "관광",
+              address: "제주시",
+            },
+          ],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(
+      legacyPlaceRoom,
+      UserIdSchema.make("user-bob"),
+    ).plans[0];
+
+    expect(plan.route).toEqual([]);
+    expect(plan.period).toBe("일정 미정");
+    expect(plan.nights).toBe(0);
+    expect(plan.days).toBe(0);
+  });
+
+  it("확인 주체와 시각이 없으면 작성자나 최근 확인으로 대체하지 않는다", (): void => {
+    const missingConfirmationRoom: TripRoom = {
+      ...room,
+      plans: [
+        {
+          ...room.plans[0],
+          accommodations: [
+            {
+              ...accommodationWithoutPrice,
+              bookingStatus: "AVAILABLE" as const,
+              priceRange: { min: 100_000, max: 100_000 },
+            },
+          ],
+        },
+      ],
+    };
+
+    const plan = toPlanDetailViewModel(
+      missingConfirmationRoom,
+      UserIdSchema.make("user-bob"),
+    ).plans[0];
+
+    expect(plan.bookingRisks).toEqual([]);
+    expect(plan.timelineItems[0]?.stay?.confirmedInfo).toBe("확인 기록 미정");
+    expect(plan.timelineItems[0]?.stay?.confirmedInfo).not.toContain("나");
+    expect(plan.timelineItems[0]?.stay?.confirmedInfo).not.toContain("최근");
+  });
+});
+
+describe("toPlanDetailViewModel 상세 행동 권한", (): void => {
+  it("방 참여자에게만 미확정 여행의 의견과 새 제안 진입을 제공한다", (): void => {
+    const memberView = toPlanDetailViewModel(
+      room,
+      UserIdSchema.make("user-bob"),
+    );
+    const guestView = toPlanDetailViewModel(
+      room,
+      UserIdSchema.make("user-stranger"),
+    );
+
+    expect(memberView.canSubmitOpinion).toBe(true);
+    expect(memberView.canCreatePlan).toBe(true);
+    expect(guestView.canSubmitOpinion).toBe(false);
+    expect(guestView.canCreatePlan).toBe(false);
+  });
+
+  it("plan status가 확정을 가리키는 legacy 방에서도 의견·관리 권한을 잠근다", (): void => {
+    const legacyConfirmedRoom: TripRoom = {
+      ...room,
+      plans: [{ ...room.plans[0], status: "CONFIRMED" }],
+      confirmedPlanId: undefined,
+    };
+
+    const viewModel = toPlanDetailViewModel(
+      legacyConfirmedRoom,
+      UserIdSchema.make("user-local-me"),
+    );
+
+    expect(viewModel.isConfirmed).toBe(true);
+    expect(viewModel.canSubmitOpinion).toBe(false);
+    expect(viewModel.canCreatePlan).toBe(false);
+    expect(viewModel.plans[0].isConfirmed).toBe(true);
+    expect(viewModel.plans[0].canManage).toBe(false);
   });
 });

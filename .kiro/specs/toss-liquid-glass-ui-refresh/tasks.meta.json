@@ -1,0 +1,803 @@
+{
+  "pbtResults": {
+    "5.2 `trip-room-navigation.test.ts`에 Correctness Property 2를 구현한다": {
+      "status": "passed",
+      "lastRunTimestamp": 1787923987551
+    },
+    "7.3 `src/features/plan-home/__tests__/plan-home-view-model.test.ts`에 Correctness Property 5를 구현한다": {
+      "status": "passed",
+      "lastRunTimestamp": 1787923995678
+    },
+    "7.2 `src/features/plan-home/plan-home-cta.property.test.ts`에 Correctness Property 1을 구현한다": {
+      "status": "passed",
+      "lastRunTimestamp": 1787923991540
+    },
+    "9.2 `src/features/plan-detail/__tests__/plan-price.property.test.ts`에 Correctness Property 3을 구현한다": {
+      "status": "passed",
+      "lastRunTimestamp": 1787923999657
+    },
+    "10.3 `ItineraryEditPage.test.ts`에 Correctness Property 4를 구현한다": {
+      "status": "passed",
+      "lastRunTimestamp": 1787924003702
+    }
+  },
+  "executionHistory": {
+    "1.1 `src/index.css`와 `src/app/layouts/AppRootLayout.tsx`의 semantic foundation을 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852610507
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852640385
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853184162
+      }
+    ],
+    "1.2 `src/ui-refresh-contract.test.ts`에 foundation/static contract tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852610648
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853203803
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853897079
+      }
+    ],
+    "2.1 `src/components/ui/button.tsx`, `input.tsx`, `textarea.tsx`, `field.tsx`, `label.tsx`를 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852610816
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853218643
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853904315
+      }
+    ],
+    "2.2 `src/components/ui/tabs.tsx`에 content/default와 Mode Tab용 `chrome` variant를 분리한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852610957
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853229467
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853913831
+      }
+    ],
+    "2.3 `src/components/ui/drawer.tsx`와 `alert-dialog.tsx`의 Overlay surface와 transition을 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611101
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853236348
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853924297
+      }
+    ],
+    "2.4 `src/components/ui/spinner.tsx`와 `sonner.tsx`의 상태·motion 표현을 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611238
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853241784
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853936591
+      }
+    ],
+    "2.5 `src/components/ui/ui-refresh.test.tsx`에 Button, form, Tabs, Spinner/Sonner component tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611380
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853957650
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854515010
+      }
+    ],
+    "2.6 `src/components/ui/overlay.test.tsx`에 Drawer/AlertDialog accessibility와 fallback tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611523
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853981786
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854531937
+      }
+    ],
+    "3. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611656
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922727643
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787923106983
+      }
+    ],
+    "4.1 `page-header.tsx`, `bottom-action.tsx`, `page-body.tsx`의 chrome/content geometry를 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611793
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854001902
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854543775
+      }
+    ],
+    "4.2 `src/components/galanda/page-state.tsx`와 `src/features/common/RouteErrorFallback.tsx`의 System State 표현을 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852611963
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854012687
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854554100
+      }
+    ],
+    "4.3 `mobile-list.tsx`, `page-title.tsx`, `section-header.tsx`의 list/heading/long-text 계약을 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612098
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854022494
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854562312
+      }
+    ],
+    "4.4 `src/components/galanda/page-chrome.test.tsx`에 header/body/action geometry tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612233
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854613282
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855172017
+      }
+    ],
+    "4.5 `src/components/galanda/page-content.test.tsx`에 PageState, MobileList, heading tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612396
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854631617
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855184292
+      }
+    ],
+    "5.1 `TripRoomTabLayout.tsx`, `TripRoomChildLayout.tsx`, `trip-room-navigation.ts`를 새 composition contract에 연결한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612533
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854662968
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855194638
+      }
+    ],
+    "5.2 `trip-room-navigation.test.ts`에 Correctness Property 2를 구현한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612667
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855216609
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855885023
+      }
+    ],
+    "5.3 `TripRoomTabLayout.test.tsx`와 `src/platform/ait/adapter.test.ts`의 platform integration tests를 확장한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612802
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855227471
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855902167
+      }
+    ],
+    "6.1 `src/features/auth/LoginPage.tsx`를 공통 token/shell에 연결한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852612939
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855233731
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855917131
+      }
+    ],
+    "6.2 `src/features/invite/InvitePage.tsx`를 공통 list/state/form/action composition에 연결한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613071
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855244992
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855931685
+      }
+    ],
+    "6.3 `src/features/trip-list/TripListPage.tsx`를 PageTitle, opaque filter Tabs, MobileList, BottomAction으로 정렬한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613229
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855253598
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855942648
+      }
+    ],
+    "6.4 `src/features/trip-create/TripCreatePage.tsx`만 국소 조정해 web header, form, BottomAction을 통합한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613364
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855967565
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787857084551
+      }
+    ],
+    "6.5 `LoginPage.test.tsx`와 `InvitePage.test.tsx`에 entry flow component tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613501
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877361321
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877692001
+      }
+    ],
+    "6.6 `TripListPage.test.tsx`와 `TripCreatePage.test.tsx`에 list/create component tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613630
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877364815
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877695240
+      }
+    ],
+    "7.1 `PlanHomePage.tsx`, `plan-home-view-model.ts`, `components/*`를 list/opaque content/glass action 계약에 맞춘다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613767
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855982346
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787857099176
+      }
+    ],
+    "7.2 `src/features/plan-home/plan-home-cta.property.test.ts`에 Correctness Property 1을 구현한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852613901
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877372714
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877698925
+      }
+    ],
+    "7.3 `src/features/plan-home/__tests__/plan-home-view-model.test.ts`에 Correctness Property 5를 구현한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614030
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877375759
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877702367
+      }
+    ],
+    "7.4 기존 Plan Home component tests를 hierarchy/state/overlay 기준으로 확장한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614192
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877379021
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877706027
+      }
+    ],
+    "8.1 `src/features/plan-editor/components/*`와 `plan-editor-section.ts`의 shared editor presentation을 국소 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614324
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855996139
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787857108236
+      }
+    ],
+    "8.2 `src/features/plan-editor/PlanCreatePage.tsx`를 PageBody/BottomAction shared editor에 연결한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614463
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877720390
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787878177616
+      }
+    ],
+    "8.3 `src/features/plan-editor/PlanEditPage.tsx`를 같은 shell에 연결하고 conflict recovery를 보존한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614599
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877724622
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787878185307
+      }
+    ],
+    "8.4 shared editor, PlanCreatePage, PlanEditPage component tests를 작성한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614733
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922354052
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922698681
+      }
+    ],
+    "9.1 `PlanDetailPage.tsx`, `plan-detail-view-model.ts`, `components/*`를 상세/list/state 계약에 맞춘다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852614868
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787856006831
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787857125783
+      }
+    ],
+    "9.2 `src/features/plan-detail/__tests__/plan-price.property.test.ts`에 Correctness Property 3을 구현한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615025
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877730057
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787921636793
+      }
+    ],
+    "9.3 Plan Detail view/component tests를 state, accessibility, Overlay 기준으로 확장한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615161
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877733861
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787921528390
+      }
+    ],
+    "9.4 `src/features/plan-compare/PlanComparePage.tsx`와 `components/ConfirmPlanSummaryView.tsx`를 세로 비교 구조로 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615298
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787856016019
+      },
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787857137801
+      }
+    ],
+    "9.5 Plan Compare view/component tests를 responsive/state 기준으로 확장한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615434
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877737494
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787921856979
+      }
+    ],
+    "10.1 `ItineraryPage.tsx`와 `itinerary-view-model.ts`를 날짜별 opaque list/timeline으로 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615579
+      },
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787876789286
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787921970245
+      }
+    ],
+    "10.2 `ItineraryEditPage.tsx`와 `itinerary-editor-state.ts`를 shared form/BottomAction/conflict contract에 연결한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615716
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787921980001
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922329973
+      }
+    ],
+    "10.3 `ItineraryEditPage.test.ts`에 Correctness Property 4를 구현한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615850
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922359390
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922704221
+      }
+    ],
+    "10.4 Itinerary view/edit component tests를 responsive/state/conflict 기준으로 확장한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852615980
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922364320
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922709346
+      }
+    ],
+    "11. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852616116
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787923129493
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787923551425
+      }
+    ],
+    "12. Final checkpoint - browser evidence와 canonical gate를 완료한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787852616251
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787923568354
+      },
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787924181688
+      }
+    ],
+    "1. Foundation token과 전역 정적 계약을 확립한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787853897261
+      }
+    ],
+    "2. shadcn/Base UI primitive의 접근성·chrome·motion 계약을 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787854532077
+      }
+    ],
+    "4. Galanda 공통 composition을 역할 기반 shell로 갱신한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855184439
+      }
+    ],
+    "5. Web/PWA와 Apps in Toss platform shell 소유권을 보존한다": [
+      {
+        "executionId": "11c19406-8679-48b6-a366-0d17098d5029",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787855902356
+      }
+    ],
+    "6. 로그인·초대·여행 목록·여행 생성 flow를 작은 단위로 refresh한다": [
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877695439
+      }
+    ],
+    "7. 여행안 목록의 CTA, entity provenance, list hierarchy를 refresh한다": [
+      {
+        "executionId": "a7491708-47a1-4981-8276-fac8bd01661c",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787877706175
+      }
+    ],
+    "9. 여행안 상세·비교 flow의 opaque content와 Overlay를 refresh한다": [
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787921857136
+      }
+    ],
+    "8. 여행안 작성·편집 flow를 공통 editor부터 점진 적용한다": [
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922698851
+      }
+    ],
+    "10. 확정 일정 조회·편집 flow의 state와 conflict 처리를 refresh한다": [
+      {
+        "executionId": "c5fe27d7-fd38-4400-b6ad-dd56a124286e",
+        "chatSessionId": "sess_2a861462-43c9-49b6-828f-a84dc4245515",
+        "timestamp": 1787922709589
+      }
+    ]
+  }
+}

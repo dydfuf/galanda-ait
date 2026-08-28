@@ -43,7 +43,7 @@ type StatusBadge = {
   readonly variant: "success" | "danger" | "warning" | "neutral";
 };
 
-const getStatusBadge = (status: string): StatusBadge => {
+const getStatusBadge = (status: StaySection["bookingStatus"]): StatusBadge => {
   switch (status) {
     case "AVAILABLE":
       return { label: "예약 가능", variant: "success" };
@@ -59,9 +59,9 @@ const getStatusBadge = (status: string): StatusBadge => {
 export function DetailTimeline({ items }: DetailTimelineProps) {
   if (items.length === 0) {
     return (
-      <MobileList aria-label="숙소와 교통 상세">
+      <MobileList aria-label="숙소와 교통 상세" className="bg-surface-content">
         <MobileListItem>
-          <p className="text-[15px] text-muted-foreground">
+          <p className="text-base leading-relaxed text-muted-foreground">
             숙소·교통 정보가 아직 등록되지 않았어요.
           </p>
         </MobileListItem>
@@ -70,31 +70,37 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
   }
 
   return (
-    <MobileList aria-label="숙소와 교통 상세">
-      {items.map((item, index) => {
+    <MobileList aria-label="숙소와 교통 상세" className="bg-surface-content">
+      {items.map((item) => {
         if (item.type === "STAY" && item.stay) {
           const stay = item.stay;
           const status = getStatusBadge(stay.bookingStatus);
 
           return (
             <MobileListItem
-              key={stay.id || index}
+              key={stay.id}
               leading={<Badge variant="info">숙소</Badge>}
               trailing={<Badge variant={status.variant}>{status.label}</Badge>}
             >
               <ItemTitle>
-                {stay.city} · {stay.period} · {stay.nights}박
+                {stay.city} · {stay.period} ·{" "}
+                {stay.nights > 0 ? `${stay.nights}박` : "숙박 수 미정"}
               </ItemTitle>
-              <ItemTitle className="text-[14px] text-secondary-foreground">
+              <ItemTitle className="text-base text-secondary-foreground">
                 {stay.hotelName}
               </ItemTitle>
-              <ItemDescription>{stay.priceText}</ItemDescription>
-              <ItemDescription className="text-muted-foreground/80">
+              <ItemDescription className="text-base">
+                {stay.priceText}
+              </ItemDescription>
+              <ItemDescription className="text-sm text-muted-foreground">
                 {stay.confirmedInfo}
               </ItemDescription>
               {stay.bookingUrl && (
-                <ExternalLink href={stay.bookingUrl} className="mt-1">
-                  예약 정보 보기 ↗
+                <ExternalLink
+                  href={stay.bookingUrl}
+                  className="mt-1 [overflow-wrap:anywhere]"
+                >
+                  예약 정보 보기
                 </ExternalLink>
               )}
             </MobileListItem>
@@ -107,24 +113,30 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
 
           return (
             <MobileListItem
-              key={transport.id || index}
+              key={transport.id}
               leading={<Badge variant="neutral">이동</Badge>}
               trailing={<Badge variant={status.variant}>{status.label}</Badge>}
             >
               <ItemTitle>
                 {transport.fromCity} → {transport.toCity}
               </ItemTitle>
-              <ItemDescription>
-                {transport.mode} · {transport.hasTransfer ? "환승 필요" : "직통"} ·{" "}
+              <ItemDescription className="text-base">
+                {transport.mode} ·{" "}
+                {transport.hasTransfer ? "환승 필요" : "직통"} ·{" "}
                 {transport.durationText}
               </ItemDescription>
-              <ItemDescription>{transport.priceText}</ItemDescription>
-              <ItemDescription className="text-muted-foreground/80">
+              <ItemDescription className="text-base">
+                {transport.priceText}
+              </ItemDescription>
+              <ItemDescription className="text-sm text-muted-foreground">
                 {transport.confirmedInfo}
               </ItemDescription>
               {transport.bookingUrl && (
-                <ExternalLink href={transport.bookingUrl} className="mt-1">
-                  교통 정보 보기 ↗
+                <ExternalLink
+                  href={transport.bookingUrl}
+                  className="mt-1 [overflow-wrap:anywhere]"
+                >
+                  교통 정보 보기
                 </ExternalLink>
               )}
             </MobileListItem>

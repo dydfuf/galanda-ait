@@ -1,70 +1,94 @@
 import { css } from "@emotion/react";
+import { PLAN_EDITOR_SECTION_PRESENTATION } from "../plan-editor-section.ts";
 
 const cardStyle = css`
-  background-color: var(--background);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background-color: var(--surface-content);
   border: 1px solid var(--border);
-  margin-bottom: 16px;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+
+  @media (min-width: 390px) {
+    padding: 20px;
+  }
+`;
+
+const sectionTitleStyle = css`
+  margin: 0;
+  color: var(--foreground);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
 `;
 
 const fieldStyle = css`
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 `;
 
 const labelStyle = css`
-  font-size: 13px;
-  font-weight: 600;
   color: var(--foreground-muted);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
 `;
 
 const inputStyle = css`
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  font-size: 14px;
-  outline: none;
+  min-width: 0;
+  min-height: var(--touch-target-min);
   box-sizing: border-box;
-  background-color: var(--background);
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  outline: none;
+  background-color: var(--surface-content);
   color: var(--foreground);
-  transition: border-color 0.15s ease;
+  font-size: 16px;
+  line-height: 1.5;
+  transition: border-color var(--motion-duration-fast)
+    var(--motion-ease-standard);
 
-  &:focus {
+  &:focus-visible {
     border-color: var(--primary);
   }
 `;
 
 const headcountWrapperStyle = css`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: none;
+  min-width: 0;
   padding: 0;
   margin: 0;
-  min-width: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 `;
 
 const headcountButtonStyle = css`
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  flex: 0 0 var(--touch-target-min);
   border: 1px solid var(--border-strong);
+  border-radius: 10px;
   background-color: var(--surface-subtle);
   color: var(--foreground);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--motion-duration-fast)
+    var(--motion-ease-standard);
 
   &:hover {
     background-color: var(--muted);
@@ -77,17 +101,19 @@ const headcountButtonStyle = css`
 `;
 
 const headcountValueStyle = css`
-  font-size: 15px;
-  font-weight: 700;
+  min-width: 48px;
   color: var(--foreground);
-  min-width: 40px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
   text-align: center;
 `;
 
 const headcountHintStyle = css`
-  font-size: 12px;
-  color: var(--foreground-subtle);
   margin-top: 2px;
+  color: var(--foreground-subtle);
+  font-size: 16px;
+  line-height: 1.5;
 `;
 
 interface BasicInfoSectionProps {
@@ -108,7 +134,11 @@ export function BasicInfoSection({
   onBaseHeadcountChange,
 }: BasicInfoSectionProps) {
   return (
-    <section css={cardStyle}>
+    <section css={cardStyle} data-galanda-surface="content">
+      <h2 css={sectionTitleStyle}>
+        {PLAN_EDITOR_SECTION_PRESENTATION.basic.sectionHeading}
+      </h2>
+
       <div css={fieldStyle}>
         <label css={labelStyle} htmlFor="plan-title">
           여행안 제목 *
@@ -139,14 +169,19 @@ export function BasicInfoSection({
       </div>
 
       <div css={fieldStyle}>
-        <fieldset css={headcountWrapperStyle} aria-describedby="plan-headcount-hint">
+        <fieldset
+          css={headcountWrapperStyle}
+          aria-describedby="plan-headcount-hint"
+        >
           <legend css={labelStyle}>비용 기준 인원 *</legend>
           <button
             type="button"
             css={headcountButtonStyle}
             aria-label="비용 기준 인원 한 명 줄이기"
             disabled={baseHeadcount <= 1}
-            onClick={() => onBaseHeadcountChange(Math.max(1, baseHeadcount - 1))}
+            onClick={() =>
+              onBaseHeadcountChange(Math.max(1, baseHeadcount - 1))
+            }
           >
             <span aria-hidden="true">-</span>
           </button>

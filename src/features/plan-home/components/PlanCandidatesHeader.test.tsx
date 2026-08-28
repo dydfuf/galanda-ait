@@ -50,7 +50,7 @@ describe("PlanCandidatesHeader (RAON-228)", () => {
     expect(onNewProposalAction).toHaveBeenCalledTimes(1);
   });
 
-  it("좌우 그룹이 한 줄을 유지하도록 heading 그룹은 줄바꿈을 허용하고 버튼은 고정 폭을 유지한다", () => {
+  it("후보 수와 secondary action을 heading 뒤의 DOM 순서로 유지하고 좁은 폭에서 줄바꿈한다", () => {
     render(
       <PlanCandidatesHeader
         candidateCount={12}
@@ -59,10 +59,22 @@ describe("PlanCandidatesHeader (RAON-228)", () => {
       />,
     );
 
+    const heading = screen.getByRole("heading", { level: 2, name: "여행안" });
     const countEl = screen.getByText("후보 12개");
-    expect(countEl.className).toMatch(/whitespace-nowrap/);
-
     const button = screen.getByRole("button", { name: "새 여행안 제안하기" });
+
+    expect(heading).toHaveAttribute("id", "plan-candidates-heading");
+    expect(
+      heading.compareDocumentPosition(countEl) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      countEl.compareDocumentPosition(button) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(countEl.className).toMatch(/whitespace-nowrap/);
+    expect(button.className).toMatch(/max-w-full/);
     expect(button.className).toMatch(/shrink-0/);
+    expect(button.className).toMatch(/whitespace-normal/);
   });
 });

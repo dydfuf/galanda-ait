@@ -1,6 +1,9 @@
 import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
-import { MobileListItem } from "@/components/galanda/mobile-list.tsx";
+import {
+  MobileList,
+  MobileListItem,
+} from "@/components/galanda/mobile-list.tsx";
 
 export interface BookingRiskItem {
   readonly level: "DANGER" | "WARNING" | "SUCCESS";
@@ -11,7 +14,7 @@ export interface BookingRiskItem {
 interface BookingRiskSummaryProps {
   readonly items: ReadonlyArray<BookingRiskItem>;
   readonly hasDetails: boolean;
-  readonly onClick: () => void;
+  readonly onClick?: () => void;
 }
 
 const getRiskState = (
@@ -46,15 +49,29 @@ export function BookingRiskSummary({ items, hasDetails, onClick }: BookingRiskSu
   const state = getRiskState(items, hasDetails);
 
   return (
-    <MobileListItem
-      chevron
-      className="px-2"
-      onClick={onClick}
-      aria-label={`숙소·교통, ${state.description}`}
-      trailing={<Badge variant={state.variant}>{state.label}</Badge>}
-    >
-      <ItemTitle>숙소·교통</ItemTitle>
-      <ItemDescription>{state.description}</ItemDescription>
-    </MobileListItem>
+    <MobileList aria-label="예약 위험 요약" className="bg-surface-content">
+      <MobileListItem
+        chevron={Boolean(onClick)}
+        onClick={onClick}
+        aria-label={`숙소·교통 예약 상태, ${state.description}`}
+        trailing={<Badge variant={state.variant}>{state.label}</Badge>}
+      >
+        <ItemTitle>예약 확인 상태</ItemTitle>
+        <ItemDescription>{state.description}</ItemDescription>
+      </MobileListItem>
+      {items.map((item, index) => (
+        <MobileListItem
+          key={`${item.level}-${item.message}-${index}`}
+          trailing={
+            <Badge variant={item.level === "DANGER" ? "danger" : "warning"}>
+              {item.level === "DANGER" ? "예약 어려움" : "확인 필요"}
+            </Badge>
+          }
+        >
+          <ItemTitle>{item.message}</ItemTitle>
+          <ItemDescription>{item.snapshotInfo}</ItemDescription>
+        </MobileListItem>
+      ))}
+    </MobileList>
   );
 }

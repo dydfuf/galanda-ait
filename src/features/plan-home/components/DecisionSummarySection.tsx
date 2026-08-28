@@ -32,12 +32,12 @@ export function DecisionSummarySection({
   return (
     <section
       aria-labelledby="decision-status-heading"
-      className="mx-(--app-inline-padding) mb-2 rounded-xl bg-muted px-3 py-2.5"
+      className="mx-(--app-inline-padding) mt-4 rounded-2xl border border-border bg-surface-raised px-4 py-4"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <h2
           id="decision-status-heading"
-          className="text-[11px] font-semibold tracking-widest text-foreground-muted uppercase"
+          className="min-w-0 text-lg leading-snug font-bold text-foreground [overflow-wrap:anywhere]"
         >
           진행 상태
         </h2>
@@ -47,14 +47,20 @@ export function DecisionSummarySection({
       </div>
       {hasCandidates ? (
         <>
-          <p className="mt-1 text-[15px] font-bold leading-snug text-foreground" aria-live="polite">
+          <p
+            className="mt-2 min-w-0 text-base leading-relaxed font-semibold text-foreground [overflow-wrap:anywhere]"
+            aria-live="polite"
+          >
             {statusText}
           </p>
           {subText ? (
-            <p className="mt-1 text-[13px] leading-normal text-foreground-muted">{subText}</p>
+            <p className="mt-1 min-w-0 text-base leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
+              {subText}
+            </p>
           ) : null}
-          <p className="mt-1 text-[12px] leading-normal text-foreground-muted">
-            참여 {participatedMemberCount}/{memberCount}명 · 의견 {totalOpinionCount}개
+          <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
+            참여 {participatedMemberCount}/{memberCount}명 · 의견{" "}
+            {totalOpinionCount}개
           </p>
         </>
       ) : null}

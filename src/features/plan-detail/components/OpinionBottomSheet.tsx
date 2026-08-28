@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Drawer,
@@ -22,9 +22,9 @@ interface OpinionBottomSheetProps {
   readonly initialReason?: string;
   readonly onSubmit: (reaction: ReactionType, reason?: string) => void;
   readonly isSubmitting?: boolean;
+  readonly errorMessage?: string;
 }
 
-// 이모지는 의견 입력 화면 고유 자산이라 공유 모듈로 옮기지 않아요. 순서와 한글 label만 공유해요.
 const REACTION_EMOJI = {
   LIKE: "👍",
   OKAY: "🙂",
@@ -48,17 +48,24 @@ export function OpinionBottomSheet({
   initialReason = "",
   onSubmit,
   isSubmitting = false,
+  errorMessage,
 }: OpinionBottomSheetProps) {
-  const [reaction, setReaction] = useState<ReactionType | undefined>(initialReaction);
+  const [reaction, setReaction] = useState<ReactionType | undefined>(
+    initialReaction,
+  );
   const [reason, setReason] = useState(initialReason);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) return;
-    setReaction(initialReaction);
-    setReason(initialReason);
+    if (isOpen && !wasOpenRef.current) {
+      setReaction(initialReaction);
+      setReason(initialReason);
+    }
+    wasOpenRef.current = isOpen;
   }, [isOpen, initialReaction, initialReason]);
 
-  const isFormValid = Boolean(reaction) && (reaction !== "HARD" || reason.trim().length > 0);
+  const isFormValid =
+    Boolean(reaction) && (reaction !== "HARD" || reason.trim().length > 0);
   const handleSubmit = (): void => {
     if (!reaction || !isFormValid || isSubmitting) return;
     onSubmit(reaction, reaction === "HARD" ? reason.trim() : undefined);
@@ -71,21 +78,21 @@ export function OpinionBottomSheet({
         if (!open) onClose();
       }}
       showSwipeHandle
-      // 기존 BottomSheet의 maxHeight 70vh → expandedMaxHeight 90vh 확장 동작을 유지해요.
       snapPoints={[0.7, 0.9]}
       defaultSnapPoint={0.7}
-      // 사유 textarea가 모바일 키보드에 가려지지 않게 해요.
       keyboardAware
     >
       <DrawerContent>
         <DrawerHeader>
-          <DrawerTitle className="text-left text-[17px] font-bold">이 여행안은 어때요?</DrawerTitle>
+          <DrawerTitle className="text-left text-[17px] font-bold">
+            이 여행안은 어때요?
+          </DrawerTitle>
           <DrawerDescription className="text-left">
             내 의견은 언제든 바꿀 수 있어요.
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-surface-raised px-4 pb-4">
           <div
             role="radiogroup"
             aria-label="이 여행안에 대한 내 의견"
@@ -98,9 +105,10 @@ export function OpinionBottomSheet({
                 <label
                   key={option.value}
                   className={cn(
-                    // `flex!`: TDS가 주입하는 전역 label 스타일보다 우선해야 해요 (RAON-189에서 무해).
-                    "flex! min-h-19 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-                    isSelected ? "border-primary bg-info-muted" : "border-border bg-background",
+                    "flex! min-h-19 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border bg-surface-content transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
+                    isSelected
+                      ? "border-primary bg-info-muted"
+                      : "border-border",
                   )}
                 >
                   <input
@@ -108,6 +116,7 @@ export function OpinionBottomSheet({
                     name="opinion-reaction"
                     value={option.value}
                     checked={isSelected}
+                    disabled={isSubmitting}
                     onChange={() => setReaction(option.value)}
                     className="sr-only"
                   />
@@ -116,7 +125,7 @@ export function OpinionBottomSheet({
                   </span>
                   <span
                     className={cn(
-                      "text-[13px] font-bold",
+                      "text-base font-bold",
                       isSelected ? "text-info" : "text-secondary-foreground",
                     )}
                   >
@@ -133,19 +142,37 @@ export function OpinionBottomSheet({
               <Textarea
                 id="opinion-hard-reason"
                 value={reason}
+                disabled={isSubmitting}
                 onChange={(event) => setReason(event.target.value)}
                 placeholder="예: 예산, 숙소 위치, 이동 시간 등"
                 rows={3}
                 required
-                className="rounded-xl px-4 py-3"
+                className="rounded-xl bg-surface-content px-4 py-3"
               />
-              <FieldDescription className="text-[13px]">방장과 나에게만 공개돼요.</FieldDescription>
+              <FieldDescription className="text-sm">
+                방장과 나에게만 공개돼요.
+              </FieldDescription>
             </Field>
+          )}
+
+          {errorMessage && (
+            <p
+              role="alert"
+              className="mt-4 rounded-xl border border-destructive-border bg-destructive-muted p-3 text-base leading-relaxed text-destructive-strong"
+            >
+              {errorMessage}
+            </p>
           )}
         </div>
 
         <DrawerFooter>
-          <Button type="button" size="xl" disabled={!isFormValid || isSubmitting} onClick={handleSubmit}>
+          <Button
+            type="button"
+            size="xl"
+            disabled={!isFormValid || isSubmitting}
+            aria-busy={isSubmitting}
+            onClick={handleSubmit}
+          >
             {isSubmitting ? "저장 중..." : "의견 저장하기"}
           </Button>
         </DrawerFooter>
