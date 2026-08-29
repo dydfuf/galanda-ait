@@ -3,6 +3,7 @@
 React + TanStack Query 기반 Web/PWA가 기본 타깃이며, Apps in Toss는 선택적 플랫폼 타깃으로 동작해요. 서버는 Hono transport + Effect application + Drizzle/PostgreSQL 경계 위에 구성되어 있어요.
 
 - **Repository guide**: [`AGENTS.md`](./AGENTS.md) — 저장소 경계·아키텍처 invariant·검증 규칙
+- **로컬 개발**: [`docs/local-development.md`](./docs/local-development.md) — 로컬 PostgreSQL·Worker API·Vite proxy 세팅과 로그인 확인
 - **Architecture**: [`docs/adr/ADR-001-galanda-effect-v4-architecture.md`](./docs/adr/ADR-001-galanda-effect-v4-architecture.md) — Hono/Effect/Domain/Ports ownership, error algebra, persistence/concurrency
 - **UI**: [`docs/ui-foundation.md`](./docs/ui-foundation.md) — shadcn + Base UI + Tailwind 기준 (과거 TDS는 참고만)
 - **Staging**: [`docs/staging-operations-runbook.md`](./docs/staging-operations-runbook.md) — Cloudflare Worker/Hyperdrive/PostgreSQL/Better Auth 운영 절차
@@ -20,10 +21,16 @@ React + TanStack Query 기반 Web/PWA가 기본 타깃이며, Apps in Toss는 �
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm dev              # 일반 브라우저 개발 (Vite)
+pnpm db:setup:local   # 최초 1회 — 로컬 PostgreSQL + Drizzle migration
+pnpm dev              # Worker API(8787) + Vite dev(5173) → http://localhost:5173
+pnpm dev:vite         # SPA만 (API 없음 — 로그인 불가, UI 전용 작업)
 pnpm build            # typecheck + vite build (Web/PWA) — build:web 동일
 pnpm preview          # 빌드 결과 미리보기
 ```
+
+`pnpm dev`는 Vite dev server와 로컬 Worker를 함께 띄우고 `/api/*`를 Worker로 proxy해요.
+`/api/*`는 Worker(Hono)가 소유하므로 Vite 단독 실행(`pnpm dev:vite`)에서는 로그인·세션이 동작하지 않아요.
+로컬 DB 준비, `.dev.vars` 키, 카카오 redirect URI 등록은 [`docs/local-development.md`](./docs/local-development.md)를 참고해요.
 
 초기 번들은 route-level lazy loading으로 분리되어 있어요. `/trips`, `plans`, `itinerary` 등 미진입 라우트 코드는 초기 entry에 포함되지 않으며 `pnpm build` 시 별도 chunk로 출력돼요.
 
@@ -57,6 +64,7 @@ HYPERDRIVE              staging/production Worker의 Cloudflare Hyperdrive bindi
 Auth schema도 Drizzle migration에 포함되므로 DB 반영은 기존 명령을 사용해요.
 
 ```bash
+pnpm db:setup:local    # 로컬 PostgreSQL 준비 + migration + 권한 검증 (idempotent)
 pnpm db:generate       # Drizzle schema → migration 생성
 pnpm db:migrate        # MIGRATION_DATABASE_URL로 migration 실행
 pnpm db:check          # drizzle-kit check
@@ -68,7 +76,7 @@ Worker runtime DB 접근과 migration credential은 분리되어 있으며, stag
 ## Apps in Toss (선택적 target)
 
 ```bash
-pnpm dev:ait           # AIT devtools를 켠 개발 (vite --mode ait)
+pnpm dev:ait           # AIT devtools를 켠 개발 (Worker API + vite --mode ait)
 pnpm build:ait         # typecheck + Web bundle + AIT packaging (vite --mode ait && ait build)
 pnpm deploy            # AIT 배포 (ait deploy)
 ```

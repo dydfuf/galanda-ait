@@ -6,12 +6,33 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 import aitDevtools from "@apps-in-toss/devtools/unplugin";
 
+/*
+ * Vite dev server는 SPA만 서빙해요. `/api/*`는 Worker(Hono)가 소유하므로
+ * dev에서도 로컬 `wrangler dev`로 그대로 넘겨요.
+ * proxy가 없으면 `/api/*` 요청이 SPA fallback HTML을 받아 로그인/세션이 조용히 깨져요.
+ * production에서는 Cloudflare assets의 `run_worker_first: ["/api/*"]`가 같은 역할을 해요.
+ */
+const DEV_API_TARGET = process.env.GALANDA_DEV_API_TARGET ?? 'http://127.0.0.1:8787'
+
 // https://vite.dev/config/
 // 기본(dev/build)은 일반 Web/PWA이고, `--mode ait`(dev:ait/build:ait)에서만 AIT tooling을 켜요.
 export default defineConfig(({ mode }) => {
   const isAitTarget = mode === 'ait'
 
   return {
+    server: {
+      proxy: {
+        '/api': {
+          target: DEV_API_TARGET,
+          /*
+           * Origin/Host를 그대로 전달해요.
+           * Better Auth는 `BETTER_AUTH_URL`을 baseURL/trustedOrigin으로 사용하므로
+           * dev에서는 브라우저가 보는 origin(기본 http://localhost:5173)과 맞춰야 해요.
+           */
+          changeOrigin: false,
+        },
+      },
+    },
     plugins: [
       ...(isAitTarget
         ? [aitDevtools.vite()]
