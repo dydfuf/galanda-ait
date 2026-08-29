@@ -324,7 +324,10 @@ export const relistPlanInExplore = Effect.fn("relistPlanInExplore")(
       snapshot: projection.snapshot,
     };
 
-    return yield* explore.compareAndSet({
+    // source 검증/새 projection 이후의 delete·edit race를 막기 위해 generic CAS가
+    // 아니라 source room lock → source revision 재검증 → listing CAS를 하나의
+    // transaction으로 수행하는 relist operation을 사용한다.
+    return yield* explore.relist({
       record: { ...record, listing: nextListing },
       expectedListingRevision: command.expectedRevision,
     });

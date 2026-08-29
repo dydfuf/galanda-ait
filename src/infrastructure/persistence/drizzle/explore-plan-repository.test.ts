@@ -371,6 +371,176 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(error).toBeInstanceOf(RepositoryError);
   });
 
+  it("relist는 source room을 FOR UPDATE로 먼저 잠그고 source revision 재검증 후 listing CAS를 수행한다", async () => {
+    const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+    const db = makeDb((config) => {
+      if (config.text.includes('from "trip_rooms"')) {
+        return { rows: sourceRoomRows([{ id: "plan-1", revision: 7 }]) };
+      }
+      if (config.text.startsWith("update")) return { rows: [[3]] };
+      return { rows: [] };
+    }, calls);
+
+    const current = record();
+    const relistedRecord: ExplorePlanListingRecord = {
+      ...current,
+      listing: {
+        ...current.listing,
+        status: "LISTED",
+        listingRevision: RevisionSchema.make(3),
+        listedAt: "2026-09-03T00:00:00.000Z",
+        updatedAt: "2026-09-03T00:00:00.000Z",
+        snapshot: snapshot(7),
+      },
+    };
+
+    const result = await Effect.runPromise(
+      provide(
+        db,
+        Effect.gen(function* () {
+          const repository = yield* ExplorePlanRepository;
+          return yield* repository.relist({
+            record: relistedRecord,
+            expectedListingRevision: RevisionSchema.make(2),
+          });
+        })
+      )
+    );
+
+    expect(result.status).toBe("LISTED");
+    expect(result.listingRevision).toBe(3);
+    expect(result.snapshot.sourcePlanRevision).toBe(7);
+
+    const lockSelect = calls.find(
+      (call) =>
+        call.text.includes('from "trip_rooms"') &&
+        call.text.includes("for update")
+    );
+    const listingUpdate = calls.find(
+      (call) =>
+        call.text.startsWith("update") &&
+        call.text.includes('"explore_plan_listings"')
+    );
+    expect(lockSelect).toBeDefined();
+    expect(listingUpdate).toBeDefined();
+    expect(lockSelect!.params).toContain("trip-1");
+    expect(listingUpdate!.params).toContain("listing-1");
+    expect(listingUpdate!.params).toContain(2);
+    // delete와 동일한 room → listing lock order가 SQL 실행 순서로 고정된다.
+    expect(calls.indexOf(lockSelect!)).toBeLessThan(
+      calls.indexOf(listingUpdate!)
+    );
+  });
+
+  it("relist source 검증 후 delete가 먼저 commit되면 lock 재검증에서 NotFound로 실패하고 listing은 UNLISTED로 남는다", async () => {
+    // relist use case가 이미 source plan revision 7을 읽고 projection까지 만든 뒤,
+    // transaction의 room lock을 얻기 전에 deletePlanAndAutoUnlist가 commit된
+    // interleaving을 모델링한다. lock 시점에는 room에 source plan이 없다.
+    const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+    let persistedStatus: "UNLISTED" | "LISTED" = "UNLISTED";
+    const db = makeDb((config) => {
+      if (config.text.includes('from "trip_rooms"')) {
+        return { rows: sourceRoomRows([]) };
+      }
+      if (config.text.startsWith("update")) {
+        persistedStatus = "LISTED";
+        return { rows: [[3]] };
+      }
+      return { rows: [] };
+    }, calls);
+
+    const current = record();
+    const relistedRecord: ExplorePlanListingRecord = {
+      ...current,
+      listing: {
+        ...current.listing,
+        status: "LISTED",
+        listingRevision: RevisionSchema.make(3),
+        listedAt: "2026-09-03T00:00:00.000Z",
+        updatedAt: "2026-09-03T00:00:00.000Z",
+        snapshot: snapshot(7),
+      },
+    };
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        provide(
+          db,
+          Effect.gen(function* () {
+            const repository = yield* ExplorePlanRepository;
+            return yield* repository.relist({
+              record: relistedRecord,
+              expectedListingRevision: RevisionSchema.make(2),
+            });
+          })
+        )
+      )
+    );
+
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({ entity: "TripPlan", id: "plan-1" });
+    expect(persistedStatus).toBe("UNLISTED");
+    // source가 사라진 뒤에는 LISTED CAS 자체가 실행되지 않는다.
+    expect(
+      calls.some(
+        (call) =>
+          call.text.startsWith("update") &&
+          call.text.includes('"explore_plan_listings"')
+      )
+    ).toBe(false);
+  });
+
+  it("relist source 검증 후 edit가 먼저 commit되면 lock 하의 revision mismatch로 fail-closed한다", async () => {
+    // use case는 revision 7 snapshot을 만들었지만 room lock 전에 source edit가
+    // revision 8로 commit된 interleaving이다. stale projection을 게시하면 안 된다.
+    const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+    const db = makeDb((config) => {
+      if (config.text.includes('from "trip_rooms"')) {
+        return { rows: sourceRoomRows([{ id: "plan-1", revision: 8 }]) };
+      }
+      if (config.text.startsWith("update")) return { rows: [[3]] };
+      return { rows: [] };
+    }, calls);
+
+    const current = record();
+    const relistedRecord: ExplorePlanListingRecord = {
+      ...current,
+      listing: {
+        ...current.listing,
+        status: "LISTED",
+        listingRevision: RevisionSchema.make(3),
+        listedAt: "2026-09-03T00:00:00.000Z",
+        updatedAt: "2026-09-03T00:00:00.000Z",
+        snapshot: snapshot(7),
+      },
+    };
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        provide(
+          db,
+          Effect.gen(function* () {
+            const repository = yield* ExplorePlanRepository;
+            return yield* repository.relist({
+              record: relistedRecord,
+              expectedListingRevision: RevisionSchema.make(2),
+            });
+          })
+        )
+      )
+    );
+
+    expect(error).toBeInstanceOf(NotFoundError);
+    expect(error).toMatchObject({ entity: "TripPlan", id: "plan-1" });
+    expect(
+      calls.some(
+        (call) =>
+          call.text.startsWith("update") &&
+          call.text.includes('"explore_plan_listings"')
+      )
+    ).toBe(false);
+  });
+
   it("compareAndSet은 id+listing_revision 단일 UPDATE로 CAS한다", async () => {
     const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
     const db = makeDb((config) => {

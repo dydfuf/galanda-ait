@@ -123,6 +123,23 @@ export class ExplorePlanRepository extends Context.Service<
     ) => RepositoryEffect<ExplorePlanListingRecord | undefined>;
 
     /**
+     * source snapshot을 새로 투영해 UNLISTED listing을 재게시한다.
+     *
+     * 단일 transaction에서 source `trip_rooms` row를 `SELECT ... FOR UPDATE`로
+     * 먼저 잠그고, `record.listing.snapshot.sourcePlanRevision`의 source plan이
+     * 여전히 존재하는지 재검증한 뒤 listing revision CAS를 수행한다. delete
+     * path와 동일한 `room → listing` lock order를 사용해 source 삭제/수정과
+     * relist를 직렬화한다. lock 하에서 source가 사라졌거나 revision이 바뀌면
+     * listing을 LISTED로 전환하지 않고 NotFoundError(TripPlan)로 fail-closed한다.
+     */
+    readonly relist: (
+      params: CompareAndSetParams
+    ) => RepositoryEffect<
+      ExplorePlanListing,
+      NotFoundError | RevisionConflictError
+    >;
+
+    /**
      * listing revision compare-and-set.
      * `WHERE id AND listing_revision = expected` 단일 UPDATE로 lifecycle 전이를
      * atomic하게 적용하고, 실패 시 현재 revision을 조회해 NotFound/Conflict로

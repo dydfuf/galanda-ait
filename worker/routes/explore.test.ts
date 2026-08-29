@@ -380,6 +380,41 @@ describe("Explore API vertical slice (RAON-259 DISC-3)", () => {
     expect(JSON.stringify(body)).not.toContain(authorId);
   });
 
+  it("POST /api/explore/listings/:id/relist: 검증 후 source 삭제가 먼저 commit되면 404이고 UNLISTED를 되살리지 않는다", async () => {
+    // getById에서는 UNLISTED listing, getRoom(auth/authz)에서는 source plan이
+    // 존재하지만, relist transaction이 room FOR UPDATE lock을 얻은 시점에는
+    // concurrent delete가 commit되어 plans가 비어 있는 interleaving이다.
+    const { app, calls } = makeApp({
+      exploreSelectRows: [
+        listingRow({
+          status: "UNLISTED",
+          listingRevision: 2,
+          unlistedAt: "2026-08-26T00:00:00.000Z",
+        }),
+      ],
+      tripRoomLockRows: [[[]]],
+      // 버그가 남아 listing CAS까지 도달하면 성공하도록 두어 잘못된 relist를 탐지한다.
+      exploreUpdateRows: [[3]],
+    });
+
+    const res = await app.fetch(
+      request("/api/explore/listings/listing-1/relist", {
+        method: "POST",
+        body: JSON.stringify({ expectedRevision: 2 }),
+      }),
+      env
+    );
+
+    expect(res.status).toBe(404);
+    expect(
+      calls.some(
+        (call) =>
+          call.text.startsWith("update") &&
+          call.text.includes('"explore_plan_listings"')
+      )
+    ).toBe(false);
+  });
+
   it("POST /api/explore/listings/:id/relist: 존재하지 않는 listing은 404", async () => {
     const { app } = makeApp({ exploreSelectRows: [] });
     const res = await app.fetch(request("/api/explore/listings/listing-missing/relist", {

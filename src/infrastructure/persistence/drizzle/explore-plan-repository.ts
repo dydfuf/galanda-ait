@@ -287,6 +287,113 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
             : undefined;
         }),
 
+      relist: ({ record, expectedListingRevision }) =>
+        Effect.gen(function* () {
+          const { listing, sourceTripId, sourcePlanId } = record;
+          const expectedSourceRevision = listing.snapshot.sourcePlanRevision;
+
+          const result = yield* databaseEffect(
+            "relistExploreListing",
+            () =>
+              db.transaction(async (tx) => {
+                // deletePlanAndAutoUnlist의 room CAS와 같은 row를 먼저 잠근다.
+                // 두 경로 모두 room → listing 순서로 lock을 획득한다.
+                const [sourceRoom] = await tx
+                  .select({ plans: tripRooms.plans })
+                  .from(tripRooms)
+                  .where(eq(tripRooms.id, sourceTripId))
+                  .for("update")
+                  .limit(1);
+
+                if (!sourceRoom) {
+                  return { _tag: "SourceGone" } as const;
+                }
+
+                // use case가 projection한 source revision이 lock 획득 시점에도
+                // 존재하는지 재검증한다. delete/edit가 먼저 commit됐다면 stale
+                // snapshot으로 다시 LISTED가 되지 않고 fail-closed한다.
+                const plans = (sourceRoom.plans ?? []) as ReadonlyArray<{
+                  readonly id?: string;
+                  readonly revision?: number;
+                }>;
+                const sourcePlan = plans.find(
+                  (plan) => plan.id === sourcePlanId
+                );
+                if (
+                  !sourcePlan ||
+                  sourcePlan.revision !== expectedSourceRevision
+                ) {
+                  return { _tag: "SourceGone" } as const;
+                }
+
+                // source room lock을 보유한 상태에서 listing revision CAS를 한다.
+                // relist가 먼저 commit되면 뒤이어 진행하는 delete가 새 LISTED row를
+                // auto-unlist하고, delete가 먼저 commit되면 위 재검증에서 실패한다.
+                const [updated] = await tx
+                  .update(explorePlanListings)
+                  .set({
+                    snapshot: listing.snapshot,
+                    status: listing.status,
+                    listingRevision: listing.listingRevision,
+                    sourcePlanRevision: listing.snapshot.sourcePlanRevision,
+                    listedAt: new Date(listing.listedAt),
+                    updatedAt: new Date(listing.updatedAt),
+                    unlistedAt: listing.unlistedAt
+                      ? new Date(listing.unlistedAt)
+                      : null,
+                  })
+                  .where(
+                    and(
+                      eq(explorePlanListings.id, listing.listingId),
+                      eq(
+                        explorePlanListings.listingRevision,
+                        expectedListingRevision
+                      )
+                    )
+                  )
+                  .returning({
+                    revision: explorePlanListings.listingRevision,
+                  });
+                if (updated) {
+                  return { _tag: "Updated" } as const;
+                }
+
+                const [current] = await tx
+                  .select({ revision: explorePlanListings.listingRevision })
+                  .from(explorePlanListings)
+                  .where(eq(explorePlanListings.id, listing.listingId))
+                  .limit(1);
+                return current
+                  ? ({ _tag: "Conflict", revision: current.revision } as const)
+                  : ({ _tag: "NotFound" } as const);
+              })
+          );
+
+          if (result._tag === "SourceGone") {
+            return yield* Effect.fail(
+              new NotFoundError({ entity: "TripPlan", id: sourcePlanId })
+            );
+          }
+          if (result._tag === "NotFound") {
+            return yield* Effect.fail(
+              new NotFoundError({
+                entity: "ExplorePlanListing",
+                id: listing.listingId,
+              })
+            );
+          }
+          if (result._tag === "Conflict") {
+            return yield* Effect.fail(
+              new RevisionConflictError({
+                message: "다른 요청이 이미 Explore listing 상태를 변경했습니다.",
+                expectedRevision: expectedListingRevision,
+                actualRevision: RevisionSchema.make(result.revision),
+              })
+            );
+          }
+          return listing;
+        }),
+
       compareAndSet: ({ record, expectedListingRevision }) =>
         Effect.gen(function* () {
           const { listing } = record;

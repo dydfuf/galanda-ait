@@ -127,6 +127,7 @@ const keysetExploreRepo = (
     create: () => Effect.die("not implemented"),
     getById: () => Effect.die("not implemented"),
     findBySource: () => Effect.die("not implemented"),
+    relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
     listListed: (params: ListListedParams): Effect.Effect<ListListedResult> => {
       onListListed?.(params);
@@ -326,6 +327,7 @@ const getByIdExploreRepo = (
     create: () => Effect.die("not implemented"),
     getById: () => Effect.succeed(record),
     findBySource: () => Effect.die("not implemented"),
+    relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
     listListed: () => Effect.die("not implemented"),
   });

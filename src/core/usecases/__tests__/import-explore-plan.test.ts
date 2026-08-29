@@ -211,6 +211,7 @@ const exploreRepoLayer = (
       return Effect.succeed(record);
     },
     findBySource: () => Effect.succeed(undefined),
+    relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
     listListed: () => Effect.succeed({ page: [], nextCursor: undefined }),
   });

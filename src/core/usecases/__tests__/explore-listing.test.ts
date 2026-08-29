@@ -210,6 +210,32 @@ const exploreRepoLayer = (
       }
       return Effect.succeed(undefined);
     },
+    relist: ({ record, expectedListingRevision }) => {
+      state.cas.push({
+        id: record.listing.listingId,
+        expected: expectedListingRevision,
+      });
+      const current = state.records.get(record.listing.listingId);
+      if (!current) {
+        return Effect.fail(
+          new NotFoundError({
+            entity: "ExplorePlanListing",
+            id: record.listing.listingId,
+          })
+        );
+      }
+      if (current.listing.listingRevision !== expectedListingRevision) {
+        return Effect.fail(
+          new RevisionConflictError({
+            message: "conflict",
+            expectedRevision: expectedListingRevision,
+            actualRevision: current.listing.listingRevision,
+          })
+        );
+      }
+      state.records.set(record.listing.listingId, record);
+      return Effect.succeed(record.listing);
+    },
     compareAndSet: ({ record, expectedListingRevision }) => {
       state.cas.push({
         id: record.listing.listingId,
