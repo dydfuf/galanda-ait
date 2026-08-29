@@ -23,12 +23,10 @@ import {
   type UpdateRoomParams,
 } from "../../../core/ports/trip-room-repository.ts";
 import { Database, type DatabaseHandle } from "./database.ts";
-import {
-  tripRooms,
-  type NewTripRoomRow,
-  type TripRoomRow,
-} from "./schema/trip-room.ts";
+import { tripRooms, type NewTripRoomRow, type TripRoomRow } from "./schema/trip-room.ts";
+import { explorePlanListings } from "./schema/explore-plan.ts";
 import { participantAliases } from "./schema/participant.ts";
+import type { DeletePlanAndAutoUnlistParams } from "../../../core/ports/trip-room-repository.ts";
 
 type RoomChanges = Partial<
   Pick<
@@ -245,7 +243,9 @@ export const TripRoomRepositoryLive: Layer.Layer<
                 title: params.title.trim(),
                 destination: params.destination?.trim() || "여행지",
                 members: [params.hostUser],
-                plans: [],
+                // NEW_TRIP import는 room+plan을 단일 INSERT로 atomic하게 저장한다.
+                // initialPlan이 없으면 기존처럼 빈 방을 만든다(partial write 없음).
+                plans: params.initialPlan ? [params.initialPlan] : [],
               })
               .onConflictDoNothing({ target: tripRooms.id })
               .returning()
@@ -360,6 +360,102 @@ export const TripRoomRepositoryLive: Layer.Layer<
           },
           "saveRoom"
         ),
+
+      deletePlanAndAutoUnlist: ({
+        room,
+        sourcePlanId,
+        expectedRevision,
+        unlistedAt,
+      }: DeletePlanAndAutoUnlistParams) =>
+        Effect.gen(function* () {
+          const unlistedAtDate = new Date(unlistedAt);
+          // room CAS와 listing auto-unlist를 하나의 transaction으로 묶는다.
+          // 어느 write가 실패하든 함께 rollback되어 partial state가 남지 않는다.
+          const result = yield* databaseEffect(
+            "deletePlanAndAutoUnlist",
+            () =>
+              db.transaction(async (tx) => {
+                const [updatedRoom] = await tx
+                  .update(tripRooms)
+                  .set({
+                    title: room.title,
+                    destination: room.destination,
+                    members: room.members,
+                    plans: room.plans,
+                    confirmedPlanId: room.confirmedPlanId ?? null,
+                    revision: sql`${tripRooms.revision} + 1`,
+                    updatedAt: sql`now()`,
+                  })
+                  .where(
+                    and(
+                      eq(tripRooms.id, room.id),
+                      eq(tripRooms.revision, expectedRevision)
+                    )
+                  )
+                  .returning();
+
+                // room CAS miss: listing을 건드리지 않고 현재 revision을 조회해
+                // NotFound/Conflict를 구분한다.
+                if (!updatedRoom) {
+                  const [current] = await tx
+                    .select({ revision: tripRooms.revision })
+                    .from(tripRooms)
+                    .where(eq(tripRooms.id, room.id))
+                    .limit(1);
+                  return current
+                    ? ({ _tag: "Conflict", revision: current.revision } as const)
+                    : ({ _tag: "NotFound" } as const);
+                }
+
+                // room CAS 성공: 같은 source plan의 LISTED listing만 UNLISTED로
+                // 전이한다. 매칭이 없거나 이미 UNLISTED면 no-op(idempotent).
+                // listing_revision은 DB에서 atomically +1, updated_at/unlisted_at는
+                // 서버 시각으로 갱신하되 listed_at/snapshot/source revision은 보존한다.
+                await tx
+                  .update(explorePlanListings)
+                  .set({
+                    status: "UNLISTED",
+                    listingRevision: sql`${explorePlanListings.listingRevision} + 1`,
+                    updatedAt: unlistedAtDate,
+                    unlistedAt: unlistedAtDate,
+                  })
+                  .where(
+                    and(
+                      eq(explorePlanListings.sourceTripId, room.id),
+                      eq(explorePlanListings.sourcePlanId, sourcePlanId),
+                      eq(explorePlanListings.status, "LISTED")
+                    )
+                  );
+
+                return { _tag: "Updated", row: updatedRoom } as const;
+              })
+          );
+
+          if (result._tag === "NotFound") {
+            return yield* Effect.fail(
+              new NotFoundError({ entity: "TripRoom", id: room.id })
+            );
+          }
+          if (result._tag === "Conflict") {
+            return yield* Effect.fail(
+              new RevisionConflictError({
+                message: "다른 사용자가 이미 방 정보를 수정했습니다.",
+                expectedRevision,
+                actualRevision: RevisionSchema.make(result.revision),
+              })
+            );
+          }
+
+          const decoded = yield* decodeRoom(
+            result.row,
+            "deletePlanAndAutoUnlist"
+          );
+          return (yield* resolveParticipantAliases(
+            db,
+            [decoded],
+            "deletePlanAndAutoUnlist"
+          ))[0];
+        }),
     };
   })
 );

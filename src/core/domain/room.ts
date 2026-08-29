@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import {
+  ExploreListingIdSchema,
   ParticipantIdSchema,
   PlanIdSchema,
   RevisionSchema,
@@ -169,6 +170,13 @@ export const TripPlanSchema = Schema.Struct({
   differenceSummary: Schema.optional(Schema.String),
   memberOpinions: Schema.optional(Schema.Array(PlanMemberOpinionSchema)),
   voteCount: Schema.Number,
+  /**
+   * server-owned provenance: Explore public snapshot을 복사해 만든 plan이면
+   * 원본 listing ID를 보존한다. source private Trip/Plan ID가 아니라 공개
+   * listing ID이므로 private aggregate를 역탐색할 수 없다. client 편집 입력으로
+   * 받지 않으며(HTTP create/update schema에 없음) import use case만 채운다.
+   */
+  importedFromExploreListingId: Schema.optional(ExploreListingIdSchema),
 });
 export type TripPlan = typeof TripPlanSchema.Type;
 

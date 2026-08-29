@@ -1,12 +1,32 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppRootLayout } from "./layouts/AppRootLayout.tsx";
+import { GlobalShellLayout } from "./layouts/GlobalShellLayout.tsx";
 import { TripRoomTabLayout } from "./layouts/TripRoomTabLayout.tsx";
 import { TripRoomChildLayout } from "./layouts/TripRoomChildLayout.tsx";
 import { SessionRoute } from "../features/auth/SessionRoute.tsx";
 import { platformOnlyRoutes } from "../platform/index.ts";
 import { PageState } from "@/components/galanda/page-state.tsx";
 
+const HomePage = lazy(() =>
+  import("../features/home/HomePage.tsx").then((m) => ({ default: m.HomePage })),
+);
+const ExplorePage = lazy(() =>
+  import("../features/explore/ExplorePage.tsx").then((m) => ({ default: m.ExplorePage })),
+);
+const ExploreListingDetailPage = lazy(() =>
+  import("../features/explore/ExploreListingDetailPage.tsx").then((m) => ({
+    default: m.ExploreListingDetailPage,
+  })),
+);
+const MePage = lazy(() =>
+  import("../features/me/MePage.tsx").then((m) => ({ default: m.MePage })),
+);
+const SavedListingsPage = lazy(() =>
+  import("../features/me/SavedListingsPage.tsx").then((m) => ({
+    default: m.SavedListingsPage,
+  })),
+);
 const TripListPage = lazy(() =>
   import("../features/trip-list/TripListPage.tsx").then((m) => ({ default: m.TripListPage })),
 );
@@ -59,8 +79,8 @@ export function AppRouter() {
   return (
     <Routes>
       <Route element={<AppRootLayout />}>
-        {/* 루트 -> 여행 목록 리다이렉트 */}
-        <Route path="/" element={<Navigate to="/trips" replace />} />
+        {/* 루트 -> 홈 리다이렉트 */}
+        <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/login" element={withSuspense(<LoginPage />)} />
 
         {/* 초대장 */}
@@ -72,22 +92,46 @@ export function AppRouter() {
         ))}
 
         <Route element={<SessionRoute />}>
-          <Route path="/trips" element={withSuspense(<TripListPage />)} />
+          {/*
+            Global 탐색 shell을 함께 보여주는 destination surface.
+            - /home, /explore, /me: honest destination
+            - /trips: 내 여행 목록
+            - /trips/:tripId(진입 리다이렉트), /trips/:tripId/{plans,itinerary}: 여행방 home surface
+          */}
+          <Route element={<GlobalShellLayout />}>
+            <Route path="/home" element={withSuspense(<HomePage />)} />
+            <Route path="/explore" element={withSuspense(<ExplorePage />)} />
+            <Route path="/me" element={withSuspense(<MePage />)} />
+            <Route path="/me/saved" element={withSuspense(<SavedListingsPage />)} />
+            <Route path="/trips" element={withSuspense(<TripListPage />)} />
+
+            {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
+            <Route path="/trips/:tripId" element={withSuspense(<TripRoomEntry />)} />
+
+            {/* 여행방 탭 레이아웃: 계획 탭 홈 및 일정 탭 홈 */}
+            <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
+              <Route path="plans" element={withSuspense(<PlanHomePage />)} />
+              <Route path="itinerary" element={withSuspense(<ItineraryPage />)} />
+            </Route>
+          </Route>
+
+          {/*
+            focused surface: Global nav를 숨긴다.
+            - /explore/:listingId: 공개 여행 일정 상세(RAON-263 DISC-5)
+            - /trips/new: 여행 생성 (registered)
+            - itinerary edit, plan create/detail/edit/compare
+          */}
+          <Route
+            path="/explore/:listingId"
+            element={withSuspense(<ExploreListingDetailPage />)}
+          />
+
           <Route element={<SessionRoute registered />}>
             <Route path="/trips/new" element={withSuspense(<TripCreatePage />)} />
           </Route>
 
           <Route path="/trips/:tripId/itinerary/edit" element={<TripRoomChildLayout />}>
             <Route index element={withSuspense(<ItineraryEditPage />)} />
-          </Route>
-
-          {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
-          <Route path="/trips/:tripId" element={withSuspense(<TripRoomEntry />)} />
-
-          {/* 여행방 탭 레이아웃: 계획 탭 홈 및 일정 탭 홈 */}
-          <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
-            <Route path="plans" element={withSuspense(<PlanHomePage />)} />
-            <Route path="itinerary" element={withSuspense(<ItineraryPage />)} />
           </Route>
 
           {/* 여행방 서브페이지 레이아웃 (뒤로가기 헤더): 계획 생성, 상세, 편집, 비교 */}

@@ -18,6 +18,7 @@ import {
   getInviteSummary,
   getTrip,
   getTrips,
+  importExplorePlan,
   issueTripInvite,
   joinInvite,
   recommendNextTripAction,
@@ -336,5 +337,70 @@ describe("API client", () => {
       ["POST", `/api/invites/${token}/join`],
     ]);
     expect(JSON.parse(calls[2].init?.body as string)).toEqual({ nickname: "라온" });
+  });
+
+  it("explore import를 tagged target으로 전송하고 {tripId,planId}만 decode한다", async () => {
+    const calls: Array<{
+      readonly input: RequestInfo | URL;
+      readonly init?: RequestInit;
+    }> = [];
+    const responses = [
+      jsonResponse({ tripId: "trip-9", planId: "plan-9" }, 201),
+      jsonResponse({ tripId: "trip-1", planId: "plan-2" }, 201),
+    ];
+    globalThis.fetch = async (input, init) => {
+      calls.push({ input, init });
+      return responses.shift() ?? jsonResponse(null, 500);
+    };
+
+    await expect(
+      importExplorePlan("listing-1" as never, { type: "NEW_TRIP" })
+    ).resolves.toEqual({ tripId: "trip-9", planId: "plan-9" });
+    await expect(
+      importExplorePlan("listing-1" as never, {
+        type: "EXISTING_TRIP",
+        tripId: TripIdSchema.make("trip-1"),
+        expectedRevision: RevisionSchema.make(7),
+      })
+    ).resolves.toEqual({ tripId: "trip-1", planId: "plan-2" });
+
+    expect(calls.map(({ input, init }) => [init?.method, input])).toEqual([
+      ["POST", "/api/explore/listings/listing-1/import"],
+      ["POST", "/api/explore/listings/listing-1/import"],
+    ]);
+    expect(JSON.parse(calls[0].init?.body as string)).toEqual({
+      target: { type: "NEW_TRIP" },
+    });
+    expect(JSON.parse(calls[1].init?.body as string)).toEqual({
+      target: { type: "EXISTING_TRIP", tripId: "trip-1", expectedRevision: 7 },
+    });
+  });
+
+  it("explore import 404는 entity details를 ApiClientError로 보존한다", async () => {
+    globalThis.fetch = async () =>
+      jsonResponse(
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "요청한 리소스를 찾을 수 없습니다.",
+            requestId: "req-2",
+            details: { entity: "TripRoom", id: "trip-1" },
+          },
+        },
+        404
+      );
+
+    const error = await importExplorePlan("listing-1" as never, {
+      type: "EXISTING_TRIP",
+      tripId: TripIdSchema.make("trip-1"),
+      expectedRevision: RevisionSchema.make(7),
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ApiClientError);
+    expect(error).toMatchObject({
+      status: 404,
+      code: "NOT_FOUND",
+      details: { entity: "TripRoom", id: "trip-1" },
+    });
   });
 });

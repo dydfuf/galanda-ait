@@ -1,0 +1,106 @@
+// @vitest-environment jsdom
+import { render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
+
+import { GlobalAppShell } from "./global-app-shell.tsx";
+import { BottomAction } from "./bottom-action.tsx";
+import { Button } from "@/components/ui/button.tsx";
+
+const renderAt = (path: string) =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <GlobalAppShell>
+        <div>child content</div>
+      </GlobalAppShell>
+    </MemoryRouter>,
+  );
+
+describe("GlobalAppShell (RAON-248)", () => {
+  it("4개 목적지를 native link로 logical order로 렌더링하고 children을 보여준다", () => {
+    renderAt("/home");
+
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    const links = within(nav).getAllByRole("link");
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      "/home",
+      "/explore",
+      "/trips",
+      "/me",
+    ]);
+    expect(links.map((a) => a.textContent)).toEqual(["홈", "탐색", "내 여행", "마이"]);
+    expect(screen.getByText("child content")).toBeVisible();
+  });
+
+  it("active 목적지를 semantic aria-current=page로 표시한다(색만으로 구분하지 않음)", () => {
+    renderAt("/explore");
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    const current = within(nav)
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(1);
+    expect(current[0]!.getAttribute("href")).toBe("/explore");
+  });
+
+  it("모든 /trips/** 하위에서 '내 여행'이 active다", () => {
+    renderAt("/trips/trip-1/plans/plan-1/edit");
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    const current = within(nav)
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(1);
+    expect(current[0]!.getAttribute("href")).toBe("/trips");
+  });
+
+  it("각 link는 44px hit target과 focus-visible ring을 유지한다", () => {
+    renderAt("/home");
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    for (const link of within(nav).getAllByRole("link")) {
+      expect(link.className).toContain("min-h-(--touch-target-min)");
+      expect(link.className).toContain("focus-visible:outline-ring");
+    }
+  });
+
+  it("Global 목적지가 아니어도(shell을 그리는 route가 아님) active가 없다", () => {
+    renderAt("/login");
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    const current = within(nav)
+      .getAllByRole("link")
+      .filter((a) => a.getAttribute("aria-current") === "page");
+    expect(current).toHaveLength(0);
+  });
+
+  it("BottomAction이 있으면 nav 위로 offset하고 safe-area는 nav가 한 번만 소유한다", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/trips"]}>
+        <GlobalAppShell>
+          <BottomAction>
+            <Button>새 여행 만들기</Button>
+          </BottomAction>
+        </GlobalAppShell>
+      </MemoryRouter>,
+    );
+
+    const shell = container.querySelector<HTMLElement>(
+      '[data-slot="global-app-shell"]',
+    );
+    const action = container.querySelector<HTMLElement>(
+      '[data-slot="bottom-action"]',
+    );
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+
+    expect(shell).toHaveStyle({
+      "--global-nav-height": "calc(64px + var(--safe-bottom))",
+      "--bottom-action-safe-bottom": "0px",
+    });
+    expect(shell?.firstElementChild?.className).toContain(
+      "pb-[var(--global-nav-height)]",
+    );
+    expect(action).toHaveStyle({
+      bottom: "var(--global-nav-height, 0px)",
+      paddingBottom:
+        "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
+    });
+    expect(nav.querySelector("ul")?.className).toContain("h-16");
+  });
+});

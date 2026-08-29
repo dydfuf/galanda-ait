@@ -1,5 +1,6 @@
 import { Context, type Effect } from "effect";
 import type {
+  ExploreListingId,
   InviteToken,
   ItineraryId,
   PlanId,
@@ -13,6 +14,7 @@ export interface IdGeneratorService {
   readonly itineraryId: Effect.Effect<ItineraryId>;
   readonly recommendationId: Effect.Effect<RecommendationId>;
   readonly inviteToken: Effect.Effect<InviteToken>;
+  readonly exploreListingId: Effect.Effect<ExploreListingId>;
 }
 
 export class IdGenerator extends Context.Service<

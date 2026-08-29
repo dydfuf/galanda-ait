@@ -466,17 +466,6 @@ describe("Trip API vertical slice", () => {
           ],
         },
       },
-      {
-        method: "DELETE",
-        path: "/api/trips/trip-1/plans/plan-1",
-        body: { expectedRevision: 3 },
-        initial: roomWithPlan,
-        updated: {
-          ...roomWithPlan,
-          revision: RevisionSchema.make(4),
-          plans: [],
-        },
-      },
     ] satisfies ReadonlyArray<{
       readonly method: string;
       readonly path: string;
@@ -508,6 +497,58 @@ describe("Trip API vertical slice", () => {
         "update",
       ]);
     }
+  });
+
+  it("DELETE plan은 room CAS와 함께 source listing auto-unlist UPDATE를 같은 transaction에서 발행하고, plan이 제거된 room을 반환한다 (RAON-258 DISC-1)", async () => {
+    const deletedRoom: TripRoom = {
+      ...roomWithPlan,
+      revision: RevisionSchema.make(4),
+      plans: [],
+    };
+    const { app, calls, transactionCommands } = makeApp([
+      [rowValues(roomWithPlan)], // getRoom select
+      [rowValues(deletedRoom)], // room CAS update ... returning
+      [], // explore_plan_listings update (auto-unlist), no returning
+    ]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/plans/plan-1", {
+        method: "DELETE",
+        body: JSON.stringify({ expectedRevision: 3 }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as TripRoom;
+    // plan이 제거된 room을 반환한다.
+    expect(body.plans).toEqual([]);
+    expect(body.revision).toBe(4);
+
+    // room CAS와 listing auto-unlist가 하나의 transaction 안에서 발행된다.
+    expect(transactionCommands.some((c) => c.startsWith("begin"))).toBe(true);
+    expect(transactionCommands.some((c) => c.startsWith("commit"))).toBe(true);
+
+    // 발행 순서: getRoom select → room update → listing auto-unlist update.
+    expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
+      "select",
+      "update",
+      "update",
+    ]);
+    const listingUpdate = calls.find(
+      ({ text }) =>
+        text.startsWith("update") && text.includes('"explore_plan_listings"')
+    );
+    expect(listingUpdate).toBeDefined();
+    // source plan에 매칭되는 LISTED만 UNLISTED로 전이하고 revision을 atomic +1.
+    expect(listingUpdate!.text).toContain('"source_trip_id" =');
+    expect(listingUpdate!.text).toContain('"source_plan_id" =');
+    expect(listingUpdate!.text).toContain('"status" =');
+    expect(listingUpdate!.text).toContain(
+      '"listing_revision" = "explore_plan_listings"."listing_revision" + 1'
+    );
+    expect(listingUpdate!.params).toContain("UNLISTED");
+    expect(listingUpdate!.params).toContain("LISTED");
   });
 
   it("confirm을 TripRoom CAS와 itinerary revision 1의 단일 transaction으로 저장한다", async () => {

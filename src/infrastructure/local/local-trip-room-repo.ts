@@ -218,7 +218,8 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
           destination: params.destination?.trim() || "여행지",
           revision: RevisionSchema.make(1),
           members: [params.hostUser],
-          plans: [],
+          // room+plan을 한 번에 저장(single write). partial empty room 없음.
+          plans: params.initialPlan ? [params.initialPlan] : [],
           confirmedPlanId: undefined,
         };
 
@@ -271,6 +272,15 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
 
     saveRoom: (room: TripRoom, expectedRevision: Revision) =>
       mutateRoom(room.id, expectedRevision, "saveRoom", () => ({
+        ...room,
+        revision: RevisionSchema.make(expectedRevision + 1),
+      })),
+
+    // Local 어댑터는 Explore listing 저장소를 갖지 않으므로 auto-unlist는 no-op이며,
+    // room CAS로 plan 삭제만 반영한다. plan 삭제는 매칭 listing 유무와 무관하게
+    // idempotent하게 성공한다(persistence policy 동일).
+    deletePlanAndAutoUnlist: ({ room, expectedRevision }) =>
+      mutateRoom(room.id, expectedRevision, "deletePlanAndAutoUnlist", () => ({
         ...room,
         revision: RevisionSchema.make(expectedRevision + 1),
       })),

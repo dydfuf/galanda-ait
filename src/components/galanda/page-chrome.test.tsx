@@ -123,14 +123,15 @@ describe("Page chrome geometry contracts", () => {
     const actionChrome = container.querySelector<HTMLElement>(
       '[data-galanda-surface="chrome"]',
     );
-    expect(actionChrome).toBeInTheDocument();
+    expect(actionChrome).toHaveAttribute("data-slot", "bottom-action");
     expect(actionChrome?.className).toContain("fixed");
     expect(actionChrome?.className).toContain("inset-x-0");
-    expect(actionChrome?.className).toContain("bottom-0");
+    expect(actionChrome).toHaveStyle({
+      bottom: "var(--global-nav-height, 0px)",
+      paddingBottom:
+        "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
+    });
     expect(actionChrome?.className).toContain("border-t");
-    expect(actionChrome?.className).toContain(
-      "pb-[calc(12px+var(--safe-bottom))]",
-    );
 
     const innerColumn = actionChrome?.firstElementChild as HTMLElement;
     expect(innerColumn.className).toContain("mx-auto");
