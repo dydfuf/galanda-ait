@@ -11,6 +11,12 @@ export const ItineraryIdSchema = Schema.String.pipe(
 );
 export type ItineraryId = typeof ItineraryIdSchema.Type;
 
+/** Explore 공개 listing 식별자. private PlanId와 별도의 branded ID다. */
+export const ExploreListingIdSchema = Schema.String.pipe(
+  Schema.brand("ExploreListingId")
+);
+export type ExploreListingId = typeof ExploreListingIdSchema.Type;
+
 export const RecommendationIdSchema = Schema.String.pipe(
   Schema.brand("RecommendationId")
 );

@@ -61,9 +61,15 @@ export function BottomAction({
   return (
     <div
       ref={actionRef}
+      data-slot="bottom-action"
       data-galanda-surface="chrome"
+      style={{
+        bottom: "var(--global-nav-height, 0px)",
+        paddingBottom:
+          "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
+      }}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 border-t px-5 pt-2 pb-[calc(12px+var(--safe-bottom))]",
+        "fixed inset-x-0 z-30 border-t px-5 pt-2",
         className,
       )}
     >

@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import type {
+  ExploreListingId,
   InviteToken,
   PlanId,
   Revision,
@@ -31,6 +32,21 @@ import {
   type RecommendNextActionRequest,
   type RecordRecommendationLifecycleEventRequest,
 } from "../contracts/recommendation.ts";
+import {
+  ExploreListingDetailResponseSchema,
+  ExploreListingsResponseSchema,
+  ImportExplorePlanResponseSchema,
+  type ExploreListingDetailResponse,
+  type ExploreListingsResponse,
+  type ImportExplorePlanRequest,
+  type ImportExplorePlanResponse,
+} from "../contracts/explore.ts";
+import {
+  ExploreSaveStateResponseSchema,
+  SavedListingsResponseSchema,
+  type ExploreSaveStateResponse,
+  type SavedListingsResponse,
+} from "../contracts/explore-save.ts";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -264,3 +280,126 @@ export const acknowledgeTripItinerary = (
     ItineraryAcknowledgementResponseSchema,
     { method: "POST", body: JSON.stringify({ expectedRevision }) }
   );
+
+/**
+ * Explore 공개 feed 조회 (RAON-260 DISC-4).
+ *
+ * authenticated session만 요구하는 public feed다. 응답은 schema로 decode해
+ * 서버가 약속한 public shape만 통과시킨다. cursor는 서버가 발급한 opaque token을
+ * 그대로 다시 전달한다.
+ */
+export const getExploreListings = (
+  params: { readonly limit?: number; readonly cursor?: string } = {},
+  signal?: AbortSignal
+): Promise<ExploreListingsResponse> => {
+  const search = new URLSearchParams();
+  if (params.limit !== undefined) search.set("limit", String(params.limit));
+  if (params.cursor !== undefined) search.set("cursor", params.cursor);
+  const queryString = search.toString();
+  const path = queryString
+    ? `/api/explore/listings?${queryString}`
+    : "/api/explore/listings";
+  return requestJson(path, ExploreListingsResponseSchema, { signal });
+};
+
+/**
+ * Explore 공개 listing 단건 detail 조회 (RAON-263 DISC-5).
+ *
+ * feed와 동일하게 authenticated session만 요구하는 public read다. detail
+ * endpoint(`/api/explore/listings/:listingId`)만 호출하고, source private
+ * Trip/Plan route나 private endpoint는 절대 호출하지 않는다. 응답은 schema로
+ * decode해 서버가 약속한 LISTED public shape만 통과시킨다. unlisted/deleted/
+ * invalid는 서버가 410/404로 응답하며, api-client는 이를 `ApiClientError`로
+ * 던지므로 UI가 unavailable/not-found를 구분할 수 있다.
+ */
+export const getExploreListingDetail = (
+  listingId: ExploreListingId,
+  signal?: AbortSignal
+): Promise<ExploreListingDetailResponse> =>
+  requestJson(
+    `/api/explore/listings/${encodeURIComponent(listingId)}`,
+    ExploreListingDetailResponseSchema,
+    { signal }
+  );
+
+/**
+ * Explore 공개 snapshot을 내 여행으로 가져오기(import) (RAON-261/262 DISC-7/8).
+ *
+ * `POST /api/explore/listings/:listingId/import`만 호출한다. body는 tagged
+ * `target`(NEW_TRIP | EXISTING_TRIP)만 담으며, actor/author/snapshot/status/
+ * revision/provenance 같은 server-owned field는 절대 보내지 않는다(서버가 세션과
+ * source listing snapshot에서 결정한다). 성공 응답은 정확히 `{ tripId, planId }`
+ * allowlist만 담고 schema로 decode해 그 shape만 통과시킨다.
+ *
+ * 상태 구분은 서버가 status code로 내려주고 api-client가 `ApiClientError`로 던진다:
+ * - 201 → `{ tripId, planId }`(성공, atomic).
+ * - 403 FORBIDDEN/ACCOUNT_UPGRADE_REQUIRED → 권한/계정 연결 필요.
+ * - 404 NOT_FOUND(`details.entity` = TripRoom | ExplorePlanListing) → 대상 없음.
+ * - 409 REVISION_CONFLICT/STATE_CONFLICT → 대상 방이 먼저 변경/확정됨.
+ * - 410 LISTING_UNAVAILABLE → listing 게시 중단.
+ * - 422 VALIDATION_FAILED → snapshot이 불완전해 가져올 수 없음.
+ * - 5xx → 일시 장애(재시도).
+ */
+export const importExplorePlan = (
+  listingId: ExploreListingId,
+  target: ImportExplorePlanRequest["target"]
+): Promise<ImportExplorePlanResponse> =>
+  requestJson(
+    `/api/explore/listings/${encodeURIComponent(listingId)}/import`,
+    ImportExplorePlanResponseSchema,
+    { method: "POST", body: JSON.stringify({ target }) }
+  );
+
+/**
+ * Explore listing 저장/해제/상태 (RAON-254 DISC-6).
+ *
+ * actor identity는 서버가 세션에서 결정하므로 어떤 participant/user ID도 보내지
+ * 않는다(빈 body). 응답은 실제 persisted 저장 상태(`{ saved }`)만 담는다. save는
+ * idempotent(200), unsave는 반복 안전(200)하다. 없음/UNLISTED는 서버가 404/410으로
+ * 응답하며 api-client가 `ApiClientError`로 던진다.
+ */
+const exploreSavePath = (listingId: ExploreListingId): string =>
+  `/api/explore/listings/${encodeURIComponent(listingId)}/save`;
+
+export const saveExploreListing = (
+  listingId: ExploreListingId
+): Promise<ExploreSaveStateResponse> =>
+  requestJson(exploreSavePath(listingId), ExploreSaveStateResponseSchema, {
+    method: "POST",
+    body: "{}",
+  });
+
+export const unsaveExploreListing = (
+  listingId: ExploreListingId
+): Promise<ExploreSaveStateResponse> =>
+  requestJson(exploreSavePath(listingId), ExploreSaveStateResponseSchema, {
+    method: "DELETE",
+    body: "{}",
+  });
+
+export const getExploreSaveState = (
+  listingId: ExploreListingId,
+  signal?: AbortSignal
+): Promise<ExploreSaveStateResponse> =>
+  requestJson(exploreSavePath(listingId), ExploreSaveStateResponseSchema, {
+    signal,
+  });
+
+/**
+ * 내 저장 목록(`/api/me/saved`) 조회 (RAON-254 DISC-6).
+ *
+ * 현재 세션 기준 저장 목록을 keyset paginate한다. 응답은 schema로 decode해 서버가
+ * 약속한 public shape(savedAt + LISTED listing)만 통과시킨다. cursor는 서버가 발급한
+ * opaque token을 그대로 다시 전달한다.
+ */
+export const getSavedListings = (
+  params: { readonly limit?: number; readonly cursor?: string } = {},
+  signal?: AbortSignal
+): Promise<SavedListingsResponse> => {
+  const search = new URLSearchParams();
+  if (params.limit !== undefined) search.set("limit", String(params.limit));
+  if (params.cursor !== undefined) search.set("cursor", params.cursor);
+  const queryString = search.toString();
+  const path = queryString ? `/api/me/saved?${queryString}` : "/api/me/saved";
+  return requestJson(path, SavedListingsResponseSchema, { signal });
+};

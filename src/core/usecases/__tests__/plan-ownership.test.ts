@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { Effect, Layer } from "effect";
 import {
+  ExploreListingIdSchema,
   PlanIdSchema,
   RevisionSchema,
   TripIdSchema,
@@ -39,8 +40,16 @@ import type { IdGenerator } from "../../ports/id-generator.ts";
 /**
  * 인메모리 테스트 레포지토리
  */
+interface AutoUnlistCall {
+  readonly roomId: TripId;
+  readonly sourcePlanId: ReturnType<typeof PlanIdSchema.make>;
+  readonly expectedRevision: Revision;
+  readonly unlistedAt: string;
+}
+
 const createInMemoryRepo = (
-  initialRooms: TripRoom[]
+  initialRooms: TripRoom[],
+  autoUnlistCalls: AutoUnlistCall[] = []
 ): Layer.Layer<TripRoomRepository> => {
   let rooms = [...initialRooms];
 
@@ -98,6 +107,29 @@ const createInMemoryRepo = (
       nextRoom: TripRoom,
       expectedRevision: Revision
     ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
+      const idx = rooms.findIndex((room) => room.id === nextRoom.id);
+      if (idx === -1) {
+        return Effect.fail(
+          new NotFoundError({ entity: "TripRoom", id: nextRoom.id })
+        );
+      }
+      if (rooms[idx].revision !== expectedRevision) {
+        return Effect.fail(new RevisionConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
+      }
+      const updated: TripRoom = {
+        ...nextRoom,
+        revision: RevisionSchema.make(expectedRevision + 1),
+      };
+      rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
+      return Effect.succeed(updated);
+    },
+    deletePlanAndAutoUnlist: ({
+      room: nextRoom,
+      sourcePlanId,
+      expectedRevision,
+      unlistedAt,
+    }): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
+      autoUnlistCalls.push({ roomId: nextRoom.id, sourcePlanId, expectedRevision, unlistedAt });
       const idx = rooms.findIndex((room) => room.id === nextRoom.id);
       if (idx === -1) {
         return Effect.fail(
@@ -601,6 +633,47 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
       expect(res.plans).toHaveLength(1);
     });
 
+    it("deletePlan은 인가 통과 후에만 atomic auto-unlist 연산을 호출하며 정확한 source(planId, roomId, expectedRevision)와 서버 unlistedAt을 전달한다", async () => {
+      const autoUnlistCalls: AutoUnlistCall[] = [];
+      const env = Layer.merge(
+        createInMemoryRepo([sampleRoom], autoUnlistCalls),
+        createSessionLayer(authorSession)
+      );
+
+      await Effect.runPromise(
+        deletePlan({
+          roomId: sampleRoom.id,
+          planId: authorPlan.id,
+          expectedRevision: sampleRoom.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      expect(autoUnlistCalls).toHaveLength(1);
+      expect(autoUnlistCalls[0].roomId).toBe(sampleRoom.id);
+      expect(autoUnlistCalls[0].sourcePlanId).toBe(authorPlan.id);
+      expect(autoUnlistCalls[0].expectedRevision).toBe(sampleRoom.revision);
+      // 서버 Clock이 정한 ISO 시각을 전달한다(빈 값/위조 아님).
+      expect(Date.parse(autoUnlistCalls[0].unlistedAt)).not.toBeNaN();
+    });
+
+    it("인가에 실패하면(타인 여행안) atomic auto-unlist 연산을 호출하지 않는다", async () => {
+      const autoUnlistCalls: AutoUnlistCall[] = [];
+      const env = Layer.merge(
+        createInMemoryRepo([sampleRoom], autoUnlistCalls),
+        createSessionLayer(strangerSession)
+      );
+
+      await Effect.runPromiseExit(
+        deletePlan({
+          roomId: sampleRoom.id,
+          planId: authorPlan.id,
+          expectedRevision: sampleRoom.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      expect(autoUnlistCalls).toHaveLength(0);
+    });
+
     it("방장(HOST)이라도 타인의 여행안 삭제를 시도하면 ForbiddenError로 실패하고 원본이 보존된다", async () => {
       const env = Layer.merge(
         createInMemoryRepo([sampleRoom]),
@@ -995,6 +1068,77 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       const target = res.plans.find((p) => p.id === opinionsPlan.id);
       expect(target?.clonedFromPlanId).toBeUndefined();
+    });
+
+    it("가져온 여행안의 출처(provenance)는 편집 입력이 위조·생략해도 원본 값을 보존하며, 편집 가능한 변경은 반영된다", async () => {
+      // 기존 imported plan은 provenance A를 가진다.
+      const provenanceA = ExploreListingIdSchema.make("listing-source-A");
+      const importedPlan: TripPlan = {
+        ...opinionsPlan,
+        id: PlanIdSchema.make("plan-imported"),
+        title: "가져온 여행안",
+        importedFromExploreListingId: provenanceA,
+      };
+      const roomWithImported: TripRoom = {
+        ...sampleRoom,
+        plans: [hostPlan, importedPlan],
+      };
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithImported]),
+        createSessionLayer(authorSession)
+      );
+
+      // 편집 입력은 provenance B로 위조를 시도한다(그리고 편집 가능한 필드도 바꾼다).
+      const res = await Effect.runPromise(
+        updatePlan({
+          roomId: roomWithImported.id,
+          plan: {
+            ...importedPlan,
+            title: "작성자가 수정한 제목",
+            importedFromExploreListingId:
+              ExploreListingIdSchema.make("listing-evil-B"),
+          },
+          expectedRevision: roomWithImported.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === importedPlan.id);
+      // provenance는 원본 A로 보존된다(위조된 B가 아님).
+      expect(target?.importedFromExploreListingId).toBe(provenanceA);
+      // 편집 가능한 변경은 반영된다.
+      expect(target?.title).toBe("작성자가 수정한 제목");
+    });
+
+    it("가져온 여행안의 출처(provenance)는 편집 입력이 생략(undefined)해도 원본 값을 보존한다", async () => {
+      const provenanceA = ExploreListingIdSchema.make("listing-source-A2");
+      const importedPlan: TripPlan = {
+        ...opinionsPlan,
+        id: PlanIdSchema.make("plan-imported-2"),
+        title: "가져온 여행안2",
+        importedFromExploreListingId: provenanceA,
+      };
+      const roomWithImported: TripRoom = {
+        ...sampleRoom,
+        plans: [hostPlan, importedPlan],
+      };
+      const env = Layer.merge(
+        createInMemoryRepo([roomWithImported]),
+        createSessionLayer(authorSession)
+      );
+
+      const { importedFromExploreListingId: _omitted, ...withoutProvenance } =
+        importedPlan;
+      const res = await Effect.runPromise(
+        updatePlan({
+          roomId: roomWithImported.id,
+          plan: { ...withoutProvenance, title: "출처 없이 수정" },
+          expectedRevision: roomWithImported.revision,
+        }).pipe(Effect.provide(env))
+      );
+
+      const target = res.plans.find((p) => p.id === importedPlan.id);
+      expect(target?.importedFromExploreListingId).toBe(provenanceA);
+      expect(target?.title).toBe("출처 없이 수정");
     });
 
     it("작성자가 편집하는 내용은 그대로 반영된다 (과보호 회귀 방지 대조군)", async () => {

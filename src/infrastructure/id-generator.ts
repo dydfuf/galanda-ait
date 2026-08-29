@@ -1,6 +1,7 @@
 import { Effect, Layer } from "effect";
 import { IdGenerator } from "../core/ports/id-generator.ts";
 import {
+  ExploreListingIdSchema,
   InviteTokenSchema,
   ItineraryIdSchema,
   PlanIdSchema,
@@ -18,6 +19,9 @@ export const IdGeneratorLive: Layer.Layer<IdGenerator> = Layer.succeed(
       RecommendationIdSchema.make(crypto.randomUUID())
     ),
     inviteToken: Effect.sync(() => InviteTokenSchema.make(crypto.randomUUID())),
+    exploreListingId: Effect.sync(() =>
+      ExploreListingIdSchema.make(crypto.randomUUID())
+    ),
   })
 );
 
@@ -27,6 +31,7 @@ export const createTestIdGenerator = (overrides?: {
   readonly itineraryId?: string;
   readonly recommendationId?: string;
   readonly inviteToken?: string;
+  readonly exploreListingId?: string;
 }): Layer.Layer<IdGenerator> =>
   Layer.succeed(
     IdGenerator,
@@ -48,6 +53,11 @@ export const createTestIdGenerator = (overrides?: {
       inviteToken: Effect.succeed(
         InviteTokenSchema.make(
           overrides?.inviteToken ?? "00000000-0000-4000-8000-000000000001"
+        )
+      ),
+      exploreListingId: Effect.succeed(
+        ExploreListingIdSchema.make(
+          overrides?.exploreListingId ?? "explore-listing-test-001"
         )
       ),
     })

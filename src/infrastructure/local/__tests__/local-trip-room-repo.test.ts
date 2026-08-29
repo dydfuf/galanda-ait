@@ -86,6 +86,37 @@ describe("LocalTripRoomRepository", () => {
     }
   });
 
+  it("createRoom initialPlan을 방과 함께 single write로 저장한다 (RAON-261 DISC-7)", async () => {
+    const roomId = TripIdSchema.make("room-import-local");
+    const hostId = UserIdSchema.make("host-local");
+    const program = Effect.gen(function* () {
+      const repo = yield* TripRoomRepository;
+      return yield* repo.createRoom({
+        id: roomId,
+        title: "가져온 여행",
+        destination: "오사카",
+        hostUser: { id: hostId, name: "Host", role: "HOST" },
+        initialPlan: {
+          id: PlanIdSchema.make("plan-local-imported"),
+          title: "가져온 여행안",
+          status: "VOTING",
+          revision: RevisionSchema.make(1),
+          places: [],
+          voteCount: 0,
+        },
+      });
+    }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));
+
+    const exit = await Effect.runPromiseExit(program);
+    expect(Exit.isSuccess(exit)).toBe(true);
+    if (Exit.isSuccess(exit)) {
+      expect(exit.value.plans).toHaveLength(1);
+      expect(exit.value.plans[0]!.id).toBe("plan-local-imported");
+    }
+    // 저장된 스토리지에도 room+plan이 한 번에 반영된다.
+    expect(memoryStore[STORAGE_KEY]).toContain("plan-local-imported");
+  });
+
   it("참여 중인 방만 반환한다", async () => {
     const aliceId = UserIdSchema.make("alice");
     const bobId = UserIdSchema.make("bob");

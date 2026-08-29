@@ -72,6 +72,16 @@ export function mapDomainError(
           }),
         };
 
+      case "ExploreListingUnavailableError":
+        return {
+          status: 410,
+          body: formatApiError({
+            code: "LISTING_UNAVAILABLE",
+            message: "게시가 중단되었거나 더 이상 볼 수 없는 여행 일정입니다.",
+            requestId,
+          }),
+        };
+
       case "InvalidInviteError":
         return {
           status: 404,

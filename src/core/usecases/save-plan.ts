@@ -292,6 +292,8 @@ export const updatePlan = Effect.fn("updatePlan")(
       clonedFromPlanId: existingPlan.clonedFromPlanId,
       memberOpinions: existingPlan.memberOpinions,
       voteCount: existingPlan.voteCount,
+      // server-owned provenance는 편집 입력으로 덮어쓰지 않고 원본에서 보존한다.
+      importedFromExploreListingId: existingPlan.importedFromExploreListingId,
     };
 
     if (hasDecisionInputChanges(existingPlan, finalPlan)) {
@@ -371,9 +373,16 @@ export const deletePlan = Effect.fn("deletePlan")(
       "확정된 여행안은 삭제할 수 없습니다."
     );
 
-    return yield* repo.saveRoom(
-      deletePlanFromRoom(room, plan),
-      input.expectedRevision
-    );
+    // 5. source plan 삭제와 Explore listing auto-unlist를 하나의 atomic
+    //    persistence로 수행한다(RAON-258 / DISC-1). room CAS가 성공해야만 그 plan을
+    //    원본으로 하는 LISTED listing이 함께 UNLISTED로 전이한다. unlistedAt은
+    //    서버 Clock이 결정한다(client 시각 미신뢰).
+    const unlistedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+    return yield* repo.deletePlanAndAutoUnlist({
+      room: deletePlanFromRoom(room, plan),
+      sourcePlanId: plan.id,
+      expectedRevision: input.expectedRevision,
+      unlistedAt,
+    });
   }
 );

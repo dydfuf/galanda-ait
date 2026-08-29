@@ -1,5 +1,10 @@
 import { Schema, type Result } from "effect";
-import { TripIdSchema, PlanIdSchema, InviteTokenSchema } from "../../core/domain/ids.ts";
+import {
+  TripIdSchema,
+  PlanIdSchema,
+  InviteTokenSchema,
+  ExploreListingIdSchema,
+} from "../../core/domain/ids.ts";
 
 export const TripParamsSchema = Schema.Struct({
   tripId: TripIdSchema,
@@ -16,6 +21,11 @@ export const InviteParamsSchema = Schema.Struct({
   inviteToken: InviteTokenSchema,
 });
 export type InviteParams = typeof InviteParamsSchema.Type;
+
+export const ExploreListingParamsSchema = Schema.Struct({
+  listingId: ExploreListingIdSchema,
+});
+export type ExploreListingParams = typeof ExploreListingParamsSchema.Type;
 
 export const CompareQuerySchema = Schema.Struct({
   left: PlanIdSchema,

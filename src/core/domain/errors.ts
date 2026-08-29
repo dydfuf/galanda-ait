@@ -75,3 +75,17 @@ export class RepositoryError extends Schema.TaggedError<RepositoryError>()(
     message: Schema.String,
   }
 ) {}
+
+/**
+ * Explore listing이 더 이상 공개 상태가 아님(gone).
+ *
+ * - listing record는 존재하지만 UNLISTED(게시 중단)여서 공개 detail을 제공할 수
+ *   없는 상태를 "존재하지 않음"(NotFoundError)과 명시적으로 구분한다.
+ * - source private aggregate를 read-through한 cached fallback을 절대 제공하지
+ *   않는다. UNLISTED/삭제/무효는 오직 이 typed error 또는 NotFound로만 표현한다.
+ * - HTTP 경계는 이 오류를 410 GONE + `LISTING_UNAVAILABLE`로 매핑한다.
+ */
+export class ExploreListingUnavailableError extends Schema.TaggedError<ExploreListingUnavailableError>()(
+  "ExploreListingUnavailableError",
+  {}
+) {}
