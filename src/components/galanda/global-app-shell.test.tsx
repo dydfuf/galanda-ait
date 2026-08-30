@@ -101,6 +101,18 @@ describe("GlobalAppShell (RAON-248)", () => {
       paddingBottom:
         "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
     });
-    expect(nav.querySelector("ul")?.className).toContain("h-16");
+    expect(nav).toHaveAttribute("data-galanda-surface", "chrome");
+    expect(nav.className).toContain("fixed");
+    expect(nav.className).toContain("inset-x-0");
+    expect(nav.className).toContain("bottom-0");
+    expect(nav.className).not.toContain("border-t");
+    expect(nav.className).toContain("pb-[var(--safe-bottom)]");
+    expect(nav.className).not.toContain("pointer-events-none");
+    const navList = nav.querySelector("ul");
+    expect(navList?.className).toContain("h-16");
+    expect(navList?.className).toContain("w-full");
+    expect(navList?.className).toContain("max-w-(--content-max-width)");
+    expect(navList?.className).not.toContain("mb-2");
+    expect(navList?.className).not.toContain("rounded-[28px]");
   });
 });
