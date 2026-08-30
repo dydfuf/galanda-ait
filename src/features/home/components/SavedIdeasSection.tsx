@@ -1,11 +1,15 @@
 import { Link } from "react-router-dom";
+import { BookmarkCheck, MapPinned } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
+import { toLocalTravelDate } from "@/core/domain/room.ts";
 import { useSessionQuery } from "@/hooks/useSession.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 import { useSavedListingsQuery } from "@/features/explore/save-queries.ts";
 import type { SavedListingItem } from "@/contracts/explore-save.ts";
+import { getHomeTripDayLabel } from "./HomeTripDashboard.tsx";
 
 /**
  * Home `저장한 여행 아이디어` section (RAON-256 DISC-9).
@@ -76,40 +80,63 @@ function SavedIdeaRow({ entry }: { entry: SavedListingItem }) {
   const durationText = formatDuration(
     snapshot.dateRange.nightCount,
     snapshot.dateRange.startDate,
-    snapshot.dateRange.endDate
+    snapshot.dateRange.endDate,
   );
   const savedAtText = formatSavedAt(savedAt);
+  const dayLabel = getHomeTripDayLabel(
+    snapshot.dateRange.startDate,
+    snapshot.dateRange.endDate,
+    toLocalTravelDate(new Date()),
+  );
   const titleId = `home-saved-title-${listing.listingId}`;
 
   return (
-    <li className="min-w-0">
+    <li className="min-w-0 border-b border-border last:border-b-0">
       <Link
         to={`/explore/${encodeURIComponent(listing.listingId)}`}
         aria-labelledby={titleId}
-        className="flex min-w-0 flex-col gap-1 rounded-xl border border-border bg-card p-4 text-foreground! no-underline! transition-colors hover:bg-surface-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="group flex min-w-0 items-center gap-3 rounded-xl px-2 py-3 text-foreground! no-underline! transition-colors hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
-        <h3
-          id={titleId}
-          className="min-w-0 text-base leading-snug font-bold text-foreground [overflow-wrap:anywhere]"
+        <span
+          aria-hidden="true"
+          className="grid size-18 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary-muted text-primary"
         >
-          {snapshot.title}
-        </h3>
-        <dl className="flex min-w-0 flex-col gap-0.5 text-sm text-foreground-muted">
-          <div className="flex min-w-0 gap-1.5">
-            <dt className="sr-only">경로</dt>
-            <dd className="min-w-0 [overflow-wrap:anywhere]">{routeText}</dd>
-          </div>
-          <div className="flex min-w-0 gap-1.5">
-            <dt className="sr-only">기간</dt>
-            <dd className="min-w-0 [overflow-wrap:anywhere]">{durationText}</dd>
-          </div>
-        </dl>
-        {savedAtText && (
-          <p className="min-w-0 text-sm text-foreground-subtle [overflow-wrap:anywhere]">
-            <span className="sr-only">저장 시각</span>
-            {savedAtText}
-          </p>
-        )}
+          <span className="flex flex-col items-center gap-1">
+            <MapPinned className="size-6" />
+            <span className="max-w-14 truncate text-xs font-bold">
+              {snapshot.destination}
+            </span>
+          </span>
+        </span>
+
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <h3
+            id={titleId}
+            className="min-w-0 text-[15px] leading-snug font-bold text-foreground [overflow-wrap:anywhere]"
+          >
+            {snapshot.title}
+          </h3>
+          <span className="min-w-0 text-sm text-foreground-muted [overflow-wrap:anywhere]">
+            {routeText}
+          </span>
+          <span className="min-w-0 text-sm text-foreground-subtle [overflow-wrap:anywhere]">
+            {durationText}
+          </span>
+          {savedAtText && (
+            <span className="min-w-0 text-xs text-foreground-subtle [overflow-wrap:anywhere]">
+              <span className="sr-only">저장 시각</span>
+              {savedAtText}
+            </span>
+          )}
+        </span>
+
+        <span className="flex shrink-0 flex-col items-end justify-between self-stretch py-1">
+          {dayLabel ? <Badge variant="info">{dayLabel}</Badge> : <span />}
+          <span className="text-foreground-muted" title="저장됨">
+            <BookmarkCheck className="size-5" aria-hidden="true" />
+            <span className="sr-only">저장됨</span>
+          </span>
+        </span>
       </Link>
     </li>
   );
@@ -186,7 +213,7 @@ export function SavedIdeasSection() {
     // 최신처럼 보이게 하지 않는다.
     body = (
       <div className="flex min-w-0 flex-col gap-3">
-        <ul className="flex flex-col gap-2">
+        <ul className="overflow-hidden rounded-2xl border border-border bg-card px-1">
           {items.map((entry) => (
             <SavedIdeaRow key={entry.listing.listingId} entry={entry} />
           ))}

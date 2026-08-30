@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Compass, House, Map, UserRound } from "lucide-react";
+import { Compass, House, Luggage, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -33,7 +33,7 @@ import {
 const NAV_ICONS: Record<GlobalNavKey, typeof House> = {
   HOME: House,
   EXPLORE: Compass,
-  TRIPS: Map,
+  TRIPS: Luggage,
   ME: UserRound,
 };
 
@@ -63,7 +63,7 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
       <nav
         aria-label="주요 화면"
         data-galanda-surface="chrome"
-        className="fixed inset-x-0 bottom-0 z-20 border-t bg-background pb-[var(--safe-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-20 bg-background pb-[var(--safe-bottom)]"
       >
         <ul className="mx-auto flex h-16 w-full max-w-(--content-max-width) items-stretch">
           {GLOBAL_NAV_ITEMS.map((item) => {
