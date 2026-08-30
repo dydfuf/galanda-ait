@@ -88,11 +88,20 @@ beforeEach(() => {
 
 describe("TripCreatePage", () => {
   it("permanent label과 validation accessory로 완료 조건을 표시한다", () => {
-    renderPage();
+    const { container } = renderPage();
 
     const input = screen.getByLabelText("여행 이름 *");
     const submit = screen.getByRole("button", { name: "여행 만들기" });
+    const main = screen.getByRole("main");
+    const form = document.getElementById("trip-create-form");
+    const bottomAction = container.querySelector('[data-slot="bottom-action"]');
 
+    expect(main.parentElement).toHaveAttribute("data-galanda-surface", "content");
+    expect(container.querySelector("header")).not.toHaveAttribute(
+      "data-galanda-surface",
+    );
+    expect(form).toHaveClass("rounded-2xl", "border-border", "bg-card");
+    expect(bottomAction).toHaveAttribute("data-galanda-surface", "content");
     expect(input).toHaveAttribute("aria-describedby", "trip-title-help");
     expect(input).toHaveAttribute("maxLength", "30");
     expect(submit).toBeDisabled();

@@ -50,7 +50,8 @@ export interface TripRoomViewModel {
   readonly displayEndDate?: string;
   readonly period: string;
   readonly memberCount: number;
-  readonly memberNames: string;
+  /** 참가자 identity를 표시 문자열로 합치지 않고 구조화된 순서로 유지한다. */
+  readonly memberNames: ReadonlyArray<string>;
   readonly revision: number;
   readonly confirmedPlanId?: string;
   readonly confirmedPlanTitle?: string;
@@ -61,6 +62,8 @@ export interface TripRoomViewModel {
   readonly candidateCount: number;
   readonly totalOpinionCount: number;
   readonly participatedMemberCount: number;
+  /** legacy voteCount처럼 참여자 identity를 복원할 수 없는 의견이 하나라도 있는지 나타낸다. */
+  readonly hasUnattributedOpinions: boolean;
   readonly isConfirmed: boolean;
   readonly plans: ReadonlyArray<PlanHomePlanSummaryData>;
 }
@@ -247,6 +250,9 @@ export const toTripRoomViewModel = (
     }
   }
   const participatedMemberCount = participatedIds.size;
+  const hasUnattributedOpinions = room.plans.some(
+    (plan) => plan.memberOpinions === undefined && plan.voteCount > 0,
+  );
   const decisionBadgeText = isConfirmed
     ? "확정됨"
     : candidateCount === 0
@@ -265,7 +271,7 @@ export const toTripRoomViewModel = (
     displayEndDate: displayDate?.endDate,
     period: displayDate ? `${displayDate.startDate} ~ ${displayDate.endDate}` : "일정 미정",
     memberCount: room.members.length,
-    memberNames: room.members.map((m) => m.name).join(", "),
+    memberNames: room.members.map((member) => member.name),
     revision: room.revision,
     confirmedPlanId: room.confirmedPlanId,
     confirmedPlanTitle: confirmed?.title,
@@ -276,6 +282,7 @@ export const toTripRoomViewModel = (
     candidateCount,
     totalOpinionCount,
     participatedMemberCount,
+    hasUnattributedOpinions,
     isConfirmed,
     plans,
   };

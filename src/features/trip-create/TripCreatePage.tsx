@@ -49,25 +49,30 @@ export function TripCreatePage() {
     }
   };
 
-  const counterText = `(${title.length}/${MAX_TITLE_LENGTH})`;
-  const completionCondition = !isValid
+  const counterText = `${title.length}/${MAX_TITLE_LENGTH}`;
+  const helperText = !isValid
     ? "여행 이름을 입력해 주세요."
-    : undefined;
+    : "여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.";
 
   return (
-    <div className="flex min-h-dvh flex-1 flex-col">
+    <div
+      data-galanda-surface="content"
+      className="flex min-h-dvh flex-1 flex-col"
+    >
       {!platformNavigation && (
         <PageHeader
           title="여행 만들기"
           back={{ onClick: () => void goBack() }}
+          surface="none"
         />
       )}
 
       <main className="flex flex-1 flex-col">
-        <PageBody withBottomAction>
+        <PageBody withBottomAction className="flex flex-col">
           <PageTitle
             title="어떤 여행을 계획하고 있나요?"
             description="먼저 여행 이름만 정해주세요."
+            className="pb-2"
           />
 
           <form
@@ -76,10 +81,18 @@ export function TripCreatePage() {
               e.preventDefault();
               void handleSubmit();
             }}
-            className="flex flex-col px-(--app-inline-padding) pt-4"
+            className="mx-(--app-inline-padding) mt-3 flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
           >
-            <Field data-invalid={Boolean(errorMsg) || undefined}>
-              <FieldLabel htmlFor="trip-title">여행 이름 *</FieldLabel>
+            <Field
+              data-invalid={Boolean(errorMsg) || undefined}
+              className="gap-3"
+            >
+              <FieldLabel
+                htmlFor="trip-title"
+                className="text-base font-semibold text-foreground"
+              >
+                여행 이름 *
+              </FieldLabel>
               <Input
                 id="trip-title"
                 ref={inputRef}
@@ -93,16 +106,25 @@ export function TripCreatePage() {
                 aria-describedby="trip-title-help"
                 aria-invalid={Boolean(errorMsg) || undefined}
                 required
-                className="h-12 rounded-xl px-4"
+                className="h-14 rounded-xl border-border bg-background px-4 text-base"
               />
               {errorMsg ? (
-                <FieldError id="trip-title-help">
-                  {errorMsg} {counterText}
+                <FieldError
+                  id="trip-title-help"
+                  className="flex items-start justify-between gap-3"
+                >
+                  <span className="min-w-0 flex-1">{errorMsg}</span>
+                  <span className="shrink-0 tabular-nums">{counterText}</span>
                 </FieldError>
               ) : (
-                <FieldDescription id="trip-title-help">
-                  여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.{" "}
-                  {counterText}
+                <FieldDescription
+                  id="trip-title-help"
+                  className="flex items-start justify-between gap-3"
+                >
+                  <span className="min-w-0 flex-1">{helperText}</span>
+                  <span className="shrink-0 tabular-nums text-foreground-muted">
+                    {counterText}
+                  </span>
                 </FieldDescription>
               )}
             </Field>
@@ -110,15 +132,7 @@ export function TripCreatePage() {
         </PageBody>
       </main>
 
-      <BottomAction
-        accessory={
-          completionCondition ? (
-            <p className="text-center text-base leading-relaxed text-foreground-muted">
-              {completionCondition}
-            </p>
-          ) : undefined
-        }
-      >
+      <BottomAction surface="content" className="border-border">
         <Button
           type="submit"
           form="trip-create-form"

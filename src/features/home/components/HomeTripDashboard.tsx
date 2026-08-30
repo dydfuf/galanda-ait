@@ -68,10 +68,7 @@ export const selectHomeTrip = (
   rooms.find((room) => !isPastTravelDate(room.displayEndDate, today));
 
 const getMemberNames = (room: TripRoomViewModel): ReadonlyArray<string> =>
-  room.memberNames
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
+  room.memberNames.map((name) => name.trim()).filter(Boolean);
 
 const getInitial = (name: string): string =>
   Array.from(name.trim())[0]?.toUpperCase() ?? "?";
@@ -88,16 +85,23 @@ export function HomeTripCard({ room, userName, today }: HomeTripCardProps) {
     room.displayEndDate,
     today,
   );
+  const hasNoCandidate = room.candidateCount === 0;
   const isParticipationUnknown =
-    room.totalOpinionCount > 0 && room.participatedMemberCount === 0;
-  const participationPercent = isParticipationUnknown
-    ? undefined
-    : room.memberCount > 0
-      ? Math.min(
-          100,
-          Math.round((room.participatedMemberCount / room.memberCount) * 100),
-        )
-      : 0;
+    !hasNoCandidate && room.hasUnattributedOpinions;
+  const participationPercent =
+    hasNoCandidate || isParticipationUnknown
+      ? undefined
+      : room.memberCount > 0
+        ? Math.min(
+            100,
+            Math.round((room.participatedMemberCount / room.memberCount) * 100),
+          )
+        : 0;
+  const participationStatus = hasNoCandidate
+    ? "여행안 없음"
+    : isParticipationUnknown
+      ? "집계 전"
+      : `${participationPercent}%`;
   const memberNames = getMemberNames(room);
   const shownMembers = memberNames.slice(0, 4);
   const remainingMembers = Math.max(0, room.memberCount - shownMembers.length);
@@ -137,11 +141,16 @@ export function HomeTripCard({ room, userName, today }: HomeTripCardProps) {
               여행안 의견 참여율
             </span>
             <span className="shrink-0 text-foreground">
-              {participationPercent === undefined ? "집계 전" : `${participationPercent}%`}
+              {participationStatus}
             </span>
           </div>
           {participationPercent === undefined ? (
-            <div className="h-2 rounded-full bg-muted" aria-label="의견 참여 인원 집계 전" />
+            <div
+              className="h-2 rounded-full bg-muted"
+              aria-label={
+                hasNoCandidate ? "등록된 여행안 없음" : "의견 참여 인원 집계 전"
+              }
+            />
           ) : (
             <div
               role="progressbar"

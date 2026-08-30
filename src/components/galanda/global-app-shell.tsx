@@ -44,6 +44,7 @@ export interface GlobalAppShellProps {
 export function GlobalAppShell({ children }: GlobalAppShellProps) {
   const location = useLocation();
   const activeKey = resolveGlobalNavKey(location.pathname);
+  const usesContentSurface = /^\/trips\/?$/.test(location.pathname);
   const shellStyle = {
     "--global-nav-height": "calc(64px + var(--safe-bottom))",
     // BottomAction이 nav 위에 놓일 때 safe-area는 nav만 소유한다.
@@ -56,13 +57,16 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
       style={shellStyle}
       className="flex min-h-dvh flex-1 flex-col"
     >
-      <div className="flex flex-1 flex-col pb-[var(--global-nav-height)]">
+      <div
+        data-galanda-surface={usesContentSurface ? "content" : undefined}
+        className="flex flex-1 flex-col pb-[var(--global-nav-height)]"
+      >
         {children}
       </div>
 
       <nav
         aria-label="주요 화면"
-        data-galanda-surface="chrome"
+        data-galanda-surface={usesContentSurface ? "content" : "chrome"}
         className="fixed inset-x-0 bottom-0 z-20 bg-background pb-[var(--safe-bottom)]"
       >
         <ul className="mx-auto flex h-16 w-full max-w-(--content-max-width) items-stretch">

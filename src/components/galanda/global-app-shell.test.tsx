@@ -70,9 +70,46 @@ describe("GlobalAppShell (RAON-248)", () => {
     expect(current).toHaveLength(0);
   });
 
+  it.each(["/trips", "/trips/"])(
+    "%s 목록에서는 상단 wrapper와 bottom nav가 content surface를 공유한다",
+    (path) => {
+      const { container } = renderAt(path);
+      const shell = container.querySelector<HTMLElement>(
+        '[data-slot="global-app-shell"]',
+      );
+      const nav = screen.getByRole("navigation", { name: "주요 화면" });
+
+      expect(shell?.firstElementChild).toHaveAttribute(
+        "data-galanda-surface",
+        "content",
+      );
+      expect(nav).toHaveAttribute("data-galanda-surface", "content");
+    },
+  );
+
+  it.each([
+    "/home",
+    "/explore",
+    "/me",
+    "/me/saved",
+    "/trips/trip-1/plans",
+    "/trips/trip-1/itinerary",
+  ])("%s에서는 기존 bottom chrome surface를 유지한다", (path) => {
+    const { container } = renderAt(path);
+    const shell = container.querySelector<HTMLElement>(
+      '[data-slot="global-app-shell"]',
+    );
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+
+    expect(shell?.firstElementChild).not.toHaveAttribute(
+      "data-galanda-surface",
+    );
+    expect(nav).toHaveAttribute("data-galanda-surface", "chrome");
+  });
+
   it("BottomAction이 있으면 nav 위로 offset하고 safe-area는 nav가 한 번만 소유한다", () => {
     const { container } = render(
-      <MemoryRouter initialEntries={["/trips"]}>
+      <MemoryRouter initialEntries={["/home"]}>
         <GlobalAppShell>
           <BottomAction>
             <Button>새 여행 만들기</Button>
