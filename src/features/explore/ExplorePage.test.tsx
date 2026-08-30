@@ -6,12 +6,12 @@ import { MemoryRouter } from "react-router-dom";
 import type { ExploreListingItem } from "../../contracts/explore.ts";
 
 vi.mock("./queries.ts", () => ({
-  useExploreListingsQuery: vi.fn(),
+  useExploreListingsQuery: vi.fn<(...args: unknown[]) => unknown>(),
   EXPLORE_FEED_PAGE_SIZE: 20,
   exploreKeys: { all: ["explore"], listings: () => ["explore", "listings"] },
 }));
 vi.mock("../../hooks/useSession.ts", () => ({
-  useSessionQuery: vi.fn(),
+  useSessionQuery: vi.fn<(...args: unknown[]) => unknown>(),
 }));
 vi.mock("./components/ExploreSaveToggle.tsx", () => ({
   ExploreSaveToggle: () => null,
@@ -52,19 +52,19 @@ const sessionOk = () =>
     isPending: false,
     isError: false,
     error: null,
-    refetch: vi.fn(),
+    refetch: vi.fn<(...args: unknown[]) => unknown>(),
   } as unknown as ReturnType<typeof useSessionQuery>);
 
 const exploreResult = (
-  over: Record<string, unknown>
+  over: Record<string, unknown>,
 ): ReturnType<typeof useExploreListingsQuery> =>
   ({
     data: undefined,
     isPending: false,
     isError: false,
     error: null,
-    refetch: vi.fn(),
-    fetchNextPage: vi.fn(),
+    refetch: vi.fn<(...args: unknown[]) => unknown>(),
+    fetchNextPage: vi.fn<(...args: unknown[]) => unknown>(),
     hasNextPage: false,
     isFetchingNextPage: false,
     isFetchNextPageError: false,
@@ -104,7 +104,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
 
   it("초기 오류는 error 상태 + 재시도 액션으로 노출한다", () => {
     sessionOk();
-    const refetch = vi.fn();
+    const refetch = vi.fn<(...args: unknown[]) => unknown>();
     mockUseExplore.mockReturnValue(
       exploreResult({ isError: true, error: new Error("boom"), refetch }),
     );
@@ -114,7 +114,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("카드는 공개 필드(제목/경로/기간/작성자)만 렌더링한다", () => {
+  it("h1→h2→h3 단일 section hierarchy에서 item을 한 번만 렌더링한다", () => {
     sessionOk();
     mockUseExplore.mockReturnValue(
       exploreResult({
@@ -125,21 +125,59 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       }),
     );
     const { container } = renderPage();
-    const card = container.querySelector('[data-slot="explore-listing-card"]')!;
-    expect(within(card as HTMLElement).getByRole("heading", { level: 3 })).toHaveTextContent(
-      "오사카 3박 4일",
+    const section = screen.getByRole("region", { name: "새로 공개된 여행 일정" });
+
+    expect(screen.getByRole("heading", { level: 1, name: "탐색" })).toBeVisible();
+    expect(
+      within(section).getByRole("heading", {
+        level: 2,
+        name: "새로 공개된 여행 일정",
+      }),
+    ).toBeVisible();
+    expect(
+      within(section).getByRole("heading", { level: 3, name: "오사카 3박 4일" }),
+    ).toBeVisible();
+    expect(screen.getAllByText("오사카 3박 4일")).toHaveLength(1);
+    expect(
+      container.querySelectorAll('[data-slot="explore-listing-card"]'),
+    ).toHaveLength(1);
+  });
+
+  it("카드는 실제 공개 필드와 semantic visual만 사용하고 금지된 탐색 UI는 만들지 않는다", () => {
+    sessionOk();
+    mockUseExplore.mockReturnValue(
+      exploreResult({
+        data: {
+          pages: [{ items: [item({ id: "l1" })] }],
+          pageParams: [undefined],
+        },
+      }),
     );
-    expect(card.textContent).toContain("오사카 → 교토");
-    expect(card.textContent).toContain("3박 4일");
-    expect(card.textContent).toContain("여행자A");
-    // fake popularity/image/count 없음.
+    const { container } = renderPage();
+    const card = container.querySelector<HTMLElement>(
+      '[data-slot="explore-listing-card"]',
+    )!;
+    const visual = card.querySelector<HTMLElement>(
+      '[data-slot="explore-destination-visual"]',
+    )!;
+
+    expect(visual).toHaveClass("bg-primary-muted");
+    expect(visual).toHaveTextContent("오사카");
+    expect(card).toHaveTextContent("오사카 → 교토");
+    expect(card).toHaveTextContent("3박 4일");
+    expect(card).toHaveTextContent("여행자A");
+    expect(card).toHaveTextContent("공개일 2026.09.05");
     expect(card.querySelector("img")).toBeNull();
-    expect(card.textContent).not.toMatch(/저장|인기|조회수/);
+    expect(container.querySelector("ol")).toBeNull();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent(
+      /지금 뜨는|theme|테마|인기 도시|순위|가격|인원|알림|전체보기|조회수/,
+    );
   });
 
   it("hasNextPage면 '더 보기'로 다음 페이지를 요청한다", () => {
     sessionOk();
-    const fetchNextPage = vi.fn();
+    const fetchNextPage = vi.fn<(...args: unknown[]) => unknown>();
     mockUseExplore.mockReturnValue(
       exploreResult({
         data: { pages: [{ items: [item({ id: "l1" })] }], pageParams: [undefined] },
@@ -162,18 +200,16 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       }),
     );
     const { container } = renderPage();
-    // 기존 카드 유지.
     expect(
       container.querySelector('[data-slot="explore-listing-card"]'),
     ).not.toBeNull();
     expect(screen.getByText("더 불러오는 중이에요.")).toBeVisible();
-    // 초기 로딩 상태와 섞이지 않는다.
     expect(container.querySelector('[data-system-state="loading"]')).toBeNull();
   });
 
   it("다음 페이지 오류는 기존 행을 유지한 채 별도 재시도를 제공한다", () => {
     sessionOk();
-    const fetchNextPage = vi.fn();
+    const fetchNextPage = vi.fn<(...args: unknown[]) => unknown>();
     mockUseExplore.mockReturnValue(
       exploreResult({
         data: { pages: [{ items: [item({ id: "l1" })] }], pageParams: [undefined] },
@@ -185,7 +221,6 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       }),
     );
     const { container } = renderPage();
-    // 기존 카드 유지 + 초기 error 상태로 대체되지 않음.
     expect(
       container.querySelector('[data-slot="explore-listing-card"]'),
     ).not.toBeNull();
@@ -202,7 +237,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       isPending: false,
       isError: true,
       error: new Error("session down"),
-      refetch: vi.fn(),
+      refetch: vi.fn<(...args: unknown[]) => unknown>(),
     } as unknown as ReturnType<typeof useSessionQuery>);
     mockUseExplore.mockReturnValue(exploreResult({ isPending: true }));
     renderPage();

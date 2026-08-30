@@ -7,6 +7,8 @@ interface BottomActionProps {
   readonly accessory?: ReactNode;
   /** 하나 또는 두 개의 CTA 버튼. 두 개면 좌우로 나란히 배치돼요. */
   readonly children: ReactNode;
+  /** 상위 화면과 이어지는 배경이 필요하면 content surface를 명시해요. */
+  readonly surface?: "chrome" | "content";
   readonly className?: string;
 }
 
@@ -23,6 +25,7 @@ const BOTTOM_ACTION_HEIGHT_PROPERTY = "--app-bottom-action-height";
 export function BottomAction({
   accessory,
   children,
+  surface = "chrome",
   className,
 }: BottomActionProps) {
   const actionRef = useRef<HTMLDivElement>(null);
@@ -62,7 +65,7 @@ export function BottomAction({
     <div
       ref={actionRef}
       data-slot="bottom-action"
-      data-galanda-surface="chrome"
+      data-galanda-surface={surface}
       style={{
         bottom: "var(--global-nav-height, 0px)",
         paddingBottom:

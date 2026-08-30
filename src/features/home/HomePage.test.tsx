@@ -65,7 +65,7 @@ const room: TripRoomViewModel = {
   displayEndDate: "2999-06-23",
   period: "2999-06-15 ~ 2999-06-23",
   memberCount: 5,
-  memberNames: "라온, 민지, 서준, 지수, 하늘",
+  memberNames: ["라온", "민지", "서준", "지수", "하늘"],
   revision: 1,
   confirmedPlanId: "plan-1",
   confirmedPlanTitle: "남부 로드트립",
@@ -76,6 +76,7 @@ const room: TripRoomViewModel = {
   candidateCount: 2,
   totalOpinionCount: 6,
   participatedMemberCount: 4,
+  hasUnattributedOpinions: false,
   isConfirmed: true,
   plans: [],
 };
@@ -258,10 +259,17 @@ describe("HomePage dashboard", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("legacy 의견의 참여 인원을 집계할 수 없으면 0%로 단정하지 않는다", () => {
+  it("legacy 의견이 섞여 참여 인원을 완전히 집계할 수 없으면 비율로 단정하지 않는다", () => {
     mockRooms.mockReturnValue(
       roomsResult({
-        data: [{ ...room, totalOpinionCount: 2, participatedMemberCount: 0 }],
+        data: [
+          {
+            ...room,
+            totalOpinionCount: 3,
+            participatedMemberCount: 1,
+            hasUnattributedOpinions: true,
+          },
+        ],
       }),
     );
     mockSaved.mockReturnValue(

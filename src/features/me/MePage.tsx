@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Bookmark, Monitor, Moon, Palette, Sun } from "lucide-react";
 
 import { useTheme } from "@/app/theme-provider.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
@@ -31,12 +30,16 @@ const THEME_OPTIONS = [
   { value: "dark", label: "다크", Icon: Moon },
 ] as const;
 
+const getNameInitial = (name: string): string => {
+  const [firstCharacter] = Array.from(name.trim());
+  return firstCharacter?.toUpperCase() ?? "";
+};
+
 /**
  * My(마이) destination (RAON-248 / Goal 13).
  *
- * Global 탐색의 마이 목적지. 지금은 로그인한 사용자의 표시 이름만 정직하게 보여주는
- * minimal surface다. Goal 14 UI가 확장할 자리를 남겨두되, 존재하지 않는 통계·배지·
- * 활동 내역 같은 fake data를 만들지 않는다.
+ * 실제 session 표시 이름과 현재 동작하는 저장 목록·화면 설정만 제공한다.
+ * 존재하지 않는 프로필 정보나 통계·활동 내역은 만들지 않는다.
  */
 export function MePage() {
   const { preference, setPreference } = useTheme();
@@ -66,33 +69,51 @@ export function MePage() {
     );
   }
 
+  const displayName = session?.name.trim() ?? "";
+
   return (
     <PageBody safeTop>
-      <PageTitle
-        title="마이"
-        description={
-          session?.name
-            ? `${session.name}님으로 이용 중이에요.`
-            : "내 계정 정보를 여기에서 관리해요."
-        }
-      />
-      <nav className="flex flex-col gap-2 px-(--app-inline-padding)" aria-label="마이 메뉴">
-        <Link
-          to="/me/saved"
-          className="flex min-h-(--touch-target-min) min-w-0 items-center rounded-xl border border-border bg-card px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-surface-content focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          저장한 여행 일정
-        </Link>
-      </nav>
+      <PageTitle title="마이" />
 
-      <section className="mt-6 px-(--app-inline-padding)" aria-label="화면 설정">
-        <MobileList
-          aria-label="화면 설정 메뉴"
-          className="overflow-hidden rounded-2xl border border-border bg-card"
-        >
+      {displayName && (
+        <section className="px-(--app-inline-padding)" aria-label="내 프로필">
+          <div className="flex min-w-0 items-center gap-4 rounded-2xl border border-primary-border bg-primary-muted p-5 shadow-sm">
+            <span
+              aria-hidden="true"
+              className="grid size-14 shrink-0 place-items-center rounded-full border border-primary-border bg-card text-lg font-bold text-primary shadow-sm"
+            >
+              {getNameInitial(displayName)}
+            </span>
+            <h2 className="min-w-0 flex-1 text-xl leading-snug font-semibold text-foreground [overflow-wrap:anywhere]">
+              {displayName}
+            </h2>
+          </div>
+        </section>
+      )}
+
+      <nav className="mt-5 px-(--app-inline-padding)" aria-label="마이 메뉴">
+        <MobileList className="overflow-hidden rounded-2xl border border-border bg-card">
+          <MobileListItem
+            to="/me/saved"
+            chevron
+            leading={
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">
+                <Bookmark className="size-5" aria-hidden="true" />
+              </span>
+            }
+          >
+            <ItemTitle className="text-base font-medium text-foreground">
+              저장한 여행 일정
+            </ItemTitle>
+          </MobileListItem>
           <MobileListItem
             chevron
             onClick={() => setIsThemeSheetOpen(true)}
+            leading={
+              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">
+                <Palette className="size-5" aria-hidden="true" />
+              </span>
+            }
             trailing={
               <span className="text-sm font-medium text-foreground-muted">
                 {THEME_LABELS[preference]}
@@ -104,7 +125,7 @@ export function MePage() {
             </ItemTitle>
           </MobileListItem>
         </MobileList>
-      </section>
+      </nav>
 
       <Drawer
         open={isThemeSheetOpen}

@@ -187,7 +187,11 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
       ...room,
       members: [
         ...room.members,
-        { id: UserIdSchema.make("user-alice"), name: "앨리스", role: "MEMBER" },
+        {
+          id: UserIdSchema.make("user-alice"),
+          name: "앨리스, 여행자",
+          role: "MEMBER",
+        },
       ],
       plans: [
         {
@@ -213,6 +217,7 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
     expect(vm.candidateCount).toBe(2);
     expect(vm.totalOpinionCount).toBe(4);
     expect(vm.participatedMemberCount).toBe(3);
+    expect(vm.memberNames).toContain("앨리스, 여행자");
     expect(vm.isConfirmed).toBe(false);
   });
 
@@ -277,7 +282,7 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
     expect(vm.plans[0].isConfirmed).toBe(false);
   });
 
-  it("memberOpinions이 없는 legacy plan은 voteCount를 좋아요 수로 계산한다", (): void => {
+  it("legacy voteCount와 구조화 의견이 섞이면 참여자 미상 상태를 보존한다", (): void => {
     const legacyPlan = {
       id: PlanIdSchema.make("plan-legacy"),
       title: "legacy",
@@ -285,10 +290,25 @@ describe("toTripRoomViewModel 진행 상태 요약 (RAON-225)", (): void => {
       places: [],
       voteCount: 2,
     };
-    const vm = toTripRoomViewModel({ ...room, plans: [legacyPlan] });
-    expect(vm.totalOpinionCount).toBe(2);
-    // legacy plan에는 opinion author가 없으므로 참여자는 집계하지 않는다
-    expect(vm.participatedMemberCount).toBe(0);
+    const structuredPlan = {
+      ...room.plans[0],
+      id: PlanIdSchema.make("plan-structured"),
+      memberOpinions: [
+        {
+          userId: UserIdSchema.make("user-local-me"),
+          userName: "나",
+          reaction: "LIKE" as const,
+        },
+      ],
+    };
+    const vm = toTripRoomViewModel({
+      ...room,
+      plans: [legacyPlan, structuredPlan],
+    });
+
+    expect(vm.totalOpinionCount).toBe(3);
+    expect(vm.participatedMemberCount).toBe(1);
+    expect(vm.hasUnattributedOpinions).toBe(true);
   });
 
   it("source 여행안 순서와 제목을 보존하고 누락된 핵심 차이를 미정으로 표시한다", (): void => {

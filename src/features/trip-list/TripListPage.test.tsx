@@ -34,7 +34,7 @@ const roomFixture = (
   displayEndDate: "2999-04-05",
   period: "2999-04-01 ~ 2999-04-05",
   memberCount: 4,
-  memberNames: "라온, 민지, 서준, 지수",
+  memberNames: ["라온", "민지", "서준", "지수"],
   revision: 1,
   confirmedPlanId: undefined,
   confirmedPlanTitle: undefined,
@@ -45,6 +45,7 @@ const roomFixture = (
   candidateCount: 0,
   totalOpinionCount: 0,
   participatedMemberCount: 0,
+  hasUnattributedOpinions: false,
   isConfirmed: false,
   plans: [],
   ...overrides,
@@ -102,20 +103,40 @@ beforeEach(() => {
 });
 
 describe("TripListPage", () => {
-  it("진행 중/지난 여행을 opaque filter와 semantic list로 배타적으로 표시하고 긴 제목을 보존한다", () => {
+  it("진행 중 탭은 진행 중 카드와 최근 지난 여행 2건을, 지난 여행 탭은 전체 목록을 표시한다", () => {
     const longTitle =
       "가족 모두의 취향을 반영한 아주 긴 오키나와 북부와 남부 일주 여행";
-    const ongoingRoom = roomFixture({ title: longTitle });
-    const pastRoom = roomFixture({
-      id: "trip-past",
-      title: "지난 제주 여행",
-      destination: "제주도",
-      displayStartDate: "2000-01-01",
-      displayEndDate: "2000-01-03",
-      period: "2000-01-01 ~ 2000-01-03",
+    const ongoingRoom = roomFixture({
+      title: longTitle,
+      candidateCount: 1,
+      totalOpinionCount: 3,
+      participatedMemberCount: 2,
     });
+    const pastRooms = [
+      roomFixture({
+        id: "trip-past-oldest",
+        title: "오래된 부산 여행",
+        destination: "부산",
+        displayStartDate: "2000-01-01",
+        displayEndDate: "2000-01-03",
+      }),
+      roomFixture({
+        id: "trip-past-newest",
+        title: "최근 제주 여행",
+        destination: "제주도",
+        displayStartDate: "2002-01-01",
+        displayEndDate: "2002-01-03",
+      }),
+      roomFixture({
+        id: "trip-past-middle",
+        title: "지난 강릉 여행",
+        destination: "강릉",
+        displayStartDate: "2001-01-01",
+        displayEndDate: "2001-01-03",
+      }),
+    ];
     mockUseTripRoomsQuery.mockReturnValue(
-      roomsQueryResult([ongoingRoom, pastRoom]),
+      roomsQueryResult([ongoingRoom, ...pastRooms]),
     );
 
     renderPage();
@@ -123,29 +144,103 @@ describe("TripListPage", () => {
     const filter = screen.getByRole("tablist", { name: "여행 목록 필터" });
     expect(filter).toHaveAttribute("data-variant", "default");
     expect(filter).not.toHaveAttribute("data-galanda-surface");
-
+    expect(screen.getByRole("tab", { name: "진행 중 (1)" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
-      screen.getByRole("tab", { name: "진행 중인 여행 (1)" }),
-    ).toHaveAttribute("aria-selected", "true");
-    const ongoingList = screen.getByRole("list", { name: "진행 중인 여행" });
-    expect(within(ongoingList).getAllByRole("listitem")).toHaveLength(1);
-    expect(within(ongoingList).getByText(longTitle).className).toContain(
+      screen.getByRole("link", { name: `${longTitle} 여행 열기` }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(longTitle).className).toContain(
       "[overflow-wrap:anywhere]",
     );
-    expect(screen.queryByText("지난 제주 여행")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: "지난 여행 (1)" }));
-
     expect(
-      screen.getByRole("tab", { name: "지난 여행 (1)" }),
-    ).toHaveAttribute("aria-selected", "true");
-    const pastList = screen.getByRole("list", { name: "지난 여행" });
-    expect(within(pastList).getAllByRole("listitem")).toHaveLength(1);
-    expect(within(pastList).getByText("지난 제주 여행")).toBeInTheDocument();
-    expect(screen.queryByText(longTitle)).not.toBeInTheDocument();
+      screen.getByRole("progressbar", {
+        name: `${longTitle} 여행안 의견 참여율`,
+      }),
+    ).toHaveAttribute("aria-valuenow", "50");
+    expect(
+      screen.getByRole("list", { name: "여행 참여자 4명" }),
+    ).toBeInTheDocument();
+
+    const preview = screen.getByRole("list", { name: "지난 여행 미리보기" });
+    expect(within(preview).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(preview).getByText("최근 제주 여행")).toBeInTheDocument();
+    expect(within(preview).getByText("지난 강릉 여행")).toBeInTheDocument();
+    expect(within(preview).queryByText("오래된 부산 여행")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "지난 여행" }));
+
+    expect(screen.getByRole("tab", { name: "지난 여행" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.queryByRole("link", { name: `${longTitle} 여행 열기` }),
+    ).not.toBeInTheDocument();
+    const fullPastList = screen.getByRole("list", { name: "지난 여행 전체" });
+    expect(within(fullPastList).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(fullPastList).getByText("오래된 부산 여행")).toBeInTheDocument();
   });
 
-  it("여행 row와 유일한 Primary Action이 실제 route로 이동한다", () => {
+  it("여행안·의견 집계 상태와 구조화된 참가자 이름을 사실대로 표시한다", () => {
+    mockUseTripRoomsQuery.mockReturnValue(
+      roomsQueryResult([
+        roomFixture({
+          id: "trip-no-plan",
+          title: "여행안 없는 여행",
+          memberCount: 1,
+          memberNames: ["김, 라온"],
+        }),
+        roomFixture({
+          id: "trip-no-opinion",
+          title: "아직 의견 없는 여행",
+          candidateCount: 1,
+        }),
+        roomFixture({
+          id: "trip-legacy-opinion",
+          title: "집계 전 여행",
+          candidateCount: 2,
+          totalOpinionCount: 3,
+          participatedMemberCount: 1,
+          hasUnattributedOpinions: true,
+        }),
+      ]),
+    );
+
+    renderPage();
+
+    const noPlanCard = screen.getByRole("link", {
+      name: "여행안 없는 여행 여행 열기",
+    });
+    expect(within(noPlanCard).getByText("여행안 없음")).toBeVisible();
+    expect(within(noPlanCard).getByLabelText("등록된 여행안 없음")).toBeVisible();
+    expect(within(noPlanCard).queryByRole("progressbar")).not.toBeInTheDocument();
+    const participantList = within(noPlanCard).getByRole("list", {
+      name: "여행 참여자 1명",
+    });
+    expect(within(participantList).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(participantList).getByTitle("김, 라온")).toBeVisible();
+
+    const noOpinionCard = screen.getByRole("link", {
+      name: "아직 의견 없는 여행 여행 열기",
+    });
+    expect(within(noOpinionCard).getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+
+    const legacyCard = screen.getByRole("link", {
+      name: "집계 전 여행 여행 열기",
+    });
+    expect(within(legacyCard).getByText("집계 전")).toBeVisible();
+    expect(
+      within(legacyCard).getByLabelText("의견 참여 인원 집계 전"),
+    ).toBeVisible();
+    expect(within(legacyCard).queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("여행 카드와 유일한 Primary Action이 실제 route로 이동한다", () => {
     mockUseTripRoomsQuery.mockReturnValue(
       roomsQueryResult([roomFixture({ id: "trip-route" })]),
     );
@@ -153,9 +248,7 @@ describe("TripListPage", () => {
     const firstView = renderPage();
 
     fireEvent.click(
-      screen.getByRole("button", {
-        name: /오키나와 가족 여행, 오키나와, 4\.1 ~ 4\.5, 첫 여행안을 만들어보세요/,
-      }),
+      screen.getByRole("link", { name: "오키나와 가족 여행 여행 열기" }),
     );
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       "/trips/trip-route",
@@ -163,12 +256,26 @@ describe("TripListPage", () => {
 
     firstView.unmount();
     mockUseTripRoomsQuery.mockReturnValue(roomsQueryResult([]));
-    renderPage();
+    const secondView = renderPage();
+
+    const pageBody = secondView.container.querySelector<HTMLElement>(
+      '[data-slot="trip-list-page"]',
+    );
+    expect(pageBody?.className).toContain(
+      "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]",
+    );
+    expect(pageBody?.className).not.toContain("pb-(--app-page-padding-bottom)");
 
     const primaryActions = screen.getAllByRole("button", {
       name: "새 여행 만들기",
     });
     expect(primaryActions).toHaveLength(1);
+    expect(document.querySelector('[data-slot="bottom-action"]')).toBeNull();
+    const floatingLayer = primaryActions[0].closest("div.fixed");
+    expect(floatingLayer).not.toBeNull();
+    expect(floatingLayer).toHaveStyle({
+      bottom: "calc(var(--global-nav-height, 0px) + 1rem)",
+    });
     fireEvent.click(primaryActions[0]);
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       "/trips/new",
@@ -186,7 +293,9 @@ describe("TripListPage", () => {
       view.container.querySelector('[data-system-state="loading"]'),
     ).toHaveTextContent("여행 목록을 불러오는 중이에요.");
     expect(screen.queryByText("진행 중인 여행이 없어요")).not.toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "진행 중인 여행" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /여행 열기/ }),
+    ).not.toBeInTheDocument();
 
     mockUseTripRoomsQuery.mockReturnValue(roomsQueryResult([]));
     view.rerender(<TestApp />);
@@ -200,7 +309,7 @@ describe("TripListPage", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("조회 오류만 alert로 표시하고 다시 시도하면 rooms query를 refetch한다", () => {
+  it("초기 조회 오류만 alert로 표시하고 다시 시도하면 rooms query를 refetch한다", () => {
     const refetch = vi.fn();
     mockUseTripRoomsQuery.mockReturnValue(
       roomsQueryResult(undefined, {
@@ -223,6 +332,30 @@ describe("TripListPage", () => {
     expect(container.querySelector('[data-system-state="empty"]')).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("캐시된 여행이 있으면 최신 조회 실패를 밝히면서 기존 목록을 유지한다", () => {
+    const refetch = vi.fn();
+    mockUseTripRoomsQuery.mockReturnValue(
+      roomsQueryResult([roomFixture()], {
+        isError: true,
+        error: new Error("offline"),
+        refetch,
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "표시된 내용은 이전에 불러온 정보예요.",
+    );
+    expect(
+      screen.getByRole("link", { name: "오키나와 가족 여행 여행 열기" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "여행 정보 다시 확인" }),
+    );
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

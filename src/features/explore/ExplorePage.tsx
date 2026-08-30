@@ -1,6 +1,7 @@
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
+import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { useSessionQuery } from "@/hooks/useSession.ts";
@@ -13,7 +14,8 @@ import { ExploreListingCard } from "./components/ExploreListingCard.tsx";
  * Explore page (RAON-251 lazy honest state → RAON-260 data-backed feed).
  *
  * v1 primary section은 실제 정렬 의미(`listedAt DESC`)와 일치하는 "새로 공개된 여행
- * 일정"이다. theme/city section이나 인기 지표는 실제 집계가 없으므로 만들지 않는다.
+ * 일정" 하나다. 추천 rail/theme/city section이나 인기 지표는 실제 집계가 없으므로
+ * 만들지 않는다.
  *
  * 상태 계약:
  * - 초기 loading/error/empty는 상호 배타적으로 하나만 노출한다.
@@ -70,9 +72,15 @@ export function ExplorePage() {
       description="여행 일정이 공개되면 이곳에서 둘러볼 수 있어요."
     />
   ) : (
-    <div className="flex flex-col gap-6 px-(--app-inline-padding)">
-      <section aria-label="새로 공개된 여행 일정" className="flex flex-col gap-3">
-        <ul className="flex flex-col gap-3">
+    <section aria-label="새로 공개된 여행 일정" className="flex min-w-0 flex-col pb-2">
+      <SectionHeader
+        title="새로 공개된 여행 일정"
+        description="가장 최근에 공개된 일정부터 둘러보세요."
+        className="pt-0"
+      />
+
+      <div className="flex min-w-0 flex-col gap-4 px-(--app-inline-padding)">
+        <ul className="flex min-w-0 flex-col gap-4">
           {items.map((item) => (
             <li key={item.listingId} className="min-w-0">
               <ExploreListingCard item={item} />
@@ -116,8 +124,8 @@ export function ExplorePage() {
             )}
           </div>
         )}
-      </section>
-    </div>
+      </div>
+    </section>
   );
 
   return (
