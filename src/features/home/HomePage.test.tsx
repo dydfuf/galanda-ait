@@ -141,7 +141,7 @@ const expectDashboard = () => {
   );
   expect(screen.getByRole("link", { name: "여행 일정 열기" })).toHaveAttribute(
     "href",
-    "/trips/trip-italy",
+    "/trips/trip-italy/itinerary",
   );
   expect(screen.getByRole("link", { name: "숙소 정보 열기" })).toHaveAttribute(
     "href",
@@ -159,6 +159,31 @@ beforeEach(() => {
 });
 
 describe("HomePage dashboard", () => {
+  it("미확정 여행에서도 일정 quick action은 일정 route를 직접 가리킨다", () => {
+    mockRooms.mockReturnValue(
+      roomsResult({
+        data: [
+          {
+            ...room,
+            confirmedPlanId: undefined,
+            confirmedPlanTitle: undefined,
+            isConfirmed: false,
+          },
+        ],
+      }),
+    );
+    mockSaved.mockReturnValue(
+      savedResult({ data: { pages: [{ items: [] }], pageParams: [undefined] } }),
+    );
+
+    renderHome();
+
+    expect(screen.getByRole("link", { name: "여행 일정 열기" })).toHaveAttribute(
+      "href",
+      "/trips/trip-italy/itinerary",
+    );
+  });
+
   it("저장 section이 오류여도 여행 dashboard 핵심 콘텐츠를 유지한다", () => {
     mockSaved.mockReturnValue(
       savedResult({ isError: true, error: new Error("boom") }),

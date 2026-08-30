@@ -210,7 +210,7 @@ export function HomeQuickActions({ room }: { readonly room: TripRoomViewModel })
       label: "일정",
       description: "여행 일정 열기",
       icon: CalendarDays,
-      to: tripRoot,
+      to: `${tripRoot}/itinerary`,
     },
     {
       label: "숙소",
