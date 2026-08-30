@@ -42,7 +42,8 @@ source: ./2026-08-14-galanda-screen-flow-brainstorm.md
 | `/invites/:inviteToken` | `IN-01` 초대장 | 로그인 전 최소 초대 정보 표시 |
 | `/trips/:tripId` | 여행방 진입점 | 미확정이면 `plans`, 확정이면 `itinerary`로 `replace` |
 | `/trips/:tripId/plans` | `PL-01` 계획 탭 홈 | 계획 현황과 여행안 목록 |
-| `/trips/:tripId/plans/new` | `PL-03` 여행안 편집 | 기본안 또는 새 대안 작성 |
+| `/trips/:tripId/setup/companions` | 여행 생성 2단계 | 첫 여행안 전 동행자 초대 또는 미정 진행 |
+| `/trips/:tripId/plans/new/:section?` | `PL-03` 여행안 편집 | 첫 여행안 Wizard 또는 새 대안 작성 |
 | `/trips/:tripId/plans/:planId` | `PL-02` 여행안 상세 | 여행안 검토와 의견 작성 |
 | `/trips/:tripId/plans/:planId/edit` | `PL-03` 여행안 편집 | 작성자의 임시 수정본 편집 |
 | `/trips/:tripId/plans/compare?left=:planId&right=:planId` | `PL-04` 여행안 비교 | 두 공개 여행안 비교 |
@@ -120,7 +121,7 @@ history에 내부 이전 화면이 있는지는 앱 세션의 Router 이동 기�
 
 ## 10. Mutation 이후 이동
 
-- 여행방 생성 성공: 생성된 `/trips/:tripId`로 `replace`하여 폼 재제출을 막는다.
+- 여행방 생성 성공: 생성 폼 entry를 `/trips/:tripId/plans`로 `replace`해 재제출을 막고, 동행자 설정을 그 위에 `push`한다. 첫 여행안 Wizard와 등록된 여행안 상세는 이 상단 entry만 `replace`하여 완료 후 브라우저·native Back이 계획 홈으로 돌아가게 한다.
 - 여행안 공개 또는 편집 완료: 해당 여행안 상세 또는 계획 홈으로 이동하고 관련 query를 invalidate한다.
 - 여행안 삭제: 계획 홈으로 `replace`한다.
 - 여행안 확정: `/trips/:tripId/itinerary`로 `replace`하고 계획 기록은 계획 탭에서 계속 접근할 수 있게 한다.

@@ -41,8 +41,10 @@ export function TripCreatePage() {
         title: trimmedTitle,
       });
 
-      // 방이 생성된 뒤에만 실제 TripId가 필요한 동행자 초대 단계로 이동한다.
-      navigate(`/trips/${newRoom.id}/setup/companions`, { replace: true });
+      // 생성 폼 entry를 canonical 여행방 anchor로 바꾼 뒤 Wizard slot을 push한다.
+      // 이후 단계와 상세 화면은 이 slot만 replace하므로 browser/native Back이 여행방으로 돌아간다.
+      navigate(`/trips/${newRoom.id}/plans`, { replace: true });
+      navigate(`/trips/${newRoom.id}/setup/companions`);
     } catch (err: unknown) {
       setErrorMsg(toUserMessage(err, "여행을 만들지 못했어요. 다시 시도해주세요."));
     } finally {

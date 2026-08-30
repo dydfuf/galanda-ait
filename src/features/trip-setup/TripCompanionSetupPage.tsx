@@ -40,7 +40,7 @@ const SHARE_RESULT_MESSAGE: Record<SetupShareResult, string> = {
 export function TripCompanionSetupPage() {
   const params = useParams();
   const navigate = useNavigate();
-  const { platformNavigation } = useAppNavigation();
+  const { goBack, platformNavigation } = useAppNavigation();
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
@@ -115,8 +115,7 @@ export function TripCompanionSetupPage() {
           title="새 여행 만들기"
           back={{
             label: "여행 설정 닫기",
-            onClick: () =>
-              navigate(`/trips/${tripId}/plans`, { replace: true }),
+            onClick: () => void goBack(`/trips/${tripId}/plans`),
           }}
           surface="none"
         />

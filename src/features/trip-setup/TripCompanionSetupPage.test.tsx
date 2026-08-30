@@ -22,6 +22,7 @@ import type {
 import type { PlatformNavigation } from "../../platform/types.ts";
 
 const mocks = vi.hoisted(() => ({
+  goBack: vi.fn<(...args: unknown[]) => unknown>(),
   useAppNavigation: vi.fn<(...args: unknown[]) => unknown>(),
   useTripRoomRawQuery: vi.fn<(...args: unknown[]) => unknown>(),
   useSessionQuery: vi.fn<(...args: unknown[]) => unknown>(),
@@ -138,12 +139,14 @@ function TestApp() {
 const renderPage = () => render(<TestApp />);
 
 beforeEach(() => {
+  mocks.goBack.mockReset();
   mocks.useAppNavigation.mockReset();
   mocks.useTripRoomRawQuery.mockReset();
   mocks.useSessionQuery.mockReset();
   mockShareTripInvite.mockReset();
 
   mocks.useAppNavigation.mockReturnValue({
+    goBack: mocks.goBack,
     platformNavigation: undefined,
   } as unknown as ReturnType<typeof useAppNavigation>);
   mocks.useTripRoomRawQuery.mockReturnValue(roomQueryResult());
@@ -173,6 +176,19 @@ describe("TripCompanionSetupPage", () => {
       }),
     ).toBeEnabled();
     expect(container).not.toHaveTextContent(/이메일 초대|권한 선택|AI 추천/);
+  });
+
+  it("웹 header Back은 실제 여행방 history anchor로 돌아간다", () => {
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "여행 설정 닫기" }),
+    );
+
+    expect(mocks.goBack).toHaveBeenCalledTimes(1);
+    expect(mocks.goBack).toHaveBeenCalledWith(
+      "/trips/trip-created/plans",
+    );
   });
 
   it("공유 중에는 중복 요청과 skip 이동을 막고 결과 이후에만 계속한다", async () => {
@@ -311,6 +327,7 @@ describe("TripCompanionSetupPage", () => {
       removeAccessoryButton: vi.fn<PlatformNavigation["removeAccessoryButton"]>(),
     };
     mocks.useAppNavigation.mockReturnValue({
+      goBack: mocks.goBack,
       platformNavigation: navigation,
     } as unknown as ReturnType<typeof useAppNavigation>);
 

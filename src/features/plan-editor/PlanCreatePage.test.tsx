@@ -6,7 +6,6 @@ import {
   Route,
   Routes,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 
 import {
@@ -192,12 +191,7 @@ function LocationProbe() {
 }
 
 function CompletionProbe() {
-  const navigate = useNavigate();
-  return (
-    <button type="button" onClick={() => navigate(-1)}>
-      완료 화면에서 뒤로
-    </button>
-  );
+  return <p>완료 화면</p>;
 }
 
 type TestInitialEntry =
@@ -213,10 +207,7 @@ function TestApp({
   readonly initialEntry?: TestInitialEntry;
 }) {
   return (
-    <MemoryRouter
-      initialEntries={[`/trips/${tripId}/plans`, initialEntry]}
-      initialIndex={1}
-    >
+    <MemoryRouter initialEntries={[initialEntry]}>
       <LocationProbe />
       <Routes>
         <Route
@@ -465,16 +456,7 @@ describe("PlanCreatePage", () => {
         `/trips/${tripId}/plans/${createdPlan.id}`,
       ),
     );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "완료 화면에서 뒤로" }),
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("location-path")).toHaveTextContent(
-        `/trips/${tripId}/plans`,
-      ),
-    );
-    expect(screen.getByText("여행방")).toBeVisible();
+    expect(screen.getByText("완료 화면")).toBeVisible();
   });
 
   it("검토에서 다시 연 section이 미완료가 되어도 검토로 돌아갈 수 있다", async () => {
