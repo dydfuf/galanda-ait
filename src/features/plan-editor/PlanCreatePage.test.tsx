@@ -6,6 +6,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 
 import {
@@ -180,25 +181,60 @@ const writeValidDraft = (): void => {
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="location-path">{location.pathname}</output>;
+  return (
+    <>
+      <output data-testid="location-path">{location.pathname}</output>
+      <output data-testid="location-state">
+        {JSON.stringify(location.state)}
+      </output>
+    </>
+  );
 }
 
-function TestApp({ initialEntry = summaryPath }: { readonly initialEntry?: string }) {
+function CompletionProbe() {
+  const navigate = useNavigate();
   return (
-    <MemoryRouter initialEntries={[initialEntry]}>
+    <button type="button" onClick={() => navigate(-1)}>
+      완료 화면에서 뒤로
+    </button>
+  );
+}
+
+type TestInitialEntry =
+  | string
+  | {
+      readonly pathname: string;
+      readonly state?: Record<string, unknown>;
+    };
+
+function TestApp({
+  initialEntry = summaryPath,
+}: {
+  readonly initialEntry?: TestInitialEntry;
+}) {
+  return (
+    <MemoryRouter
+      initialEntries={[`/trips/${tripId}/plans`, initialEntry]}
+      initialIndex={1}
+    >
       <LocationProbe />
       <Routes>
         <Route
           path="/trips/:tripId/plans/new/:section?"
           element={<PlanCreatePage />}
         />
+        <Route
+          path="/trips/:tripId/plans/:planId"
+          element={<CompletionProbe />}
+        />
+        <Route path="/trips/:tripId/plans" element={<p>여행방</p>} />
         <Route path="*" element={<p>이동 완료</p>} />
       </Routes>
     </MemoryRouter>
   );
 }
 
-const renderPage = (initialEntry = summaryPath) =>
+const renderPage = (initialEntry: TestInitialEntry = summaryPath) =>
   render(<TestApp initialEntry={initialEntry} />);
 
 beforeEach(() => {
@@ -212,35 +248,171 @@ beforeEach(() => {
 });
 
 describe("PlanCreatePage", () => {
-  it("opaque editor hierarchy와 validation accessory를 BottomAction에 표시한다", () => {
-    const { container } = renderPage();
+  it("미완료 입력을 만들지 않고 각 Plan 단계를 미정으로 두어 검토까지 진행한다", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(createdRoom);
+    mockUseCreatePlanMutation.mockReturnValue(mutationResult(mutateAsync));
+    renderPage(`${summaryPath}/basic`);
 
-    expect(
-      screen.getByRole("heading", { level: 1, name: "새 여행안 제안하기" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", {
-        level: 2,
-        name: "첫 여행안을 만들어볼까요?",
-      }),
-    ).toBeInTheDocument();
-    const editorList = screen.getByRole("list", {
-      name: "여행안 편집 항목",
+    const progress = screen.getByRole("navigation", {
+      name: "여행 만들기 진행 단계",
     });
-    expect(editorList).toHaveAttribute("data-galanda-surface", "content");
-    expect(editorList).toHaveClass("bg-surface-content");
+    expect(progress).toHaveTextContent("3/7");
+    expect(progress).toHaveTextContent("기본 정보");
+    expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent(
+      "3. 기본 정보 현재 단계",
+    );
 
-    const submit = screen.getByRole("button", { name: "여행안 제안 등록" });
-    expect(submit).toBeDisabled();
+    const skipBasic = screen.getByRole("button", {
+      name: "미정으로 두고 다음",
+    });
+    expect(skipBasic).toBeEnabled();
+    fireEvent.click(skipBasic);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/route`,
+      ),
+    );
+    expect(screen.getByTestId("location-state")).toHaveTextContent(
+      '"allowIncompleteWizardProgress":true',
+    );
+    expect(progress).toHaveTextContent("4/7");
+    fireEvent.click(
+      screen.getByRole("button", { name: "미정으로 두고 다음" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/accommodation`,
+      ),
+    );
+    expect(progress).toHaveTextContent("5/7");
+    fireEvent.click(
+      screen.getByRole("button", { name: "미정으로 두고 다음" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/transport`,
+      ),
+    );
+    expect(progress).toHaveTextContent("6/7");
+    fireEvent.click(
+      screen.getByRole("button", { name: "미정으로 두고 다음" }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
+    );
+    expect(progress).toHaveTextContent("7/7");
+    expect(screen.getByText("여행안 이름을 입력해주세요.")).toBeVisible();
+    expect(screen.getByText("방문 도시와 날짜를 정해주세요.")).toBeVisible();
+    expect(screen.getAllByText("아직 추가하지 않았어요")).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "여행안 제안 등록" }),
+    ).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent(
       "여행안 제목을 입력해주세요.",
     );
-    expect(submit.closest('[data-galanda-surface="chrome"]')).not.toBeNull();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("미완료 section을 건너뛴 deep link는 첫 미완료 단계로 복귀시킨다", async () => {
+    renderPage(`${summaryPath}/transport`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/basic`,
+      ),
+    );
+    const progress = screen.getByRole("navigation", {
+      name: "여행 만들기 진행 단계",
+    });
+    expect(progress).toHaveTextContent("3/7");
+    expect(progress).toHaveTextContent("기본 정보");
+  });
+
+  it("명시적인 이전 단계로 section을 거슬러 올라가고 basic에서 여행방으로 돌아간다", async () => {
+    writeValidDraft();
+    renderPage({
+      pathname: `${summaryPath}/route`,
+      state: {
+        tripCreationWizard: true,
+        wizardEntrySource: "plans",
+      },
+    });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "이전 단계" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/basic`,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이전 단계" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans`,
+      ),
+    );
+    expect(screen.getByText("여행방")).toBeVisible();
+  });
+
+  it("완료된 첫 여행안 draft는 기본 정보부터 검토·등록까지 순서대로 진행한다", async () => {
+    writeValidDraft();
+    renderPage(`${summaryPath}/basic`);
+
+    const progress = await screen.findByRole("navigation", {
+      name: "여행 만들기 진행 단계",
+    });
+    const basicAction = await screen.findByRole("button", {
+      name: "다음: 여행 경로",
+    });
+    await waitFor(() => expect(basicAction).toBeEnabled());
+    expect(progress).toHaveTextContent("3/7");
+    fireEvent.click(basicAction);
+
+    const routeAction = await screen.findByRole("button", {
+      name: "다음: 숙소",
+    });
+    expect(screen.getByTestId("location-path")).toHaveTextContent(
+      `${summaryPath}/route`,
+    );
+    expect(progress).toHaveTextContent("4/7");
+    expect(routeAction).toBeEnabled();
+    fireEvent.click(routeAction);
+
+    const accommodationAction = await screen.findByRole("button", {
+      name: "다음: 교통",
+    });
+    expect(screen.getByTestId("location-path")).toHaveTextContent(
+      `${summaryPath}/accommodation`,
+    );
+    expect(progress).toHaveTextContent("5/7");
+    expect(accommodationAction).toBeEnabled();
+    fireEvent.click(accommodationAction);
+
+    const transportAction = await screen.findByRole("button", {
+      name: "입력 내용 검토하기",
+    });
+    expect(screen.getByTestId("location-path")).toHaveTextContent(
+      `${summaryPath}/transport`,
+    );
+    expect(progress).toHaveTextContent("6/7");
+    expect(transportAction).toBeEnabled();
+    fireEvent.click(transportAction);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
+    );
+    expect(progress).toHaveTextContent("7/7");
+    expect(progress).toHaveTextContent("검토·등록");
+    expect(screen.getByRole("button", { name: "이전: 교통" })).toBeEnabled();
     expect(
-      Array.from(
-        container.querySelectorAll<HTMLElement>('[data-galanda-surface="content"]'),
-      ).some((element) => element.className.includes("--app-cta-space")),
-    ).toBe(true);
+      screen.getByRole("button", { name: "여행안 제안 등록" }),
+    ).toBeEnabled();
   });
 
   it("pending 중 중복 제출을 막고 expectedRevision을 보내며 서버 성공 뒤에만 이동한다", async () => {
@@ -293,6 +465,72 @@ describe("PlanCreatePage", () => {
         `/trips/${tripId}/plans/${createdPlan.id}`,
       ),
     );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "완료 화면에서 뒤로" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans`,
+      ),
+    );
+    expect(screen.getByText("여행방")).toBeVisible();
+  });
+
+  it("검토에서 다시 연 section이 미완료가 되어도 검토로 돌아갈 수 있다", async () => {
+    writeValidDraft();
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /기본 정보/ }),
+    );
+    const titleInput = await screen.findByLabelText("여행안 제목 *");
+    fireEvent.change(titleInput, { target: { value: "" } });
+
+    const returnAction = screen.getByRole("button", {
+      name: "검토로 돌아가기",
+    });
+    expect(returnAction).toBeEnabled();
+    fireEvent.click(returnAction);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
+    );
+    expect(screen.getByText("검토·등록")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "여행안 제안 등록" }),
+    ).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "여행안 제목을 입력해주세요.",
+    );
+  });
+
+  it("등록 뒤 남은 Wizard history는 다시 편집하지 않고 여행방으로 보낸다", async () => {
+    mockUseTripRoomRawQuery.mockReturnValue(queryResult(createdRoom));
+
+    renderPage({
+      pathname: `${summaryPath}/transport`,
+      state: { tripCreationWizard: true },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans`,
+      ),
+    );
+    expect(screen.getByText("여행방")).toBeVisible();
+  });
+
+  it("기존 여행의 새 여행안 section은 기존 요약형 편집 동작을 유지한다", () => {
+    mockUseTripRoomRawQuery.mockReturnValue(queryResult(createdRoom));
+
+    renderPage(`${summaryPath}/transport`);
+
+    expect(
+      screen.queryByRole("navigation", { name: "여행 만들기 진행 단계" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "교통" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "편집 완료" })).toBeEnabled();
   });
 
   it("resize rerender와 mutation 실패 뒤에도 입력 draft와 현재 route를 유지한다", async () => {
@@ -318,7 +556,7 @@ describe("PlanCreatePage", () => {
     view.rerender(<TestApp />);
     expect(screen.getByLabelText("여행안 제목 *")).toHaveValue(editedTitle);
 
-    fireEvent.click(screen.getByRole("button", { name: "편집 완료" }));
+    fireEvent.click(screen.getByRole("button", { name: "검토로 돌아가기" }));
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
     );

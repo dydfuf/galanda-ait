@@ -43,9 +43,11 @@ interface PlanEditorSectionsProps {
   readonly recommendedActionId?: TripActionId;
   readonly recommendation?: RecommendNextActionResponse;
   readonly isRecommendationPending?: boolean;
+  readonly isReturningToSummary?: boolean;
   readonly onRecommendationAction?: (context: RecommendationActionContext) => void;
   readonly onRecommendationDismiss?: (recommendationId: string) => void;
   readonly onOpenSection: (section: PlanEditorSection) => void;
+  readonly onPreviousSection?: () => void;
   readonly onCompleteSection: () => void;
 }
 
@@ -116,9 +118,11 @@ export function PlanEditorSections({
   recommendedActionId,
   recommendation,
   isRecommendationPending = false,
+  isReturningToSummary = false,
   onRecommendationAction,
   onRecommendationDismiss,
   onOpenSection,
+  onPreviousSection,
   onCompleteSection,
 }: PlanEditorSectionsProps): JSX.Element {
   const {
@@ -127,6 +131,12 @@ export function PlanEditorSections({
     accommodation: accommodationComplete,
     transport: transportComplete,
   } = getPlanPublishCompletion(editor);
+  const sectionCompletion = {
+    basic: basicComplete,
+    route: routeComplete,
+    accommodation: accommodationComplete,
+    transport: transportComplete,
+  } satisfies Record<PlanEditorSection, boolean>;
   const accommodationEmpty = editor.accommodations.length === 0;
   const transportEmpty = editor.transports.length === 0;
 
@@ -379,8 +389,29 @@ export function PlanEditorSections({
       </form>
 
       <BottomAction>
+        {onPreviousSection && (
+          <Button
+            type="button"
+            size="xl"
+            variant="secondary"
+            onClick={onPreviousSection}
+          >
+            이전 단계
+          </Button>
+        )}
         <Button type="button" size="xl" onClick={onCompleteSection}>
-          편집 완료
+          {isReturningToSummary
+            ? "검토로 돌아가기"
+            : isFirstPlan && !isEditMode && !isCloneMode
+              ? sectionCompletion[section]
+                ? {
+                    basic: "다음: 여행 경로",
+                    route: "다음: 숙소",
+                    accommodation: "다음: 교통",
+                    transport: "입력 내용 검토하기",
+                  }[section]
+                : "미정으로 두고 다음"
+              : "편집 완료"}
         </Button>
       </BottomAction>
     </>

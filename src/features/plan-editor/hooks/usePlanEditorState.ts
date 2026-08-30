@@ -486,6 +486,7 @@ export function usePlanEditorState(
     diffFromOriginal,
     validation,
     draftSaveStatus,
+    isDraftHydrated: !editorId || hydratedEditorId === editorId,
     clearDraft,
     discardDraft,
     draftConflict: Boolean(draftConflict),
