@@ -238,6 +238,30 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     });
   });
 
+  it("alias cityId deep-link를 canonical URL과 server filter에서 제거한다", async () => {
+    sessionOk();
+    mockUseExplore.mockReturnValue(
+      exploreResult({
+        data: { pages: [{ items: [] }], pageParams: [undefined] },
+      }),
+    );
+
+    renderPage("/explore?cityId=%EC%98%A4%EC%82%AC%EC%B9%B4");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search").textContent).toBe("")
+    );
+    expect(mockUseExplore).toHaveBeenLastCalledWith({
+      query: undefined,
+      destination: undefined,
+      routeCity: undefined,
+      cityId: undefined,
+      themeId: undefined,
+      startDate: undefined,
+      endDate: undefined,
+    });
+  });
+
   it("URL filter를 query에 복원하고 form 변경을 canonical URL과 server query에 반영한다", async () => {
     sessionOk();
     mockUseExplore.mockReturnValue(

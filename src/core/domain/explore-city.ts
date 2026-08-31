@@ -48,6 +48,9 @@ for (const { id, aliases } of EXPLORE_CITY_TAXONOMY) {
     aliasToCityId.set(normalized, id);
   }
 }
+const knownCityIds: ReadonlySet<string> = new Set(
+  EXPLORE_CITY_TAXONOMY.map(({ id }) => id)
+);
 
 /** Exact alias match only. Unknown or ambiguous text stays unmapped. */
 export const getExploreCityId = (value: string): ExploreCityId | undefined =>
@@ -66,7 +69,7 @@ export const canonicalizeExploreCityIds = (
 };
 
 export const isExploreCityId = (value: unknown): value is ExploreCityId =>
-  typeof value === "string" && aliasToCityId.has(value);
+  typeof value === "string" && knownCityIds.has(value);
 
 export const getExploreCityLabel = (cityId: ExploreCityId): string =>
   EXPLORE_CITY_TAXONOMY.find(({ id }) => id === cityId)?.label ?? cityId;

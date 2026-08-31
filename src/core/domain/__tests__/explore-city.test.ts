@@ -4,6 +4,7 @@ import {
   EXPLORE_CITY_TAXONOMY,
   getExploreCityId,
   getExploreCityLabel,
+  isExploreCityId,
   normalizeExploreCity,
 } from "../explore-city.ts";
 
@@ -21,6 +22,12 @@ describe("Explore city taxonomy", () => {
       }
       expect(getExploreCityLabel(city.id)).toBe(city.label);
     }
+  });
+
+  it("recognizes stable IDs without accepting aliases", () => {
+    expect(isExploreCityId("osaka")).toBe(true);
+    expect(isExploreCityId("오사카")).toBe(false);
+    expect(isExploreCityId("서울")).toBe(false);
   });
 
   it("fails the taxonomy contract if normalized aliases or IDs collide", () => {
