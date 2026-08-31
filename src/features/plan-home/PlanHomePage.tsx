@@ -204,6 +204,13 @@ export function PlanHomePage() {
         navigate(`/trips/${tripId}/itinerary`, { replace: true });
         return;
       case "create-first":
+        navigate(`/trips/${tripId}/plans/new/basic`, {
+          state: {
+            tripCreationWizard: true,
+            wizardEntrySource: "plans",
+          },
+        });
+        return;
       case "propose-new":
         navigate(`/trips/${tripId}/plans/new`);
         return;

@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
+import { TripCreationProgress } from "@/components/galanda/trip-creation-progress.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -40,8 +41,10 @@ export function TripCreatePage() {
         title: trimmedTitle,
       });
 
-      // 생성 성공 시 첫 여행안 작성으로 바로 연결해 dead-end 빈 PlanHome을 거치지 않는다.
-      navigate(`/trips/${newRoom.id}/plans/new`, { replace: true });
+      // 생성 폼 entry를 canonical 여행방 anchor로 바꾼 뒤 Wizard slot을 push한다.
+      // 이후 단계와 상세 화면은 이 slot만 replace하므로 browser/native Back이 여행방으로 돌아간다.
+      navigate(`/trips/${newRoom.id}/plans`, { replace: true });
+      navigate(`/trips/${newRoom.id}/setup/companions`);
     } catch (err: unknown) {
       setErrorMsg(toUserMessage(err, "여행을 만들지 못했어요. 다시 시도해주세요."));
     } finally {
@@ -52,7 +55,7 @@ export function TripCreatePage() {
   const counterText = `${title.length}/${MAX_TITLE_LENGTH}`;
   const helperText = !isValid
     ? "여행 이름을 입력해 주세요."
-    : "여행방을 만든 후 첫 번째 여행안을 제안할 수 있어요.";
+    : "다음 단계에서 동행자를 초대하거나 바로 여행안을 작성할 수 있어요.";
 
   return (
     <div
@@ -69,10 +72,15 @@ export function TripCreatePage() {
 
       <main className="flex flex-1 flex-col">
         <PageBody withBottomAction className="flex flex-col">
+          <TripCreationProgress
+            currentStep="trip-info"
+            className="mx-(--app-inline-padding) mt-1"
+          />
+
           <PageTitle
-            title="어떤 여행을 계획하고 있나요?"
-            description="먼저 여행 이름만 정해주세요."
-            className="pb-2"
+            title="여행 이름을 정해주세요"
+            description="여행방을 먼저 만든 뒤 동행자 초대와 첫 여행안 작성을 이어갈 수 있어요."
+            className="pt-5 pb-2"
           />
 
           <form
@@ -142,7 +150,7 @@ export function TripCreatePage() {
           disabled={!isValid || createRoomMutation.isPending}
         >
           {createRoomMutation.isPending && <Spinner aria-hidden="true" />}
-          {createRoomMutation.isPending ? "여행방 만드는 중..." : "여행 만들기"}
+          {createRoomMutation.isPending ? "여행방 만드는 중..." : "여행 만들고 계속"}
         </Button>
       </BottomAction>
     </div>

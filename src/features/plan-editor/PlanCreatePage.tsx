@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { css } from "@emotion/react";
 import {
+  Navigate,
   useLocation,
   useParams,
   useNavigate,
@@ -14,6 +15,7 @@ import {
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
+import { TripCreationProgress } from "@/components/galanda/trip-creation-progress.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
@@ -22,6 +24,7 @@ import { usePlanEditorState } from "./hooks/usePlanEditorState.ts";
 import { PlanEditorSections } from "./components/PlanEditorSections.tsx";
 import {
   isPlanEditorSection,
+  PLAN_EDITOR_SECTIONS,
   type PlanEditorSection,
 } from "./plan-editor-section.ts";
 import { ValidationBanner } from "./components/ValidationBanner.tsx";
@@ -65,11 +68,47 @@ const errorMessageStyle = css`
   line-height: 1.5;
 `;
 
+const PLAN_SECTION_WIZARD_STEP = {
+  basic: "plan-basic",
+  route: "plan-route",
+  accommodation: "plan-accommodation",
+  transport: "plan-transport",
+} as const satisfies Record<PlanEditorSection, string>;
+
+const NEXT_PLAN_WIZARD_SECTION = {
+  basic: "route",
+  route: "accommodation",
+  accommodation: "transport",
+  transport: undefined,
+} as const satisfies Record<
+  PlanEditorSection,
+  PlanEditorSection | undefined
+>;
+
+const PREVIOUS_PLAN_WIZARD_SECTION = {
+  basic: undefined,
+  route: "basic",
+  accommodation: "route",
+  transport: "accommodation",
+} as const satisfies Record<
+  PlanEditorSection,
+  PlanEditorSection | undefined
+>;
+
+interface PlanCreateLocationState {
+  readonly allowIncompleteWizardProgress?: boolean;
+  readonly fromEditorSummary?: boolean;
+  readonly tripCreationWizard?: boolean;
+  readonly wizardReview?: boolean;
+  readonly wizardEntrySource?: "companions" | "plans";
+}
+
 export function PlanCreatePage(): JSX.Element {
   const params = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = location.state as PlanCreateLocationState | null;
   const cloneFromPlanId = searchParams.get("cloneFrom");
   const section = isPlanEditorSection(params.section)
     ? params.section
@@ -77,6 +116,7 @@ export function PlanCreatePage(): JSX.Element {
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
+  const editorBasePath = `/trips/${tripId}/plans/new`;
 
   const {
     data: room,
@@ -112,6 +152,9 @@ export function PlanCreatePage(): JSX.Element {
   );
   const draftCompletion = getPlanPublishCompletion(editor);
   const isFirstPlan = Boolean(!cloneFromPlan && room?.plans.length === 0);
+  const firstIncompleteSection = PLAN_EDITOR_SECTIONS.find(
+    (candidate) => !draftCompletion[candidate],
+  );
   const recommendationQuery = useNextTripActionRecommendation(
     tripId,
     {
@@ -166,6 +209,82 @@ export function PlanCreatePage(): JSX.Element {
         onAction={() =>
           navigate(`/trips/${tripId}/itinerary`, { replace: true })
         }
+      />
+    );
+  }
+
+  if (
+    locationState?.tripCreationWizard &&
+    room.plans.length > 0 &&
+    !cloneFromPlan
+  ) {
+    return <Navigate to={`/trips/${tripId}/plans`} replace />;
+  }
+
+  if (isFirstPlan && !editor.isDraftHydrated) {
+    return <div css={loadingContainerStyle}>임시안을 불러오는 중입니다...</div>;
+  }
+
+  const firstIncompleteIndex = firstIncompleteSection
+    ? PLAN_EDITOR_SECTIONS.indexOf(firstIncompleteSection)
+    : -1;
+  const currentSectionIndex = section
+    ? PLAN_EDITOR_SECTIONS.indexOf(section)
+    : -1;
+  const shouldResumeAtFirstIncomplete = Boolean(
+    isFirstPlan &&
+      !editor.draftConflict &&
+      firstIncompleteSection &&
+      !locationState?.wizardReview &&
+      !locationState?.allowIncompleteWizardProgress &&
+      (!section || currentSectionIndex > firstIncompleteIndex),
+  );
+
+  if (shouldResumeAtFirstIncomplete && firstIncompleteSection) {
+    return (
+      <Navigate
+        to={`${editorBasePath}/${firstIncompleteSection}${location.search}`}
+        replace
+        state={{
+          ...locationState,
+          tripCreationWizard: true,
+        }}
+      />
+    );
+  }
+
+  if (
+    isFirstPlan &&
+    section &&
+    !locationState?.tripCreationWizard
+  ) {
+    return (
+      <Navigate
+        to={`${editorBasePath}/${section}${location.search}`}
+        replace
+        state={{
+          ...locationState,
+          tripCreationWizard: true,
+        }}
+      />
+    );
+  }
+
+  if (
+    isFirstPlan &&
+    !section &&
+    !firstIncompleteSection &&
+    !locationState?.wizardReview
+  ) {
+    return (
+      <Navigate
+        to={`${editorBasePath}${location.search}`}
+        replace
+        state={{
+          ...locationState,
+          tripCreationWizard: true,
+          wizardReview: true,
+        }}
       />
     );
   }
@@ -248,11 +367,50 @@ export function PlanCreatePage(): JSX.Element {
     }
   };
 
-  const editorBasePath = `/trips/${tripId}/plans/new`;
+  const isReturningToSummary = Boolean(locationState?.fromEditorSummary);
   const openSection = (nextSection: PlanEditorSection): void => {
     navigate(`${editorBasePath}/${nextSection}${location.search}`, {
-      state: { fromEditorSummary: true },
+      state: {
+        ...locationState,
+        fromEditorSummary: true,
+        tripCreationWizard: isFirstPlan || undefined,
+      },
     });
+  };
+  const goToPreviousWizardStep = (): void => {
+    if (!section) {
+      navigate(`${editorBasePath}/transport${location.search}`, {
+        replace: true,
+        state: {
+          ...locationState,
+          fromEditorSummary: undefined,
+          tripCreationWizard: true,
+          wizardReview: undefined,
+        },
+      });
+      return;
+    }
+
+    const previousSection = PREVIOUS_PLAN_WIZARD_SECTION[section];
+    if (previousSection) {
+      navigate(`${editorBasePath}/${previousSection}${location.search}`, {
+        replace: true,
+        state: {
+          ...locationState,
+          fromEditorSummary: undefined,
+          tripCreationWizard: true,
+          wizardReview: undefined,
+        },
+      });
+      return;
+    }
+
+    navigate(
+      locationState?.wizardEntrySource === "companions"
+        ? `/trips/${tripId}/setup/companions`
+        : `/trips/${tripId}/plans`,
+      { replace: true },
+    );
   };
   const completeSection = (): void => {
     if (
@@ -270,14 +428,33 @@ export function PlanCreatePage(): JSX.Element {
       );
       setActiveRecommendation(undefined);
     }
-    if (
-      (location.state as { fromEditorSummary?: boolean } | null)
-        ?.fromEditorSummary
-    ) {
+    if (isReturningToSummary) {
       navigate(-1);
-    } else {
-      navigate(`${editorBasePath}${location.search}`, { replace: true });
+      return;
     }
+    if (isFirstPlan && section) {
+      const nextSection = NEXT_PLAN_WIZARD_SECTION[section];
+      navigate(
+        nextSection
+          ? `${editorBasePath}/${nextSection}${location.search}`
+          : `${editorBasePath}${location.search}`,
+        {
+          replace: true,
+          state: {
+            ...locationState,
+            allowIncompleteWizardProgress:
+              locationState?.allowIncompleteWizardProgress ||
+              !draftCompletion[section] ||
+              undefined,
+            fromEditorSummary: undefined,
+            tripCreationWizard: true,
+            wizardReview: nextSection ? undefined : true,
+          },
+        },
+      );
+      return;
+    }
+    navigate(`${editorBasePath}${location.search}`, { replace: true });
   };
 
   const actor = getRoomActor(room, session.participantIds);
@@ -332,6 +509,15 @@ export function PlanCreatePage(): JSX.Element {
       withBottomAction={!editor.draftConflict}
       className="max-w-[640px] px-(--app-inline-padding)"
     >
+      {isFirstPlan && (
+        <TripCreationProgress
+          currentStep={
+            section ? PLAN_SECTION_WIZARD_STEP[section] : "plan-review"
+          }
+          className="mb-5"
+        />
+      )}
+
       <PlanEditorSections
         editor={editor}
         section={section}
@@ -343,11 +529,17 @@ export function PlanCreatePage(): JSX.Element {
         recommendedActionId={recommendedActionId}
         recommendation={recommendation}
         isRecommendationPending={isRecommendationPending}
+        isReturningToSummary={isFirstPlan && isReturningToSummary}
         onRecommendationAction={(context) =>
           void runRecommendationAction(context)
         }
         onRecommendationDismiss={setDismissedRecommendationId}
         onOpenSection={openSection}
+        onPreviousSection={
+          isFirstPlan && section && !isReturningToSummary
+            ? goToPreviousWizardStep
+            : undefined
+        }
         onCompleteSection={completeSection}
       />
 
@@ -375,6 +567,16 @@ export function PlanCreatePage(): JSX.Element {
               ) : undefined
             }
           >
+            {isFirstPlan && (
+              <Button
+                type="button"
+                size="xl"
+                variant="secondary"
+                onClick={goToPreviousWizardStep}
+              >
+                이전: 교통
+              </Button>
+            )}
             <Button
               type="button"
               size="xl"

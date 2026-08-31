@@ -91,10 +91,19 @@ describe("TripCreatePage", () => {
     const { container } = renderPage();
 
     const input = screen.getByLabelText("여행 이름 *");
-    const submit = screen.getByRole("button", { name: "여행 만들기" });
+    const submit = screen.getByRole("button", { name: "여행 만들고 계속" });
     const main = screen.getByRole("main");
     const form = document.getElementById("trip-create-form");
     const bottomAction = container.querySelector('[data-slot="bottom-action"]');
+    const progress = screen.getByRole("navigation", {
+      name: "여행 만들기 진행 단계",
+    });
+
+    expect(progress).toHaveTextContent("1/7");
+    expect(progress).toHaveTextContent("여행 정보");
+    expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent(
+      "1. 여행 정보 현재 단계",
+    );
 
     expect(main.parentElement).toHaveAttribute("data-galanda-surface", "content");
     expect(container.querySelector("header")).not.toHaveAttribute(
@@ -156,7 +165,7 @@ describe("TripCreatePage", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
-        "/trips/trip-created/plans/new",
+        "/trips/trip-created/setup/companions",
       ),
     );
   });
@@ -180,6 +189,6 @@ describe("TripCreatePage", () => {
     expect(input).toHaveValue("실패해도 남아야 할 여행");
     expect(input).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByTestId("location-path")).toHaveTextContent("/trips/new");
-    expect(screen.getByRole("button", { name: "여행 만들기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "여행 만들고 계속" })).toBeEnabled();
   });
 });

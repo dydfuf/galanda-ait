@@ -33,6 +33,11 @@ const TripListPage = lazy(() =>
 const TripCreatePage = lazy(() =>
   import("../features/trip-create/TripCreatePage.tsx").then((m) => ({ default: m.TripCreatePage })),
 );
+const TripCompanionSetupPage = lazy(() =>
+  import("../features/trip-setup/TripCompanionSetupPage.tsx").then((m) => ({
+    default: m.TripCompanionSetupPage,
+  })),
+);
 const InvitePage = lazy(() =>
   import("../features/invite/InvitePage.tsx").then((m) => ({ default: m.InvitePage })),
 );
@@ -128,6 +133,10 @@ export function AppRouter() {
 
           <Route element={<SessionRoute registered />}>
             <Route path="/trips/new" element={withSuspense(<TripCreatePage />)} />
+            <Route
+              path="/trips/:tripId/setup/companions"
+              element={withSuspense(<TripCompanionSetupPage />)}
+            />
           </Route>
 
           <Route path="/trips/:tripId/itinerary/edit" element={<TripRoomChildLayout />}>
