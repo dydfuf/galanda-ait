@@ -7,6 +7,7 @@ import type {
   TripId,
 } from "../domain/ids.ts";
 import type { ExplorePlanListing } from "../domain/explore-plan.ts";
+import type { ExploreCityId } from "../domain/explore-city.ts";
 import type { ExploreThemeId } from "../domain/explore-theme.ts";
 import type {
   NotFoundError,
@@ -35,6 +36,16 @@ export interface ExplorePlanListingRecord {
   readonly sourceAuthorParticipantId: ParticipantId;
 }
 
+export interface ExplorePopularCity {
+  readonly cityId: ExploreCityId;
+  readonly listingCount: number;
+}
+
+export interface CreateExploreListingParams {
+  readonly record: ExplorePlanListingRecord;
+  readonly cityIds: ReadonlyArray<ExploreCityId>;
+}
+
 /**
  * `listListed` keyset pagination cursor.
  *
@@ -54,6 +65,8 @@ export interface ExploreListingFilters {
   readonly destination?: string;
   /** 공개 snapshot route city의 case-insensitive literal substring. */
   readonly routeCity?: string;
+  /** 공개 snapshot route city에서 파생한 server-owned canonical ID exact match. */
+  readonly cityId?: ExploreCityId;
   /** 공개 snapshot의 server-owned taxonomy stable ID exact match. */
   readonly themeId?: ExploreThemeId;
   /** listing 공개 dateRange가 이 날짜 이후까지 이어져야 한다(overlap lower bound). */
@@ -88,6 +101,11 @@ export interface CompareAndSetParams {
   readonly expectedListingRevision: Revision;
 }
 
+export interface RelistExploreListingParams extends CompareAndSetParams {
+  /** 새 projection의 route에서 core가 계산한 canonical city IDs. */
+  readonly cityIds: ReadonlyArray<ExploreCityId>;
+}
+
 /**
  * Explore listing 저장소 port.
  *
@@ -120,7 +138,7 @@ export class ExplorePlanRepository extends Context.Service<
      * StateConflictError로 실패한다.
      */
     readonly create: (
-      record: ExplorePlanListingRecord
+      params: CreateExploreListingParams
     ) => RepositoryEffect<
       ExplorePlanListing,
       NotFoundError | StateConflictError
@@ -151,7 +169,7 @@ export class ExplorePlanRepository extends Context.Service<
      * listing을 LISTED로 전환하지 않고 NotFoundError(TripPlan)로 fail-closed한다.
      */
     readonly relist: (
-      params: CompareAndSetParams
+      params: RelistExploreListingParams
     ) => RepositoryEffect<
       ExplorePlanListing,
       NotFoundError | RevisionConflictError
@@ -177,5 +195,10 @@ export class ExplorePlanRepository extends Context.Service<
     readonly listListed: (
       params: ListListedParams
     ) => RepositoryEffect<ListListedResult>;
+
+    /** 전체 현재 LISTED listing의 canonical route city coverage aggregate. */
+    readonly listPopularCities: (params: {
+      readonly limit: number;
+    }) => RepositoryEffect<ReadonlyArray<ExplorePopularCity>>;
   }
 >()("galanda/ports/ExplorePlanRepository") {}

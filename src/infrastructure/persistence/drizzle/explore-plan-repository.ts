@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import {
   NotFoundError,
@@ -10,6 +10,7 @@ import {
   ExplorePlanListingSchema,
   type ExplorePlanListing,
 } from "../../../core/domain/explore-plan.ts";
+import { ExploreCityIdSchema } from "../../../core/domain/explore-city.ts";
 import {
   ParticipantIdSchema,
   PlanIdSchema,
@@ -29,6 +30,7 @@ import {
   explorePlanListings,
   type ExplorePlanListingRow,
 } from "./schema/explore-plan.ts";
+import { exploreListingCities } from "./schema/explore-listing-city.ts";
 import { tripRooms } from "./schema/trip-room.ts";
 
 const databaseEffect = <A>(
@@ -130,7 +132,7 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
         .limit(1);
 
     return {
-      create: (record) =>
+      create: ({ record, cityIds }) =>
         Effect.gen(function* () {
           // 최초 게시 INSERT는 source room deletion/update와 반드시 serialize돼야
           // 한다. delete path(deletePlanAndAutoUnlist)는 같은 transaction에서
@@ -201,6 +203,14 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
                 .returning({ id: explorePlanListings.id });
 
               if (inserted.length > 0) {
+                if (cityIds.length > 0) {
+                  await tx.insert(exploreListingCities).values(
+                    cityIds.map((cityId) => ({
+                      listingId: record.listing.listingId,
+                      cityId,
+                    }))
+                  );
+                }
                 return { _tag: "Inserted" } as const;
               }
 
@@ -287,7 +297,7 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
             : undefined;
         }),
 
-      relist: ({ record, expectedListingRevision }) =>
+      relist: ({ record, expectedListingRevision, cityIds }) =>
         Effect.gen(function* () {
           const { listing, sourceTripId, sourcePlanId } = record;
           const expectedSourceRevision = listing.snapshot.sourcePlanRevision;
@@ -355,6 +365,19 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
                     revision: explorePlanListings.listingRevision,
                   });
                 if (updated) {
+                  await tx
+                    .delete(exploreListingCities)
+                    .where(
+                      eq(exploreListingCities.listingId, listing.listingId)
+                    );
+                  if (cityIds.length > 0) {
+                    await tx.insert(exploreListingCities).values(
+                      cityIds.map((cityId) => ({
+                        listingId: listing.listingId,
+                        cityId,
+                      }))
+                    );
+                  }
                   return { _tag: "Updated" } as const;
                 }
 
@@ -489,6 +512,14 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
                 where strpos(lower(route ->> 'city'), lower(${filters.routeCity})) > 0
               )`
             : undefined;
+          const cityFilter = filters?.cityId
+            ? sql<boolean>`exists (
+                select 1
+                from ${exploreListingCities} as city
+                where city.listing_id = ${explorePlanListings.id}
+                  and city.city_id = ${filters.cityId}
+              )`
+            : undefined;
           const themeFilter = filters?.themeId
             ? sql<boolean>`exists (
                 select 1
@@ -524,6 +555,7 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
             queryFilter,
             destinationFilter,
             routeCityFilter,
+            cityFilter,
             themeFilter,
             startsAfterFilter,
             endsBeforeFilter,
@@ -554,6 +586,46 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
               : undefined;
 
           return { page, nextCursor };
+        }),
+
+      listPopularCities: ({ limit }) =>
+        Effect.gen(function* () {
+          const rows = yield* databaseEffect("listPopularExploreCities", () =>
+            db
+              .select({
+                cityId: exploreListingCities.cityId,
+                listingCount: sql<number>`count(distinct ${exploreListingCities.listingId})`,
+              })
+              .from(exploreListingCities)
+              .innerJoin(
+                explorePlanListings,
+                eq(explorePlanListings.id, exploreListingCities.listingId)
+              )
+              .where(eq(explorePlanListings.status, "LISTED"))
+              .groupBy(exploreListingCities.cityId)
+              .orderBy(
+                sql`count(distinct ${exploreListingCities.listingId}) desc`,
+                asc(exploreListingCities.cityId)
+              )
+              .limit(limit)
+          );
+
+          return yield* Effect.forEach(rows, (row) =>
+            Effect.gen(function* () {
+              const cityId = yield* Schema.decodeUnknownEffect(
+                ExploreCityIdSchema
+              )(row.cityId).pipe(
+                Effect.mapError(() => malformed("listPopularExploreCities.decode"))
+              );
+              const listingCount = Number(row.listingCount);
+              if (!Number.isInteger(listingCount) || listingCount < 1) {
+                return yield* Effect.fail(
+                  malformed("listPopularExploreCities.decode")
+                );
+              }
+              return { cityId, listingCount };
+            })
+          );
         }),
     };
   })

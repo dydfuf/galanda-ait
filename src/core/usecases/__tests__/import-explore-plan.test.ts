@@ -214,6 +214,7 @@ const exploreRepoLayer = (
     relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
     listListed: () => Effect.succeed({ page: [], nextCursor: undefined }),
+    listPopularCities: () => Effect.succeed([]),
   });
 
 const makeFixedClock = (iso: string): Clock.Clock => {

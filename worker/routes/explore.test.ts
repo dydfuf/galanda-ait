@@ -144,6 +144,8 @@ interface DbBehavior {
   readonly exploreCasSelectRows?: Array<Array<unknown>>;
   /** rows returned by update ... returning (empty => CAS miss) */
   readonly exploreUpdateRows?: Array<Array<unknown>>;
+  /** rows returned by the public city aggregate */
+  readonly popularCityRows?: Array<Array<unknown>>;
 }
 
 const makeApp = (
@@ -179,6 +181,12 @@ const makeApp = (
       }
       if (text.includes('"trip_rooms"') && text.startsWith("update")) {
         return { rows: behavior.tripRoomUpdateRows ?? [] };
+      }
+      if (
+        text.includes('"explore_listing_cities"') &&
+        text.includes("group by")
+      ) {
+        return { rows: behavior.popularCityRows ?? [] };
       }
       if (text.includes('"explore_plan_listings"')) {
         if (text.startsWith("insert")) {
@@ -632,6 +640,64 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
       env,
     );
     expect(res.status).toBe(400);
+  });
+
+  it("cityId filter는 canonical city aggregate와 sidecar query로 전달한다", async () => {
+    const { app, calls } = makeApp({ exploreSelectRows: [listingRow()] });
+    const res = await app.fetch(
+      request("/api/explore/listings?cityId=osaka"),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    const select = calls.find(
+      (call) =>
+        call.text.startsWith("select") &&
+        call.text.includes('from "explore_plan_listings"')
+    )!;
+    expect(select.text).toContain('"explore_listing_cities"');
+    expect(select.text).toContain("city.city_id");
+    expect(select.params).toContain("osaka");
+  });
+
+  it("알 수 없는 cityId는 400으로 거부한다", async () => {
+    const { app } = makeApp({ exploreSelectRows: [] });
+    const res = await app.fetch(
+      request("/api/explore/listings?cityId=not-a-city"),
+      env
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("인기 도시 aggregate는 인증된 public listing만 집계하고 strict query를 적용한다", async () => {
+    const { app, calls } = makeApp({
+      popularCityRows: [["osaka", "3"], ["kyoto", 2]],
+    });
+    const res = await app.fetch(request("/api/explore/popular-cities"), env);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      items: [
+        { cityId: "osaka", listingCount: 3 },
+        { cityId: "kyoto", listingCount: 2 },
+      ],
+    });
+    const aggregate = calls.find((call) => call.text.includes("group by"))!;
+    expect(aggregate.text).toContain('"explore_listing_cities"');
+    expect(aggregate.text).toContain('"explore_plan_listings"');
+    expect(aggregate.text).not.toContain('"trip_rooms"');
+
+    const strict = await app.fetch(
+      request("/api/explore/popular-cities?limit=8"),
+      env
+    );
+    expect(strict.status).toBe(400);
+  });
+
+  it("인기 도시 aggregate는 미인증 세션을 401로 거부한다", async () => {
+    const { app } = makeApp({ popularCityRows: [] }, null);
+    const res = await app.fetch(request("/api/explore/popular-cities"), env);
+    expect(res.status).toBe(401);
   });
 
   it("hasMore일 때 opaque nextCursor를 발급하고, 그 cursor로 다음 페이지를 조회할 수 있다", async () => {

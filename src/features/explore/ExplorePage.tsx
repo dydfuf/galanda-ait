@@ -14,6 +14,11 @@ import {
   type ExploreListingsFilters,
 } from "@/contracts/explore.ts";
 import {
+  getExploreCityLabel,
+  isExploreCityId,
+  type ExploreCityId,
+} from "@/core/domain/explore-city.ts";
+import {
   EXPLORE_SELECTABLE_THEMES,
   isExploreThemeId,
   type ExploreThemeId,
@@ -21,7 +26,10 @@ import {
 import { useSessionQuery } from "@/hooks/useSession.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 
-import { useExploreListingsQuery } from "./queries.ts";
+import {
+  useExploreListingsQuery,
+  useExplorePopularCitiesQuery,
+} from "./queries.ts";
 import { ExploreListingCard } from "./components/ExploreListingCard.tsx";
 
 const themeIdFromUrl = (value: string | null): ExploreThemeId | undefined =>
@@ -33,6 +41,10 @@ const filterFromUrl = (
   query: searchParams.get("query") ?? undefined,
   destination: searchParams.get("destination") ?? undefined,
   routeCity: searchParams.get("routeCity") ?? undefined,
+  cityId: (() => {
+    const cityId = searchParams.get("cityId");
+    return isExploreCityId(cityId) ? cityId : undefined;
+  })(),
   themeId: themeIdFromUrl(searchParams.get("themeId")),
   startDate: searchParams.get("startDate") ?? undefined,
   endDate: searchParams.get("endDate") ?? undefined,
@@ -104,6 +116,10 @@ export function ExplorePage() {
     isFetchingNextPage,
     isFetchNextPageError,
   } = useExploreListingsQuery(filters);
+  const {
+    data: popularCitiesData,
+    isError: isPopularCitiesError,
+  } = useExplorePopularCitiesQuery();
 
   const items = data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -141,6 +157,20 @@ export function ExplorePage() {
   const loadNextPage = () => {
     void fetchNextPage();
   };
+
+  const selectPopularCity = (cityId: ExploreCityId) => {
+    setSearchParams(
+      filtersToSearchParams({
+        ...filters,
+        cityId: filters.cityId === cityId ? undefined : cityId,
+      })
+    );
+  };
+
+  const popularCities =
+    !isPopularCitiesError && popularCitiesData?.items.length
+      ? popularCitiesData.items
+      : [];
 
   const sectionTitle = hasFilters ? "검색 결과" : "새로 공개된 여행 일정";
   const sectionDescription = hasFilters
@@ -372,6 +402,37 @@ export function ExplorePage() {
           <Button type="submit">검색하기</Button>
         </div>
       </form>
+
+      {popularCities.length > 0 && (
+        <section
+          aria-label="인기 도시"
+          className="mb-6 flex min-w-0 flex-col gap-3 px-(--app-inline-padding)"
+        >
+          <SectionHeader
+            title="인기 도시"
+            description="전체 공개 일정에서 많이 등장한 도시예요."
+            className="px-0 pt-0"
+          />
+          <div className="flex min-w-0 flex-wrap gap-2">
+            {popularCities.map(({ cityId, listingCount }) => {
+              const label = getExploreCityLabel(cityId);
+              return (
+                <Button
+                  key={cityId}
+                  type="button"
+                  size="sm"
+                  variant={filters.cityId === cityId ? "default" : "outline"}
+                  aria-pressed={filters.cityId === cityId}
+                  aria-label={`${label}, 공개 일정 ${listingCount}개`}
+                  onClick={() => selectPopularCity(cityId)}
+                >
+                  {label} <span aria-hidden="true">{listingCount}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {content}
     </PageBody>

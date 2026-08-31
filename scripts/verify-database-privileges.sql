@@ -7,7 +7,7 @@ DECLARE
 	app_privilege text;
 BEGIN
 	FOREACH public_role IN ARRAY ARRAY['anon', 'authenticated', 'service_role']::name[] LOOP
-		FOREACH app_table IN ARRAY ARRAY['user', 'session', 'account', 'verification', 'participant', 'participant_alias', 'trip_rooms', 'trip_invite', 'confirmed_itineraries', 'itinerary_revisions', 'itinerary_acknowledgements']::name[] LOOP
+		FOREACH app_table IN ARRAY ARRAY['user', 'session', 'account', 'verification', 'participant', 'participant_alias', 'trip_rooms', 'trip_invite', 'confirmed_itineraries', 'itinerary_revisions', 'itinerary_acknowledgements', 'explore_plan_listings', 'explore_plan_saves', 'explore_listing_cities']::name[] LOOP
 			FOREACH app_privilege IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
 				IF has_table_privilege(public_role, format('public.%I', app_table), app_privilege) THEN
 					RAISE EXCEPTION '% still has % on public.%', public_role, app_privilege, app_table;
@@ -40,7 +40,7 @@ BEGIN
 		RAISE EXCEPTION 'PUBLIC still has default EXECUTE on postgres functions';
 	END IF;
 
-	FOREACH app_table IN ARRAY ARRAY['user', 'session', 'account', 'verification', 'participant', 'participant_alias', 'trip_rooms', 'trip_invite', 'confirmed_itineraries', 'itinerary_revisions', 'itinerary_acknowledgements']::name[] LOOP
+	FOREACH app_table IN ARRAY ARRAY['user', 'session', 'account', 'verification', 'participant', 'participant_alias', 'trip_rooms', 'trip_invite', 'confirmed_itineraries', 'itinerary_revisions', 'itinerary_acknowledgements', 'explore_plan_listings', 'explore_plan_saves', 'explore_listing_cities']::name[] LOOP
 		FOREACH app_privilege IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
 			IF NOT has_table_privilege('galanda_worker', format('public.%I', app_table), app_privilege) THEN
 				RAISE EXCEPTION 'galanda_worker lacks % on public.%', app_privilege, app_table;

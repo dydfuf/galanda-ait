@@ -13,6 +13,7 @@ import type { UserSession } from "../../domain/room.ts";
 import { SessionService } from "../../ports/session.ts";
 import {
   ExplorePlanRepository,
+  type ExplorePopularCity,
   type ExploreListingCursor,
   type ExplorePlanListingRecord,
   type ListListedParams,
@@ -25,6 +26,7 @@ import {
 } from "../../domain/errors.ts";
 import {
   getExploreListingDetail,
+  listPopularExploreCities,
   listExploreListings,
 } from "../explore-listing.ts";
 
@@ -121,7 +123,8 @@ const isBeforeCursor = (
 
 const keysetExploreRepo = (
   all: ReadonlyArray<ExplorePlanListingRecord>,
-  onListListed?: (params: ListListedParams) => void
+  onListListed?: (params: ListListedParams) => void,
+  popularCities: ReadonlyArray<ExplorePopularCity> = []
 ): Layer.Layer<ExplorePlanRepository> =>
   Layer.succeed(ExplorePlanRepository, {
     create: () => Effect.die("not implemented"),
@@ -147,6 +150,7 @@ const keysetExploreRepo = (
           : undefined;
       return Effect.succeed({ page, nextCursor });
     },
+    listPopularCities: () => Effect.succeed(popularCities),
   });
 
 const sessionLayer = (session: UserSession): Layer.Layer<SessionService> =>
@@ -164,6 +168,7 @@ const runQuery = <A, E>(
     session: UserSession;
     records: ReadonlyArray<ExplorePlanListingRecord>;
     onListListed?: (params: ListListedParams) => void;
+    popularCities?: ReadonlyArray<ExplorePopularCity>;
   }
 ): Promise<A> =>
   Effect.runPromise(
@@ -171,7 +176,7 @@ const runQuery = <A, E>(
       Effect.provide(
         Layer.mergeAll(
           sessionLayer(opts.session),
-          keysetExploreRepo(opts.records, opts.onListListed)
+          keysetExploreRepo(opts.records, opts.onListListed, opts.popularCities)
         )
       )
     ) as Effect.Effect<A, E, never>
@@ -319,6 +324,30 @@ describe("RAON-260 listExploreListings (read query)", () => {
   });
 });
 
+describe("RAON-272 listPopularExploreCities", () => {
+  it("authenticated session만 요구하고 repository aggregate를 그대로 반환한다", async () => {
+    const items: ReadonlyArray<ExplorePopularCity> = [
+      { cityId: "osaka", listingCount: 3 },
+    ];
+    const result = await runQuery(listPopularExploreCities(), {
+      session: registeredSession,
+      records: [],
+      popularCities: items,
+    });
+
+    expect(result).toEqual({ items });
+  });
+
+  it("aggregate 결과가 없으면 빈 items를 반환한다", async () => {
+    await expect(
+      runQuery(listPopularExploreCities(), {
+        session: registeredSession,
+        records: [],
+      })
+    ).resolves.toEqual({ items: [] });
+  });
+});
+
 // --- detail read (RAON-263 DISC-5) -----------------------------------------
 
 /**
@@ -337,6 +366,7 @@ const getByIdExploreRepo = (
     relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
     listListed: () => Effect.die("not implemented"),
+    listPopularCities: () => Effect.die("not implemented"),
   });
 
 const runDetail = <A, E>(

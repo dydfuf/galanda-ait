@@ -71,6 +71,13 @@
       "when": 1788014250143,
       "tag": "0009_daily_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788191216990,
+      "tag": "0010_ambiguous_karen_page",
+      "breakpoints": true
     }
   ]
 }

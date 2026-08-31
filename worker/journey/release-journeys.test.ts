@@ -154,6 +154,7 @@ describe("Journey 1: author lists private plan → other session discover/detail
           sourceAuthorParticipantId: AUTHOR.id,
         })
       );
+      harness.store.exploreListingCities.set(winnerListingId, new Set(["osaka"]));
     };
 
     const loser = await harness.requestAs(
@@ -173,6 +174,9 @@ describe("Journey 1: author lists private plan → other session discover/detail
     );
     expect(listingsForSource).toHaveLength(1);
     expect(listingsForSource[0]!.id).toBe(winnerListingId);
+    expect(harness.store.exploreListingCities.get(winnerListingId)).toEqual(
+      new Set(["osaka"])
+    );
   });
 
   it("같은 plan을 두 번 게시(double-submit/재시도)해도 503이 아니라 같은 listing을 idempotent하게 반환한다", async () => {
@@ -219,6 +223,59 @@ describe("Journey 1: author lists private plan → other session discover/detail
     );
     expect(listingsForSource).toHaveLength(1);
     expect(listingsForSource[0]!.status).toBe("LISTED");
+  });
+
+  it("인기 도시와 cityId feed filter가 sidecar 전체 LISTED 상태를 사용한다", async () => {
+    const harness = createJourneyHarness({
+      participants: [{ id: VIEWER.id, name: VIEWER.name }],
+      exploreListings: [
+        listedListing({
+          listingId: "listing-osaka",
+          sourceTripId: "trip-osaka",
+          sourcePlanId: "plan-osaka",
+          sourceAuthorParticipantId: AUTHOR.id,
+          cityIds: ["osaka"],
+        }),
+        listedListing({
+          listingId: "listing-both",
+          sourceTripId: "trip-both",
+          sourcePlanId: "plan-both",
+          sourceAuthorParticipantId: AUTHOR.id,
+          cityIds: ["osaka", "kyoto", "kyoto"],
+        }),
+        listedListing({
+          listingId: "listing-kyoto",
+          sourceTripId: "trip-kyoto",
+          sourcePlanId: "plan-kyoto",
+          sourceAuthorParticipantId: AUTHOR.id,
+          cityIds: ["kyoto"],
+        }),
+      ],
+    });
+    harness.store.exploreListings.get("listing-kyoto")!.status = "UNLISTED";
+
+    const popular = await harness.requestAs(
+      VIEWER.id,
+      "/api/explore/popular-cities"
+    );
+    expect(popular.status).toBe(200);
+    expect(await popular.json()).toEqual({
+      items: [
+        { cityId: "osaka", listingCount: 2 },
+        { cityId: "kyoto", listingCount: 1 },
+      ],
+    });
+
+    const kyotoFeed = await harness.requestAs(
+      VIEWER.id,
+      "/api/explore/listings?cityId=kyoto"
+    );
+    expect(kyotoFeed.status).toBe(200);
+    expect(
+      ((await kyotoFeed.json()) as { items: Array<{ listingId: string }> }).items.map(
+        (item) => item.listingId
+      )
+    ).toEqual(["listing-both"]);
   });
 });
 

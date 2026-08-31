@@ -62,6 +62,8 @@ export interface ExploreListingRecord {
   listedAt: string;
   updatedAt: string;
   unlistedAt: string | null;
+  /** Test seed for the persisted sidecar rows. */
+  cityIds?: readonly string[];
 }
 
 export interface ExploreSaveRecord {
@@ -78,6 +80,7 @@ export interface ParticipantAliasRecord {
 interface Store {
   tripRooms: Map<string, TripRoomRecord>;
   exploreListings: Map<string, ExploreListingRecord>;
+  exploreListingCities: Map<string, Set<string>>;
   exploreSaves: ExploreSaveRecord[];
   participantAliases: ParticipantAliasRecord[];
   /**
@@ -96,6 +99,9 @@ const cloneStore = (store: Store): Store => ({
   exploreListings: new Map(
     [...store.exploreListings].map(([k, v]) => [k, { ...v }])
   ),
+  exploreListingCities: new Map(
+    [...store.exploreListingCities].map(([k, v]) => [k, new Set(v)])
+  ),
   exploreSaves: store.exploreSaves.map((row) => ({ ...row })),
   participantAliases: store.participantAliases.map((row) => ({ ...row })),
   beforeNextListingInsert: store.beforeNextListingInsert,
@@ -104,6 +110,7 @@ const cloneStore = (store: Store): Store => ({
 const restoreStore = (target: Store, source: Store): void => {
   target.tripRooms = source.tripRooms;
   target.exploreListings = source.exploreListings;
+  target.exploreListingCities = source.exploreListingCities;
   target.exploreSaves = source.exploreSaves;
   target.participantAliases = source.participantAliases;
   target.beforeNextListingInsert = source.beforeNextListingInsert;
@@ -166,6 +173,15 @@ class QueryEngine {
 
     if (text.includes('"trip_rooms"')) {
       return this.executeTripRooms(text, params);
+    }
+
+    if (
+      text.startsWith('insert into "explore_listing_cities"') ||
+      text.startsWith('delete from "explore_listing_cities"') ||
+      (text.includes("group by") &&
+        text.includes('"explore_listing_cities"'))
+    ) {
+      return this.executeListingCities(text, params);
     }
 
     if (
@@ -317,6 +333,13 @@ class QueryEngine {
       let rows = [...this.store.exploreListings.values()].filter(
         (l) => l.status === status
       );
+      const cityPlaceholder = /city\.city_id = \$(\d+)/.exec(text);
+      if (cityPlaceholder) {
+        const cityId = String(params[Number(cityPlaceholder[1]) - 1]);
+        rows = rows.filter((l) =>
+          this.store.exploreListingCities.get(l.id)?.has(cityId)
+        );
+      }
       if (text.includes("<")) {
         const cursorListedAt = String(params[1]);
         const cursorId = String(params[3]);
@@ -477,6 +500,45 @@ class QueryEngine {
     }
 
     throw new Error(`Unrecognized explore_plan_listings SQL: ${text}`);
+  }
+
+  private executeListingCities(
+    text: string,
+    params: readonly unknown[]
+  ): { rows: unknown[][] } {
+    if (text.startsWith('insert into "explore_listing_cities"')) {
+      for (let index = 0; index < params.length; index += 2) {
+        const listingId = String(params[index]);
+        const cityId = String(params[index + 1]);
+        const cityIds = this.store.exploreListingCities.get(listingId) ?? new Set();
+        cityIds.add(cityId);
+        this.store.exploreListingCities.set(listingId, cityIds);
+      }
+      return { rows: [] };
+    }
+
+    if (text.startsWith('delete from "explore_listing_cities"')) {
+      this.store.exploreListingCities.delete(String(params[0]));
+      return { rows: [] };
+    }
+
+    const status = String(params[0]);
+    const counts = new Map<string, number>();
+    for (const listing of this.store.exploreListings.values()) {
+      if (listing.status !== status) continue;
+      for (const cityId of this.store.exploreListingCities.get(listing.id) ?? []) {
+        counts.set(cityId, (counts.get(cityId) ?? 0) + 1);
+      }
+    }
+    const limit = Number(params[params.length - 1]);
+    return {
+      rows: [...counts.entries()]
+        .sort(([cityA, countA], [cityB, countB]) =>
+          countA !== countB ? countB - countA : cityA < cityB ? -1 : 1
+        )
+        .slice(0, limit)
+        .map(([cityId, count]) => [cityId, count]),
+    };
   }
 
   private executeSaves(
@@ -674,6 +736,7 @@ export const createJourneyHarness = (seed: HarnessSeed): JourneyHarness => {
   const store: Store = {
     tripRooms: new Map(),
     exploreListings: new Map(),
+    exploreListingCities: new Map(),
     exploreSaves: [],
     participantAliases: [],
   };
@@ -682,6 +745,7 @@ export const createJourneyHarness = (seed: HarnessSeed): JourneyHarness => {
   }
   for (const listing of seed.exploreListings ?? []) {
     store.exploreListings.set(listing.id, { ...listing });
+    store.exploreListingCities.set(listing.id, new Set(listing.cityIds ?? []));
   }
   store.exploreSaves = (seed.exploreSaves ?? []).map((s) => ({ ...s }));
   for (const p of seed.participants) {

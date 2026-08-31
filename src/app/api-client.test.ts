@@ -17,6 +17,7 @@ import {
   getCurrentSession,
   getInviteSummary,
   getExploreListings,
+  getExplorePopularCities,
   getTrip,
   getTrips,
   importExplorePlan,
@@ -351,6 +352,34 @@ describe("API client", () => {
       getExploreListings({ themeId: "food", limit: 20 })
     ).resolves.toEqual({ items: [] });
     expect(requested).toBe("/api/explore/listings?limit=20&themeId=food");
+  });
+
+  it("Explore feed cityId를 URL query로 전송한다", async () => {
+    let requested: RequestInfo | URL | undefined;
+    globalThis.fetch = async (input) => {
+      requested = input;
+      return jsonResponse({ items: [] });
+    };
+
+    await expect(
+      getExploreListings({ cityId: "osaka", limit: 20 })
+    ).resolves.toEqual({ items: [] });
+    expect(requested).toBe("/api/explore/listings?limit=20&cityId=osaka");
+  });
+
+  it("인기 도시 aggregate endpoint를 schema decode한다", async () => {
+    let requested: RequestInfo | URL | undefined;
+    globalThis.fetch = async (input) => {
+      requested = input;
+      return jsonResponse({
+        items: [{ cityId: "osaka", listingCount: 3 }],
+      });
+    };
+
+    await expect(getExplorePopularCities()).resolves.toEqual({
+      items: [{ cityId: "osaka", listingCount: 3 }],
+    });
+    expect(requested).toBe("/api/explore/popular-cities");
   });
 
   it("explore import를 tagged target으로 전송하고 {tripId,planId}만 decode한다", async () => {
