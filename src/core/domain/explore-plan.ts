@@ -7,6 +7,11 @@ import {
   type PlanId,
 } from "./ids.ts";
 import {
+  canonicalizeExploreThemeIds,
+  ExploreThemeIdSchema,
+  type ExploreThemeId,
+} from "./explore-theme.ts";
+import {
   getPlanNightCount,
   getPlanPublishValidationErrors,
   getRouteValidationError,
@@ -109,6 +114,11 @@ export const ExplorePlanSnapshotSchema = Schema.Struct({
   transports: Schema.Array(ExploreTransportSummarySchema),
   author: ExploreAuthorAttributionSchema,
   sourcePlanRevision: PositiveRevisionSchema,
+  /**
+   * 작성자가 명시적으로 선택한 server-owned taxonomy ID. legacy snapshot에는
+   * field가 없을 수 있으며, 그 경우 분류 없음으로 해석한다(추론 fallback 금지).
+   */
+  themeIds: Schema.optional(Schema.Array(ExploreThemeIdSchema)),
 });
 export type ExplorePlanSnapshot = typeof ExplorePlanSnapshotSchema.Type;
 
@@ -127,9 +137,12 @@ export type ExploreListingStatus = typeof ExploreListingStatusSchema.Type;
  *
  * 상태 기계는 두 상태만 갖는다: `LISTED` ⇄ `UNLISTED`.
  * `listingRevision`은 optimistic concurrency용 monotonic revision이며,
- * 상태를 바꾸는 모든 전이에서 반드시 증가한다(read-modify-write 우회 금지).
- * `snapshot`은 최초 project 시점의 immutable value이므로, 아래 어떤 전이도
- * 이미 저장된 snapshot의 내용을 바꾸지 않는다(relist 재사영 시에만 교체).
+ * 상태 또는 작성자 선택 공개 분류를 바꾸는 모든 전이에서 반드시 증가한다
+ * (read-modify-write 우회 금지). source-derived snapshot은 최초 project 시점의
+ * immutable value다. 단, server allowlist를 통과한 `themeIds`는 source plan에서
+ * 추론한 값이 아니라 listing-owned metadata이므로 명시적 classify command가
+ * listing CAS로만 교체할 수 있다. 그 외 source-derived snapshot field는 relist
+ * 재사영 시에만 교체한다.
  *
  * - list (최초 게시): status=`LISTED`, `listingRevision`=최초값,
  *   `listedAt`=`updatedAt`=게시 시각, `unlistedAt` 없음.
@@ -242,7 +255,8 @@ const sanitizeTransport = (
  */
 export const projectExplorePlanSnapshot = (
   room: TripRoom,
-  plan: TripPlan
+  plan: TripPlan,
+  themeIds: ReadonlyArray<ExploreThemeId> = []
 ): ExploreProjectionResult => {
   if (plan.revision === undefined) {
     return { ok: false, failure: { kind: "MISSING_REVISION" } };
@@ -300,6 +314,7 @@ export const projectExplorePlanSnapshot = (
     transports: (plan.transports ?? []).map(sanitizeTransport),
     author: { displayName },
     sourcePlanRevision: plan.revision,
+    themeIds: canonicalizeExploreThemeIds(themeIds),
   };
 
   return { ok: true, snapshot };

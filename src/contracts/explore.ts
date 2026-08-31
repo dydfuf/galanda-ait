@@ -10,6 +10,10 @@ import {
   RevisionSchema,
   TripIdSchema,
 } from "../core/domain/ids.ts";
+import {
+  ExploreThemeIdSchema,
+  ExploreThemeIdsSchema,
+} from "../core/domain/explore-theme.ts";
 import { TravelDateSchema } from "../core/domain/room.ts";
 
 /**
@@ -25,11 +29,12 @@ import { TravelDateSchema } from "../core/domain/room.ts";
  *
  * ## Server-owned fields
  *
- * actor identity(userId/role/authorId)와 snapshot은 서버가 세션·source
+ * actor identity(userId/role/authorId)와 source-derived snapshot은 서버가 세션·source
  * aggregate에서 결정한다. client는 mutation request로 이 값들을 보낼 수 없다.
- * - 최초 게시(create)는 body 없이 source (tripId, planId)만으로 게시하므로
- *   spoof 필드를 받지 않도록 **empty strict** request를 요구한다.
- * - unlist/relist는 optimistic concurrency용 `expectedRevision`만 받는다.
+ * - 최초 게시(create)는 optional `themeIds`만 받으며 server taxonomy ID allowlist를
+ *   통과해야 한다. actor/author/snapshot/label spoof field는 strict decode가 거부한다.
+ * - unlist는 optimistic concurrency용 `expectedRevision`만 받는다.
+ * - relist/classify는 `expectedRevision`과 ID-only theme selection만 받는다.
  */
 
 const ExpectedRevisionSchema = RevisionSchema.check(
@@ -38,22 +43,13 @@ const ExpectedRevisionSchema = RevisionSchema.check(
 );
 
 /**
- * 최초 게시 request. 서버가 소유하지 않는 어떤 필드도 받지 않는다.
- *
- * 빈 `Schema.Struct({})`는 field가 없으면 excess property 검사를 건너뛰므로
- * (Effect Schema 동작), spoof 필드를 확실히 거부하기 위해 "key가 하나도 없어야
- * 한다"는 filter를 명시적으로 건다. client가 authorId/snapshot 등을 보내면
- * decode가 실패해 400으로 매핑된다.
+ * 최초 게시 request. client는 server-owned taxonomy의 stable ID만 선택할 수 있다.
+ * actor/author/snapshot/label 등 다른 field는 strict decode가 거부한다. 생략하면
+ * 분류 없는 listing으로 게시하며 destination/text에서 theme를 추론하지 않는다.
  */
-export const ListPlanInExploreRequestSchema = Schema.Record(
-  Schema.String,
-  Schema.Unknown
-).check(
-  Schema.makeFilter(
-    (value) => Object.keys(value).length === 0,
-    { message: "게시 요청 본문에는 어떤 필드도 포함할 수 없습니다." }
-  )
-);
+export const ListPlanInExploreRequestSchema = Schema.Struct({
+  themeIds: Schema.optional(ExploreThemeIdsSchema),
+});
 export type ListPlanInExploreRequest =
   typeof ListPlanInExploreRequestSchema.Type;
 
@@ -64,12 +60,24 @@ export const UnlistPlanFromExploreRequestSchema = Schema.Struct({
 export type UnlistPlanFromExploreRequest =
   typeof UnlistPlanFromExploreRequestSchema.Type;
 
-/** relist request. listing optimistic concurrency revision만 받는다. */
+/**
+ * relist request. themeIds를 생략하면 기존 분류를 보존하고, 전달하면 허용된 ID로
+ * 교체한다. source snapshot과 lifecycle은 expectedRevision CAS로 보호한다.
+ */
 export const RelistPlanInExploreRequestSchema = Schema.Struct({
   expectedRevision: ExpectedRevisionSchema,
+  themeIds: Schema.optional(ExploreThemeIdsSchema),
 });
 export type RelistPlanInExploreRequest =
   typeof RelistPlanInExploreRequestSchema.Type;
+
+/** listing-owned theme 분류를 수정하는 explicit CAS command. */
+export const ClassifyExploreListingRequestSchema = Schema.Struct({
+  expectedRevision: ExpectedRevisionSchema,
+  themeIds: ExploreThemeIdsSchema,
+});
+export type ClassifyExploreListingRequest =
+  typeof ClassifyExploreListingRequestSchema.Type;
 
 /**
  * Explore import HTTP contract (RAON-261 / Goal 14 DISC-7).
@@ -264,6 +272,7 @@ const ExploreFilterTextSchema = Schema.String.check(
  *
  * - `query`: title/destination/route city를 대상으로 하는 literal substring 검색.
  * - `destination` / `routeCity`: 공개 snapshot field의 literal substring 필터.
+ * - `themeId`: server-owned taxonomy stable ID의 exact match 필터.
  * - `startDate` / `endDate`: 요청 기간과 공개 dateRange가 겹치는 listing 필터.
  * - `limit`은 optional bounded 정수, `cursor`는 optional opaque token.
  *
@@ -282,6 +291,7 @@ export const ExploreListingsQuerySchema = Schema.Struct({
   query: Schema.optional(ExploreFilterTextSchema),
   destination: Schema.optional(ExploreFilterTextSchema),
   routeCity: Schema.optional(ExploreFilterTextSchema),
+  themeId: Schema.optional(ExploreThemeIdSchema),
   startDate: Schema.optional(TravelDateSchema),
   endDate: Schema.optional(TravelDateSchema),
 }).check(
@@ -296,7 +306,7 @@ export const ExploreListingsQuerySchema = Schema.Struct({
 export type ExploreListingsQuery = typeof ExploreListingsQuerySchema.Type;
 export type ExploreListingsFilters = Pick<
   ExploreListingsQuery,
-  "query" | "destination" | "routeCity" | "startDate" | "endDate"
+  "query" | "destination" | "routeCity" | "themeId" | "startDate" | "endDate"
 >;
 
 const normalizedFilterText = (
@@ -313,6 +323,7 @@ export const normalizeExploreListingsFilters = (
   query: normalizedFilterText(filters.query),
   destination: normalizedFilterText(filters.destination),
   routeCity: normalizedFilterText(filters.routeCity),
+  themeId: filters.themeId,
   startDate: normalizedFilterText(filters.startDate),
   endDate: normalizedFilterText(filters.endDate),
 });
@@ -326,6 +337,7 @@ export const encodeExploreFiltersKey = (
     normalized.query ?? null,
     normalized.destination ?? null,
     normalized.routeCity ?? null,
+    normalized.themeId ?? null,
     normalized.startDate ?? null,
     normalized.endDate ?? null,
   ]);

@@ -34,9 +34,12 @@ import {
 } from "../contracts/recommendation.ts";
 import {
   ExploreListingDetailResponseSchema,
+  ExploreListingResponseSchema,
   ExploreListingsResponseSchema,
   ImportExplorePlanResponseSchema,
+  type ClassifyExploreListingRequest,
   type ExploreListingDetailResponse,
+  type ExploreListingResponse,
   type ExploreListingsFilters,
   type ExploreListingsResponse,
   type ImportExplorePlanRequest,
@@ -303,6 +306,7 @@ export const getExploreListings = (
   if (params.destination !== undefined)
     search.set("destination", params.destination);
   if (params.routeCity !== undefined) search.set("routeCity", params.routeCity);
+  if (params.themeId !== undefined) search.set("themeId", params.themeId);
   if (params.startDate !== undefined) search.set("startDate", params.startDate);
   if (params.endDate !== undefined) search.set("endDate", params.endDate);
   const queryString = search.toString();
@@ -330,6 +334,16 @@ export const getExploreListingDetail = (
     `/api/explore/listings/${encodeURIComponent(listingId)}`,
     ExploreListingDetailResponseSchema,
     { signal }
+  );
+
+export const classifyExploreListing = (
+  listingId: ExploreListingId,
+  request: ClassifyExploreListingRequest
+): Promise<ExploreListingResponse> =>
+  requestJson(
+    `/api/explore/listings/${encodeURIComponent(listingId)}/themes`,
+    ExploreListingResponseSchema,
+    { method: "PUT", body: JSON.stringify(request) }
   );
 
 /**

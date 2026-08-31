@@ -126,6 +126,7 @@ const PUBLIC_SNAPSHOT_KEYS = [
   "routes",
   "sourcePlanRevision",
   "stays",
+  "themeIds",
   "title",
   "transports",
 ].sort();
@@ -216,6 +217,16 @@ describe("projectExplorePlanSnapshot", () => {
     expect(snapshot.sourcePlanRevision).toBe(3);
     expect(snapshot.title).toBe("도쿄·교토 5박 미식 여행");
     expect(snapshot.destination).toBe("일본");
+  });
+
+  it("명시적으로 선택한 theme ID만 canonical order로 공개하고 텍스트에서 추론하지 않는다", () => {
+    const plan = makePlan();
+    const room = makeRoom(plan);
+
+    expect(expectSnapshot(room, plan).themeIds).toEqual([]);
+    const result = projectExplorePlanSnapshot(room, plan, ["nature", "food"]);
+    if (!result.ok) throw new Error("projection failed");
+    expect(result.snapshot.themeIds).toEqual(["food", "nature"]);
   });
 
   it("revision 없는 source plan은 MISSING_REVISION으로 fail-closed한다", () => {

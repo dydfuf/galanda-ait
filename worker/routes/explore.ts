@@ -8,6 +8,7 @@ import {
   TripIdSchema,
 } from "../../src/core/domain/ids.ts";
 import {
+  ClassifyExploreListingRequestSchema,
   decodeExploreCursor,
   encodeExploreCursor,
   encodeExploreFiltersKey,
@@ -51,6 +52,7 @@ import type { IdGenerator } from "../../src/core/ports/id-generator.ts";
 import type { SessionService } from "../../src/core/ports/session.ts";
 import type { TripRoomRepository } from "../../src/core/ports/trip-room-repository.ts";
 import {
+  classifyExploreListing,
   getExploreListingDetail,
   listExploreListings,
   listPlanInExplore,
@@ -140,7 +142,7 @@ export const explorePlanListingRoute = new Hono<AppEnv>();
 explorePlanListingRoute.post(
   "/:tripId/plans/:planId/explore-listing",
   effectValidator("param", ExplorePlanParamsSchema),
-  // body는 서버 소유 필드 spoof를 막기 위해 empty strict DTO만 허용한다.
+  // client는 server taxonomy stable ID만 선택할 수 있고 나머지 field는 거부한다.
   effectValidator("json", ListPlanInExploreRequestSchema, strictInput),
   (c) =>
     runExploreEffect(
@@ -148,6 +150,7 @@ explorePlanListingRoute.post(
       listPlanInExplore({
         sourceTripId: c.req.valid("param").tripId,
         sourcePlanId: c.req.valid("param").planId,
+        themeIds: c.req.valid("json").themeIds,
       }),
       201
     )
@@ -180,6 +183,22 @@ exploreRoute.post(
       relistPlanInExplore({
         listingId: c.req.valid("param").listingId,
         expectedRevision: c.req.valid("json").expectedRevision,
+        themeIds: c.req.valid("json").themeIds,
+      })
+    )
+);
+
+exploreRoute.put(
+  "/listings/:listingId/themes",
+  effectValidator("param", ExploreListingParamsSchema),
+  effectValidator("json", ClassifyExploreListingRequestSchema, strictInput),
+  (c) =>
+    runExploreEffect(
+      c,
+      classifyExploreListing({
+        listingId: c.req.valid("param").listingId,
+        expectedRevision: c.req.valid("json").expectedRevision,
+        themeIds: c.req.valid("json").themeIds,
       })
     )
 );
@@ -293,6 +312,7 @@ exploreRoute.get(
       query: query.query,
       destination: query.destination,
       routeCity: query.routeCity,
+      themeId: query.themeId,
       startDate: query.startDate,
       endDate: query.endDate,
     });

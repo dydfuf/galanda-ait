@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Badge } from "@/components/ui/badge.tsx";
+import { getExploreThemeLabel } from "@/core/domain/explore-theme.ts";
 import type { ExploreListingItem } from "../../../contracts/explore.ts";
 
 /**
@@ -96,6 +98,16 @@ export function ExploreListingDetailContent({
           {snapshot.destination}
         </p>
       </header>
+
+      {(snapshot.themeIds?.length ?? 0) > 0 && (
+        <section aria-label="여행 테마" className="flex min-w-0 flex-wrap gap-2">
+          {snapshot.themeIds?.map((themeId) => (
+            <Badge key={themeId} variant="info">
+              {getExploreThemeLabel(themeId)}
+            </Badge>
+          ))}
+        </section>
+      )}
 
       {/* 2. 경로 + 각 구간 날짜 */}
       <section aria-label="경로" className="flex min-w-0 flex-col gap-2">

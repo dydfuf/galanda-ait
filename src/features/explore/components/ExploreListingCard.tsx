@@ -1,6 +1,8 @@
 import { MapPinned } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { Badge } from "@/components/ui/badge.tsx";
+import { getExploreThemeLabel } from "@/core/domain/explore-theme.ts";
 import type { ExploreListingItem } from "../../../contracts/explore.ts";
 import { ExploreSaveToggle } from "./ExploreSaveToggle.tsx";
 
@@ -101,6 +103,16 @@ export function ExploreListingCard({ item }: { item: ExploreListingItem }) {
           >
             {snapshot.title}
           </h3>
+
+          {(snapshot.themeIds?.length ?? 0) > 0 && (
+            <ul aria-label="여행 테마" className="flex min-w-0 flex-wrap gap-1.5">
+              {snapshot.themeIds?.map((themeId) => (
+                <li key={themeId}>
+                  <Badge variant="info">{getExploreThemeLabel(themeId)}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <dl className="flex min-w-0 flex-col gap-2 rounded-xl bg-surface-subtle p-3 text-sm text-foreground-muted">
             {routeText && (
