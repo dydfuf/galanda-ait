@@ -5,6 +5,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../app/api-client.ts", () => ({
+  getExplorePopularCities: vi.fn(),
   getExploreListingDetail: vi.fn(),
   getExploreListings: vi.fn(),
 }));
@@ -13,6 +14,7 @@ vi.mock("../../hooks/useSession.ts", () => ({
 }));
 
 import {
+  getExplorePopularCities,
   getExploreListingDetail,
   getExploreListings,
 } from "../../app/api-client.ts";
@@ -22,11 +24,13 @@ import {
   EXPLORE_FEED_PAGE_SIZE,
   exploreKeys,
   useExploreListingDetailQuery,
+  useExplorePopularCitiesQuery,
   useExploreListingsQuery,
 } from "./queries.ts";
 
 const mockGetDetail = vi.mocked(getExploreListingDetail);
 const mockGetListings = vi.mocked(getExploreListings);
+const mockGetPopularCities = vi.mocked(getExplorePopularCities);
 const mockUseSession = vi.mocked(useSessionQuery);
 
 const makeWrapper = (queryClient: QueryClient) =>
@@ -37,6 +41,7 @@ const makeWrapper = (queryClient: QueryClient) =>
 beforeEach(() => {
   mockGetDetail.mockReset();
   mockGetListings.mockReset();
+  mockGetPopularCities.mockReset();
   mockUseSession.mockReturnValue({
     isSuccess: true,
   } as ReturnType<typeof useSessionQuery>);
@@ -113,6 +118,27 @@ describe("useExploreListingsQuery (RAON-270)", () => {
     );
     expect(exploreKeys.listings({ themeId: "food" })).not.toEqual(
       exploreKeys.listings({ themeId: "nature" })
+    );
+  });
+});
+
+describe("useExplorePopularCitiesQuery (RAON-272)", () => {
+  it("feed와 별도 key로 limit 없는 aggregate endpoint를 조회한다", async () => {
+    mockGetPopularCities.mockResolvedValue({
+      items: [{ cityId: "osaka", listingCount: 3 }],
+    });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    renderHook(() => useExplorePopularCitiesQuery(), {
+      wrapper: makeWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(mockGetPopularCities).toHaveBeenCalledTimes(1));
+    expect(mockGetPopularCities).toHaveBeenCalledWith(expect.any(AbortSignal));
+    expect(queryClient.getQueryCache().getAll()[0]?.queryKey).toEqual(
+      exploreKeys.popularCities()
     );
   });
 });

@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery, type InfiniteData } from "@tanstack/react-query";
 
 import {
+  getExplorePopularCities,
   getExploreListingDetail,
   getExploreListings,
 } from "../../app/api-client.ts";
@@ -10,6 +11,7 @@ import {
   type ExploreListingDetailResponse,
   type ExploreListingsFilters,
   type ExploreListingsResponse,
+  type ExplorePopularCitiesResponse,
 } from "../../contracts/explore.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 
@@ -24,6 +26,7 @@ export const exploreKeys = {
       "listings",
       normalizeExploreListingsFilters(filters),
     ] as const,
+  popularCities: () => [...exploreKeys.all, "popular-cities"] as const,
   detail: (
     listingId: ExploreListingId
   ): readonly ["explore", "detail", ExploreListingId] =>
@@ -68,6 +71,17 @@ export const useExploreListingsQuery = (
         signal
       ),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: isSessionReady,
+  });
+};
+
+/** Explore 인기 도시 aggregate. Feed와 독립된 cache/query 상태를 사용한다. */
+export const useExplorePopularCitiesQuery = () => {
+  const { isSuccess: isSessionReady } = useSessionQuery();
+
+  return useQuery<ExplorePopularCitiesResponse, Error>({
+    queryKey: exploreKeys.popularCities(),
+    queryFn: ({ signal }) => getExplorePopularCities(signal),
     enabled: isSessionReady,
   });
 };

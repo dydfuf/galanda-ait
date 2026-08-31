@@ -116,6 +116,7 @@ export const listedListing = (options: {
   readonly sourceAuthorParticipantId: string;
   readonly listedAt?: string;
   readonly title?: string;
+  readonly cityIds?: readonly string[];
 }): ExploreListingRecord => {
   const listedAt = options.listedAt ?? "2026-08-25T00:00:00.000Z";
   return {
@@ -162,5 +163,6 @@ export const listedListing = (options: {
     listedAt,
     updatedAt: listedAt,
     unlistedAt: null,
+    cityIds: options.cityIds ?? ["osaka"],
   };
 };

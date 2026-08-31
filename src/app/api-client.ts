@@ -36,12 +36,14 @@ import {
   ExploreListingDetailResponseSchema,
   ExploreListingResponseSchema,
   ExploreListingsResponseSchema,
+  ExplorePopularCitiesResponseSchema,
   ImportExplorePlanResponseSchema,
   type ClassifyExploreListingRequest,
   type ExploreListingDetailResponse,
   type ExploreListingResponse,
   type ExploreListingsFilters,
   type ExploreListingsResponse,
+  type ExplorePopularCitiesResponse,
   type ImportExplorePlanRequest,
   type ImportExplorePlanResponse,
 } from "../contracts/explore.ts";
@@ -306,6 +308,7 @@ export const getExploreListings = (
   if (params.destination !== undefined)
     search.set("destination", params.destination);
   if (params.routeCity !== undefined) search.set("routeCity", params.routeCity);
+  if (params.cityId !== undefined) search.set("cityId", params.cityId);
   if (params.themeId !== undefined) search.set("themeId", params.themeId);
   if (params.startDate !== undefined) search.set("startDate", params.startDate);
   if (params.endDate !== undefined) search.set("endDate", params.endDate);
@@ -315,6 +318,16 @@ export const getExploreListings = (
     : "/api/explore/listings";
   return requestJson(path, ExploreListingsResponseSchema, { signal });
 };
+
+/** 전체 현재 LISTED set의 canonical route city aggregate를 조회한다. */
+export const getExplorePopularCities = (
+  signal?: AbortSignal
+): Promise<ExplorePopularCitiesResponse> =>
+  requestJson(
+    "/api/explore/popular-cities",
+    ExplorePopularCitiesResponseSchema,
+    { signal }
+  );
 
 /**
  * Explore 공개 listing 단건 detail 조회 (RAON-263 DISC-5).

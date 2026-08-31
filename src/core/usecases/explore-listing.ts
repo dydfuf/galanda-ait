@@ -18,6 +18,7 @@ import {
   canonicalizeExploreThemeIds,
   type ExploreThemeId,
 } from "../domain/explore-theme.ts";
+import { canonicalizeExploreCityIds } from "../domain/explore-city.ts";
 import {
   RevisionSchema,
   type ExploreListingId,
@@ -191,7 +192,12 @@ export const listPlanInExplore = Effect.fn("listPlanInExplore")(
       sourceAuthorParticipantId: session.participantId,
     };
 
-    return yield* explore.create(record);
+    return yield* explore.create({
+      record,
+      cityIds: canonicalizeExploreCityIds(
+        projection.snapshot.routes.map(({ city }) => city)
+      ),
+    });
   }
 );
 
@@ -347,6 +353,9 @@ export const relistPlanInExplore = Effect.fn("relistPlanInExplore")(
     return yield* explore.relist({
       record: { ...record, listing: nextListing },
       expectedListingRevision: command.expectedRevision,
+      cityIds: canonicalizeExploreCityIds(
+        projection.snapshot.routes.map(({ city }) => city)
+      ),
     });
   }
 );
@@ -482,6 +491,22 @@ export const listExploreListings = Effect.fn("listExploreListings")(
     });
 
     return result;
+  }
+);
+
+/** 전체 현재 LISTED set에서 canonical route city coverage를 조회한다. */
+export const EXPLORE_POPULAR_CITIES_LIMIT = 8;
+
+export const listPopularExploreCities = Effect.fn("listPopularExploreCities")(
+  function* () {
+    yield* requireAuthSession("탐색을 보려면 로그인이 필요합니다.");
+
+    const explore = yield* ExplorePlanRepository;
+    return {
+      items: yield* explore.listPopularCities({
+        limit: EXPLORE_POPULAR_CITIES_LIMIT,
+      }),
+    };
   }
 );
 

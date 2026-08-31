@@ -11,6 +11,10 @@ import {
   TripIdSchema,
 } from "../core/domain/ids.ts";
 import {
+  ExploreCityIdSchema,
+  type ExploreCityId,
+} from "../core/domain/explore-city.ts";
+import {
   ExploreThemeIdSchema,
   ExploreThemeIdsSchema,
 } from "../core/domain/explore-theme.ts";
@@ -291,6 +295,7 @@ export const ExploreListingsQuerySchema = Schema.Struct({
   query: Schema.optional(ExploreFilterTextSchema),
   destination: Schema.optional(ExploreFilterTextSchema),
   routeCity: Schema.optional(ExploreFilterTextSchema),
+  cityId: Schema.optional(ExploreCityIdSchema),
   themeId: Schema.optional(ExploreThemeIdSchema),
   startDate: Schema.optional(TravelDateSchema),
   endDate: Schema.optional(TravelDateSchema),
@@ -306,7 +311,13 @@ export const ExploreListingsQuerySchema = Schema.Struct({
 export type ExploreListingsQuery = typeof ExploreListingsQuerySchema.Type;
 export type ExploreListingsFilters = Pick<
   ExploreListingsQuery,
-  "query" | "destination" | "routeCity" | "themeId" | "startDate" | "endDate"
+  | "query"
+  | "destination"
+  | "routeCity"
+  | "cityId"
+  | "themeId"
+  | "startDate"
+  | "endDate"
 >;
 
 const normalizedFilterText = (
@@ -323,6 +334,7 @@ export const normalizeExploreListingsFilters = (
   query: normalizedFilterText(filters.query),
   destination: normalizedFilterText(filters.destination),
   routeCity: normalizedFilterText(filters.routeCity),
+  cityId: filters.cityId,
   themeId: filters.themeId,
   startDate: normalizedFilterText(filters.startDate),
   endDate: normalizedFilterText(filters.endDate),
@@ -337,6 +349,7 @@ export const encodeExploreFiltersKey = (
     normalized.query ?? null,
     normalized.destination ?? null,
     normalized.routeCity ?? null,
+    normalized.cityId ?? null,
     normalized.themeId ?? null,
     normalized.startDate ?? null,
     normalized.endDate ?? null,
@@ -371,3 +384,23 @@ export type ExploreListingsResponse =
   typeof ExploreListingsResponseSchema.Type;
 export type ExploreListingsResponseEncoded =
   typeof ExploreListingsResponseSchema.Encoded;
+
+export const ExplorePopularCityItemSchema = Schema.Struct({
+  cityId: ExploreCityIdSchema,
+  listingCount: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(1)
+  ),
+});
+export type ExplorePopularCityItem = {
+  readonly cityId: ExploreCityId;
+  readonly listingCount: number;
+};
+
+export const ExplorePopularCitiesResponseSchema = Schema.Struct({
+  items: Schema.Array(ExplorePopularCityItemSchema),
+});
+export type ExplorePopularCitiesResponse =
+  typeof ExplorePopularCitiesResponseSchema.Type;
+export type ExplorePopularCitiesResponseEncoded =
+  typeof ExplorePopularCitiesResponseSchema.Encoded;

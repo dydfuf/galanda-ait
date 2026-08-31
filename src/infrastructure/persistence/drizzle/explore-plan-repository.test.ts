@@ -136,7 +136,7 @@ describe("ExplorePlanRepositoryLive", () => {
         db,
         Effect.gen(function* () {
           const repository = yield* ExplorePlanRepository;
-          const created = yield* repository.create(record());
+          const created = yield* repository.create({ record: record(), cityIds: ["kyoto"] });
           const found = yield* repository.getById(
             ExploreListingIdSchema.make("listing-1")
           );
@@ -169,6 +169,11 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(insert.params).toContain("trip-1");
     expect(insert.params).toContain("plan-1");
     expect(insert.params).toContain("author-1");
+    const cityInsert = calls.find((c) =>
+      c.text.includes('insert into "explore_listing_cities"')
+    );
+    expect(cityInsert).toBeDefined();
+    expect(cityInsert!.params).toEqual(["listing-1", "kyoto"]);
     // FOR UPDATE lock select가 INSERT보다 먼저 실행된다(serialize 보장).
     expect(calls.indexOf(lockSelect)).toBeLessThan(calls.indexOf(insert));
   });
@@ -187,7 +192,7 @@ describe("ExplorePlanRepositoryLive", () => {
           db,
           Effect.gen(function* () {
             const repository = yield* ExplorePlanRepository;
-            return yield* repository.create(record());
+            return yield* repository.create({ record: record(), cityIds: [] });
           })
         )
       )
@@ -214,7 +219,7 @@ describe("ExplorePlanRepositoryLive", () => {
           db,
           Effect.gen(function* () {
             const repository = yield* ExplorePlanRepository;
-            return yield* repository.create(record());
+            return yield* repository.create({ record: record(), cityIds: [] });
           })
         )
       )
@@ -240,7 +245,7 @@ describe("ExplorePlanRepositoryLive", () => {
           db,
           Effect.gen(function* () {
             const repository = yield* ExplorePlanRepository;
-            return yield* repository.create(record());
+            return yield* repository.create({ record: record(), cityIds: [] });
           })
         )
       )
@@ -273,7 +278,7 @@ describe("ExplorePlanRepositoryLive", () => {
         db,
         Effect.gen(function* () {
           const repository = yield* ExplorePlanRepository;
-          return yield* repository.create(record());
+            return yield* repository.create({ record: record(), cityIds: [] });
         })
       )
     );
@@ -316,7 +321,7 @@ describe("ExplorePlanRepositoryLive", () => {
           db,
           Effect.gen(function* () {
             const repository = yield* ExplorePlanRepository;
-            return yield* repository.create(record());
+            return yield* repository.create({ record: record(), cityIds: [] });
           })
         )
       )
@@ -402,6 +407,7 @@ describe("ExplorePlanRepositoryLive", () => {
           return yield* repository.relist({
             record: relistedRecord,
             expectedListingRevision: RevisionSchema.make(2),
+            cityIds: ["kyoto"],
           });
         })
       )
@@ -468,10 +474,11 @@ describe("ExplorePlanRepositoryLive", () => {
           db,
           Effect.gen(function* () {
             const repository = yield* ExplorePlanRepository;
-            return yield* repository.relist({
-              record: relistedRecord,
-              expectedListingRevision: RevisionSchema.make(2),
-            });
+          return yield* repository.relist({
+            record: relistedRecord,
+            expectedListingRevision: RevisionSchema.make(2),
+            cityIds: ["kyoto"],
+          });
           })
         )
       )
@@ -521,10 +528,11 @@ describe("ExplorePlanRepositoryLive", () => {
           db,
           Effect.gen(function* () {
             const repository = yield* ExplorePlanRepository;
-            return yield* repository.relist({
-              record: relistedRecord,
-              expectedListingRevision: RevisionSchema.make(2),
-            });
+          return yield* repository.relist({
+            record: relistedRecord,
+            expectedListingRevision: RevisionSchema.make(2),
+            cityIds: ["kyoto"],
+          });
           })
         )
       )
@@ -735,6 +743,7 @@ describe("ExplorePlanRepositoryLive", () => {
               query: "%교토_",
               destination: "간사이",
               routeCity: "오사카",
+              cityId: "osaka",
               themeId: "food",
               startDate: "2026-10-01",
               endDate: "2026-10-31",
@@ -752,6 +761,8 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(select.text).toContain("jsonb_array_elements_text");
     expect(select.text).toContain("coalesce");
     expect(select.text).toContain("strpos");
+    expect(select.text).toContain('"explore_listing_cities"');
+    expect(select.text).toContain("city.city_id = $");
     expect(select.text).not.toContain(" like ");
     expect(select.text).toContain("-> 'dateRange' ->> 'endDate' >= $");
     expect(select.text).toContain("-> 'dateRange' ->> 'startDate' <= $");
@@ -767,6 +778,7 @@ describe("ExplorePlanRepositoryLive", () => {
         "%교토_",
         "간사이",
         "오사카",
+        "osaka",
         "food",
         "2026-10-01",
         "2026-10-31",
@@ -774,5 +786,58 @@ describe("ExplorePlanRepositoryLive", () => {
         6,
       ])
     );
+  });
+
+  it("listPopularCities는 LISTED의 distinct city coverage를 count DESC, cityId ASC로 반환한다", async () => {
+    const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+    const db = makeDb(
+      (config) =>
+        config.text.includes("group by")
+          ? { rows: [["kyoto", 3], ["osaka", 3], ["seoul", 1]] }
+          : { rows: [] },
+      calls
+    );
+
+    const result = await Effect.runPromise(
+      provide(
+        db,
+        Effect.gen(function* () {
+          const repository = yield* ExplorePlanRepository;
+          return yield* repository.listPopularCities({ limit: 8 });
+        })
+      )
+    );
+
+    expect(result).toEqual([
+      { cityId: "kyoto", listingCount: 3 },
+      { cityId: "osaka", listingCount: 3 },
+      { cityId: "seoul", listingCount: 1 },
+    ]);
+    const select = calls[0]!;
+    expect(select.text).toContain('from "explore_listing_cities"');
+    expect(select.text).toContain('inner join "explore_plan_listings"');
+    expect(select.text).toContain('"status" = $');
+    expect(select.text).toContain("count(distinct");
+    expect(select.text).toContain("group by");
+    expect(select.text).toContain("limit");
+    expect(select.params).toEqual(["LISTED", 8]);
+  });
+
+  it("listPopularCities는 persisted unknown city ID를 integrity error로 거부한다", async () => {
+    const db = makeDb(() => ({ rows: [["unknown-city", 1]] }));
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        provide(
+          db,
+          Effect.gen(function* () {
+            const repository = yield* ExplorePlanRepository;
+            return yield* repository.listPopularCities({ limit: 8 });
+          })
+        )
+      )
+    );
+
+    expect(error).toBeInstanceOf(RepositoryError);
   });
 });

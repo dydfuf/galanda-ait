@@ -7,8 +7,13 @@ import type { ExploreListingItem } from "../../contracts/explore.ts";
 
 vi.mock("./queries.ts", () => ({
   useExploreListingsQuery: vi.fn<(...args: unknown[]) => unknown>(),
+  useExplorePopularCitiesQuery: vi.fn<(...args: unknown[]) => unknown>(),
   EXPLORE_FEED_PAGE_SIZE: 20,
-  exploreKeys: { all: ["explore"], listings: () => ["explore", "listings"] },
+  exploreKeys: {
+    all: ["explore"],
+    listings: () => ["explore", "listings"],
+    popularCities: () => ["explore", "popular-cities"],
+  },
 }));
 vi.mock("../../hooks/useSession.ts", () => ({
   useSessionQuery: vi.fn<(...args: unknown[]) => unknown>(),
@@ -17,11 +22,15 @@ vi.mock("./components/ExploreSaveToggle.tsx", () => ({
   ExploreSaveToggle: () => null,
 }));
 
-import { useExploreListingsQuery } from "./queries.ts";
+import {
+  useExploreListingsQuery,
+  useExplorePopularCitiesQuery,
+} from "./queries.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { ExplorePage } from "./ExplorePage.tsx";
 
 const mockUseExplore = vi.mocked(useExploreListingsQuery);
+const mockUsePopularCities = vi.mocked(useExplorePopularCitiesQuery);
 const mockUseSession = vi.mocked(useSessionQuery);
 
 const item = (over: { id: string; title?: string }): ExploreListingItem => ({
@@ -45,8 +54,9 @@ const item = (over: { id: string; title?: string }): ExploreListingItem => ({
   },
 });
 
-const sessionOk = () =>
-  mockUseSession.mockReturnValue({
+const sessionOk = () => {
+  mockUsePopularCities.mockReturnValue(popularResult());
+  return mockUseSession.mockReturnValue({
     data: { name: "나" },
     isSuccess: true,
     isPending: false,
@@ -54,6 +64,16 @@ const sessionOk = () =>
     error: null,
     refetch: vi.fn<(...args: unknown[]) => unknown>(),
   } as unknown as ReturnType<typeof useSessionQuery>);
+};
+
+const popularResult = (
+  over: Record<string, unknown> = {}
+): ReturnType<typeof useExplorePopularCitiesQuery> =>
+  ({
+    data: undefined,
+    isError: false,
+    ...over,
+  }) as unknown as ReturnType<typeof useExplorePopularCitiesQuery>;
 
 const exploreResult = (
   over: Record<string, unknown>,
@@ -179,6 +199,67 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     expect(container).not.toHaveTextContent(
       /지금 뜨는|인기 도시|순위|가격|인원|알림|전체보기|조회수/,
     );
+  });
+
+  it("인기 도시 aggregate를 표시하고 선택을 server cityId filter로 반영한다", async () => {
+    sessionOk();
+    mockUsePopularCities.mockReturnValue(
+      popularResult({
+        data: { items: [{ cityId: "osaka", listingCount: 3 }] },
+      }),
+    );
+    mockUseExplore.mockReturnValue(
+      exploreResult({
+        data: { pages: [{ items: [item({ id: "l1" })] }], pageParams: [undefined] },
+      }),
+    );
+
+    renderPage("/explore?query=%EB%B2%9A%EA%BD%83");
+
+    const cityButton = screen.getByRole("button", {
+      name: "오사카, 공개 일정 3개",
+    });
+    expect(cityButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(cityButton);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "query=%EB%B2%9A%EA%BD%83&cityId=osaka",
+      ),
+    );
+    expect(mockUseExplore).toHaveBeenLastCalledWith({
+      query: "벚꽃",
+      destination: undefined,
+      routeCity: undefined,
+      cityId: "osaka",
+      themeId: undefined,
+      startDate: undefined,
+      endDate: undefined,
+    });
+  });
+
+  it("alias cityId deep-link를 canonical URL과 server filter에서 제거한다", async () => {
+    sessionOk();
+    mockUseExplore.mockReturnValue(
+      exploreResult({
+        data: { pages: [{ items: [] }], pageParams: [undefined] },
+      }),
+    );
+
+    renderPage("/explore?cityId=%EC%98%A4%EC%82%AC%EC%B9%B4");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search").textContent).toBe("")
+    );
+    expect(mockUseExplore).toHaveBeenLastCalledWith({
+      query: undefined,
+      destination: undefined,
+      routeCity: undefined,
+      cityId: undefined,
+      themeId: undefined,
+      startDate: undefined,
+      endDate: undefined,
+    });
   });
 
   it("URL filter를 query에 복원하고 form 변경을 canonical URL과 server query에 반영한다", async () => {

@@ -196,7 +196,7 @@ const exploreRepoLayer = (
   state: FakeExploreState
 ): Layer.Layer<ExplorePlanRepository> =>
   Layer.succeed(ExplorePlanRepository, {
-    create: (record) => {
+    create: ({ record }) => {
       state.records.set(record.listing.listingId, record);
       state.created.push(record);
       return Effect.succeed(record.listing);
@@ -273,6 +273,7 @@ const exploreRepoLayer = (
       return Effect.succeed(record.listing);
     },
     listListed: () => Effect.succeed({ page: [], nextCursor: undefined }),
+    listPopularCities: () => Effect.succeed([]),
   });
 
 const makeState = (

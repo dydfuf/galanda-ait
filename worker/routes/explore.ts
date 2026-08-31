@@ -23,6 +23,7 @@ import {
   ListPlanInExploreRequestSchema,
   RelistPlanInExploreRequestSchema,
   UnlistPlanFromExploreRequestSchema,
+  ExplorePopularCitiesResponseSchema,
   type ExploreListingsResponseEncoded,
 } from "../../src/contracts/explore.ts";
 import {
@@ -55,6 +56,7 @@ import {
   classifyExploreListing,
   getExploreListingDetail,
   listExploreListings,
+  listPopularExploreCities,
   listPlanInExplore,
   relistPlanInExplore,
   unlistPlanFromExplore,
@@ -78,6 +80,9 @@ import { effectValidator } from "../http/effect-validator.ts";
 import type { RequestScopeService } from "../http/request-scope.ts";
 
 const strictInput = { onExcessProperty: "error" } as const;
+const NoQuerySchema = Schema.Struct({}).check(
+  Schema.makeFilter((value) => Object.keys(value).length === 0)
+);
 
 const ExplorePlanParamsSchema = Schema.Struct({
   tripId: TripIdSchema,
@@ -203,6 +208,42 @@ exploreRoute.put(
     )
 );
 
+/** GET /api/explore/popular-cities (전체 LISTED route-city coverage). */
+exploreRoute.get(
+  "/popular-cities",
+  effectValidator("query", NoQuerySchema, strictInput),
+  (c) => {
+    const db = c.var.database;
+    if (!db) {
+      return runEffect(
+        c,
+        Effect.fail(
+          new RepositoryError({
+            operation: "ExplorePlanRepositoryLive",
+            message: "데이터베이스를 사용할 수 없습니다.",
+          })
+        )
+      );
+    }
+
+    const services = ExplorePlanRepositoryLive.pipe(
+      Layer.provide(Layer.succeed(Database, { db }))
+    );
+
+    return runEffect(
+      c,
+      listPopularExploreCities().pipe(Effect.provide(services)),
+      {
+        mapSuccess: (result, ctx) =>
+          ctx.json(
+            Schema.encodeSync(ExplorePopularCitiesResponseSchema)(result),
+            200
+          ),
+      }
+    );
+  }
+);
+
 /**
  * POST /api/explore/listings/:listingId/import (RAON-261 DISC-7 snapshot import).
  *
@@ -312,6 +353,7 @@ exploreRoute.get(
       query: query.query,
       destination: query.destination,
       routeCity: query.routeCity,
+      cityId: query.cityId,
       themeId: query.themeId,
       startDate: query.startDate,
       endDate: query.endDate,
