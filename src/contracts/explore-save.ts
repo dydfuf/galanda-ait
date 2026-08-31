@@ -36,6 +36,10 @@ export type ExploreSaveMutationRequest =
 /** save/unsave/상태 조회 응답. 현재 persisted 저장 상태만 담는다. */
 export const ExploreSaveStateResponseSchema = Schema.Struct({
   saved: Schema.Boolean,
+  saveCount: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(0)
+  ),
 });
 export type ExploreSaveStateResponse =
   typeof ExploreSaveStateResponseSchema.Type;

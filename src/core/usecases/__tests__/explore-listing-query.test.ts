@@ -129,6 +129,7 @@ const keysetExploreRepo = (
   Layer.succeed(ExplorePlanRepository, {
     create: () => Effect.die("not implemented"),
     getById: () => Effect.die("not implemented"),
+    getPublicById: () => Effect.die("not implemented"),
     findBySource: () => Effect.die("not implemented"),
     relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
@@ -142,13 +143,22 @@ const keysetExploreRepo = (
       const window = listed.slice(0, params.limit + 1);
       const hasMore = window.length > params.limit;
       const pageRecords = hasMore ? window.slice(0, params.limit) : window;
-      const page = pageRecords.map((r) => r.listing);
+      const page = pageRecords.map((r) => ({ ...r.listing, saveCount: 0 }));
       const last = page[page.length - 1];
       const nextCursor =
         hasMore && last
-          ? { listedAt: last.listedAt, listingId: last.listingId }
+          ? {
+              rankedAt: params.rankedAt ?? "2026-09-01T00:00:00.000Z",
+              rankScore: 0,
+              listedAt: last.listedAt,
+              listingId: last.listingId,
+            }
           : undefined;
-      return Effect.succeed({ page, nextCursor });
+      return Effect.succeed({
+        page,
+        nextCursor,
+        rankingMode: "RECENCY_FALLBACK" as const,
+      });
     },
     listPopularCities: () => Effect.succeed(popularCities),
   });
@@ -250,7 +260,9 @@ describe("RAON-260 listExploreListings (read query)", () => {
       records: [listedRecord("a", "2026-09-05T00:00:00.000Z")],
       onListListed: (params) => seen.push(params),
     });
-    expect(seen).toEqual([{ limit: 7, cursor: undefined, filters }]);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ limit: 7, cursor: undefined, filters });
+    expect(seen[0]?.rankedAt).toMatch(/Z$/);
   });
 
   it("동점 listedAt에서도 listingId DESC로 결정적 정렬한다", async () => {
@@ -362,6 +374,8 @@ const getByIdExploreRepo = (
   Layer.succeed(ExplorePlanRepository, {
     create: () => Effect.die("not implemented"),
     getById: () => Effect.succeed(record),
+    getPublicById: () =>
+      Effect.succeed(record ? { ...record.listing, saveCount: 0 } : undefined),
     findBySource: () => Effect.die("not implemented"),
     relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),

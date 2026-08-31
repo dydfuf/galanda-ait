@@ -91,7 +91,7 @@ describe("useToggleExploreSaveMutation", () => {
   });
 
   it("성공 시 state cache를 서버 응답으로 확정하고 저장 목록을 invalidate한다", async () => {
-    mockSave.mockResolvedValue({ saved: true });
+    mockSave.mockResolvedValue({ saved: true, saveCount: 0 });
     const { queryClient, wrapper } = makeWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(
@@ -103,7 +103,7 @@ describe("useToggleExploreSaveMutation", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     const stateKey = exploreSaveKeys.state(listingId, "p-1");
-    expect(queryClient.getQueryData(stateKey)).toEqual({ saved: true });
+    expect(queryClient.getQueryData(stateKey)).toEqual({ saved: true, saveCount: 0 });
     // 저장 목록 invalidate 호출됨.
     const savedListKey = exploreSaveKeys.savedList("p-1");
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: savedListKey });
@@ -114,7 +114,7 @@ describe("useToggleExploreSaveMutation", () => {
     const { queryClient, wrapper } = makeWrapper();
     const stateKey = exploreSaveKeys.state(listingId, "p-1");
     // 초기 상태: 미저장.
-    queryClient.setQueryData(stateKey, { saved: false });
+    queryClient.setQueryData(stateKey, { saved: false, saveCount: 0 });
 
     const { result } = renderHook(
       () => useToggleExploreSaveMutation(listingId),
@@ -125,11 +125,11 @@ describe("useToggleExploreSaveMutation", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
 
     // rollback: 다시 미저장으로 돌아간다.
-    expect(queryClient.getQueryData(stateKey)).toEqual({ saved: false });
+    expect(queryClient.getQueryData(stateKey)).toEqual({ saved: false, saveCount: 0 });
   });
 
   it("mutation invalidation이 Home과 /me/saved가 공유하는 저장 목록 query key에 도달한다 (RAON-256 DISC-9)", async () => {
-    mockSave.mockResolvedValue({ saved: true });
+    mockSave.mockResolvedValue({ saved: true, saveCount: 0 });
     mockSaved.mockResolvedValue({ items: [], nextCursor: undefined });
     const { queryClient, wrapper } = makeWrapper();
 

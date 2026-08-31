@@ -40,7 +40,7 @@ const listingRow = (over?: { status?: string }): Array<unknown> => {
   ];
 };
 
-/** saved-list join row in select() key order: savedAt,id,status,listingRevision,sourcePlanRevision,snapshot,listedAt,updatedAt,unlistedAt */
+/** saved-list join row in select() key order, including authoritative saveCount. */
 const savedJoinRow = (): Array<unknown> => [
   "2026-08-26T00:00:00.000Z",
   "listing-1",
@@ -51,6 +51,7 @@ const savedJoinRow = (): Array<unknown> => [
   "2026-08-25T00:00:00.000Z",
   "2026-08-25T00:00:00.000Z",
   null,
+  1,
 ];
 
 interface SaveBehavior {
@@ -77,13 +78,20 @@ const makeApp = (
       params: unknown[] = []
     ) => {
       const text = config.text;
-      if (text.includes('from "participant_alias"')) return { rows: [] };
+      if (
+        text.includes('from "participant_alias"') &&
+        !text.includes('"explore_plan_saves"')
+      ) return { rows: [] };
       if (/^(begin|commit|rollback)/i.test(text)) return { rows: [] };
       calls.push({ text, params });
 
       if (text.includes('"explore_plan_saves"')) {
         if (text.startsWith("insert")) return { rows: [] };
-        if (text.startsWith("delete")) return { rows: [] };
+        if (text.startsWith("update")) return { rows: [] };
+        if (text.includes("deduped_saves")) {
+          return { rows: behavior.savedListRows ?? [] };
+        }
+        if (text.includes("count(distinct")) return { rows: [[0]] };
         // select on saves alone = exists/isSaved.
         if (text.startsWith("select") && !text.includes("inner join")) {
           return { rows: behavior.saveExistsRows ?? [] };
@@ -97,6 +105,10 @@ const makeApp = (
         text.includes('"explore_plan_listings"') &&
         text.startsWith("select")
       ) {
+        if (text.startsWith('select "status"')) {
+          const listing = behavior.listingRows?.[0];
+          return listing ? { rows: [[listing[5]]] } : { rows: [] };
+        }
         return { rows: behavior.listingRows ?? [listingRow()] };
       }
       return { rows: [] };
@@ -137,7 +149,7 @@ const request = (path: string, init?: RequestInit) =>
 afterEach(() => vi.restoreAllMocks());
 
 describe("Explore save API (RAON-254 DISC-6)", () => {
-  it("POST save: LISTED listing을 저장하면 200 + { saved: true }", async () => {
+  it("POST save: LISTED listing을 저장하면 authoritative count와 함께 200", async () => {
     const { app } = makeApp({ saveExistsRows: [], listingRows: [listingRow()] });
     const res = await app.fetch(
       request("/api/explore/listings/listing-1/save", {
@@ -147,7 +159,7 @@ describe("Explore save API (RAON-254 DISC-6)", () => {
       env
     );
     expect(res.status).toBe(200);
-    expect((await res.json()) as unknown).toEqual({ saved: true });
+    expect((await res.json()) as unknown).toEqual({ saved: true, saveCount: 0 });
   });
 
   it("POST save: body에 spoof 필드가 있으면 400", async () => {
@@ -175,7 +187,7 @@ describe("Explore save API (RAON-254 DISC-6)", () => {
       env
     );
     expect(res.status).toBe(200);
-    expect((await res.json()) as unknown).toEqual({ saved: true });
+    expect((await res.json()) as unknown).toEqual({ saved: true, saveCount: 0 });
     // insert가 발생하지 않았다(이미 저장).
     expect(
       calls.some(
@@ -233,7 +245,7 @@ describe("Explore save API (RAON-254 DISC-6)", () => {
       env
     );
     expect(res.status).toBe(200);
-    expect((await res.json()) as unknown).toEqual({ saved: false });
+    expect((await res.json()) as unknown).toEqual({ saved: false, saveCount: 0 });
   });
 
   it("GET save: 실제 저장 상태를 반환한다", async () => {
@@ -243,7 +255,7 @@ describe("Explore save API (RAON-254 DISC-6)", () => {
       env
     );
     expect(res.status).toBe(200);
-    expect((await res.json()) as unknown).toEqual({ saved: true });
+    expect((await res.json()) as unknown).toEqual({ saved: true, saveCount: 0 });
   });
 
   it("GET /api/me/saved: LISTED read-through 페이지 + savedAt을 반환하고 private ID를 노출하지 않는다", async () => {

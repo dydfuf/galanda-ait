@@ -102,7 +102,7 @@ describe("Cross-surface Journey 2: Home 저장한 여행 아이디어 (real Reac
       { method: "POST", body: "{}" }
     );
     expect(save.status).toBe(200);
-    expect((await save.json()) as unknown).toEqual({ saved: true });
+    expect((await save.json()) as unknown).toEqual({ saved: true, saveCount: 1 });
 
     const { container, queryClient } = renderSavedIdeasAs(harness, VIEWER.id);
 
@@ -132,7 +132,7 @@ describe("Cross-surface Journey 2: Home 저장한 여행 아이디어 (real Reac
       { method: "DELETE", body: "{}" }
     );
     expect(unsave.status).toBe(200);
-    expect((await unsave.json()) as unknown).toEqual({ saved: false });
+    expect((await unsave.json()) as unknown).toEqual({ saved: false, saveCount: 0 });
 
     await act(async () => {
       await queryClient.invalidateQueries();

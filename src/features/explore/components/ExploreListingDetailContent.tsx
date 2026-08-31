@@ -63,6 +63,12 @@ const formatTransportLabel = (
   return parts.join(" · ");
 };
 
+const formatSaveCount = (count: number): string =>
+  new Intl.NumberFormat("ko-KR", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+  }).format(count);
+
 interface ExploreListingDetailContentProps {
   readonly item: ExploreListingItem;
   /**
@@ -96,6 +102,10 @@ export function ExploreListingDetailContent({
         <p className="min-w-0 text-base text-foreground-muted [overflow-wrap:anywhere]">
           <span className="sr-only">목적지</span>
           {snapshot.destination}
+        </p>
+        <p className="text-sm text-foreground-subtle">
+          <span aria-hidden="true">저장 {formatSaveCount(item.saveCount)}</span>
+          <span className="sr-only">저장한 사람 {item.saveCount}명</span>
         </p>
       </header>
 

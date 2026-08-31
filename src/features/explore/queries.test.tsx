@@ -50,8 +50,8 @@ beforeEach(() => {
 describe("useExploreListingsQuery (RAON-270)", () => {
   it("normalized filter를 cache key와 모든 page request에 동일하게 사용한다", async () => {
     mockGetListings
-      .mockResolvedValueOnce({ items: [], nextCursor: "cursor-1" })
-      .mockResolvedValueOnce({ items: [] });
+      .mockResolvedValueOnce({ items: [], nextCursor: "cursor-1", rankingMode: "RECENCY_FALLBACK" })
+      .mockResolvedValueOnce({ items: [], rankingMode: "RECENCY_FALLBACK" });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });

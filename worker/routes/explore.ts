@@ -20,6 +20,7 @@ import {
   ImportExplorePlanRequestSchema,
   ImportExplorePlanResponseSchema,
   InvalidExploreCursorError,
+  validateExploreCursorTime,
   ListPlanInExploreRequestSchema,
   RelistPlanInExploreRequestSchema,
   UnlistPlanFromExploreRequestSchema,
@@ -337,9 +338,14 @@ const toExploreListingsResponse = (
   return result.nextCursor
     ? {
         items,
-        nextCursor: encodeExploreCursor({ ...result.nextCursor, filterKey }),
+        nextCursor: encodeExploreCursor({
+          policy: "recent-active-save-v1",
+          ...result.nextCursor,
+          filterKey,
+        }),
+        rankingMode: result.rankingMode,
       }
-    : { items };
+    : { items, rankingMode: result.rankingMode };
 };
 
 exploreRoute.get(
@@ -364,10 +370,13 @@ exploreRoute.get(
     if (query.cursor !== undefined) {
       try {
         const payload = decodeExploreCursor(query.cursor);
+        validateExploreCursorTime(payload);
         if (payload.filterKey !== filterKey) {
           throw new InvalidExploreCursorError();
         }
         cursor = {
+          rankedAt: payload.rankedAt,
+          rankScore: payload.rankScore,
           listedAt: payload.listedAt,
           listingId: payload.listingId,
         };
@@ -482,13 +491,13 @@ exploreRoute.get(
 /** save state response encode helper. */
 const toSaveStateResponse = (state: {
   readonly saved: boolean;
+  readonly saveCount: number;
 }): typeof ExploreSaveStateResponseSchema.Encoded =>
   Schema.encodeSync(ExploreSaveStateResponseSchema)(state);
 
 type ExploreSaveRequirements =
   | RequestScopeService
   | SessionService
-  | ExplorePlanRepository
   | ExploreSaveRepository
   | IdGenerator;
 
@@ -503,7 +512,7 @@ type ExploreSaveRequirements =
 const runExploreSaveEffect = <E>(
   c: HonoContext<AppEnv>,
   effect: Effect.Effect<
-    { readonly saved: boolean },
+    { readonly saved: boolean; readonly saveCount: number },
     E,
     ExploreSaveRequirements
   >,
@@ -523,9 +532,6 @@ const runExploreSaveEffect = <E>(
   }
 
   const services = Layer.mergeAll(
-    ExplorePlanRepositoryLive.pipe(
-      Layer.provide(Layer.succeed(Database, { db }))
-    ),
     ExploreSaveRepositoryLive.pipe(
       Layer.provide(Layer.succeed(Database, { db }))
     ),
@@ -610,7 +616,11 @@ const toSavedListingsResponse = (
     }
     return Schema.encodeSync(SavedListingItemSchema)({
       savedAt: entry.savedAt,
-      listing: { ...entry.listing, status: "LISTED" as const },
+      listing: {
+        ...entry.listing,
+        status: "LISTED" as const,
+        saveCount: entry.saveCount,
+      },
     });
   });
   return result.nextCursor
