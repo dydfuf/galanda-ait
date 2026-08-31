@@ -2,6 +2,7 @@ import { Clock, Effect } from "effect";
 import {
   ExplorePlanRepository,
   type ExploreListingCursor,
+  type ExploreListingFilters,
   type ExplorePlanListingRecord,
   type ListListedResult,
 } from "../ports/explore-plan-repository.ts";
@@ -386,6 +387,8 @@ export interface ListExploreListingsQuery {
   readonly limit: number;
   /** 이전 페이지 마지막 cursor. 없으면 첫 페이지. */
   readonly cursor?: ExploreListingCursor;
+  /** LISTED public snapshot에만 적용할 검색/공개 facet 조건. */
+  readonly filters?: ExploreListingFilters;
 }
 
 export const listExploreListings = Effect.fn("listExploreListings")(
@@ -397,6 +400,7 @@ export const listExploreListings = Effect.fn("listExploreListings")(
     const result: ListListedResult = yield* explore.listListed({
       limit: query.limit,
       cursor: query.cursor,
+      filters: query.filters,
     });
 
     return result;

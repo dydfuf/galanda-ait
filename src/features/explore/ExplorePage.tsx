@@ -1,28 +1,83 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
+
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
+import {
+  normalizeExploreListingsFilters,
+  type ExploreListingsFilters,
+} from "@/contracts/explore.ts";
 import { useSessionQuery } from "@/hooks/useSession.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 
 import { useExploreListingsQuery } from "./queries.ts";
 import { ExploreListingCard } from "./components/ExploreListingCard.tsx";
 
+const filterFromUrl = (
+  searchParams: URLSearchParams
+): ExploreListingsFilters => ({
+  query: searchParams.get("query") ?? undefined,
+  destination: searchParams.get("destination") ?? undefined,
+  routeCity: searchParams.get("routeCity") ?? undefined,
+  startDate: searchParams.get("startDate") ?? undefined,
+  endDate: searchParams.get("endDate") ?? undefined,
+});
+
+const filtersToSearchParams = (
+  filters: ExploreListingsFilters
+): URLSearchParams => {
+  const searchParams = new URLSearchParams();
+  for (const [name, value] of Object.entries(filters)) {
+    if (value) searchParams.set(name, value);
+  }
+  return searchParams;
+};
+
 /**
- * Explore page (RAON-251 lazy honest state → RAON-260 data-backed feed).
+ * Explore page (RAON-251 → RAON-260 data-backed feed → RAON-270 filters).
  *
- * v1 primary section은 실제 정렬 의미(`listedAt DESC`)와 일치하는 "새로 공개된 여행
- * 일정" 하나다. 추천 rail/theme/city section이나 인기 지표는 실제 집계가 없으므로
- * 만들지 않는다.
- *
- * 상태 계약:
- * - 초기 loading/error/empty는 상호 배타적으로 하나만 노출한다.
- * - next-page loading/error/retry는 기존 행을 보존한 채 별도 하단 영역에서 구분해
- *   보여준다(초기 상태와 섞지 않는다).
+ * URL에는 검색/공개 facet 조건만 저장하고 cursor는 TanStack infinite query가
+ * 소유한다. query key와 모든 page 요청이 같은 normalized 조건을 사용하므로,
+ * 현재 로드된 page를 client-side filtering하지 않고 서버의 전체 LISTED dataset
+ * 결과를 그대로 렌더링한다.
  */
 export function ExplorePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawSearch = searchParams.toString();
+  const filters = useMemo(
+    () =>
+      normalizeExploreListingsFilters(
+        filterFromUrl(new URLSearchParams(rawSearch))
+      ),
+    [rawSearch]
+  );
+  const canonicalSearch = useMemo(
+    () => filtersToSearchParams(filters).toString(),
+    [filters]
+  );
+  const [draftFilters, setDraftFilters] =
+    useState<ExploreListingsFilters>(filters);
+  const [filterError, setFilterError] = useState<string | null>(null);
+  const hasFilters = Object.values(filters).some(Boolean);
+  const hasDraftFilters = Object.values(
+    normalizeExploreListingsFilters(draftFilters)
+  ).some(Boolean);
+
+  // back/forward/direct URL을 form에 반영하되 form subtree는 remount하지 않아
+  // submit/reset button의 keyboard focus를 보존한다. 비정규 URL은 replace한다.
+  useEffect(() => {
+    setDraftFilters(filters);
+    if (rawSearch !== canonicalSearch) {
+      setSearchParams(new URLSearchParams(canonicalSearch), { replace: true });
+    }
+  }, [canonicalSearch, filters, rawSearch, setSearchParams]);
+
   const {
     isError: isSessionError,
     error: sessionError,
@@ -39,13 +94,49 @@ export function ExplorePage() {
     hasNextPage,
     isFetchingNextPage,
     isFetchNextPageError,
-  } = useExploreListingsQuery();
+  } = useExploreListingsQuery(filters);
 
   const items = data?.pages.flatMap((page) => page.items) ?? [];
+
+  const handleFilterSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextFilters = normalizeExploreListingsFilters(draftFilters);
+
+    if (
+      nextFilters.startDate &&
+      nextFilters.endDate &&
+      nextFilters.startDate > nextFilters.endDate
+    ) {
+      setFilterError("시작일은 종료일보다 늦을 수 없어요.");
+      return;
+    }
+
+    setFilterError(null);
+    setDraftFilters(nextFilters);
+    setSearchParams(filtersToSearchParams(nextFilters));
+  };
+
+  const updateDraftFilter = (
+    name: keyof ExploreListingsFilters,
+    value: string
+  ) => {
+    setDraftFilters((current) => ({ ...current, [name]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilterError(null);
+    setDraftFilters({});
+    setSearchParams(new URLSearchParams());
+  };
 
   const loadNextPage = () => {
     void fetchNextPage();
   };
+
+  const sectionTitle = hasFilters ? "검색 결과" : "새로 공개된 여행 일정";
+  const sectionDescription = hasFilters
+    ? "선택한 조건에 맞는 최신 공개 일정이에요."
+    : "가장 최근에 공개된 일정부터 둘러보세요.";
 
   const content = isSessionError ? (
     <PageState
@@ -68,14 +159,25 @@ export function ExplorePage() {
   ) : items.length === 0 ? (
     <PageState
       status="empty"
-      title="아직 공개된 여행 일정이 없어요"
-      description="여행 일정이 공개되면 이곳에서 둘러볼 수 있어요."
+      title={
+        hasFilters
+          ? "조건에 맞는 여행 일정이 없어요"
+          : "아직 공개된 여행 일정이 없어요"
+      }
+      description={
+        hasFilters
+          ? "검색어나 날짜 범위를 바꿔보세요."
+          : "여행 일정이 공개되면 이곳에서 둘러볼 수 있어요."
+      }
+      {...(hasFilters
+        ? { actionText: "필터 초기화", onAction: resetFilters }
+        : {})}
     />
   ) : (
-    <section aria-label="새로 공개된 여행 일정" className="flex min-w-0 flex-col pb-2">
+    <section aria-label={sectionTitle} className="flex min-w-0 flex-col pb-2">
       <SectionHeader
-        title="새로 공개된 여행 일정"
-        description="가장 최근에 공개된 일정부터 둘러보세요."
+        title={sectionTitle}
+        description={sectionDescription}
         className="pt-0"
       />
 
@@ -134,6 +236,105 @@ export function ExplorePage() {
         title="탐색"
         description="다른 사람들이 공개한 여행 일정을 둘러보세요."
       />
+
+      <form
+        role="search"
+        aria-label="공개 여행 일정 검색"
+        onSubmit={handleFilterSubmit}
+        className="mx-(--app-inline-padding) mb-6 flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-4"
+      >
+        <Field>
+          <FieldLabel htmlFor="explore-query">일정 검색</FieldLabel>
+          <Input
+            id="explore-query"
+            name="query"
+            type="search"
+            maxLength={100}
+            value={draftFilters.query ?? ""}
+            onChange={(event) => updateDraftFilter("query", event.target.value)}
+            placeholder="제목, 목적지, 경유 도시"
+          />
+        </Field>
+
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="explore-destination">목적지</FieldLabel>
+            <Input
+              id="explore-destination"
+              name="destination"
+              maxLength={100}
+              value={draftFilters.destination ?? ""}
+              onChange={(event) =>
+                updateDraftFilter("destination", event.target.value)
+              }
+              placeholder="예: 오사카"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="explore-route-city">경유 도시</FieldLabel>
+            <Input
+              id="explore-route-city"
+              name="routeCity"
+              maxLength={100}
+              value={draftFilters.routeCity ?? ""}
+              onChange={(event) =>
+                updateDraftFilter("routeCity", event.target.value)
+              }
+              placeholder="예: 교토"
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="explore-start-date">
+              겹치는 기간 시작일
+            </FieldLabel>
+            <Input
+              id="explore-start-date"
+              name="startDate"
+              type="date"
+              value={draftFilters.startDate ?? ""}
+              onChange={(event) =>
+                updateDraftFilter("startDate", event.target.value)
+              }
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="explore-end-date">
+              겹치는 기간 종료일
+            </FieldLabel>
+            <Input
+              id="explore-end-date"
+              name="endDate"
+              type="date"
+              value={draftFilters.endDate ?? ""}
+              onChange={(event) =>
+                updateDraftFilter("endDate", event.target.value)
+              }
+            />
+          </Field>
+        </div>
+        <p className="text-base text-foreground-muted">
+          선택한 기간과 하루라도 겹치는 공개 일정을 찾아요.
+        </p>
+
+        {filterError && (
+          <p role="alert" className="text-base text-destructive-strong">
+            {filterError}
+          </p>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={resetFilters}
+            disabled={!hasDraftFilters}
+          >
+            초기화
+          </Button>
+          <Button type="submit">검색하기</Button>
+        </div>
+      </form>
+
       {content}
     </PageBody>
   );

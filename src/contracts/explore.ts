@@ -10,6 +10,7 @@ import {
   RevisionSchema,
   TripIdSchema,
 } from "../core/domain/ids.ts";
+import { TravelDateSchema } from "../core/domain/room.ts";
 
 /**
  * Explore mutation HTTP contract (RAON-259 / Goal 14 DISC-3).
@@ -160,8 +161,8 @@ export type ExploreListingResponse = typeof ExploreListingResponseSchema.Type;
 export const EXPLORE_LISTINGS_MAX_LIMIT = 50;
 /** limit query가 없을 때 사용할 기본 page 크기. */
 export const EXPLORE_LISTINGS_DEFAULT_LIMIT = 20;
-/** 비정상적으로 큰 cursor decode 비용을 제한한다. */
-export const EXPLORE_CURSOR_MAX_LENGTH = 512;
+/** 비정상적으로 큰 cursor decode 비용을 제한한다. filter identity를 포함해도 bounded다. */
+export const EXPLORE_CURSOR_MAX_LENGTH = 4096;
 
 const ExploreCursorTokenSchema = Schema.String.check(
   Schema.makeFilter(
@@ -180,6 +181,12 @@ const ExploreCursorTokenSchema = Schema.String.check(
 export const ExploreListingCursorSchema = Schema.Struct({
   listedAt: ExploreTimestampSchema,
   listingId: ExploreListingIdSchema,
+  /** cursor를 발급한 canonical filter set. 다른 filter와 재사용하면 400으로 거부한다. */
+  filterKey: Schema.String.check(
+    Schema.makeFilter((value) => value.length <= 1024, {
+      message: "cursor filter identity가 너무 깁니다.",
+    })
+  ),
 });
 export type ExploreListingCursorPayload =
   typeof ExploreListingCursorSchema.Type;
@@ -240,9 +247,28 @@ export const decodeExploreCursor = (
   return result.success;
 };
 
+/** 검색/필터 문자열은 trim 후 1..100자만 허용한다. */
+export const EXPLORE_FILTER_TEXT_MAX_LENGTH = 100;
+const ExploreFilterTextSchema = Schema.String.check(
+  Schema.makeFilter(
+    (value) => {
+      const length = value.trim().length;
+      return length >= 1 && length <= EXPLORE_FILTER_TEXT_MAX_LENGTH;
+    },
+    { message: "검색/필터 값은 1~100자여야 합니다." }
+  )
+);
+
 /**
- * feed query params. `limit`은 optional bounded 정수, `cursor`는 optional opaque
- * token이다. Hono가 query 값을 문자열로 넘기므로 numeric coercion 후 상한을 건다.
+ * feed query params.
+ *
+ * - `query`: title/destination/route city를 대상으로 하는 literal substring 검색.
+ * - `destination` / `routeCity`: 공개 snapshot field의 literal substring 필터.
+ * - `startDate` / `endDate`: 요청 기간과 공개 dateRange가 겹치는 listing 필터.
+ * - `limit`은 optional bounded 정수, `cursor`는 optional opaque token.
+ *
+ * Hono가 query 값을 문자열로 넘기므로 numeric coercion 후 상한을 건다. 필터는
+ * 이후 page에도 동일하게 전달되며 repository가 LISTED snapshot에만 적용한다.
  */
 export const ExploreListingsQuerySchema = Schema.Struct({
   limit: Schema.optional(
@@ -253,8 +279,57 @@ export const ExploreListingsQuerySchema = Schema.Struct({
     )
   ),
   cursor: Schema.optional(ExploreCursorTokenSchema),
-});
+  query: Schema.optional(ExploreFilterTextSchema),
+  destination: Schema.optional(ExploreFilterTextSchema),
+  routeCity: Schema.optional(ExploreFilterTextSchema),
+  startDate: Schema.optional(TravelDateSchema),
+  endDate: Schema.optional(TravelDateSchema),
+}).check(
+  Schema.makeFilter(
+    (value) =>
+      value.startDate === undefined ||
+      value.endDate === undefined ||
+      value.startDate <= value.endDate,
+    { message: "시작일은 종료일보다 늦을 수 없습니다." }
+  )
+);
 export type ExploreListingsQuery = typeof ExploreListingsQuerySchema.Type;
+export type ExploreListingsFilters = Pick<
+  ExploreListingsQuery,
+  "query" | "destination" | "routeCity" | "startDate" | "endDate"
+>;
+
+const normalizedFilterText = (
+  value: string | undefined
+): string | undefined => {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+};
+
+/** URL, cursor identity, query key, API 요청이 공유하는 canonical filter 표현. */
+export const normalizeExploreListingsFilters = (
+  filters: ExploreListingsFilters = {}
+): ExploreListingsFilters => ({
+  query: normalizedFilterText(filters.query),
+  destination: normalizedFilterText(filters.destination),
+  routeCity: normalizedFilterText(filters.routeCity),
+  startDate: normalizedFilterText(filters.startDate),
+  endDate: normalizedFilterText(filters.endDate),
+});
+
+/** cursor를 발급한 filter set을 충돌 없이 비교하기 위한 ordered identity. */
+export const encodeExploreFiltersKey = (
+  filters: ExploreListingsFilters = {}
+): string => {
+  const normalized = normalizeExploreListingsFilters(filters);
+  return JSON.stringify([
+    normalized.query ?? null,
+    normalized.destination ?? null,
+    normalized.routeCity ?? null,
+    normalized.startDate ?? null,
+    normalized.endDate ?? null,
+  ]);
+};
 
 /** feed item은 lifecycle상 LISTED인 public allowlist만 허용한다. */
 export const ExploreListingItemSchema = Schema.Struct({

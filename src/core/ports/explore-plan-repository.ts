@@ -46,11 +46,26 @@ export interface ExploreListingCursor {
   readonly listingId: ExploreListingId;
 }
 
+export interface ExploreListingFilters {
+  /** title/destination/route city를 대상으로 하는 case-insensitive literal 검색. */
+  readonly query?: string;
+  /** 공개 snapshot destination의 case-insensitive literal substring. */
+  readonly destination?: string;
+  /** 공개 snapshot route city의 case-insensitive literal substring. */
+  readonly routeCity?: string;
+  /** listing 공개 dateRange가 이 날짜 이후까지 이어져야 한다(overlap lower bound). */
+  readonly startDate?: string;
+  /** listing 공개 dateRange가 이 날짜 이전에 시작해야 한다(overlap upper bound). */
+  readonly endDate?: string;
+}
+
 export interface ListListedParams {
   /** 반환할 최대 row 수. adapter는 nextCursor 계산을 위해 limit+1을 조회한다. */
   readonly limit: number;
   /** 이전 페이지의 마지막 cursor. 없으면 첫 페이지. */
   readonly cursor?: ExploreListingCursor;
+  /** LISTED public snapshot에만 적용하는 검색/공개 facet 조건. */
+  readonly filters?: ExploreListingFilters;
 }
 
 export interface ListListedResult {

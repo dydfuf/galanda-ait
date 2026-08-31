@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import {
   NotFoundError,
@@ -460,27 +460,65 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
           return listing;
         }),
 
-      listListed: ({ limit, cursor }) =>
+      listListed: ({ limit, cursor, filters }) =>
         Effect.gen(function* () {
           const listedFilter = eq(explorePlanListings.status, "LISTED");
+          const snapshot = explorePlanListings.snapshot;
+
+          // 검색과 facet은 server-only source columns나 private trip_rooms가 아니라
+          // sanitized public snapshot JSONB에만 적용한다. `strpos`를 사용해 `%`/`_`도
+          // wildcard가 아닌 literal text로 검색한다.
+          const queryFilter = filters?.query
+            ? sql<boolean>`(
+                strpos(lower(${snapshot} ->> 'title'), lower(${filters.query})) > 0
+                or strpos(lower(${snapshot} ->> 'destination'), lower(${filters.query})) > 0
+                or exists (
+                  select 1
+                  from jsonb_array_elements(${snapshot} -> 'routes') as route
+                  where strpos(lower(route ->> 'city'), lower(${filters.query})) > 0
+                )
+              )`
+            : undefined;
+          const destinationFilter = filters?.destination
+            ? sql<boolean>`strpos(lower(${snapshot} ->> 'destination'), lower(${filters.destination})) > 0`
+            : undefined;
+          const routeCityFilter = filters?.routeCity
+            ? sql<boolean>`exists (
+                select 1
+                from jsonb_array_elements(${snapshot} -> 'routes') as route
+                where strpos(lower(route ->> 'city'), lower(${filters.routeCity})) > 0
+              )`
+            : undefined;
+          // 요청 기간과 listing dateRange의 overlap을 계산한다. 날짜는 검증된
+          // YYYY-MM-DD이므로 PostgreSQL text ordering이 calendar ordering과 같다.
+          const startsAfterFilter = filters?.startDate
+            ? sql<boolean>`${snapshot} -> 'dateRange' ->> 'endDate' >= ${filters.startDate}`
+            : undefined;
+          const endsBeforeFilter = filters?.endDate
+            ? sql<boolean>`${snapshot} -> 'dateRange' ->> 'startDate' <= ${filters.endDate}`
+            : undefined;
+
           // keyset predicate: (listed_at, id) < (cursor.listedAt, cursor.id)
-          // under (listed_at DESC, id DESC) ordering. tuple-equivalent so no
-          // duplicate/gap across pages.
-          const where = cursor
-            ? and(
-                listedFilter,
-                or(
-                  lt(explorePlanListings.listedAt, new Date(cursor.listedAt)),
-                  and(
-                    eq(
-                      explorePlanListings.listedAt,
-                      new Date(cursor.listedAt)
-                    ),
-                    lt(explorePlanListings.id, cursor.listingId)
-                  )
+          // under (listed_at DESC, id DESC) ordering. 필터를 먼저 적용한 subset에서도
+          // 같은 tuple order를 유지해 page 간 duplicate/gap을 만들지 않는다.
+          const cursorFilter = cursor
+            ? or(
+                lt(explorePlanListings.listedAt, new Date(cursor.listedAt)),
+                and(
+                  eq(explorePlanListings.listedAt, new Date(cursor.listedAt)),
+                  lt(explorePlanListings.id, cursor.listingId)
                 )
               )
-            : listedFilter;
+            : undefined;
+          const where = and(
+            listedFilter,
+            queryFilter,
+            destinationFilter,
+            routeCityFilter,
+            startsAfterFilter,
+            endsBeforeFilter,
+            cursorFilter
+          );
 
           const rows = yield* databaseEffect("listExploreListings", () =>
             db

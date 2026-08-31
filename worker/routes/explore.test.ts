@@ -498,12 +498,76 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
 
   it("oversized cursor는 decode 전에 400으로 거부한다", async () => {
     const { app } = makeApp({ exploreSelectRows: [] });
-    const cursor = "a".repeat(513);
+    const cursor = "a".repeat(4097);
     const res = await app.fetch(
       request(`/api/explore/listings?cursor=${cursor}`),
       env,
     );
     expect(res.status).toBe(400);
+  });
+
+  it("검색·목적지·경유 도시·기간 filter를 strict DTO로 받아 public listing query에 전달한다", async () => {
+    const { app, calls } = makeApp({ exploreSelectRows: [listingRow()] });
+    const params = new URLSearchParams({
+      query: "오사카",
+      destination: "일본",
+      routeCity: "교토",
+      startDate: "2026-09-01",
+      endDate: "2026-09-30",
+    });
+    const res = await app.fetch(
+      request(`/api/explore/listings?${params.toString()}`),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    const select = calls.find(
+      (call) =>
+        call.text.startsWith("select") &&
+        call.text.includes('from "explore_plan_listings"')
+    )!;
+    expect(select.text).toContain("jsonb_array_elements");
+    expect(select.text).not.toContain('"trip_rooms"');
+    expect(select.params).toEqual(
+      expect.arrayContaining([
+        "LISTED",
+        "오사카",
+        "일본",
+        "교토",
+        "2026-09-01",
+        "2026-09-30",
+      ])
+    );
+  });
+
+  it("빈 filter와 100자를 넘는 filter를 400으로 거부한다", async () => {
+    const { app } = makeApp({ exploreSelectRows: [] });
+    const blank = await app.fetch(
+      request("/api/explore/listings?query=%20%20"),
+      env
+    );
+    const oversized = await app.fetch(
+      request(`/api/explore/listings?destination=${"a".repeat(101)}`),
+      env
+    );
+    expect(blank.status).toBe(400);
+    expect(oversized.status).toBe(400);
+  });
+
+  it("유효하지 않거나 역순인 date range를 400으로 거부한다", async () => {
+    const { app } = makeApp({ exploreSelectRows: [] });
+    const invalid = await app.fetch(
+      request("/api/explore/listings?startDate=2026-99-01"),
+      env
+    );
+    const reversed = await app.fetch(
+      request(
+        "/api/explore/listings?startDate=2026-10-31&endDate=2026-10-01"
+      ),
+      env
+    );
+    expect(invalid.status).toBe(400);
+    expect(reversed.status).toBe(400);
   });
 
   it("지원하지 않는 query/filter는 조용히 무시하지 않고 400으로 거부한다", async () => {
@@ -545,6 +609,16 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
     const body2 = (await res2.json()) as { items: Array<Record<string, any>>; nextCursor?: string };
     expect(body2.items[0]!.listingId).toBe("listing-2");
     expect(body2.nextCursor).toBeUndefined();
+
+    // cursor는 발급 당시 filter identity에 묶인다. 다른 filter로 재사용하면
+    // matching rows를 건너뛰지 않도록 400으로 fail-closed한다.
+    const mismatched = await app2.fetch(
+      request(
+        `/api/explore/listings?limit=1&query=%EC%A0%9C%EC%A3%BC&cursor=${encodeURIComponent(body.nextCursor!)}`
+      ),
+      env
+    );
+    expect(mismatched.status).toBe(400);
   });
 });
 

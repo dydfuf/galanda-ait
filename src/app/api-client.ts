@@ -37,6 +37,7 @@ import {
   ExploreListingsResponseSchema,
   ImportExplorePlanResponseSchema,
   type ExploreListingDetailResponse,
+  type ExploreListingsFilters,
   type ExploreListingsResponse,
   type ImportExplorePlanRequest,
   type ImportExplorePlanResponse,
@@ -289,12 +290,21 @@ export const acknowledgeTripItinerary = (
  * 그대로 다시 전달한다.
  */
 export const getExploreListings = (
-  params: { readonly limit?: number; readonly cursor?: string } = {},
+  params: ExploreListingsFilters & {
+    readonly limit?: number;
+    readonly cursor?: string;
+  } = {},
   signal?: AbortSignal
 ): Promise<ExploreListingsResponse> => {
   const search = new URLSearchParams();
   if (params.limit !== undefined) search.set("limit", String(params.limit));
   if (params.cursor !== undefined) search.set("cursor", params.cursor);
+  if (params.query !== undefined) search.set("query", params.query);
+  if (params.destination !== undefined)
+    search.set("destination", params.destination);
+  if (params.routeCity !== undefined) search.set("routeCity", params.routeCity);
+  if (params.startDate !== undefined) search.set("startDate", params.startDate);
+  if (params.endDate !== undefined) search.set("endDate", params.endDate);
   const queryString = search.toString();
   const path = queryString
     ? `/api/explore/listings?${queryString}`
