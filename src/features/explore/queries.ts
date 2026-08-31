@@ -5,9 +5,11 @@ import {
   getExploreListings,
 } from "../../app/api-client.ts";
 import type { ExploreListingId } from "../../core/domain/ids.ts";
-import type {
-  ExploreListingDetailResponse,
-  ExploreListingsResponse,
+import {
+  normalizeExploreListingsFilters,
+  type ExploreListingDetailResponse,
+  type ExploreListingsFilters,
+  type ExploreListingsResponse,
 } from "../../contracts/explore.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 
@@ -16,8 +18,12 @@ export const EXPLORE_FEED_PAGE_SIZE = 20;
 
 export const exploreKeys = {
   all: ["explore"] as const,
-  listings: (): readonly ["explore", "listings"] =>
-    [...exploreKeys.all, "listings"] as const,
+  listings: (filters: ExploreListingsFilters = {}) =>
+    [
+      ...exploreKeys.all,
+      "listings",
+      normalizeExploreListingsFilters(filters),
+    ] as const,
   detail: (
     listingId: ExploreListingId
   ): readonly ["explore", "detail", ExploreListingId] =>
@@ -25,30 +31,40 @@ export const exploreKeys = {
 };
 
 type ExploreCursor = string | undefined;
+type ExploreListingsKey = ReturnType<typeof exploreKeys.listings>;
 
 /**
- * Explore 공개 feed infinite query (RAON-260 DISC-4).
+ * Explore 공개 feed infinite query (RAON-260 DISC-4, RAON-270 DISC-F1).
  *
  * - session이 준비된 뒤에만 활성화한다(feed는 authenticated session을 요구).
+ * - normalized filter를 query key와 모든 page 요청에 함께 넣어 조건별 cache/cursor가
+ *   섞이지 않게 한다.
  * - keyset pagination: 서버가 준 opaque `nextCursor`를 다음 페이지 param으로 쓴다.
  *   `nextCursor`가 없으면 마지막 페이지다.
  * - decode/at-boundary 검증은 api-client가 담당한다.
  */
-export const useExploreListingsQuery = () => {
+export const useExploreListingsQuery = (
+  filters: ExploreListingsFilters = {}
+) => {
   const { isSuccess: isSessionReady } = useSessionQuery();
+  const normalizedFilters = normalizeExploreListingsFilters(filters);
 
   return useInfiniteQuery<
     ExploreListingsResponse,
     Error,
     InfiniteData<ExploreListingsResponse, ExploreCursor>,
-    readonly ["explore", "listings"],
+    ExploreListingsKey,
     ExploreCursor
   >({
-    queryKey: exploreKeys.listings(),
+    queryKey: exploreKeys.listings(normalizedFilters),
     initialPageParam: undefined,
     queryFn: ({ pageParam, signal }) =>
       getExploreListings(
-        { limit: EXPLORE_FEED_PAGE_SIZE, cursor: pageParam },
+        {
+          ...normalizedFilters,
+          limit: EXPLORE_FEED_PAGE_SIZE,
+          cursor: pageParam,
+        },
         signal
       ),
     getNextPageParam: (lastPage) => lastPage.nextCursor,

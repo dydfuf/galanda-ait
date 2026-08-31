@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import type { ExploreListingItem } from "../../contracts/explore.ts";
 
@@ -71,10 +71,16 @@ const exploreResult = (
     ...over,
   }) as unknown as ReturnType<typeof useExploreListingsQuery>;
 
-const renderPage = () =>
+const LocationProbe = () => {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+};
+
+const renderPage = (initialEntry = "/explore") =>
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <ExplorePage />
+      <LocationProbe />
     </MemoryRouter>,
   );
 
@@ -143,7 +149,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     ).toHaveLength(1);
   });
 
-  it("카드는 실제 공개 필드와 semantic visual만 사용하고 금지된 탐색 UI는 만들지 않는다", () => {
+  it("카드는 실제 공개 필드와 semantic visual만 사용하고 근거 없는 탐색 UI는 만들지 않는다", () => {
     sessionOk();
     mockUseExplore.mockReturnValue(
       exploreResult({
@@ -169,10 +175,76 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     expect(card).toHaveTextContent("공개일 2026.09.05");
     expect(card.querySelector("img")).toBeNull();
     expect(container.querySelector("ol")).toBeNull();
-    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "일정 검색" })).toBeVisible();
     expect(container).not.toHaveTextContent(
       /지금 뜨는|theme|테마|인기 도시|순위|가격|인원|알림|전체보기|조회수/,
     );
+  });
+
+  it("URL filter를 query에 복원하고 form 변경을 canonical URL과 server query에 반영한다", async () => {
+    sessionOk();
+    mockUseExplore.mockReturnValue(
+      exploreResult({
+        data: {
+          pages: [{ items: [item({ id: "l1" })] }],
+          pageParams: [undefined],
+        },
+      })
+    );
+
+    renderPage(
+      "/explore?query=%20%20%EC%98%A4%EC%82%AC%EC%B9%B4%20%20&destination=%EC%9D%BC%EB%B3%B8&startDate=2026-09-01"
+    );
+
+    expect(screen.getByRole("searchbox", { name: "일정 검색" })).toHaveValue(
+      "오사카"
+    );
+    expect(screen.getByLabelText("목적지")).toHaveValue("일본");
+    expect(screen.getByLabelText("겹치는 기간 시작일")).toHaveValue(
+      "2026-09-01"
+    );
+    expect(mockUseExplore).toHaveBeenLastCalledWith({
+      query: "오사카",
+      destination: "일본",
+      routeCity: undefined,
+      startDate: "2026-09-01",
+      endDate: undefined,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "query=%EC%98%A4%EC%82%AC%EC%B9%B4"
+      )
+    );
+
+    fireEvent.change(screen.getByLabelText("경유 도시"), {
+      target: { value: "교토" },
+    });
+    const submitButton = screen.getByRole("button", { name: "검색하기" });
+    submitButton.focus();
+    fireEvent.click(submitButton);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "routeCity=%EA%B5%90%ED%86%A0"
+      )
+    );
+    expect(submitButton).toHaveFocus();
+    expect(mockUseExplore).toHaveBeenLastCalledWith({
+      query: "오사카",
+      destination: "일본",
+      routeCity: "교토",
+      startDate: "2026-09-01",
+      endDate: undefined,
+    });
+
+    const resetButton = screen.getByRole("button", { name: "초기화" });
+    resetButton.focus();
+    fireEvent.click(resetButton);
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search").textContent).toBe("")
+    );
+    expect(resetButton).toHaveFocus();
   });
 
   it("hasNextPage면 '더 보기'로 다음 페이지를 요청한다", () => {

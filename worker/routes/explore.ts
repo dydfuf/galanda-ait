@@ -10,10 +10,12 @@ import {
 import {
   decodeExploreCursor,
   encodeExploreCursor,
+  encodeExploreFiltersKey,
   EXPLORE_LISTINGS_DEFAULT_LIMIT,
   ExploreListingItemSchema,
   ExploreListingResponseSchema,
   ExploreListingsQuerySchema,
+  normalizeExploreListingsFilters,
   ImportExplorePlanRequestSchema,
   ImportExplorePlanResponseSchema,
   InvalidExploreCursorError,
@@ -36,6 +38,7 @@ import {
 import type { ExplorePlanListing } from "../../src/core/domain/explore-plan.ts";
 import type {
   ExploreListingCursor,
+  ExploreListingFilters,
   ExplorePlanRepository,
   ListListedResult,
 } from "../../src/core/ports/explore-plan-repository.ts";
@@ -259,7 +262,8 @@ exploreRoute.post(
  * 으로 매핑한다(첫 페이지로 조용히 fallback하지 않는다).
  */
 const toExploreListingsResponse = (
-  result: ListListedResult
+  result: ListListedResult,
+  filterKey: string
 ): ExploreListingsResponseEncoded => {
   const items = result.page.map((listing) => {
     if (listing.status !== "LISTED") {
@@ -271,7 +275,10 @@ const toExploreListingsResponse = (
     });
   });
   return result.nextCursor
-    ? { items, nextCursor: encodeExploreCursor(result.nextCursor) }
+    ? {
+        items,
+        nextCursor: encodeExploreCursor({ ...result.nextCursor, filterKey }),
+      }
     : { items };
 };
 
@@ -282,10 +289,26 @@ exploreRoute.get(
     const requestId = c.var.requestId ?? crypto.randomUUID();
     const query = c.req.valid("query");
 
+    const filters: ExploreListingFilters = normalizeExploreListingsFilters({
+      query: query.query,
+      destination: query.destination,
+      routeCity: query.routeCity,
+      startDate: query.startDate,
+      endDate: query.endDate,
+    });
+    const filterKey = encodeExploreFiltersKey(filters);
+
     let cursor: ExploreListingCursor | undefined;
     if (query.cursor !== undefined) {
       try {
-        cursor = decodeExploreCursor(query.cursor);
+        const payload = decodeExploreCursor(query.cursor);
+        if (payload.filterKey !== filterKey) {
+          throw new InvalidExploreCursorError();
+        }
+        cursor = {
+          listedAt: payload.listedAt,
+          listingId: payload.listingId,
+        };
       } catch (error) {
         if (error instanceof InvalidExploreCursorError) {
           return Promise.resolve(
@@ -326,10 +349,10 @@ exploreRoute.get(
 
     return runEffect(
       c,
-      listExploreListings({ limit, cursor }).pipe(Effect.provide(services)),
+      listExploreListings({ limit, cursor, filters }).pipe(Effect.provide(services)),
       {
         mapSuccess: (result, ctx) =>
-          ctx.json(toExploreListingsResponse(result), 200),
+          ctx.json(toExploreListingsResponse(result, filterKey), 200),
       }
     );
   }

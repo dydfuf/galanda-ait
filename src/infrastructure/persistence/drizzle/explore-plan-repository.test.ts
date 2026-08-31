@@ -715,4 +715,60 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(select.text).toContain(" or ");
     expect(select.params).toContain("listing-b");
   });
+
+  it("listListed는 LISTED public snapshot에 필터를 AND하고 keyset 정렬을 유지한다", async () => {
+    const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
+    const db = makeDb(() => ({ rows: [] }), calls);
+
+    await Effect.runPromise(
+      provide(
+        db,
+        Effect.gen(function* () {
+          const repository = yield* ExplorePlanRepository;
+          return yield* repository.listListed({
+            limit: 5,
+            cursor: {
+              listedAt: "2026-09-02T00:00:00.000Z",
+              listingId: ExploreListingIdSchema.make("listing-b"),
+            },
+            filters: {
+              query: "%교토_",
+              destination: "간사이",
+              routeCity: "오사카",
+              startDate: "2026-10-01",
+              endDate: "2026-10-31",
+            },
+          });
+        })
+      )
+    );
+
+    const select = calls[0];
+    expect(select.text).toContain('from "explore_plan_listings"');
+    expect(select.text).not.toContain('"trip_rooms"');
+    expect(select.text).toContain('"status" = $');
+    expect(select.text).toContain("jsonb_array_elements");
+    expect(select.text).toContain("strpos");
+    expect(select.text).not.toContain(" like ");
+    expect(select.text).toContain("-> 'dateRange' ->> 'endDate' >= $");
+    expect(select.text).toContain("-> 'dateRange' ->> 'startDate' <= $");
+    expect(select.text).toContain('"listed_at" < $');
+    expect(select.text).toContain('"listed_at" = $');
+    expect(select.text).toContain('"id" < $');
+    expect(select.text).toContain(
+      'order by "explore_plan_listings"."listed_at" desc, "explore_plan_listings"."id" desc'
+    );
+    expect(select.params).toEqual(
+      expect.arrayContaining([
+        "LISTED",
+        "%교토_",
+        "간사이",
+        "오사카",
+        "2026-10-01",
+        "2026-10-31",
+        "listing-b",
+        6,
+      ])
+    );
+  });
 });

@@ -231,14 +231,21 @@ describe("RAON-260 listExploreListings (read query)", () => {
     expect(result.page.map((l) => l.listingId)).toEqual(["a"]);
   });
 
-  it("limit/cursor를 repository listListed로 그대로 전달한다", async () => {
+  it("limit/cursor/filter를 repository listListed로 그대로 전달한다", async () => {
     const seen: ListListedParams[] = [];
-    await runQuery(listExploreListings({ limit: 7 }), {
+    const filters = {
+      query: "교토",
+      destination: "간사이",
+      routeCity: "오사카",
+      startDate: "2026-10-01",
+      endDate: "2026-10-31",
+    };
+    await runQuery(listExploreListings({ limit: 7, filters }), {
       session: registeredSession,
       records: [listedRecord("a", "2026-09-05T00:00:00.000Z")],
       onListListed: (params) => seen.push(params),
     });
-    expect(seen).toEqual([{ limit: 7, cursor: undefined }]);
+    expect(seen).toEqual([{ limit: 7, cursor: undefined, filters }]);
   });
 
   it("동점 listedAt에서도 listingId DESC로 결정적 정렬한다", async () => {
