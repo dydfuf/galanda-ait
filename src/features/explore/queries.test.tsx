@@ -57,6 +57,7 @@ describe("useExploreListingsQuery (RAON-270)", () => {
           query: "  오사카  ",
           destination: " 일본 ",
           routeCity: " 교토 ",
+          themeId: "food",
           startDate: "2026-09-01",
           endDate: "2026-09-30",
         }),
@@ -69,6 +70,7 @@ describe("useExploreListingsQuery (RAON-270)", () => {
         query: "오사카",
         destination: "일본",
         routeCity: "교토",
+        themeId: "food",
         startDate: "2026-09-01",
         endDate: "2026-09-30",
         limit: EXPLORE_FEED_PAGE_SIZE,
@@ -81,6 +83,7 @@ describe("useExploreListingsQuery (RAON-270)", () => {
         query: "오사카",
         destination: "일본",
         routeCity: "교토",
+        themeId: "food",
         startDate: "2026-09-01",
         endDate: "2026-09-30",
       })
@@ -94,6 +97,7 @@ describe("useExploreListingsQuery (RAON-270)", () => {
         query: "오사카",
         destination: "일본",
         routeCity: "교토",
+        themeId: "food",
         startDate: "2026-09-01",
         endDate: "2026-09-30",
         limit: EXPLORE_FEED_PAGE_SIZE,
@@ -106,6 +110,9 @@ describe("useExploreListingsQuery (RAON-270)", () => {
   it("filter가 다르면 cache key를 분리한다", () => {
     expect(exploreKeys.listings({ destination: "오사카" })).not.toEqual(
       exploreKeys.listings({ destination: "제주" })
+    );
+    expect(exploreKeys.listings({ themeId: "food" })).not.toEqual(
+      exploreKeys.listings({ themeId: "nature" })
     );
   });
 });

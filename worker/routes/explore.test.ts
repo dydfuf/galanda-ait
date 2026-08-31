@@ -241,7 +241,7 @@ describe("Explore API vertical slice (RAON-259 DISC-3)", () => {
     const { app } = makeApp({ exploreSelectRows: [] }); // findBySource -> none
     const res = await app.fetch(request("/api/trips/trip-1/plans/plan-1/explore-listing", {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({ themeIds: ["nature", "food"] }),
       }), env);
 
     expect(res.status).toBe(201);
@@ -250,6 +250,7 @@ describe("Explore API vertical slice (RAON-259 DISC-3)", () => {
     expect(body.status).toBe("LISTED");
     expect(body.listingRevision).toBe(1);
     expect(body.snapshot.author.displayName).toBe("작성자");
+    expect(body.snapshot.themeIds).toEqual(["food", "nature"]);
     // privacy: 실제 source private IDs가 response JSON에 없어야 한다.
     expect(raw).not.toContain("trip-1");
     expect(raw).not.toContain("plan-1");
@@ -266,6 +267,27 @@ describe("Explore API vertical slice (RAON-259 DISC-3)", () => {
         body: JSON.stringify({ authorId: "user-evil", snapshot: { title: "x" } }),
       }), env);
     expect(res.status).toBe(400);
+  });
+
+  it("POST .../explore-listing: arbitrary theme ID나 client label은 400으로 거부한다", async () => {
+    const { app } = makeApp({});
+    const arbitraryId = await app.fetch(
+      request("/api/trips/trip-1/plans/plan-1/explore-listing", {
+        method: "POST",
+        body: JSON.stringify({ themeIds: ["custom-theme"] }),
+      }),
+      env
+    );
+    const clientLabel = await app.fetch(
+      request("/api/trips/trip-1/plans/plan-1/explore-listing", {
+        method: "POST",
+        body: JSON.stringify({ themeIds: ["food"], themeLabel: "내 테마" }),
+      }),
+      env
+    );
+
+    expect(arbitraryId.status).toBe(400);
+    expect(clientLabel.status).toBe(400);
   });
 
   it("POST .../explore-listing: 작성자가 아니면(HOST여도) 403", async () => {
@@ -423,6 +445,28 @@ describe("Explore API vertical slice (RAON-259 DISC-3)", () => {
       }), env);
     expect(res.status).toBe(404);
   });
+  it("PUT /api/explore/listings/:id/themes: author가 ID-only 분류를 CAS로 수정한다", async () => {
+    const { app } = makeApp({
+      exploreSelectRows: [listingRow({ status: "LISTED", listingRevision: 1 })],
+      exploreUpdateRows: [[2]],
+    });
+    const res = await app.fetch(
+      request("/api/explore/listings/listing-1/themes", {
+        method: "PUT",
+        body: JSON.stringify({
+          expectedRevision: 1,
+          themeIds: ["nature", "food"],
+        }),
+      }),
+      env
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, any>;
+    expect(body.listingRevision).toBe(2);
+    expect(body.snapshot.themeIds).toEqual(["food", "nature"]);
+    expect(body.snapshot.sourcePlanRevision).toBe(3);
+  });
 });
 
 describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", () => {
@@ -506,12 +550,13 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
     expect(res.status).toBe(400);
   });
 
-  it("검색·목적지·경유 도시·기간 filter를 strict DTO로 받아 public listing query에 전달한다", async () => {
+  it("검색·목적지·경유 도시·테마·기간 filter를 strict DTO로 받아 public listing query에 전달한다", async () => {
     const { app, calls } = makeApp({ exploreSelectRows: [listingRow()] });
     const params = new URLSearchParams({
       query: "오사카",
       destination: "일본",
       routeCity: "교토",
+      themeId: "food",
       startDate: "2026-09-01",
       endDate: "2026-09-30",
     });
@@ -534,6 +579,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
         "오사카",
         "일본",
         "교토",
+        "food",
         "2026-09-01",
         "2026-09-30",
       ])
@@ -552,6 +598,15 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
     );
     expect(blank.status).toBe(400);
     expect(oversized.status).toBe(400);
+  });
+
+  it("알 수 없는 themeId는 400으로 거부한다", async () => {
+    const { app } = makeApp({ exploreSelectRows: [] });
+    const res = await app.fetch(
+      request("/api/explore/listings?themeId=custom-theme"),
+      env
+    );
+    expect(res.status).toBe(400);
   });
 
   it("유효하지 않거나 역순인 date range를 400으로 거부한다", async () => {
@@ -614,7 +669,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
     // matching rows를 건너뛰지 않도록 400으로 fail-closed한다.
     const mismatched = await app2.fetch(
       request(
-        `/api/explore/listings?limit=1&query=%EC%A0%9C%EC%A3%BC&cursor=${encodeURIComponent(body.nextCursor!)}`
+        `/api/explore/listings?limit=1&themeId=food&cursor=${encodeURIComponent(body.nextCursor!)}`
       ),
       env
     );

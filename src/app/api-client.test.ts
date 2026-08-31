@@ -16,6 +16,7 @@ import {
   deleteTripPlan,
   getCurrentSession,
   getInviteSummary,
+  getExploreListings,
   getTrip,
   getTrips,
   importExplorePlan,
@@ -337,6 +338,19 @@ describe("API client", () => {
       ["POST", `/api/invites/${token}/join`],
     ]);
     expect(JSON.parse(calls[2].init?.body as string)).toEqual({ nickname: "라온" });
+  });
+
+  it("Explore feed themeId를 URL query로 전송한다", async () => {
+    let requested: RequestInfo | URL | undefined;
+    globalThis.fetch = async (input) => {
+      requested = input;
+      return jsonResponse({ items: [] });
+    };
+
+    await expect(
+      getExploreListings({ themeId: "food", limit: 20 })
+    ).resolves.toEqual({ items: [] });
+    expect(requested).toBe("/api/explore/listings?limit=20&themeId=food");
   });
 
   it("explore import를 tagged target으로 전송하고 {tripId,planId}만 decode한다", async () => {

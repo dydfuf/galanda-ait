@@ -16,6 +16,7 @@ import type {
   TripRoom,
   UserSession,
 } from "../../domain/room.ts";
+import type { ExploreThemeId } from "../../domain/explore-theme.ts";
 import { SessionService } from "../../ports/session.ts";
 import { TripRoomRepository } from "../../ports/trip-room-repository.ts";
 import {
@@ -34,6 +35,7 @@ import {
 import { createTestIdGenerator } from "../../../infrastructure/id-generator.ts";
 import type { IdGenerator } from "../../ports/id-generator.ts";
 import {
+  classifyExploreListing,
   listPlanInExplore,
   relistPlanInExplore,
   unlistPlanFromExplore,
@@ -187,6 +189,7 @@ interface FakeExploreState {
   readonly records: Map<ExploreListingId, ExplorePlanListingRecord>;
   readonly created: ExplorePlanListingRecord[];
   readonly cas: Array<{ id: ExploreListingId; expected: Revision }>;
+  afterGet: (() => void) | undefined;
 }
 
 const exploreRepoLayer = (
@@ -198,7 +201,14 @@ const exploreRepoLayer = (
       state.created.push(record);
       return Effect.succeed(record.listing);
     },
-    getById: (listingId) => Effect.succeed(state.records.get(listingId)),
+    getById: (listingId) =>
+      Effect.sync(() => {
+        const record = state.records.get(listingId);
+        const afterGet = state.afterGet;
+        state.afterGet = undefined;
+        afterGet?.();
+        return record;
+      }),
     findBySource: (sourceTripId, sourcePlanId) => {
       for (const record of state.records.values()) {
         if (
@@ -270,7 +280,7 @@ const makeState = (
 ): FakeExploreState => {
   const records = new Map<ExploreListingId, ExplorePlanListingRecord>();
   for (const record of seed) records.set(record.listing.listingId, record);
-  return { records, created: [], cas: [] };
+  return { records, created: [], cas: [], afterGet: undefined };
 };
 
 const idLayer = (
@@ -334,6 +344,7 @@ const seedListing = (over?: {
   listedAt?: string;
   unlistedAt?: string;
   snapshotRevision?: number;
+  themeIds?: ReadonlyArray<ExploreThemeId>;
 }): ExplorePlanListingRecord => ({
   listing: {
     listingId: ExploreListingIdSchema.make("listing-seed-1"),
@@ -359,6 +370,7 @@ const seedListing = (over?: {
       transports: [],
       author: { displayName: authorUser.name },
       sourcePlanRevision: RevisionSchema.make(over?.snapshotRevision ?? 3),
+      themeIds: over?.themeIds,
     },
   },
   sourceTripId: sampleRoom.id,
@@ -375,6 +387,7 @@ describe("RAON-259 listPlanInExplore", () => {
       listPlanInExplore({
         sourceTripId: sampleRoom.id,
         sourcePlanId: authorPlan.id,
+        themeIds: ["nature", "food"],
       }),
       {
         session: registeredSession(authorUser),
@@ -393,6 +406,7 @@ describe("RAON-259 listPlanInExplore", () => {
     // server-side projection: source revision을 고정하고 표시명을 채운다.
     expect(listing.snapshot.sourcePlanRevision).toBe(3);
     expect(listing.snapshot.author.displayName).toBe(authorUser.name);
+    expect(listing.snapshot.themeIds).toEqual(["food", "nature"]);
     // server-only source reference는 저장되되 public listing에는 없다.
     expect(state.created[0]!.sourceAuthorParticipantId).toBe(authorUser.id);
     expect("sourceTripId" in listing).toBe(false);
@@ -586,6 +600,7 @@ describe("RAON-259 relistPlanInExplore", () => {
       listedAt: "2026-08-25T00:00:00.000Z",
       unlistedAt: "2026-08-26T00:00:00.000Z",
       snapshotRevision: 3,
+      themeIds: ["culture"],
     });
     const state = makeState([seeded]);
     // source plan revision을 7로 올려 relist가 최신 projection을 반영하는지 검증.
@@ -612,8 +627,9 @@ describe("RAON-259 relistPlanInExplore", () => {
     expect(listing.listedAt).toBe("2026-08-28T00:00:00.000Z");
     expect(listing.updatedAt).toBe("2026-08-28T00:00:00.000Z");
     expect(listing.unlistedAt).toBeUndefined();
-    // 새 server projection: 최신 source revision(7)로 교체된다.
+    // 새 server projection: 최신 source revision(7)로 교체하되 생략한 분류는 보존한다.
     expect(listing.snapshot.sourcePlanRevision).toBe(7);
+    expect(listing.snapshot.themeIds).toEqual(["culture"]);
     expect(state.cas[0]).toEqual({ id: seeded.listing.listingId, expected: 2 });
   });
 
@@ -697,5 +713,110 @@ describe("RAON-259 relistPlanInExplore", () => {
         }),
         { session: registeredSession(authorUser), state, nowIso: "2026-08-28T00:00:00.000Z" }
       ))).toBeInstanceOf(RevisionConflictError);
+  });
+});
+
+
+describe("RAON-271 classifyExploreListing", () => {
+  it("author가 ID-only 분류를 canonical order로 수정하고 listing revision CAS를 유지한다", async () => {
+    const seeded = seedListing({
+      status: "LISTED",
+      listingRevision: 4,
+      listedAt: "2026-08-25T00:00:00.000Z",
+      themeIds: ["culture"],
+    });
+    const state = makeState([seeded]);
+
+    const listing = await runWith(
+      classifyExploreListing({
+        listingId: seeded.listing.listingId,
+        expectedRevision: RevisionSchema.make(4),
+        themeIds: ["nature", "food"],
+      }),
+      {
+        session: registeredSession(authorUser),
+        state,
+        nowIso: "2026-08-29T00:00:00.000Z",
+      }
+    );
+
+    expect(listing.snapshot.themeIds).toEqual(["food", "nature"]);
+    expect(listing.snapshot.sourcePlanRevision).toBe(
+      seeded.listing.snapshot.sourcePlanRevision
+    );
+    expect(listing.listedAt).toBe(seeded.listing.listedAt);
+    expect(listing.updatedAt).toBe("2026-08-29T00:00:00.000Z");
+    expect(listing.listingRevision).toBe(5);
+    expect(state.cas[0]).toEqual({ id: seeded.listing.listingId, expected: 4 });
+  });
+
+  it("동일 분류 no-op도 load 이후 concurrent revision 변경을 CAS conflict로 감지한다", async () => {
+    const seeded = seedListing({ listingRevision: 1, themeIds: ["culture"] });
+    const state = makeState([seeded]);
+    state.afterGet = () => {
+      state.records.set(seeded.listing.listingId, {
+        ...seeded,
+        listing: {
+          ...seeded.listing,
+          listingRevision: RevisionSchema.make(2),
+          snapshot: {
+            ...seeded.listing.snapshot,
+            themeIds: ["nature"],
+          },
+        },
+      });
+    };
+
+    expect(
+      await runAndCatch(
+        runWith(
+          classifyExploreListing({
+            listingId: seeded.listing.listingId,
+            expectedRevision: RevisionSchema.make(1),
+            themeIds: ["culture"],
+          }),
+          { session: registeredSession(authorUser), state }
+        )
+      )
+    ).toBeInstanceOf(RevisionConflictError);
+    expect(state.cas).toEqual([{ id: seeded.listing.listingId, expected: 1 }]);
+  });
+
+  it("listing author가 아니면 분류를 수정할 수 없다", async () => {
+    const seeded = seedListing({ themeIds: ["culture"] });
+    const state = makeState([seeded]);
+
+    expect(
+      await runAndCatch(
+        runWith(
+          classifyExploreListing({
+            listingId: seeded.listing.listingId,
+            expectedRevision: RevisionSchema.make(1),
+            themeIds: ["food"],
+          }),
+          { session: registeredSession(hostUser), state }
+        )
+      )
+    ).toBeInstanceOf(ForbiddenError);
+    expect(state.cas).toEqual([]);
+  });
+
+  it("stale expectedRevision은 분류 해석 전에 RevisionConflict로 거부한다", async () => {
+    const seeded = seedListing({ listingRevision: 3, themeIds: ["culture"] });
+    const state = makeState([seeded]);
+
+    expect(
+      await runAndCatch(
+        runWith(
+          classifyExploreListing({
+            listingId: seeded.listing.listingId,
+            expectedRevision: RevisionSchema.make(2),
+            themeIds: ["food"],
+          }),
+          { session: registeredSession(authorUser), state }
+        )
+      )
+    ).toBeInstanceOf(RevisionConflictError);
+    expect(state.cas).toEqual([]);
   });
 });

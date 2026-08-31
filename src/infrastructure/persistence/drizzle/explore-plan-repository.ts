@@ -489,6 +489,15 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
                 where strpos(lower(route ->> 'city'), lower(${filters.routeCity})) > 0
               )`
             : undefined;
+          const themeFilter = filters?.themeId
+            ? sql<boolean>`exists (
+                select 1
+                from jsonb_array_elements_text(
+                  coalesce(${snapshot} -> 'themeIds', '[]'::jsonb)
+                ) as theme_id(value)
+                where value = ${filters.themeId}
+              )`
+            : undefined;
           // 요청 기간과 listing dateRange의 overlap을 계산한다. 날짜는 검증된
           // YYYY-MM-DD이므로 PostgreSQL text ordering이 calendar ordering과 같다.
           const startsAfterFilter = filters?.startDate
@@ -515,6 +524,7 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
             queryFilter,
             destinationFilter,
             routeCityFilter,
+            themeFilter,
             startsAfterFilter,
             endsBeforeFilter,
             cursorFilter

@@ -15,6 +15,10 @@ import {
   type ExplorePlanListing,
 } from "../domain/explore-plan.ts";
 import {
+  canonicalizeExploreThemeIds,
+  type ExploreThemeId,
+} from "../domain/explore-theme.ts";
+import {
   RevisionSchema,
   type ExploreListingId,
   type PlanId,
@@ -103,6 +107,8 @@ const nowIso = Effect.map(
 export interface ListPlanInExploreCommand {
   readonly sourceTripId: TripId;
   readonly sourcePlanId: PlanId;
+  /** 작성자가 고른 server-owned taxonomy ID. 생략하면 분류 없음. */
+  readonly themeIds?: ReadonlyArray<ExploreThemeId>;
 }
 
 /**
@@ -156,7 +162,11 @@ export const listPlanInExplore = Effect.fn("listPlanInExplore")(
     }
 
     // server-side projection (fail-closed): 실패 이유별로 명시적 오류를 낸다.
-    const projection = projectExplorePlanSnapshot(room, plan);
+    const projection = projectExplorePlanSnapshot(
+      room,
+      plan,
+      command.themeIds ?? []
+    );
     if (!projection.ok) {
       return yield* Effect.fail(projectionFailureError(projection.failure));
     }
@@ -250,6 +260,8 @@ export const unlistPlanFromExplore = Effect.fn("unlistPlanFromExplore")(
 export interface RelistPlanInExploreCommand {
   readonly listingId: ExploreListingId;
   readonly expectedRevision: Revision;
+  /** 생략하면 기존 listing 분류를 보존한다. */
+  readonly themeIds?: ReadonlyArray<ExploreThemeId>;
 }
 
 /**
@@ -309,7 +321,11 @@ export const relistPlanInExplore = Effect.fn("relistPlanInExplore")(
     }
 
     // 최신 source를 다시 project한 새 snapshot으로 교체(fail-closed).
-    const projection = projectExplorePlanSnapshot(room, plan);
+    const projection = projectExplorePlanSnapshot(
+      room,
+      plan,
+      command.themeIds ?? record.listing.snapshot.themeIds ?? []
+    );
     if (!projection.ok) {
       return yield* Effect.fail(projectionFailureError(projection.failure));
     }
@@ -329,6 +345,68 @@ export const relistPlanInExplore = Effect.fn("relistPlanInExplore")(
     // 아니라 source room lock → source revision 재검증 → listing CAS를 하나의
     // transaction으로 수행하는 relist operation을 사용한다.
     return yield* explore.relist({
+      record: { ...record, listing: nextListing },
+      expectedListingRevision: command.expectedRevision,
+    });
+  }
+);
+
+/** 작성자가 listing-owned 공개 theme 분류를 수정하는 explicit CAS command. */
+export interface ClassifyExploreListingCommand {
+  readonly listingId: ExploreListingId;
+  readonly expectedRevision: Revision;
+  readonly themeIds: ReadonlyArray<ExploreThemeId>;
+}
+
+export const classifyExploreListing = Effect.fn("classifyExploreListing")(
+  function* (command: ClassifyExploreListingCommand) {
+    const session = yield* requireRegisteredSession(
+      "Explore 분류를 수정하려면 계정 연결이 필요합니다."
+    );
+
+    const explore = yield* ExplorePlanRepository;
+    const record = yield* explore.getById(command.listingId);
+    if (!record) {
+      return yield* Effect.fail(
+        new NotFoundError({
+          entity: "ExplorePlanListing",
+          id: command.listingId,
+        })
+      );
+    }
+
+    yield* requireListingAuthor(session, record);
+    yield* requireExpectedListingRevision(
+      record.listing,
+      command.expectedRevision
+    );
+
+    const themeIds = canonicalizeExploreThemeIds(command.themeIds);
+    const currentThemeIds = record.listing.snapshot.themeIds ?? [];
+    if (
+      currentThemeIds.length === themeIds.length &&
+      currentThemeIds.every((themeId, index) => themeId === themeIds[index])
+    ) {
+      // 값이 같아 revision을 올리지는 않지만 load 이후 concurrent transition을
+      // stale success로 숨기지 않도록 repository CAS로 expectedRevision을 재검증한다.
+      return yield* explore.compareAndSet({
+        record,
+        expectedListingRevision: command.expectedRevision,
+      });
+    }
+
+    const updatedAt = yield* nowIso;
+    const nextListing: ExplorePlanListing = {
+      ...record.listing,
+      listingRevision: RevisionSchema.make(record.listing.listingRevision + 1),
+      updatedAt,
+      snapshot: {
+        ...record.listing.snapshot,
+        themeIds,
+      },
+    };
+
+    return yield* explore.compareAndSet({
       record: { ...record, listing: nextListing },
       expectedListingRevision: command.expectedRevision,
     });

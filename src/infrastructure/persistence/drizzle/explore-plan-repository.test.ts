@@ -735,6 +735,7 @@ describe("ExplorePlanRepositoryLive", () => {
               query: "%교토_",
               destination: "간사이",
               routeCity: "오사카",
+              themeId: "food",
               startDate: "2026-10-01",
               endDate: "2026-10-31",
             },
@@ -748,6 +749,8 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(select.text).not.toContain('"trip_rooms"');
     expect(select.text).toContain('"status" = $');
     expect(select.text).toContain("jsonb_array_elements");
+    expect(select.text).toContain("jsonb_array_elements_text");
+    expect(select.text).toContain("coalesce");
     expect(select.text).toContain("strpos");
     expect(select.text).not.toContain(" like ");
     expect(select.text).toContain("-> 'dateRange' ->> 'endDate' >= $");
@@ -764,6 +767,7 @@ describe("ExplorePlanRepositoryLive", () => {
         "%교토_",
         "간사이",
         "오사카",
+        "food",
         "2026-10-01",
         "2026-10-31",
         "listing-b",

@@ -26,6 +26,7 @@ type ItemOverrides = {
   readonly routes?: ExploreListingItem["snapshot"]["routes"];
   readonly authorName?: string;
   readonly listedAt?: string;
+  readonly themeIds?: ExploreListingItem["snapshot"]["themeIds"];
 };
 
 const item = (over?: ItemOverrides): ExploreListingItem => ({
@@ -46,6 +47,7 @@ const item = (over?: ItemOverrides): ExploreListingItem => ({
     transports: [],
     author: { displayName: over?.authorName ?? "여행자A" },
     sourcePlanRevision: 3 as ExploreListingItem["snapshot"]["sourcePlanRevision"],
+    themeIds: over?.themeIds,
   },
 });
 
@@ -109,6 +111,18 @@ describe("ExploreListingCard (RAON-263 DISC-5 detail link)", () => {
     expect(card).toHaveTextContent("여행자A");
     expect(card).toHaveTextContent("공개일 2026.09.05");
     expect(card.querySelector("img")).toBeNull();
+  });
+
+  it("실제 snapshot theme ID만 server-owned label chip으로 표시한다", () => {
+    renderCard({ themeIds: ["food", "nature"] });
+    const themes = screen.getByRole("list", { name: "여행 테마" });
+    expect(within(themes).getByText("미식")).toBeVisible();
+    expect(within(themes).getByText("자연")).toBeVisible();
+  });
+
+  it("themeIds가 없는 legacy listing에는 분류를 추론해 만들지 않는다", () => {
+    renderCard();
+    expect(screen.queryByRole("list", { name: "여행 테마" })).not.toBeInTheDocument();
   });
 
   it("destination과 route city가 없으면 예시 도시를 만들지 않는다", () => {

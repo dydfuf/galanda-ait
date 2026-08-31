@@ -177,7 +177,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     expect(container.querySelector("ol")).toBeNull();
     expect(screen.getByRole("searchbox", { name: "일정 검색" })).toBeVisible();
     expect(container).not.toHaveTextContent(
-      /지금 뜨는|theme|테마|인기 도시|순위|가격|인원|알림|전체보기|조회수/,
+      /지금 뜨는|인기 도시|순위|가격|인원|알림|전체보기|조회수/,
     );
   });
 
@@ -193,13 +193,17 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     );
 
     renderPage(
-      "/explore?query=%20%20%EC%98%A4%EC%82%AC%EC%B9%B4%20%20&destination=%EC%9D%BC%EB%B3%B8&startDate=2026-09-01"
+      "/explore?query=%20%20%EC%98%A4%EC%82%AC%EC%B9%B4%20%20&destination=%EC%9D%BC%EB%B3%B8&themeId=food&startDate=2026-09-01"
     );
 
     expect(screen.getByRole("searchbox", { name: "일정 검색" })).toHaveValue(
       "오사카"
     );
     expect(screen.getByLabelText("목적지")).toHaveValue("일본");
+    expect(screen.getByRole("button", { name: "미식" })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     expect(screen.getByLabelText("겹치는 기간 시작일")).toHaveValue(
       "2026-09-01"
     );
@@ -207,6 +211,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       query: "오사카",
       destination: "일본",
       routeCity: undefined,
+      themeId: "food",
       startDate: "2026-09-01",
       endDate: undefined,
     });
@@ -234,6 +239,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       query: "오사카",
       destination: "일본",
       routeCity: "교토",
+      themeId: "food",
       startDate: "2026-09-01",
       endDate: undefined,
     });

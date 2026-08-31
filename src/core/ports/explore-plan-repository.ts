@@ -7,6 +7,7 @@ import type {
   TripId,
 } from "../domain/ids.ts";
 import type { ExplorePlanListing } from "../domain/explore-plan.ts";
+import type { ExploreThemeId } from "../domain/explore-theme.ts";
 import type {
   NotFoundError,
   RevisionConflictError,
@@ -53,6 +54,8 @@ export interface ExploreListingFilters {
   readonly destination?: string;
   /** 공개 snapshot route city의 case-insensitive literal substring. */
   readonly routeCity?: string;
+  /** 공개 snapshot의 server-owned taxonomy stable ID exact match. */
+  readonly themeId?: ExploreThemeId;
   /** listing 공개 dateRange가 이 날짜 이후까지 이어져야 한다(overlap lower bound). */
   readonly startDate?: string;
   /** listing 공개 dateRange가 이 날짜 이전에 시작해야 한다(overlap upper bound). */

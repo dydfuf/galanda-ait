@@ -13,11 +13,19 @@ import {
   normalizeExploreListingsFilters,
   type ExploreListingsFilters,
 } from "@/contracts/explore.ts";
+import {
+  EXPLORE_SELECTABLE_THEMES,
+  isExploreThemeId,
+  type ExploreThemeId,
+} from "@/core/domain/explore-theme.ts";
 import { useSessionQuery } from "@/hooks/useSession.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 
 import { useExploreListingsQuery } from "./queries.ts";
 import { ExploreListingCard } from "./components/ExploreListingCard.tsx";
+
+const themeIdFromUrl = (value: string | null): ExploreThemeId | undefined =>
+  isExploreThemeId(value) ? value : undefined;
 
 const filterFromUrl = (
   searchParams: URLSearchParams
@@ -25,6 +33,7 @@ const filterFromUrl = (
   query: searchParams.get("query") ?? undefined,
   destination: searchParams.get("destination") ?? undefined,
   routeCity: searchParams.get("routeCity") ?? undefined,
+  themeId: themeIdFromUrl(searchParams.get("themeId")),
   startDate: searchParams.get("startDate") ?? undefined,
   endDate: searchParams.get("endDate") ?? undefined,
 });
@@ -116,9 +125,9 @@ export function ExplorePage() {
     setSearchParams(filtersToSearchParams(nextFilters));
   };
 
-  const updateDraftFilter = (
-    name: keyof ExploreListingsFilters,
-    value: string
+  const updateDraftFilter = <Key extends keyof ExploreListingsFilters>(
+    name: Key,
+    value: ExploreListingsFilters[Key]
   ) => {
     setDraftFilters((current) => ({ ...current, [name]: value }));
   };
@@ -166,7 +175,7 @@ export function ExplorePage() {
       }
       description={
         hasFilters
-          ? "검색어나 날짜 범위를 바꿔보세요."
+          ? "검색어나 테마, 날짜 범위를 바꿔보세요."
           : "여행 일정이 공개되면 이곳에서 둘러볼 수 있어요."
       }
       {...(hasFilters
@@ -255,6 +264,35 @@ export function ExplorePage() {
             placeholder="제목, 목적지, 경유 도시"
           />
         </Field>
+
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="text-sm leading-none font-medium text-foreground">
+            여행 테마
+          </legend>
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={draftFilters.themeId === undefined ? "default" : "outline"}
+              aria-pressed={draftFilters.themeId === undefined}
+              onClick={() => updateDraftFilter("themeId", undefined)}
+            >
+              전체
+            </Button>
+            {EXPLORE_SELECTABLE_THEMES.map((theme) => (
+              <Button
+                key={theme.id}
+                type="button"
+                size="sm"
+                variant={draftFilters.themeId === theme.id ? "default" : "outline"}
+                aria-pressed={draftFilters.themeId === theme.id}
+                onClick={() => updateDraftFilter("themeId", theme.id)}
+              >
+                {theme.label}
+              </Button>
+            ))}
+          </div>
+        </fieldset>
 
         <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>

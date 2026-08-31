@@ -73,6 +73,20 @@ describe("ExploreListingDetailContent (RAON-263 DISC-5)", () => {
     expect(text).toContain("여행자A");
   });
 
+  it("실제 snapshot theme ID만 server-owned label로 표시하고 누락 시 section을 만들지 않는다", () => {
+    const { rerender } = render(
+      <ExploreListingDetailContent item={item({ themeIds: ["culture"] })} />
+    );
+    expect(screen.getByRole("region", { name: "여행 테마" })).toHaveTextContent(
+      "문화·예술"
+    );
+
+    rerender(<ExploreListingDetailContent item={item()} />);
+    expect(
+      screen.queryByRole("region", { name: "여행 테마" })
+    ).not.toBeInTheDocument();
+  });
+
   it("금지 필드(price/booking/status/opinion/private ID)를 노출하지 않는다", () => {
     const { container } = render(<ExploreListingDetailContent item={item()} />);
     const text =
