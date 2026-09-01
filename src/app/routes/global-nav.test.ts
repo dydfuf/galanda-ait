@@ -21,14 +21,19 @@ describe("resolveGlobalNavKey (RAON-249 route contract / Issue #96)", () => {
     ]);
   });
 
-  it("Global shell이 표시되는 exact path만 올바른 destination key를 반환한다", () => {
+  it("Global shell이 표시되는 exact path만 올바른 destination key를 반환한다 (대소문자/쿼리/슬래시 무관)", () => {
     expect(resolveGlobalNavKey("/home")).toBe("HOME");
     expect(resolveGlobalNavKey("/home/")).toBe("HOME");
+    expect(resolveGlobalNavKey("/HOME")).toBe("HOME");
     expect(resolveGlobalNavKey("/explore?cursor=abc")).toBe("EXPLORE");
+    expect(resolveGlobalNavKey("/EXPLORE?cursor=abc")).toBe("EXPLORE");
     expect(resolveGlobalNavKey("/trips#top")).toBe("TRIPS");
+    expect(resolveGlobalNavKey("/TRIPS")).toBe("TRIPS");
     expect(resolveGlobalNavKey("/me")).toBe("ME");
+    expect(resolveGlobalNavKey("/ME")).toBe("ME");
     expect(resolveGlobalNavKey("/me/saved")).toBe("ME");
     expect(resolveGlobalNavKey("/me/saved/")).toBe("ME");
+    expect(resolveGlobalNavKey("/ME/SAVED")).toBe("ME");
   });
 
   it("Trip Room, focused/standalone 화면, 존재하지 않는 하위 경로는 undefined", () => {

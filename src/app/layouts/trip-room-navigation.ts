@@ -3,8 +3,12 @@ export const TRIP_ROOM_SECTIONS = ["plans", "itinerary"] as const;
 export type TripRoomSection = (typeof TRIP_ROOM_SECTIONS)[number];
 
 function normalizePathname(pathname: string): string {
-  const normalized = pathname.replace(/\/+$/, "");
-  return normalized || "/";
+  const withoutQuery = pathname.split(/[?#]/, 1)[0] ?? pathname;
+  const withoutTrailingSlash =
+    withoutQuery.length > 1
+      ? withoutQuery.replace(/\/+$/, "")
+      : withoutQuery;
+  return withoutTrailingSlash.toLowerCase() || "/";
 }
 
 export function getTripRoomSection(pathname: string): TripRoomSection {

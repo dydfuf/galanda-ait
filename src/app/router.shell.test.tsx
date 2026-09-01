@@ -167,10 +167,15 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
     it.each([
       { path: "/home", testId: "route-home", activeHref: "/home" },
       { path: "/home/", testId: "route-home", activeHref: "/home" },
+      { path: "/HOME", testId: "route-home", activeHref: "/home" },
       { path: "/explore?query=제주", testId: "route-explore", activeHref: "/explore" },
+      { path: "/EXPLORE?query=제주", testId: "route-explore", activeHref: "/explore" },
       { path: "/trips", testId: "route-trips", activeHref: "/trips" },
+      { path: "/TRIPS", testId: "route-trips", activeHref: "/trips" },
       { path: "/me", testId: "route-me", activeHref: "/me" },
+      { path: "/ME", testId: "route-me", activeHref: "/me" },
       { path: "/me/saved", testId: "route-me-saved", activeHref: "/me" },
+      { path: "/ME/SAVED", testId: "route-me-saved", activeHref: "/me" },
     ])("$path 에서는 marker($testId)와 $activeHref active Global nav가 렌더된다", async ({
       path,
       testId,
@@ -199,7 +204,7 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
       { path: "/trips/trip-1/itinerary", testId: "route-itinerary" },
       { path: "/explore/listing-1", testId: "route-explore-detail" },
       { path: "/trips/new", testId: "route-trip-create" },
-      { path: "/trips/trip-1/setup/companions", testId: "route-companion-setup" },
+      { path: "/trips/:tripId/setup/companions", testId: "route-companion-setup" },
       { path: "/trips/trip-1/plans/new", testId: "route-plan-create" },
       { path: "/trips/trip-1/plans/new/basic", testId: "route-plan-create" },
       { path: "/trips/trip-1/plans/compare", testId: "route-plan-compare" },
@@ -224,7 +229,7 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
     });
   });
 
-  describe("루트(/) 인증 진입 흐름", () => {
+  describe("루트(/) 및 보호 라우트 인증 진입 흐름", () => {
     it("인증된 사용자 진입 시 /home 으로 replace되고 Global nav가 보인다", async () => {
       renderApp("/");
 
@@ -253,6 +258,47 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
       expect(
         screen.queryByRole("navigation", { name: "주요 화면" }),
       ).not.toBeInTheDocument();
+    });
+
+    it("미인증 사용자가 Trip Room에 직접 진입하면 로그인으로 이동한다", async () => {
+      mocks.session = {
+        data: null as unknown as typeof mocks.session.data,
+        isSuccess: false,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn<() => Promise<unknown>>(),
+      };
+
+      renderApp("/trips/trip-1/plans");
+
+      expect(await screen.findByTestId("route-login")).toBeInTheDocument();
+      expect(screen.queryByTestId("route-plan-home")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("navigation", { name: "주요 화면" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("미등록(게스트) 사용자는 /trips/new 및 동행자 설정에 진입할 수 없다", async () => {
+      mocks.session = {
+        data: {
+          participantId: "guest-1",
+          participantIds: ["guest-1"],
+          accountType: "GUEST",
+          name: "게스트",
+          isAuthenticated: true,
+        },
+        isSuccess: true,
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn<() => Promise<unknown>>(),
+      };
+
+      renderApp("/trips/new");
+
+      expect(await screen.findByTestId("route-login")).toBeInTheDocument();
+      expect(screen.queryByTestId("route-trip-create")).not.toBeInTheDocument();
     });
 
     it("세션 로딩 중에는 Global nav가 없다", async () => {

@@ -30,10 +30,11 @@ const normalize = (pathname: string): string => {
   if (!pathname) return "/";
   // 쿼리/해시는 이미 분리되어 들어오지만, 방어적으로 잘라낸다.
   const withoutQuery = pathname.split(/[?#]/, 1)[0] ?? pathname;
-  if (withoutQuery.length > 1 && withoutQuery.endsWith("/")) {
-    return withoutQuery.replace(/\/+$/, "");
-  }
-  return withoutQuery;
+  const withoutTrailingSlash =
+    withoutQuery.length > 1
+      ? withoutQuery.replace(/\/+$/, "")
+      : withoutQuery;
+  return withoutTrailingSlash.toLowerCase();
 };
 
 /**

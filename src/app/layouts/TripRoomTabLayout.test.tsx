@@ -250,7 +250,7 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     ).toBeInTheDocument();
   });
 
-  it("selects the plans Mode Tab for direct entry with and without trailing slash", () => {
+  it("selects the plans Mode Tab for direct entry with and without trailing slash or uppercase", () => {
     const { unmount } = renderLayout("/trips/trip-1/plans");
     expectPlansTabSelected();
     expect(
@@ -258,10 +258,33 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     ).toBeInTheDocument();
     unmount();
 
-    renderLayout("/trips/trip-1/plans/");
+    const { unmount: unmount2 } = renderLayout("/trips/trip-1/plans/");
     expectPlansTabSelected();
     expect(
       screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+    unmount2();
+
+    renderLayout("/trips/trip-1/PLANS");
+    expectPlansTabSelected();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+  });
+
+  it("selects the itinerary Mode Tab for uppercase direct entry", () => {
+    renderLayout("/trips/trip-1/ITINERARY");
+
+    expect(screen.getByRole("tab", { name: "계획" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "일정 콘텐츠" }),
     ).toBeInTheDocument();
   });
 
