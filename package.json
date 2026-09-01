@@ -22,6 +22,7 @@
     "types:worker": "wrangler types --env-file=wrangler-types.env",
     "typecheck": "wrangler types --check --env-file=wrangler-types.env && tsc -b --pretty false",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "eval:nba": "node scripts/run-trip-action-ranking-eval.ts",
     "db:setup:local": "bash scripts/setup-local-db.sh",
     "db:generate": "drizzle-kit generate",
@@ -61,6 +62,7 @@
   "devDependencies": {
     "@apps-in-toss/devtools": "3.0.3",
     "@better-auth/memory-adapter": "1.7.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/babel__core": "7.20.5",

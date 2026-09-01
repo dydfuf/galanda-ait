@@ -31,6 +31,9 @@ export const useTripRoomsQuery = (
       const response = await getTrips(signal);
       return response.items;
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     enabled: enabled && isSessionReady,
   });
 };

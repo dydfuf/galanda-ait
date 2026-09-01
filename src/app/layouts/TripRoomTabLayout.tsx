@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { shareTripInvite } from "../../features/invite/share-trip-invite.ts";
 import { ActivityDrawer } from "../../features/activity/components/ActivityDrawer.tsx";
+import { OfflineStatusBanner } from "@/components/galanda/OfflineStatusBanner.tsx";
 import { useTripRoomsQuery } from "../../features/plan-home/queries.ts";
 import {
   getTripRoomNavigationTitle,
@@ -141,6 +142,7 @@ export function TripRoomTabLayout() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
+      <OfflineStatusBanner />
       {showWebNavigation ? (
         <div
           data-galanda-surface="chrome"

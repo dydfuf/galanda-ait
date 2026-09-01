@@ -33,6 +33,9 @@ export const useTripActivitiesInfiniteQuery = (
     initialPageParam: undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? (lastPage.nextBeforeSequence ?? undefined) : undefined,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     enabled,
   });
 };
@@ -45,6 +48,7 @@ export const useMarkTripActivityReadMutation = (tripId: string) => {
       markTripActivityRead(tripId, throughSequence),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: tripOverviewKeys.all });
+      void queryClient.invalidateQueries({ queryKey: tripActivityKeys.list(tripId) });
     },
   });
 };
