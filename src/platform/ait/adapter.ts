@@ -15,7 +15,7 @@ import type {
   ShareMessage,
   ShareOutcome,
 } from "../types.ts";
-import { copyToClipboard, webAdapter } from "../web/adapter.ts";
+import { copyToClipboard, isShareAbortError, webAdapter } from "../web/adapter.ts";
 import { postAuthJson, safeReturnTo } from "../auth.ts";
 
 // ponytail: 구형 host/mock이 초기 inset을 주입하지 않을 때의 partner nav 실측값.
@@ -39,7 +39,10 @@ async function shareWithToss(message: ShareMessage): Promise<ShareOutcome> {
   try {
     await Share.sendMessage({ message: message.url });
     return "shared";
-  } catch {
+  } catch (error: unknown) {
+    if (isShareAbortError(error)) {
+      return "cancelled";
+    }
     // 미지원 앱 버전에서는 브라우저 공유로 fallback해요.
   }
 
