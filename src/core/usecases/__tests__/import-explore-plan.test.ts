@@ -198,6 +198,26 @@ const tripRepoLayer = (
         revision: RevisionSchema.make(expected + 1),
       });
     },
+    saveRoomWithActivity: ({ room, expectedRevision: expected }) => {
+      const current = rooms.find((r) => r.id === room.id);
+      if (!current) {
+        return Effect.fail(new NotFoundError({ entity: "TripRoom", id: room.id }));
+      }
+      if (current.revision !== expected) {
+        return Effect.fail(
+          new RevisionConflictError({
+            message: "conflict",
+            expectedRevision: expected,
+            actualRevision: current.revision,
+          })
+        );
+      }
+      state.saved.push({ room, expected });
+      return Effect.succeed({
+        ...room,
+        revision: RevisionSchema.make(expected + 1),
+      });
+    },
     deletePlanAndAutoUnlist: () => Effect.die("not implemented"),
   });
 

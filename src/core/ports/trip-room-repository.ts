@@ -8,6 +8,8 @@ import type {
 } from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
 
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
+
 export interface TripOverviewSourceRecord {
   readonly room: TripRoom;
   readonly roomCreatedAt: string;
@@ -15,24 +17,33 @@ export interface TripOverviewSourceRecord {
   readonly currentItinerary: ConfirmedItinerary | null;
 }
 
-export interface CreateRoomParams {
+export interface CreateRoomBase {
   readonly id: TripId;
   readonly title: string;
   readonly destination?: string;
   /** 방장으로 등록할 사용자. Use Case가 세션에서 결정해 반드시 채워준다 */
   readonly hostUser: TripMember;
-  /**
-   * 방 생성과 동시에 하나의 aggregate row에 함께 저장할 서버 전용 초기 plan.
-   * (RAON-261 / Goal 14 DISC-7) NEW_TRIP import가 room+plan을 단일 INSERT로
-   * atomic하게 저장해 partial empty room을 남기지 않도록 한다. client input이
-   * 아니라 use case가 server-side로 구성한 값이며, 없으면 기존처럼 빈 방을 만든다.
-   */
-  readonly initialPlan?: TripPlan;
 }
+
+export type CreateRoomParams =
+  | (CreateRoomBase & {
+      readonly initialPlan?: undefined;
+      readonly initialPlanActivity?: never;
+    })
+  | (CreateRoomBase & {
+      readonly initialPlan: TripPlan;
+      readonly initialPlanActivity: TripActivityWrite;
+    });
 
 export interface UpdateRoomParams {
   readonly title?: string;
   readonly destination?: string;
+}
+
+export interface SaveRoomWithActivityParams {
+  readonly room: TripRoom;
+  readonly expectedRevision: Revision;
+  readonly activity: TripActivityWrite;
 }
 
 /**
@@ -56,6 +67,7 @@ export interface DeletePlanAndAutoUnlistParams {
   readonly expectedRevision: Revision;
   /** 서버 Clock이 정한 unlist/갱신 시각(ISO). listing updated_at/unlisted_at에 사용. */
   readonly unlistedAt: string;
+  readonly activity: TripActivityWrite;
 }
 
 export class TripRoomRepository extends Context.Service<
@@ -89,6 +101,9 @@ export class TripRoomRepository extends Context.Service<
     readonly saveRoom: (
       room: TripRoom,
       expectedRevision: Revision
+    ) => RepositoryEffect<TripRoom, NotFoundError | RevisionConflictError>;
+    readonly saveRoomWithActivity: (
+      params: SaveRoomWithActivityParams
     ) => RepositoryEffect<TripRoom, NotFoundError | RevisionConflictError>;
     /**
      * source plan 삭제(room CAS)와 그 plan을 원본으로 하는 LISTED Explore

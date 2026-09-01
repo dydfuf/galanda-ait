@@ -11,6 +11,7 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "../../src/core/domain/errors.ts";
+import { InvalidActivityCursorError } from "../../src/core/domain/trip-activity.ts";
 import { formatApiError, mapDomainError } from "./api-error.ts";
 
 describe("api-error", () => {
@@ -125,6 +126,22 @@ describe("api-error", () => {
     expect(result.status).toBe(422);
     expect(result.body.error.code).toBe("VALIDATION_FAILED");
     expect(result.body.error.message).toBe("Invalid field");
+  });
+
+  it("maps InvalidActivityCursorError", () => {
+    const err = new InvalidActivityCursorError({
+      message: "해당 여행의 활동 순번이 아닙니다.",
+      tripId: "trip-1" as any,
+      sequence: 999n,
+    });
+    const result = mapDomainError(err, reqId);
+    expect(result.status).toBe(422);
+    expect(result.body.error.code).toBe("INVALID_ACTIVITY_CURSOR");
+    expect(result.body.error.message).toBe("해당 여행의 활동 순번이 아닙니다.");
+    expect(result.body.error.details).toEqual({
+      tripId: "trip-1",
+      sequence: "999",
+    });
   });
 
   it("maps SessionUnavailableError", () => {

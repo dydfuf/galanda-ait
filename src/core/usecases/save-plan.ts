@@ -35,6 +35,7 @@ import {
   deletePlanFromRoom,
   mergeParticipantIdentityInRoom,
 } from "../domain/room-transitions.ts";
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
 
 export type CreateAccommodationSnapshot = Pick<
   AccommodationSnapshot,
@@ -206,10 +207,23 @@ export const createPlan = Effect.fn("createPlan")(
       return yield* Effect.fail(new ValidationError({ message: "여행안 날짜 형식이 올바르지 않습니다." }));
     }
 
-    return yield* repo.saveRoom(
-      { ...room, plans: [...room.plans, finalPlan] },
-      command.expectedRevision
-    );
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: actor.member?.name ?? session.name,
+      event: {
+        type: "PLAN_CREATED",
+        subjectPlanId: finalPlan.id,
+        subjectTitle: finalPlan.title,
+        roomRevision: room.revision + 1,
+        itineraryRevision: null,
+      },
+    };
+
+    return yield* repo.saveRoomWithActivity({
+      room: { ...room, plans: [...room.plans, finalPlan] },
+      expectedRevision: command.expectedRevision,
+      activity,
+    });
   }
 );
 
@@ -235,7 +249,7 @@ export const updatePlan = Effect.fn("updatePlan")(
     const existingPlan = yield* requirePlanInRoom(room, input.plan.id);
 
     // 4. RBAC: 세션 사용자의 'plan:update' 권한 검증
-    yield* requireRoomPermission(
+    const actor = yield* requireRoomPermission(
       room,
       session.participantIds,
       "plan:update",
@@ -318,15 +332,28 @@ export const updatePlan = Effect.fn("updatePlan")(
       return yield* Effect.fail(new ValidationError({ message: "여행안 날짜 형식이 올바르지 않습니다." }));
     }
 
-    return yield* repo.saveRoom(
-      {
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: actor.member?.name ?? session.name,
+      event: {
+        type: "PLAN_UPDATED",
+        subjectPlanId: finalPlan.id,
+        subjectTitle: finalPlan.title,
+        roomRevision: room.revision + 1,
+        itineraryRevision: null,
+      },
+    };
+
+    return yield* repo.saveRoomWithActivity({
+      room: {
         ...room,
         plans: room.plans.map((plan) =>
           plan.id === finalPlan.id ? finalPlan : plan
         ),
       },
-      input.expectedRevision
-    );
+      expectedRevision: input.expectedRevision,
+      activity,
+    });
   }
 );
 
@@ -352,7 +379,7 @@ export const deletePlan = Effect.fn("deletePlan")(
     const plan = yield* requirePlanInRoom(room, input.planId);
 
     // 2. RBAC: 세션 사용자의 'plan:delete' 권한 검증
-    yield* requireRoomPermission(
+    const actor = yield* requireRoomPermission(
       room,
       session.participantIds,
       "plan:delete",
@@ -378,11 +405,23 @@ export const deletePlan = Effect.fn("deletePlan")(
     //    원본으로 하는 LISTED listing이 함께 UNLISTED로 전이한다. unlistedAt은
     //    서버 Clock이 결정한다(client 시각 미신뢰).
     const unlistedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: actor.member?.name ?? session.name,
+      event: {
+        type: "PLAN_DELETED",
+        subjectPlanId: plan.id,
+        subjectTitle: plan.title,
+        roomRevision: room.revision + 1,
+        itineraryRevision: null,
+      },
+    };
     return yield* repo.deletePlanAndAutoUnlist({
       room: deletePlanFromRoom(room, plan),
       sourcePlanId: plan.id,
       expectedRevision: input.expectedRevision,
       unlistedAt,
+      activity,
     });
   }
 );

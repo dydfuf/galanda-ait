@@ -133,6 +133,30 @@ const rowValues = (value: TripRoom): Array<unknown> => [
   "2026-08-23T00:00:00.000Z",
 ];
 
+const activityEventRowValues = (
+  sequence = 10n,
+  type = "PLAN_CREATED",
+  tripId = "trip-1",
+  actorId = hostId,
+  actorName = "Host",
+  planId = "plan-1",
+  title = "First Plan",
+  roomRev = 2,
+  itinRev = null,
+  createdAt = "2026-08-25T00:00:00.000Z"
+): Array<unknown> => [
+  sequence,
+  tripId,
+  type,
+  actorId,
+  actorName,
+  planId,
+  title,
+  roomRev,
+  itinRev,
+  createdAt,
+];
+
 const makeApp = (
   responses: Array<Array<Array<unknown>> | Error>,
   user: { readonly id: string; readonly name: string } | null | Error = {
@@ -148,6 +172,12 @@ const makeApp = (
       params: unknown[] = []
     ) => {
       if (config.text.includes('from "participant_alias"')) return { rows: [] };
+      if (
+        config.text.startsWith("select") &&
+        config.text.includes('"trip_activity_reads"')
+      ) {
+        return { rows: [] };
+      }
       if (/^(begin|commit|rollback)/i.test(config.text)) {
         transactionCommands.push(config.text.toLowerCase());
         return { rows: [] };
@@ -213,6 +243,7 @@ describe("Trip API vertical slice", () => {
     const { app, calls } = makeApp([
       [rowValues(room)],
       [],
+      [],
       [rowValues(room)],
       [rowValues(created)],
       [rowValues(room)],
@@ -240,15 +271,25 @@ describe("Trip API vertical slice", () => {
     );
 
     expect(listResponse.status).toBe(200);
-    const listBody = (await listResponse.json()) as any;
-    expect(listBody.items).toHaveLength(1);
-    expect(listBody.items[0]).toMatchObject({
-      id: room.id,
-      title: room.title,
-      destination: room.destination,
-      revision: room.revision,
-      isConfirmed: false,
-      memberCount: 1,
+    await expect(listResponse.json()).resolves.toMatchObject({
+      items: [
+        {
+          id: room.id,
+          title: room.title,
+          destination: room.destination,
+          revision: room.revision,
+          isConfirmed: false,
+          confirmedPeriod: null,
+          memberCount: 1,
+          memberNames: ["Host"],
+          candidateCount: 0,
+          opinionParticipantCount: 0,
+          hasUnattributedOpinions: false,
+          createdAt: "2026-08-23T00:00:00.000Z",
+          updatedAt: "2026-08-23T00:00:00.000Z",
+          eligibleActionIds: ["EDIT_PLAN_BASIC", "INVITE_MEMBER"],
+        },
+      ],
     });
     expect(detailResponse.status).toBe(200);
     await expect(detailResponse.json()).resolves.toEqual(room);
@@ -260,16 +301,17 @@ describe("Trip API vertical slice", () => {
       "select",
       "select",
       "select",
+      "select",
       "insert",
       "select",
       "update",
     ]);
-    expect(calls[3].params).toContain(
+    expect(calls[4].params).toContain(
       JSON.stringify([{ id: hostId, name: "Host", role: "HOST" }])
     );
     expect(calls[0].text).toContain('"trip_rooms"."members" @>');
     expect(calls[0].params).toEqual([JSON.stringify([{ id: hostId }])]);
-    expect(calls[5].params.slice(-2)).toEqual([room.id, room.revision]);
+    expect(calls[6].params.slice(-2)).toEqual([room.id, room.revision]);
   });
 
   it("목록은 인증을 요구하고 세션 장애를 구분하며 비멤버 상세를 숨긴다", async () => {
@@ -506,6 +548,7 @@ describe("Trip API vertical slice", () => {
       expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
         "select",
         "update",
+        "insert",
       ]);
     }
   });
@@ -540,11 +583,12 @@ describe("Trip API vertical slice", () => {
     expect(transactionCommands.some((c) => c.startsWith("begin"))).toBe(true);
     expect(transactionCommands.some((c) => c.startsWith("commit"))).toBe(true);
 
-    // 발행 순서: getRoom select → room update → listing auto-unlist update.
+    // 발행 순서: getRoom select → room update → listing auto-unlist update → activity insert.
     expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
       "select",
       "update",
       "update",
+      "insert",
     ]);
     const listingUpdate = calls.find(
       ({ text }) =>
@@ -591,6 +635,7 @@ describe("Trip API vertical slice", () => {
     expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
       "select",
       "update",
+      "insert",
       "insert",
       "insert",
     ]);
@@ -659,6 +704,7 @@ describe("Trip API vertical slice", () => {
       "select",
       "select",
       "update",
+      "insert",
       "insert",
     ]);
     expect(revised.transactionCommands).toEqual(["begin", "commit"]);
@@ -1103,5 +1149,105 @@ describe("Trip API vertical slice", () => {
 
     expect(response.status).toBe(503);
     expect(failed.transactionCommands).toEqual(["begin", "rollback"]);
+  });
+
+  it("GET /api/trips/:tripId/activity는 활동 이력을 페이징하여 반환한다", async () => {
+    const { app } = makeApp([
+      [rowValues(room)], // getRoom check
+      [
+        activityEventRowValues(
+          10n,
+          "PLAN_CREATED",
+          "trip-1",
+          hostId,
+          "Host",
+          "plan-1",
+          "First Plan",
+          2,
+          null,
+          "2026-08-25T00:00:00.000Z"
+        ),
+      ],
+      [[10n]], // latestRow query
+      [[0]], // unreadCount query
+    ]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/activity?limit=10"),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      sequence: "10",
+      tripId: "trip-1",
+      type: "PLAN_CREATED",
+      actorDisplayName: "Host",
+      subjectTitle: "First Plan",
+      isOwn: true,
+    });
+    expect(body.hasMore).toBe(false);
+    expect(body.latestSequence).toBe("10");
+    expect(body.unreadCount).toBe(0);
+  });
+
+  it("PUT /api/trips/:tripId/activity/read는 throughSequence로 읽음 처리하고 요약을 반환한다", async () => {
+    const { app } = makeApp([
+      [rowValues(room)], // getRoom check
+      [[10n]], // check event exists in trip
+      [[10n]], // insert / upsert trip_activity_reads returning last_seen_sequence
+      [[0]], // select count unread events after throughSequence
+    ]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/activity/read", {
+        method: "PUT",
+        body: JSON.stringify({ throughSequence: "10" }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as any;
+    expect(body).toMatchObject({
+      tripId: "trip-1",
+      unreadCount: 0,
+      lastSeenSequence: "10",
+    });
+  });
+
+  it("PUT /api/trips/:tripId/activity/read는 존재하지 않거나 다른 여행방의 sequence에 대해 422 INVALID_ACTIVITY_CURSOR를 반환한다", async () => {
+    const { app } = makeApp([
+      [rowValues(room)], // getRoom check
+      [], // event not found in this trip!
+    ]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/activity/read", {
+        method: "PUT",
+        body: JSON.stringify({ throughSequence: "999" }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(422);
+    const body = (await response.json()) as any;
+    expect(body.error.code).toBe("INVALID_ACTIVITY_CURSOR");
+  });
+
+  it("PUT /api/trips/:tripId/activity/read는 overflow sequence(BIGINT 초과)를 400으로 거부한다", async () => {
+    const { app } = makeApp([]);
+
+    const response = await app.fetch(
+      request("/api/trips/trip-1/activity/read", {
+        method: "PUT",
+        body: JSON.stringify({ throughSequence: "9223372036854775808" }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
   });
 });

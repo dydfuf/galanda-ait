@@ -4,7 +4,7 @@ import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../
 import type { TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
 import type { ConfirmedItinerary } from "../../domain/confirmed-itinerary.ts";
 import { SessionService, requireAuthSession, getCurrentUser, getOptionalSession } from "../../ports/session.ts";
-import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams, type DeletePlanAndAutoUnlistParams } from "../../ports/trip-room-repository.ts";
+import { TripRoomRepository, type CreateRoomParams, type UpdateRoomParams, type DeletePlanAndAutoUnlistParams, type SaveRoomWithActivityParams } from "../../ports/trip-room-repository.ts";
 import { ConfirmedItineraryRepository } from "../../ports/confirmed-itinerary-repository.ts";
 import { createLocalSessionLayer, DEFAULT_LOCAL_USER, makeLocalSessionService } from "../../../infrastructure/local/local-session.ts";
 import { createTripRoom, type CreateRoomInput } from "../create-room.ts";
@@ -166,6 +166,37 @@ const createInMemoryRepositoryLayer = (
       nextRoom: TripRoom,
       expectedRevision: typeof RevisionSchema.Type
     ): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
+      const index = rooms.findIndex((room) => room.id === nextRoom.id);
+      if (index === -1) {
+        return Effect.fail(
+          new NotFoundError({ entity: "TripRoom", id: nextRoom.id })
+        );
+      }
+      const room = rooms[index];
+      if (room.revision !== expectedRevision) {
+        return Effect.fail(
+          new RevisionConflictError({
+            message: "Revision mismatch",
+            expectedRevision,
+            actualRevision: room.revision,
+          })
+        );
+      }
+      const savedRoom: TripRoom = {
+        ...nextRoom,
+        revision: RevisionSchema.make(expectedRevision + 1),
+      };
+      rooms = [
+        ...rooms.slice(0, index),
+        savedRoom,
+        ...rooms.slice(index + 1),
+      ];
+      return Effect.succeed(savedRoom);
+    },
+    saveRoomWithActivity: ({
+      room: nextRoom,
+      expectedRevision,
+    }: SaveRoomWithActivityParams): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
       const index = rooms.findIndex((room) => room.id === nextRoom.id);
       if (index === -1) {
         return Effect.fail(

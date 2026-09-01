@@ -24,6 +24,7 @@ import {
   type ConfirmedItineraryRow,
 } from "./schema/confirmed-itinerary.ts";
 import { tripRooms } from "./schema/trip-room.ts";
+import { tripActivityEvents } from "./schema/trip-activity.ts";
 
 const databaseEffect = <A>(operation: string, run: () => PromiseLike<A>) =>
   Effect.tryPromise({
@@ -66,7 +67,7 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
     const { db } = yield* Database;
 
     return {
-      confirm: ({ room, expectedRoomRevision, itinerary }) =>
+      confirm: ({ room, expectedRoomRevision, itinerary, activity }) =>
         Effect.gen(function* () {
           const result = yield* databaseEffect("confirmItinerary", () =>
             db.transaction(async (tx) => {
@@ -116,6 +117,16 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
                 changes: [],
                 changedBy: itinerary.createdBy,
                 createdAt: new Date(itinerary.createdAt),
+              });
+              await tx.insert(tripActivityEvents).values({
+                tripId: room.id,
+                eventType: activity.event.type,
+                actorParticipantId: activity.actorParticipantId,
+                actorDisplayName: activity.actorDisplayName ?? null,
+                subjectPlanId: activity.event.subjectPlanId ?? null,
+                subjectTitle: activity.event.subjectTitle ?? null,
+                roomRevision: activity.event.roomRevision ?? updated.revision,
+                itineraryRevision: activity.event.itineraryRevision ?? itinerary.currentRevision,
               });
               return { _tag: "Confirmed", itinerary } as const;
             })
@@ -172,7 +183,7 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
           return row ? yield* decodeItinerary(row) : undefined;
         }),
 
-      revise: ({ itinerary, expectedRevision }) =>
+      revise: ({ itinerary, expectedRevision, activity }) =>
         Effect.gen(function* () {
           const result = yield* databaseEffect("reviseItinerary", () =>
             db.transaction(async (tx) => {
@@ -203,6 +214,16 @@ export const ConfirmedItineraryRepositoryLive = Layer.effect(
                 changes: itinerary.changes ?? [],
                 changedBy: itinerary.changedBy ?? itinerary.createdBy,
                 createdAt: new Date(itinerary.changedAt ?? itinerary.createdAt),
+              });
+              await tx.insert(tripActivityEvents).values({
+                tripId: itinerary.tripId,
+                eventType: activity.event.type,
+                actorParticipantId: activity.actorParticipantId,
+                actorDisplayName: activity.actorDisplayName ?? null,
+                subjectPlanId: activity.event.subjectPlanId ?? null,
+                subjectTitle: activity.event.subjectTitle ?? null,
+                roomRevision: activity.event.roomRevision ?? null,
+                itineraryRevision: activity.event.itineraryRevision ?? itinerary.currentRevision,
               });
               return { _tag: "Revised", itinerary } as const;
             })

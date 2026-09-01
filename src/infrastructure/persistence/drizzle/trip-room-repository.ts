@@ -27,12 +27,14 @@ import { tripRooms, type NewTripRoomRow, type TripRoomRow } from "./schema/trip-
 import { explorePlanListings } from "./schema/explore-plan.ts";
 import { participantAliases } from "./schema/participant.ts";
 import { confirmedItineraries, itineraryRevisions } from "./schema/confirmed-itinerary.ts";
+import { tripActivityEvents } from "./schema/trip-activity.ts";
 import {
   ConfirmedItinerarySchema,
   type ConfirmedItinerary,
 } from "../../../core/domain/confirmed-itinerary.ts";
 import type {
   DeletePlanAndAutoUnlistParams,
+  SaveRoomWithActivityParams,
 } from "../../../core/ports/trip-room-repository.ts";
 
 type RoomChanges = Partial<
@@ -335,6 +337,50 @@ export const TripRoomRepositoryLive: Layer.Layer<
 
       createRoom: (params: CreateRoomParams) =>
         Effect.gen(function* () {
+          if (params.initialPlan && params.initialPlanActivity) {
+            const result = yield* databaseEffect("createRoom", () =>
+              db.transaction(async (tx) => {
+                const [row] = await tx
+                  .insert(tripRooms)
+                  .values({
+                    id: params.id,
+                    title: params.title.trim(),
+                    destination: params.destination?.trim() || "여행지",
+                    members: [params.hostUser],
+                    plans: params.initialPlan ? [params.initialPlan] : [],
+                  })
+                  .onConflictDoNothing({ target: tripRooms.id })
+                  .returning();
+
+                if (!row) return { _tag: "Conflict" } as const;
+
+                await tx.insert(tripActivityEvents).values({
+                  tripId: params.id,
+                  eventType: params.initialPlanActivity.event.type,
+                  actorParticipantId: params.initialPlanActivity.actorParticipantId,
+                  actorDisplayName: params.initialPlanActivity.actorDisplayName ?? null,
+                  subjectPlanId: params.initialPlanActivity.event.subjectPlanId ?? null,
+                  subjectTitle: params.initialPlanActivity.event.subjectTitle ?? null,
+                  roomRevision: 1,
+                  itineraryRevision: null,
+                });
+
+                return { _tag: "Created", row } as const;
+              })
+            );
+
+            if (result._tag === "Conflict") {
+              return yield* Effect.fail(
+                new RepositoryError({
+                  operation: "createRoom",
+                  message: "같은 ID의 여행방이 이미 존재합니다.",
+                })
+              );
+            }
+
+            return yield* decodeRoom(result.row, "createRoom");
+          }
+
           const [row] = yield* databaseEffect("createRoom", () =>
             db
               .insert(tripRooms)
@@ -343,32 +389,22 @@ export const TripRoomRepositoryLive: Layer.Layer<
                 title: params.title.trim(),
                 destination: params.destination?.trim() || "여행지",
                 members: [params.hostUser],
-                plans: params.initialPlan ? [params.initialPlan] : [],
+                plans: [],
               })
               .onConflictDoNothing({ target: tripRooms.id })
               .returning()
           );
-          if (row) return yield* decodeRoom(row, "createRoom");
 
-          const actualRevision = yield* findRevision(
-            db,
-            params.id,
-            "createRoom.findRevision"
-          );
-          if (actualRevision === undefined) {
+          if (!row) {
             return yield* Effect.fail(
               new RepositoryError({
                 operation: "createRoom",
-                message: "중복된 여행방의 revision을 조회하지 못했습니다.",
+                message: "같은 ID의 여행방이 이미 존재합니다.",
               })
             );
           }
-          return yield* Effect.fail(
-            new RepositoryError({
-              operation: "createRoom",
-              message: "같은 ID의 여행방이 이미 존재합니다.",
-            })
-          );
+
+          return yield* decodeRoom(row, "createRoom");
         }),
 
       updateRoom: (
@@ -459,15 +495,97 @@ export const TripRoomRepositoryLive: Layer.Layer<
           "saveRoom"
         ),
 
+      saveRoomWithActivity: ({
+        room,
+        expectedRevision,
+        activity,
+      }: SaveRoomWithActivityParams) =>
+        Effect.gen(function* () {
+          const result = yield* databaseEffect(
+            "saveRoomWithActivity",
+            () =>
+              db.transaction(async (tx) => {
+                const [updatedRoom] = await tx
+                  .update(tripRooms)
+                  .set({
+                    title: room.title,
+                    destination: room.destination,
+                    members: room.members,
+                    plans: room.plans,
+                    confirmedPlanId: room.confirmedPlanId ?? null,
+                    revision: sql`${tripRooms.revision} + 1`,
+                    updatedAt: sql`now()`,
+                  })
+                  .where(
+                    and(
+                      eq(tripRooms.id, room.id),
+                      eq(tripRooms.revision, expectedRevision)
+                    )
+                  )
+                  .returning();
+
+                if (!updatedRoom) {
+                  const [current] = await tx
+                    .select({ revision: tripRooms.revision })
+                    .from(tripRooms)
+                    .where(eq(tripRooms.id, room.id))
+                    .limit(1);
+                  return current
+                    ? ({ _tag: "Conflict", revision: current.revision } as const)
+                    : ({ _tag: "NotFound" } as const);
+                }
+
+                await tx.insert(tripActivityEvents).values({
+                  tripId: room.id,
+                  eventType: activity.event.type,
+                  actorParticipantId: activity.actorParticipantId,
+                  actorDisplayName: activity.actorDisplayName ?? null,
+                  subjectPlanId: activity.event.subjectPlanId ?? null,
+                  subjectTitle: activity.event.subjectTitle ?? null,
+                  roomRevision: activity.event.roomRevision ?? updatedRoom.revision,
+                  itineraryRevision: activity.event.itineraryRevision ?? null,
+                });
+
+                return { _tag: "Updated", row: updatedRoom } as const;
+              })
+          );
+
+          if (result._tag === "NotFound") {
+            return yield* Effect.fail(
+              new NotFoundError({ entity: "TripRoom", id: room.id })
+            );
+          }
+          if (result._tag === "Conflict") {
+            return yield* Effect.fail(
+              new RevisionConflictError({
+                message: "다른 사용자가 이미 방 정보를 수정했습니다.",
+                expectedRevision,
+                actualRevision: RevisionSchema.make(result.revision),
+              })
+            );
+          }
+
+          const decoded = yield* decodeRoom(
+            result.row,
+            "saveRoomWithActivity"
+          );
+          return (yield* resolveParticipantAliases(
+            db,
+            [decoded],
+            "saveRoomWithActivity"
+          ))[0];
+        }),
+
       deletePlanAndAutoUnlist: ({
         room,
         sourcePlanId,
         expectedRevision,
         unlistedAt,
+        activity,
       }: DeletePlanAndAutoUnlistParams) =>
         Effect.gen(function* () {
           const unlistedAtDate = new Date(unlistedAt);
-          // room CAS와 listing auto-unlist를 하나의 transaction으로 묶는다.
+          // room CAS와 listing auto-unlist, activity insert를 하나의 transaction으로 묶는다.
           // 어느 write가 실패하든 함께 rollback되어 partial state가 남지 않는다.
           const result = yield* databaseEffect(
             "deletePlanAndAutoUnlist",
@@ -492,7 +610,7 @@ export const TripRoomRepositoryLive: Layer.Layer<
                   )
                   .returning();
 
-                // room CAS miss: listing을 건드리지 않고 현재 revision을 조회해
+                // room CAS miss: listing과 activity를 건드리지 않고 현재 revision을 조회해
                 // NotFound/Conflict를 구분한다.
                 if (!updatedRoom) {
                   const [current] = await tx
@@ -505,10 +623,7 @@ export const TripRoomRepositoryLive: Layer.Layer<
                     : ({ _tag: "NotFound" } as const);
                 }
 
-                // room CAS 성공: 같은 source plan의 LISTED listing만 UNLISTED로
-                // 전이한다. 매칭이 없거나 이미 UNLISTED면 no-op(idempotent).
-                // listing_revision은 DB에서 atomically +1, updated_at/unlisted_at는
-                // 서버 시각으로 갱신하되 listed_at/snapshot/source revision은 보존한다.
+                // room CAS 성공: 같은 source plan의 LISTED listing만 UNLISTED로 전이
                 await tx
                   .update(explorePlanListings)
                   .set({
@@ -524,6 +639,20 @@ export const TripRoomRepositoryLive: Layer.Layer<
                       eq(explorePlanListings.status, "LISTED")
                     )
                   );
+
+                // PLAN_DELETED activity event insert (if activity provided)
+                if (activity) {
+                  await tx.insert(tripActivityEvents).values({
+                    tripId: room.id,
+                    eventType: activity.event.type,
+                    actorParticipantId: activity.actorParticipantId,
+                    actorDisplayName: activity.actorDisplayName ?? null,
+                    subjectPlanId: activity.event.subjectPlanId ?? null,
+                    subjectTitle: activity.event.subjectTitle ?? null,
+                    roomRevision: activity.event.roomRevision ?? updatedRoom.revision,
+                    itineraryRevision: null,
+                  });
+                }
 
                 return { _tag: "Updated", row: updatedRoom } as const;
               })

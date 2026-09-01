@@ -149,6 +149,26 @@ export function mapDomainError(
           }),
         };
 
+      case "InvalidActivityCursorError":
+        return {
+          status: 422,
+          body: formatApiError({
+            code: "INVALID_ACTIVITY_CURSOR",
+            message:
+              typeof tagged.message === "string" && tagged.message.length > 0
+                ? tagged.message
+                : "해당 여행의 활동 순번이 아닙니다.",
+            requestId,
+            details: {
+              tripId: tagged.tripId,
+              sequence:
+                typeof tagged.sequence === "bigint"
+                  ? tagged.sequence.toString()
+                  : tagged.sequence,
+            },
+          }),
+        };
+
       case "SessionUnavailableError":
         return {
           status: 503,

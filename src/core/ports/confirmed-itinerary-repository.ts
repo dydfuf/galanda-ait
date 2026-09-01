@@ -13,15 +13,19 @@ import type { TripRoom } from "../domain/room.ts";
 import type { NotFoundError, RevisionConflictError } from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
 
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
+
 export interface ConfirmItineraryParams {
   readonly room: TripRoom;
   readonly expectedRoomRevision: Revision;
   readonly itinerary: ConfirmedItinerary;
+  readonly activity: TripActivityWrite;
 }
 
 export interface ReviseItineraryParams {
   readonly itinerary: ConfirmedItinerary;
   readonly expectedRevision: Revision;
+  readonly activity: TripActivityWrite;
 }
 
 export interface AcknowledgeItineraryParams {

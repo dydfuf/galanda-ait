@@ -1,6 +1,9 @@
 import { Effect } from "effect";
 import type { TripOverviewDto, TripOverviewListResponse } from "../../contracts/trip-overview.ts";
+import type { TripActivitySummaryDto } from "../../contracts/trip-activity.ts";
+import type { TripActivitySummary } from "../domain/trip-activity.ts";
 import { TripRoomRepository, type TripOverviewSourceRecord } from "../ports/trip-room-repository.ts";
+import { TripActivityRepository } from "../ports/trip-activity-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
 import { getRoomActor, isRoomConfirmed } from "../domain/auth-guards.ts";
@@ -11,7 +14,8 @@ import type { ParticipantId } from "../domain/ids.ts";
 
 export const toTripOverviewDto = (
   record: TripOverviewSourceRecord,
-  sessionParticipantIds: ReadonlyArray<ParticipantId>
+  sessionParticipantIds: ReadonlyArray<ParticipantId>,
+  activitySummary?: TripActivitySummary | null
 ): TripOverviewDto => {
   const { room, roomCreatedAt, roomUpdatedAt, currentItinerary } = record;
   const isConfirmed = isRoomConfirmed(room);
@@ -66,6 +70,27 @@ export const toTripOverviewDto = (
   const eligibleActions = resolveEligibleTripActions(decisionContext, actor);
   const eligibleActionIds = eligibleActions.map((a) => a.actionId);
 
+  const summaryDto: TripActivitySummaryDto | null = activitySummary
+    ? {
+        tripId: activitySummary.tripId,
+        unreadCount: activitySummary.unreadCount,
+        latestUnreadSummary: activitySummary.latestUnreadSummary
+          ? {
+              type: activitySummary.latestUnreadSummary.type,
+              actorDisplayName:
+                activitySummary.latestUnreadSummary.actorDisplayName ?? null,
+              subjectTitle:
+                activitySummary.latestUnreadSummary.subjectTitle ?? null,
+              createdAt: activitySummary.latestUnreadSummary.createdAt,
+            }
+          : null,
+        lastSeenSequence:
+          activitySummary.lastSeenSequence !== undefined
+            ? activitySummary.lastSeenSequence.toString()
+            : null,
+      }
+    : null;
+
   return {
     id: room.id,
     title: room.title,
@@ -81,6 +106,7 @@ export const toTripOverviewDto = (
     createdAt: roomCreatedAt,
     updatedAt: effectiveUpdatedAt,
     eligibleActionIds,
+    activitySummary: summaryDto,
   };
 };
 
@@ -89,15 +115,24 @@ export const listTripOverviews = Effect.fn("listTripOverviews")(function* () {
   const repo = yield* TripRoomRepository;
   const records = yield* repo.getRoomOverviewRecords(session.participantIds);
 
+  const activityRepo = yield* TripActivityRepository;
+  const roomIds = records.map((r) => r.room.id);
+  const summaries = yield* activityRepo.getSummariesForTrips({
+    tripIds: roomIds,
+    actorParticipantIds: session.participantIds,
+  });
+
   const items = records.map((record) => {
     const mergedRoom = mergeParticipantIdentityInRoom(
       record.room,
       session.participantId,
       session.participantIds
     );
+    const summary = summaries.get(record.room.id) ?? null;
     return toTripOverviewDto(
       { ...record, room: mergedRoom },
-      session.participantIds
+      session.participantIds,
+      summary
     );
   });
 

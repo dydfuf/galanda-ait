@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
-import { Share2 } from "lucide-react";
+import { Bell, Share2 } from "lucide-react";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
 import { Result } from "effect";
@@ -9,6 +9,8 @@ import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { shareTripInvite } from "../../features/invite/share-trip-invite.ts";
+import { ActivityDrawer } from "../../features/activity/components/ActivityDrawer.tsx";
+import { useTripRoomsQuery } from "../../features/plan-home/queries.ts";
 import {
   getTripRoomNavigationTitle,
   getTripRoomSection,
@@ -21,6 +23,7 @@ export function TripRoomTabLayout() {
   const navigate = useNavigate();
   const { goBack, platformNavigation } = useAppNavigation();
   const [failedAccessoryTripId, setFailedAccessoryTripId] = useState<string>();
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [platformTopInset, setPlatformTopInset] = useState(
     platformNavigation?.contentTopInset ?? 0,
   );
@@ -34,6 +37,10 @@ export function TripRoomTabLayout() {
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
   const selectedTab = getTripRoomSection(location.pathname);
+
+  const { data: trips } = useTripRoomsQuery();
+  const currentTripOverview = trips?.find((t) => t.id === tripId);
+  const unreadCount = currentTripOverview?.activitySummary?.unreadCount ?? 0;
 
   useEffect(
     () => platformNavigation?.subscribeContentTopInset(setPlatformTopInset),
@@ -85,18 +92,38 @@ export function TripRoomTabLayout() {
   const showWebNavigation = !platformNavigation;
   const showShareAction = showWebNavigation || failedAccessoryTripId === tripId;
 
-  const shareAction = showShareAction ? (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-lg"
-      aria-label="여행 초대 링크 공유"
-      className="text-primary"
-      onClick={() => void shareTripInvite(tripId)}
-    >
-      <Share2 className="size-5" />
-    </Button>
-  ) : undefined;
+  const headerActions = (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-lg"
+        aria-label={`활동 알림${unreadCount > 0 ? ` (새 활동 ${unreadCount}개)` : ""}`}
+        className="relative text-primary"
+        onClick={() => setIsActivityOpen(true)}
+      >
+        <Bell className="size-5" />
+        {unreadCount > 0 && (
+          <span className="absolute top-2 right-2 flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex size-2 rounded-full bg-primary" />
+          </span>
+        )}
+      </Button>
+      {showShareAction && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-lg"
+          aria-label="여행 초대 링크 공유"
+          className="text-primary"
+          onClick={() => void shareTripInvite(tripId)}
+        >
+          <Share2 className="size-5" />
+        </Button>
+      )}
+    </div>
+  );
 
   const modeSwitcher = (
     <Tabs value={selectedTab} onValueChange={handleTabChange}>
@@ -124,7 +151,7 @@ export function TripRoomTabLayout() {
             surface="none"
             title={getTripRoomNavigationTitle(location.pathname)}
             back={{ onClick: () => void goBack() }}
-            action={shareAction}
+            action={headerActions}
           />
           <div className="mx-auto flex w-full max-w-(--content-max-width) justify-center px-2 pb-2">
             {modeSwitcher}
@@ -138,7 +165,7 @@ export function TripRoomTabLayout() {
           topInset={platformTopInset}
           className="z-[5]"
           center={modeSwitcher}
-          action={shareAction}
+          action={headerActions}
         />
       )}
 
@@ -146,6 +173,12 @@ export function TripRoomTabLayout() {
       <main className="flex flex-1 flex-col">
         <Outlet context={{ tripId }} />
       </main>
+
+      <ActivityDrawer
+        tripId={tripId}
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+      />
     </div>
   );
 }

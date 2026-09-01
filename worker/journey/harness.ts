@@ -79,6 +79,26 @@ export interface ParticipantAliasRecord {
   canonicalParticipantId: string;
 }
 
+export interface TripActivityEventRecord {
+  sequence: bigint;
+  tripId: string;
+  eventType: string;
+  actorParticipantId: string;
+  actorDisplayName: string | null;
+  subjectPlanId: string | null;
+  subjectTitle: string | null;
+  roomRevision: number | null;
+  itineraryRevision: number | null;
+  createdAt: string;
+}
+
+export interface TripActivityReadRecord {
+  tripId: string;
+  participantId: string;
+  lastSeenSequence: bigint;
+  seenAt: string;
+}
+
 interface Store {
   tripRooms: Map<string, TripRoomRecord>;
   exploreListings: Map<string, ExploreListingRecord>;
@@ -86,6 +106,9 @@ interface Store {
   exploreSaves: ExploreSaveRecord[];
   participantAliases: ParticipantAliasRecord[];
   registeredParticipantIds: Set<string>;
+  tripActivityEvents: TripActivityEventRecord[];
+  tripActivityReads: Map<string, TripActivityReadRecord>;
+  nextActivitySequence: bigint;
   /**
    * 테스트 전용 one-shot 훅. 다음 explore listing INSERT가 실행되기 "직전"에 한 번
    * 호출된다(그 뒤 자동 해제). concurrent first-list race를 결정론적으로 재현하는
@@ -108,6 +131,11 @@ const cloneStore = (store: Store): Store => ({
   exploreSaves: store.exploreSaves.map((row) => ({ ...row })),
   participantAliases: store.participantAliases.map((row) => ({ ...row })),
   registeredParticipantIds: new Set(store.registeredParticipantIds),
+  tripActivityEvents: [...store.tripActivityEvents],
+  tripActivityReads: new Map(
+    [...store.tripActivityReads].map(([k, v]) => [k, { ...v }])
+  ),
+  nextActivitySequence: store.nextActivitySequence,
   beforeNextListingInsert: store.beforeNextListingInsert,
 });
 
@@ -118,6 +146,9 @@ const restoreStore = (target: Store, source: Store): void => {
   target.exploreSaves = source.exploreSaves;
   target.participantAliases = source.participantAliases;
   target.registeredParticipantIds = source.registeredParticipantIds;
+  target.tripActivityEvents = source.tripActivityEvents;
+  target.tripActivityReads = source.tripActivityReads;
+  target.nextActivitySequence = source.nextActivitySequence;
   target.beforeNextListingInsert = source.beforeNextListingInsert;
 };
 
@@ -261,7 +292,179 @@ class QueryEngine {
       return this.executeSaves(text, params);
     }
 
+    if (
+      text.includes('"trip_activity_events"') ||
+      text.includes('"trip_activity_reads"') ||
+      text.includes('"confirmed_itineraries"') ||
+      text.includes('"itinerary_revisions"') ||
+      text.includes("trip_activity_sequence")
+    ) {
+      return this.executeTripActivities(text, params);
+    }
+
     throw new Error(`Unrecognized SQL in journey harness: ${text}`);
+  }
+
+  private executeTripActivities(
+    text: string,
+    params: readonly unknown[]
+  ): { rows: unknown[][] } {
+    if (text.includes("trip_activity_sequence")) {
+      this.store.nextActivitySequence += 1n;
+      return { rows: [[this.store.nextActivitySequence.toString()]] };
+    }
+
+    if (text.startsWith('insert into "trip_activity_events"')) {
+      const [
+        tripId,
+        eventType,
+        actorParticipantId,
+        actorDisplayName,
+        subjectPlanId,
+        subjectTitle,
+        roomRevision,
+        itineraryRevision,
+      ] = params as [string, string, string, string | null, string | null, string | null, number | null, number | null];
+      this.store.nextActivitySequence += 1n;
+      const sequence = this.store.nextActivitySequence;
+      const record: TripActivityEventRecord = {
+        sequence,
+        tripId,
+        eventType,
+        actorParticipantId,
+        actorDisplayName: actorDisplayName ?? null,
+        subjectPlanId: subjectPlanId ?? null,
+        subjectTitle: subjectTitle ?? null,
+        roomRevision: roomRevision ?? null,
+        itineraryRevision: itineraryRevision ?? null,
+        createdAt: new Date().toISOString(),
+      };
+      this.store.tripActivityEvents.push(record);
+      return { rows: [] };
+    }
+
+    if (text.startsWith('insert into "trip_activity_reads"')) {
+      const [tripId, participantId, lastSeenSequence] = params as [string, string, bigint | string];
+      const seq = BigInt(lastSeenSequence);
+      const key = `${tripId}:${participantId}`;
+      const existing = this.store.tripActivityReads.get(key);
+      let finalSeq = seq;
+      if (existing) {
+        if (seq > existing.lastSeenSequence) {
+          existing.lastSeenSequence = seq;
+          existing.seenAt = new Date().toISOString();
+        }
+        finalSeq = existing.lastSeenSequence;
+      } else {
+        this.store.tripActivityReads.set(key, {
+          tripId,
+          participantId,
+          lastSeenSequence: seq,
+          seenAt: new Date().toISOString(),
+        });
+      }
+      if (text.includes("returning")) {
+        return { rows: [[finalSeq]] };
+      }
+      return { rows: [] };
+    }
+
+    if (text.startsWith("select") && text.includes('"trip_activity_reads"')) {
+      let reads = [...this.store.tripActivityReads.values()];
+      if (text.includes("where") && params.length > 0) {
+        const paramStrings = params.map((p) => String(p));
+        reads = reads.filter(
+          (r) =>
+            paramStrings.includes(r.tripId) &&
+            paramStrings.includes(r.participantId)
+        );
+      }
+      const rows = reads.map((r) => [
+        r.tripId,
+        r.participantId,
+        r.lastSeenSequence,
+        r.seenAt,
+      ]);
+      return { rows };
+    }
+
+    if (text.startsWith("select") && text.includes('"trip_activity_events"')) {
+      let events = this.store.tripActivityEvents.slice();
+
+      if (text.includes("not in")) {
+        const notInIndex = text.indexOf("not in");
+        const beforeNotIn = text.slice(0, notInIndex);
+        const tripMatches = [...beforeNotIn.matchAll(/\$(\d+)/g)].map(
+          (m) => Number(m[1]) - 1
+        );
+        const actorMatches = [...text.slice(notInIndex).matchAll(/\$(\d+)/g)].map(
+          (m) => Number(m[1]) - 1
+        );
+
+        const tripIds = tripMatches.map((i) => String(params[i]));
+        const excludedActors = new Set(
+          actorMatches.map((i) => String(params[i]))
+        );
+
+        events = events.filter(
+          (e) =>
+            (tripIds.length === 0 || tripIds.includes(e.tripId)) &&
+            !excludedActors.has(e.actorParticipantId)
+        );
+      } else if (text.includes('"trip_id"')) {
+        const tripParam =
+          typeof params[0] === "string"
+            ? params[0]
+            : typeof params[0] === "number"
+              ? String(params[0])
+              : undefined;
+        if (tripParam) {
+          events = events.filter((e) => e.tripId === tripParam);
+        }
+      }
+
+      if (text.includes('"sequence" < $')) {
+        const match = /"sequence" < \$(\d+)/.exec(text);
+        if (match) {
+          const beforeSeq = BigInt(String(params[Number(match[1]) - 1]));
+          events = events.filter((e) => e.sequence < beforeSeq);
+        }
+      }
+
+      if (text.includes('"sequence" > $')) {
+        const match = /"sequence" > \$(\d+)/.exec(text);
+        if (match) {
+          const afterSeq = BigInt(String(params[Number(match[1]) - 1]));
+          events = events.filter((e) => e.sequence > afterSeq);
+        }
+      }
+
+      if (text.includes("count(*)::int")) {
+        return { rows: [[events.length]] };
+      }
+
+      if (text.includes('select "sequence" from "trip_activity_events"')) {
+        return { rows: events.map((e) => [e.sequence]) };
+      }
+
+      const rows = events
+        .sort((a, b) => (a.sequence < b.sequence ? 1 : -1))
+        .map((e) => [
+          e.sequence,
+          e.tripId,
+          e.eventType,
+          e.actorParticipantId,
+          e.actorDisplayName,
+          e.subjectPlanId,
+          e.subjectTitle,
+          e.roomRevision,
+          e.itineraryRevision,
+          e.createdAt,
+        ]);
+      return { rows };
+    }
+
+    return { rows: [] };
   }
 
   private executeTripRooms(
@@ -888,6 +1091,9 @@ export const createJourneyHarness = (seed: HarnessSeed): JourneyHarness => {
     exploreSaves: [],
     participantAliases: [],
     registeredParticipantIds: new Set(),
+    tripActivityEvents: [],
+    tripActivityReads: new Map(),
+    nextActivitySequence: 0n,
   };
   for (const room of seed.tripRooms ?? []) {
     store.tripRooms.set(room.id, { ...room });

@@ -183,6 +183,7 @@ const tripRepoLayer = (
     createPlan: () => Effect.die("not implemented"),
     updatePlan: () => Effect.die("not implemented"),
     saveRoom: () => Effect.die("not implemented"),
+    saveRoomWithActivity: () => Effect.die("not implemented"),
     deletePlanAndAutoUnlist: () => Effect.die("not implemented"),
   });
 

@@ -3,7 +3,7 @@ import {
   showFullScreenAd,
 } from "@apps-in-toss/web-framework";
 import { toast } from "sonner";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface Reward {
   unitType: string;
@@ -21,7 +21,13 @@ interface UseInAppAdsReturn {
 export function useInAppAds(adGroupId: string): UseInAppAdsReturn {
   const [isAdLoaded, setIsAdLoaded] = useState(false);
   const [lastReward, setLastReward] = useState<Reward | null>(null);
-  const [isSupported, setIsSupported] = useState(false);
+  const isSupported = useMemo(() => {
+    try {
+      return loadFullScreenAd.isSupported();
+    } catch {
+      return false;
+    }
+  }, []);
   const unregisterRef = useRef<(() => void) | null>(null);
 
   /**
@@ -49,15 +55,9 @@ export function useInAppAds(adGroupId: string): UseInAppAdsReturn {
   }, [adGroupId]);
 
   useEffect(() => {
-    try {
-      setIsSupported(loadFullScreenAd.isSupported());
-
-      if (loadFullScreenAd.isSupported()) {
-        load();
-      }
-    } catch (error) {
-      console.error("광고 지원 여부 확인 실패:", error);
-      setIsSupported(false);
+    if (isSupported) {
+      // oxlint-disable-next-line react/set-state-in-effect
+      load();
     }
 
     return () => {
@@ -67,7 +67,7 @@ export function useInAppAds(adGroupId: string): UseInAppAdsReturn {
         console.error("광고 정리(cleanup) 중 에러:", error);
       }
     };
-  }, [load]);
+  }, [load, isSupported]);
 
   /**
    * 광고를 실제로 화면에 표시해요.

@@ -1,5 +1,8 @@
 import { Schema } from "effect";
 import { TripActionIdSchema } from "../core/domain/trip-action.ts";
+import {
+  TripActivitySummaryDtoSchema,
+} from "./trip-activity.ts";
 
 export const ConfirmedPeriodSchema = Schema.Struct({
   startDate: Schema.String,
@@ -22,6 +25,7 @@ export const TripOverviewDtoSchema = Schema.Struct({
   createdAt: Schema.String,
   updatedAt: Schema.String,
   eligibleActionIds: Schema.Array(TripActionIdSchema),
+  activitySummary: Schema.optional(Schema.NullOr(TripActivitySummaryDtoSchema)),
 });
 export type TripOverviewDto = typeof TripOverviewDtoSchema.Type;
 

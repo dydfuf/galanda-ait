@@ -291,6 +291,12 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         revision: RevisionSchema.make(expectedRevision + 1),
       })),
 
+    saveRoomWithActivity: ({ room, expectedRevision }) =>
+      mutateRoom(room.id, expectedRevision, "saveRoomWithActivity", () => ({
+        ...room,
+        revision: RevisionSchema.make(expectedRevision + 1),
+      })),
+
     // Local 어댑터는 Explore listing 저장소를 갖지 않으므로 auto-unlist는 no-op이며,
     // room CAS로 plan 삭제만 반영한다. plan 삭제는 매칭 listing 유무와 무관하게
     // idempotent하게 성공한다(persistence policy 동일).

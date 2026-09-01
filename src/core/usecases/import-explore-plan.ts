@@ -26,6 +26,7 @@ import {
   requireRegisteredSession,
 } from "../ports/session.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
 
 /**
  * Explore snapshot import use case (RAON-261 / Goal 14 DISC-7).
@@ -151,6 +152,18 @@ const importIntoNewTrip = Effect.fn("importExplorePlan.newTrip")(
       role: "HOST",
     };
 
+    const initialPlanActivity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: session.name,
+      event: {
+        type: "PLAN_CREATED",
+        subjectPlanId: planId,
+        subjectTitle: copy.plan.title,
+        roomRevision: 1,
+        itineraryRevision: null,
+      },
+    };
+
     const repo = yield* TripRoomRepository;
     // room + copied plan을 단일 aggregate write로 저장한다(partial empty room 없음).
     yield* repo.createRoom({
@@ -159,6 +172,7 @@ const importIntoNewTrip = Effect.fn("importExplorePlan.newTrip")(
       destination: listing.snapshot.destination,
       hostUser,
       initialPlan: copy.plan,
+      initialPlanActivity,
     });
 
     return { tripId, planId } satisfies ImportExplorePlanResult;
@@ -225,11 +239,24 @@ const importIntoExistingTrip = Effect.fn("importExplorePlan.existingTrip")(
       return yield* Effect.fail(new ValidationError({ message: copy.message }));
     }
 
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: actor.member?.name ?? session.name,
+      event: {
+        type: "PLAN_CREATED",
+        subjectPlanId: planId,
+        subjectTitle: copy.plan.title,
+        roomRevision: room.revision + 1,
+        itineraryRevision: null,
+      },
+    };
+
     // 기존 방 title/destination은 덮어쓰지 않는다. plan만 추가하고 aggregate CAS.
-    yield* repo.saveRoom(
-      { ...room, plans: [...room.plans, copy.plan] },
-      expectedRevision
-    );
+    yield* repo.saveRoomWithActivity({
+      room: { ...room, plans: [...room.plans, copy.plan] },
+      expectedRevision,
+      activity,
+    });
 
     return { tripId, planId } satisfies ImportExplorePlanResult;
   }
