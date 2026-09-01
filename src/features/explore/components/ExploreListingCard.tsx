@@ -11,9 +11,8 @@ import { ExploreSaveToggle } from "./ExploreSaveToggle.tsx";
  * DISC-6 save toggle).
  *
  * public snapshot의 허용 필드만 렌더링한다: 제목, 목적지/경로(방문 도시), 기간
- * (박수/일수와 날짜 범위), 작성자 표시명과 listing envelope의 공개일. 이미지나
- * impression/save/import 같은 인기 지표, 저장 수 등은 실제 데이터가 없으므로 만들지
- * 않는다(fake popularity/image/count 금지).
+ * (박수/일수와 날짜 범위), 저장 수, 작성자 표시명과 listing envelope의 공개일을
+ * 렌더링한다. 저장 수는 서버 aggregate만 사용한다.
  *
  * 카드의 정보 영역이 `/explore/:listingId` focused detail로 이동하는 native link다.
  * save toggle은 link **밖**의 형제 요소로 두어 nested interactive(link 안의 button)를
@@ -48,6 +47,12 @@ const formatPublicDate = (listedAt: string): string => {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(listedAt);
   return match ? `${match[1]}.${match[2]}.${match[3]}` : listedAt;
 };
+
+const formatSaveCount = (count: number): string =>
+  new Intl.NumberFormat("ko-KR", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+  }).format(count);
 
 const getVisualDestination = (
   snapshot: ExploreListingItem["snapshot"],
@@ -128,6 +133,10 @@ export function ExploreListingCard({ item }: { item: ExploreListingItem }) {
           </dl>
 
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-foreground-subtle">
+            <p className="min-w-0 [overflow-wrap:anywhere]">
+              <span aria-hidden="true">저장 {formatSaveCount(item.saveCount)}</span>
+              <span className="sr-only">저장한 사람 {item.saveCount}명</span>
+            </p>
             {authorName && (
               <p className="min-w-0 [overflow-wrap:anywhere]">
                 <span className="sr-only">작성자 </span>

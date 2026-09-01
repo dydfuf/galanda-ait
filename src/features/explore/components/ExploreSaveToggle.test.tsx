@@ -71,7 +71,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
 
   it("미저장 상태에서는 aria-pressed=false, 저장 label을 노출한다", async () => {
     mockUseSession.mockReturnValue(readySession());
-    mockState.mockResolvedValue({ saved: false });
+    mockState.mockResolvedValue({ saved: false, saveCount: 0 });
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장" });
     expect(button).toHaveAttribute("aria-pressed", "false");
@@ -79,7 +79,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
 
   it("저장 상태에서는 aria-pressed=true, 저장됨 label을 노출한다", async () => {
     mockUseSession.mockReturnValue(readySession());
-    mockState.mockResolvedValue({ saved: true });
+    mockState.mockResolvedValue({ saved: true, saveCount: 0 });
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장됨" });
     expect(button).toHaveAttribute("aria-pressed", "true");
@@ -87,11 +87,11 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
 
   it("toggle 클릭 시 save를 호출하고 성공하면 저장됨으로 확정한다", async () => {
     mockUseSession.mockReturnValue(readySession());
-    mockState.mockResolvedValue({ saved: false });
+    mockState.mockResolvedValue({ saved: false, saveCount: 0 });
     mockSave.mockImplementation(async () => {
       // 저장 성공 후 서버 진실도 saved=true로 바뀐다(invalidate 재조회 반영).
-      mockState.mockResolvedValue({ saved: true });
-      return { saved: true };
+      mockState.mockResolvedValue({ saved: true, saveCount: 0 });
+      return { saved: true, saveCount: 0 };
     });
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장" });
@@ -103,7 +103,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
 
   it("save 실패 시 저장됨으로 표시하지 않고 rollback + 오류 안내한다", async () => {
     mockUseSession.mockReturnValue(readySession());
-    mockState.mockResolvedValue({ saved: false });
+    mockState.mockResolvedValue({ saved: false, saveCount: 0 });
     mockSave.mockRejectedValue(new Error("boom"));
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장" });
@@ -123,8 +123,8 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
 
   it("저장 상태에서 클릭하면 unsave를 호출한다", async () => {
     mockUseSession.mockReturnValue(readySession());
-    mockState.mockResolvedValue({ saved: true });
-    mockUnsave.mockResolvedValue({ saved: false });
+    mockState.mockResolvedValue({ saved: true, saveCount: 0 });
+    mockUnsave.mockResolvedValue({ saved: false, saveCount: 0 });
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장됨" });
     await waitFor(() => expect(button).toBeEnabled());

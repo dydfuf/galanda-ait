@@ -1,15 +1,10 @@
 import { Clock, Effect } from "effect";
-import { ExplorePlanRepository } from "../ports/explore-plan-repository.ts";
 import {
   ExploreSaveRepository,
   type ListSavedListingsResult,
   type SavedListingCursor,
 } from "../ports/explore-save-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
-import {
-  ExploreListingUnavailableError,
-  NotFoundError,
-} from "../domain/errors.ts";
 import type { ExploreListingId } from "../domain/ids.ts";
 
 /**
@@ -24,15 +19,14 @@ import type { ExploreListingId } from "../domain/ids.ts";
  *
  * ## Reference-only + read-through
  *
- * save는 snapshot을 복사하지 않고 listing reference + savedAt만 저장한다.
+ * save는 snapshot을 복사하지 않고 listing reference + save interval만 저장한다.
  * saved-list는 항상 현재 listing을 read-through하므로 UNLISTED/deleted는 제외되고
  * 최신 공개 snapshot만 노출된다.
  *
  * ## Public read boundary
  *
- * save/saved-list는 `ExplorePlanRepository`(public listing)와 `ExploreSaveRepository`
- * 만 사용한다. private `TripRoomRepository`를 read-through하지 않는다(공개 read는
- * private aggregate에 의존하지 않는다).
+ * save transaction과 public aggregate는 `ExploreSaveRepository`가 소유한다.
+ * private `TripRoomRepository`를 read-through하지 않는다.
  */
 
 const nowIso = Effect.map(
@@ -47,35 +41,14 @@ export interface SaveExploreListingCommand {
 /**
  * 공개 listing 저장(save).
  *
- * - LISTED listing만 저장할 수 있다(정책). listing이 없으면 NotFound, UNLISTED면
- *   ExploreListingUnavailable(410). 게시 중단된 것을 새로 저장하도록 허용하지 않는다.
- * - `(participantId, listingId)` composite uniqueness + ON CONFLICT DO NOTHING으로
- *   idempotent하다. 이미 저장돼 있으면(alias 포함) no-op이고 성공으로 응답한다.
- * - 새 row는 canonical `session.participantId`로 insert한다(alias 중복 방지).
+ * - LISTED 여부와 interval write/count는 repository transaction에서 함께 확인한다.
+ * - 이미 저장돼 있으면(alias 포함) no-op이고 authoritative count를 반환한다.
  */
 export const saveExploreListing = Effect.fn("saveExploreListing")(
   function* (command: SaveExploreListingCommand) {
     const session = yield* requireAuthSession(
       "여행 일정을 저장하려면 로그인이 필요합니다."
     );
-
-    const explore = yield* ExplorePlanRepository;
-    const record = yield* explore.getById(command.listingId);
-
-    // 없음: deleted/invalid/never-existed. private fallback 없이 NotFound.
-    if (!record) {
-      return yield* Effect.fail(
-        new NotFoundError({
-          entity: "ExplorePlanListing",
-          id: command.listingId,
-        })
-      );
-    }
-
-    // UNLISTED: 공개 중단된 listing은 새로 저장할 수 없다(410 gone).
-    if (record.listing.status !== "LISTED") {
-      return yield* Effect.fail(new ExploreListingUnavailableError());
-    }
 
     const saves = yield* ExploreSaveRepository;
     const savedAt = yield* nowIso;
@@ -96,10 +69,8 @@ export interface UnsaveExploreListingCommand {
 /**
  * 저장 해제(unsave).
  *
- * - alias 집합 전체에서 해당 listing save를 삭제한다. 대상이 없어도 실패하지
- *   않는다(반복 호출 안전, idempotent).
- * - listing 존재/상태를 검사하지 않는다. deleted/UNLISTED listing에 대한 unsave도
- *   idempotent하게 성공한다(저장 참조만 정리).
+ * - alias 집합 전체에서 해당 listing의 active interval을 닫는다. 대상이 없어도
+ *   실패하지 않는다(반복 호출 안전, idempotent).
  */
 export const unsaveExploreListing = Effect.fn("unsaveExploreListing")(
   function* (command: UnsaveExploreListingCommand) {
@@ -108,9 +79,11 @@ export const unsaveExploreListing = Effect.fn("unsaveExploreListing")(
     );
 
     const saves = yield* ExploreSaveRepository;
+    const unsavedAt = yield* nowIso;
     return yield* saves.unsave({
       participantIds: session.participantIds,
       listingId: command.listingId,
+      unsavedAt,
     });
   }
 );
@@ -136,7 +109,7 @@ export const getExploreSaveState = Effect.fn("getExploreSaveState")(
       participantIds: session.participantIds,
       listingId: query.listingId,
     });
-    return { saved };
+    return saved;
   }
 );
 

@@ -103,10 +103,16 @@ const listingRepoLayer = (
   Layer.succeed(ExplorePlanRepository, {
     create: () => Effect.die("not implemented"),
     getById: () => Effect.succeed(record),
+    getPublicById: () => Effect.die("not implemented"),
     findBySource: () => Effect.succeed(undefined),
     relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
-    listListed: () => Effect.succeed({ page: [], nextCursor: undefined }),
+    listListed: () =>
+      Effect.succeed({
+        page: [],
+        nextCursor: undefined,
+        rankingMode: "RECENCY_FALLBACK" as const,
+      }),
     listPopularCities: () => Effect.succeed([]),
   });
 
@@ -119,17 +125,26 @@ interface FakeSaveState {
 }
 
 const saveRepoLayer = (
-  state: FakeSaveState
+  state: FakeSaveState,
+  listing?: ExplorePlanListingRecord
 ): Layer.Layer<ExploreSaveRepository> =>
   Layer.succeed(ExploreSaveRepository, {
     save: ({ participantId, participantIds, listingId: id }) => {
+      if (!listing) {
+        return Effect.fail(
+          new NotFoundError({ entity: "ExplorePlanListing", id })
+        );
+      }
+      if (listing.listing.status !== "LISTED") {
+        return Effect.fail(new ExploreListingUnavailableError());
+      }
       state.savedCalls.push({ participantId, listingId: id });
       // idempotent: alias 집합 중 하나라도 이미 있으면 새로 만들지 않는다.
       const already = participantIds.some((pid) =>
         state.rows.has(`${pid}::${id}`)
       );
       if (!already) state.rows.add(`${participantId}::${id}`);
-      return Effect.succeed({ saved: true } as const);
+      return Effect.succeed({ saved: true, saveCount: 0 } as const);
     },
     unsave: ({ participantIds, listingId: id }) => {
       state.unsaveCalls.push({
@@ -137,12 +152,13 @@ const saveRepoLayer = (
         listingId: id,
       });
       for (const pid of participantIds) state.rows.delete(`${pid}::${id}`);
-      return Effect.succeed({ saved: false } as const);
+      return Effect.succeed({ saved: false, saveCount: 0 } as const);
     },
     isSaved: ({ participantIds, listingId: id }) =>
-      Effect.succeed(
-        participantIds.some((pid) => state.rows.has(`${pid}::${id}`))
-      ),
+      Effect.succeed({
+        saved: participantIds.some((pid) => state.rows.has(`${pid}::${id}`)),
+        saveCount: 0,
+      }),
     listSaved: () =>
       Effect.succeed(
         state.savedList ?? { page: [], nextCursor: undefined }
@@ -184,7 +200,7 @@ const runWith = <A, E>(
   const base = Layer.mergeAll(
     sessionLayer(opts.session),
     listingRepoLayer(opts.listing),
-    saveRepoLayer(state),
+    saveRepoLayer(state, opts.listing),
     idLayer
   );
   const provided = effect.pipe(Effect.provide(base));
@@ -214,7 +230,7 @@ describe("saveExploreListing", () => {
       state,
       nowIso: "2026-09-03T00:00:00.000Z",
     });
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
     expect(state.savedCalls[0]!.participantId).toBe("p-1");
     expect(state.rows.has("p-1::listing-1")).toBe(true);
   });
@@ -226,7 +242,7 @@ describe("saveExploreListing", () => {
       listing: listingRecord("LISTED"),
       state,
     });
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
     expect(state.rows.size).toBe(1);
   });
 
@@ -267,7 +283,7 @@ describe("saveExploreListing", () => {
       listing: listingRecord("LISTED"),
       state,
     });
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
   });
 
   it("identity promotion 후 alias가 저장한 listing은 재저장하지 않는다(중복 방지)", async () => {
@@ -278,7 +294,7 @@ describe("saveExploreListing", () => {
       listing: listingRecord("LISTED"),
       state,
     });
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
     // 새 canonical row를 만들지 않는다(alias row가 이미 존재).
     expect(state.rows.has("new-canonical::listing-1")).toBe(false);
     expect(state.rows.size).toBe(1);
@@ -294,7 +310,7 @@ describe("unsaveExploreListing", () => {
       session: session("p-1", ["p-1", "p-alias"]),
       state,
     });
-    expect(result).toEqual({ saved: false });
+    expect(result).toEqual({ saved: false, saveCount: 0 });
     expect(state.rows.size).toBe(0);
   });
 
@@ -304,7 +320,7 @@ describe("unsaveExploreListing", () => {
       session: session("p-1"),
       state,
     });
-    expect(result).toEqual({ saved: false });
+    expect(result).toEqual({ saved: false, saveCount: 0 });
   });
 
   it("listing 존재/상태를 검사하지 않는다(deleted/unlisted에도 unsave 성공)", async () => {
@@ -315,7 +331,7 @@ describe("unsaveExploreListing", () => {
       listing: undefined,
       state,
     });
-    expect(result).toEqual({ saved: false });
+    expect(result).toEqual({ saved: false, saveCount: 0 });
   });
 });
 
@@ -328,7 +344,7 @@ describe("getExploreSaveState", () => {
       session: session("p-1", ["p-1", "p-alias"]),
       state,
     });
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
   });
 
   it("저장하지 않았으면 saved=false", async () => {
@@ -336,7 +352,7 @@ describe("getExploreSaveState", () => {
       session: session("p-1"),
       state: makeSaveState(),
     });
-    expect(result).toEqual({ saved: false });
+    expect(result).toEqual({ saved: false, saveCount: 0 });
   });
 });
 
@@ -345,6 +361,7 @@ describe("listSavedExploreListings", () => {
     const entry: SavedListingEntry = {
       savedAt: "2026-09-02T00:00:00.000Z",
       listing: listingRecord("LISTED").listing,
+      saveCount: 0,
     };
     const state = makeSaveState();
     state.savedList = { page: [entry], nextCursor: undefined };

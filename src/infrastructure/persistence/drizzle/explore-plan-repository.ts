@@ -23,6 +23,7 @@ import {
 import {
   ExplorePlanRepository,
   type ExploreListingCursor,
+  type ExploreListingReadModel,
   type ExplorePlanListingRecord,
 } from "../../../core/ports/explore-plan-repository.ts";
 import { Database } from "./database.ts";
@@ -114,6 +115,32 @@ const toValues = (record: ExplorePlanListingRecord) => {
     unlistedAt: listing.unlistedAt ? new Date(listing.unlistedAt) : null,
   };
 };
+
+const currentSaveCountSql = () => sql<number>`(
+  select count(distinct coalesce(alias.canonical_participant_id, active_save.participant_id))::int
+  from "explore_plan_saves" as active_save
+  left join "participant_alias" as alias
+    on alias.alias_participant_id = active_save.participant_id
+  inner join "participant" as canonical
+    on canonical.id = coalesce(alias.canonical_participant_id, active_save.participant_id)
+  where active_save.listing_id = "explore_plan_listings"."id"
+    and active_save.unsaved_at is null
+    and canonical.auth_user_id is not null
+)`;
+
+const rankScoreSql = (rankedAt: Date) => sql<number>`(
+  select count(distinct coalesce(alias.canonical_participant_id, ranked_save.participant_id))::int
+  from "explore_plan_saves" as ranked_save
+  left join "participant_alias" as alias
+    on alias.alias_participant_id = ranked_save.participant_id
+  inner join "participant" as canonical
+    on canonical.id = coalesce(alias.canonical_participant_id, ranked_save.participant_id)
+  where ranked_save.listing_id = "explore_plan_listings"."id"
+    and ranked_save.saved_at > ${new Date(rankedAt.getTime() - 30 * 24 * 60 * 60 * 1000)}
+    and ranked_save.saved_at <= ${rankedAt}
+    and (ranked_save.unsaved_at is null or ranked_save.unsaved_at > ${rankedAt})
+    and canonical.auth_user_id is not null
+)`;
 
 export const ExplorePlanRepositoryLive: Layer.Layer<
   ExplorePlanRepository,
@@ -276,6 +303,43 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
           return row
             ? yield* decodeRecord(row, "getExploreListing.decode")
             : undefined;
+        }),
+
+      getPublicById: (listingId) =>
+        Effect.gen(function* () {
+          const [row] = yield* databaseEffect("getPublicExploreListing", () =>
+            db
+              .select({
+                id: explorePlanListings.id,
+                sourceTripId: explorePlanListings.sourceTripId,
+                sourcePlanId: explorePlanListings.sourcePlanId,
+                sourceAuthorParticipantId:
+                  explorePlanListings.sourceAuthorParticipantId,
+                status: explorePlanListings.status,
+                listingRevision: explorePlanListings.listingRevision,
+                sourcePlanRevision: explorePlanListings.sourcePlanRevision,
+                snapshot: explorePlanListings.snapshot,
+                listedAt: explorePlanListings.listedAt,
+                updatedAt: explorePlanListings.updatedAt,
+                unlistedAt: explorePlanListings.unlistedAt,
+                saveCount: currentSaveCountSql(),
+              })
+              .from(explorePlanListings)
+              .where(eq(explorePlanListings.id, listingId))
+              .limit(1)
+          );
+          if (!row) return undefined;
+          const listing = yield* decodeRecord(
+            row,
+            "getPublicExploreListing.decode"
+          );
+          const saveCount = Number(row.saveCount);
+          if (!Number.isInteger(saveCount) || saveCount < 0) {
+            return yield* Effect.fail(
+              malformed("getPublicExploreListing.decode")
+            );
+          }
+          return { ...listing.listing, saveCount } satisfies ExploreListingReadModel;
         }),
 
       findBySource: (sourceTripId: TripId, sourcePlanId: PlanId) =>
@@ -483,10 +547,17 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
           return listing;
         }),
 
-      listListed: ({ limit, cursor, filters }) =>
+      listListed: ({ limit, cursor, filters, rankedAt }) =>
         Effect.gen(function* () {
           const listedFilter = eq(explorePlanListings.status, "LISTED");
           const snapshot = explorePlanListings.snapshot;
+          const anchor = new Date(rankedAt ?? new Date().toISOString());
+          if (!Number.isFinite(anchor.getTime())) {
+            return yield* Effect.fail(malformed("listExploreListings"));
+          }
+          const rankScore = rankScoreSql(anchor);
+          const currentSaveCount = currentSaveCountSql();
+          const maxRankScore = sql<number>`max(${rankScore}) over ()`;
 
           // 검색과 facet은 server-only source columns나 private trip_rooms가 아니라
           // sanitized public snapshot JSONB에만 적용한다. `strpos`를 사용해 `%`/`_`도
@@ -538,15 +609,22 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
             ? sql<boolean>`${snapshot} -> 'dateRange' ->> 'startDate' <= ${filters.endDate}`
             : undefined;
 
-          // keyset predicate: (listed_at, id) < (cursor.listedAt, cursor.id)
-          // under (listed_at DESC, id DESC) ordering. 필터를 먼저 적용한 subset에서도
-          // 같은 tuple order를 유지해 page 간 duplicate/gap을 만들지 않는다.
+          // keyset predicate exactly matches the ranked order.
           const cursorFilter = cursor
             ? or(
-                lt(explorePlanListings.listedAt, new Date(cursor.listedAt)),
+                lt(rankScore, cursor.rankScore),
                 and(
-                  eq(explorePlanListings.listedAt, new Date(cursor.listedAt)),
-                  lt(explorePlanListings.id, cursor.listingId)
+                  eq(rankScore, cursor.rankScore),
+                  or(
+                    lt(explorePlanListings.listedAt, new Date(cursor.listedAt)),
+                    and(
+                      eq(
+                        explorePlanListings.listedAt,
+                        new Date(cursor.listedAt)
+                      ),
+                      lt(explorePlanListings.id, cursor.listingId)
+                    )
+                  )
                 )
               )
             : undefined;
@@ -564,28 +642,84 @@ export const ExplorePlanRepositoryLive: Layer.Layer<
 
           const rows = yield* databaseEffect("listExploreListings", () =>
             db
-              .select()
+              .select({
+                id: explorePlanListings.id,
+                sourceTripId: explorePlanListings.sourceTripId,
+                sourcePlanId: explorePlanListings.sourcePlanId,
+                sourceAuthorParticipantId:
+                  explorePlanListings.sourceAuthorParticipantId,
+                status: explorePlanListings.status,
+                listingRevision: explorePlanListings.listingRevision,
+                sourcePlanRevision: explorePlanListings.sourcePlanRevision,
+                snapshot: explorePlanListings.snapshot,
+                listedAt: explorePlanListings.listedAt,
+                updatedAt: explorePlanListings.updatedAt,
+                unlistedAt: explorePlanListings.unlistedAt,
+                saveCount: currentSaveCount,
+                rankScore,
+                maxRankScore,
+              })
               .from(explorePlanListings)
               .where(where)
-              .orderBy(desc(explorePlanListings.listedAt), desc(explorePlanListings.id))
+              .orderBy(
+                desc(rankScore),
+                desc(explorePlanListings.listedAt),
+                desc(explorePlanListings.id)
+              )
               // limit+1로 다음 페이지 존재 여부를 판단한다.
               .limit(limit + 1)
           );
 
           const hasMore = rows.length > limit;
           const pageRows = hasMore ? rows.slice(0, limit) : rows;
-          const records = yield* Effect.forEach(pageRows, (row) =>
-            decodeRecord(row, "listExploreListings.decode")
+          const decoded = yield* Effect.forEach(pageRows, (row) =>
+            Effect.gen(function* () {
+              const saveCount = Number(row.saveCount);
+              const rowRankScore = Number(row.rankScore);
+              const rowMaxRankScore = Number(row.maxRankScore);
+              if (
+                !Number.isInteger(saveCount) ||
+                saveCount < 0 ||
+                !Number.isInteger(rowRankScore) ||
+                rowRankScore < 0 ||
+                !Number.isInteger(rowMaxRankScore) ||
+                rowMaxRankScore < 0
+              ) {
+                return yield* Effect.fail(malformed("listExploreListings.decode"));
+              }
+              const record = yield* decodeRecord(
+                row,
+                "listExploreListings.decode"
+              );
+              return {
+                listing: { ...record.listing, saveCount },
+                rankScore: rowRankScore,
+                maxRankScore: rowMaxRankScore,
+              };
+            })
           );
-          const page = records.map((record) => record.listing);
+          const page = decoded.map((entry) => entry.listing);
 
           const last = page[page.length - 1];
+          const lastDecoded = decoded[decoded.length - 1];
           const nextCursor: ExploreListingCursor | undefined =
-            hasMore && last
-              ? { listedAt: last.listedAt, listingId: last.listingId }
+            hasMore && last && lastDecoded
+              ? {
+                  rankedAt: anchor.toISOString(),
+                  rankScore: lastDecoded.rankScore,
+                  listedAt: last.listedAt,
+                  listingId: last.listingId,
+                }
               : undefined;
 
-          return { page, nextCursor };
+          return {
+            page,
+            nextCursor,
+            rankingMode:
+              decoded[0]?.maxRankScore && decoded[0].maxRankScore > 0
+                ? ("RECENT_SAVE_ACTIVITY" as const)
+                : ("RECENCY_FALLBACK" as const),
+          };
         }),
 
       listPopularCities: ({ limit }) =>

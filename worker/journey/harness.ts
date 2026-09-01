@@ -69,7 +69,9 @@ export interface ExploreListingRecord {
 export interface ExploreSaveRecord {
   participantId: string;
   listingId: string;
+  saveCycle?: number;
   savedAt: string;
+  unsavedAt?: string | null;
 }
 
 export interface ParticipantAliasRecord {
@@ -83,6 +85,7 @@ interface Store {
   exploreListingCities: Map<string, Set<string>>;
   exploreSaves: ExploreSaveRecord[];
   participantAliases: ParticipantAliasRecord[];
+  registeredParticipantIds: Set<string>;
   /**
    * 테스트 전용 one-shot 훅. 다음 explore listing INSERT가 실행되기 "직전"에 한 번
    * 호출된다(그 뒤 자동 해제). concurrent first-list race를 결정론적으로 재현하는
@@ -104,6 +107,7 @@ const cloneStore = (store: Store): Store => ({
   ),
   exploreSaves: store.exploreSaves.map((row) => ({ ...row })),
   participantAliases: store.participantAliases.map((row) => ({ ...row })),
+  registeredParticipantIds: new Set(store.registeredParticipantIds),
   beforeNextListingInsert: store.beforeNextListingInsert,
 });
 
@@ -113,6 +117,7 @@ const restoreStore = (target: Store, source: Store): void => {
   target.exploreListingCities = source.exploreListingCities;
   target.exploreSaves = source.exploreSaves;
   target.participantAliases = source.participantAliases;
+  target.registeredParticipantIds = source.registeredParticipantIds;
   target.beforeNextListingInsert = source.beforeNextListingInsert;
 };
 
@@ -146,6 +151,63 @@ const rowToListingArray = (r: ExploreListingRecord): unknown[] => [
   r.unlistedAt,
 ];
 
+const iso = (value: unknown): string =>
+  value instanceof Date ? value.toISOString() : String(value);
+
+const canonicalParticipantId = (store: Store, participantId: string): string =>
+  store.participantAliases.find((a) => a.aliasParticipantId === participantId)
+    ?.canonicalParticipantId ?? participantId;
+
+const isActiveSave = (save: ExploreSaveRecord): boolean =>
+  save.unsavedAt == null;
+
+const saveCount = (
+  store: Store,
+  listingId: string,
+  asOf?: string
+): number => {
+  const canonicalIds = new Set<string>();
+  const anchor = asOf ? new Date(asOf).getTime() : undefined;
+  for (const save of store.exploreSaves) {
+    if (save.listingId !== listingId) continue;
+    const canonicalId = canonicalParticipantId(store, save.participantId);
+    if (!store.registeredParticipantIds.has(canonicalId)) continue;
+    if (anchor === undefined) {
+      if (!isActiveSave(save)) continue;
+    } else {
+      const savedAt = new Date(save.savedAt).getTime();
+      const unsavedAt = save.unsavedAt ? new Date(save.unsavedAt).getTime() : null;
+      if (
+        !(savedAt > anchor - 30 * 24 * 60 * 60 * 1000) ||
+        !(savedAt <= anchor) ||
+        !(unsavedAt === null || unsavedAt > anchor)
+      ) {
+        continue;
+      }
+    }
+    canonicalIds.add(canonicalId);
+  }
+  return canonicalIds.size;
+};
+
+const rowToPublicListingArray = (
+  r: ExploreListingRecord,
+  count: number
+): unknown[] => [
+  r.id,
+  r.sourceTripId,
+  r.sourcePlanId,
+  r.sourceAuthorParticipantId,
+  r.status,
+  r.listingRevision,
+  r.sourcePlanRevision,
+  r.snapshot,
+  r.listedAt,
+  r.updatedAt,
+  r.unlistedAt,
+  count,
+];
+
 /**
  * SQL executor.
  *
@@ -163,7 +225,10 @@ class QueryEngine {
   execute(rawText: string, params: readonly unknown[]): { rows: unknown[][] } {
     const text = normalize(rawText);
 
-    if (text.includes('from "participant_alias"')) {
+    if (
+      text.includes('from "participant_alias"') &&
+      !text.includes('"explore_plan_saves"')
+    ) {
       const ids = new Set(params.map((p) => String(p)));
       const rows = this.store.participantAliases
         .filter((a) => ids.has(a.aliasParticipantId))
@@ -184,10 +249,11 @@ class QueryEngine {
       return this.executeListingCities(text, params);
     }
 
-    if (
-      text.includes('"explore_plan_listings"') &&
-      !text.includes('"explore_plan_saves"')
-    ) {
+    if (text.includes("deduped_saves")) {
+      return this.executeSaves(text, params);
+    }
+
+    if (text.includes('"explore_plan_listings"')) {
       return this.executeListings(text, params);
     }
 
@@ -301,6 +367,22 @@ class QueryEngine {
     text: string,
     params: readonly unknown[]
   ): { rows: unknown[][] } {
+    // save transaction listing lock: status is the only selected column.
+    if (text.startsWith('select "status"') && text.includes("for update")) {
+      const row = this.store.exploreListings.get(String(params[0]));
+      return { rows: row ? [[row.status]] : [] };
+    }
+
+    // public detail: the listing row is read together with its authoritative count.
+    if (
+      text.startsWith('select "id"') &&
+      text.includes('where "explore_plan_listings"."id" = $1') &&
+      text.includes("count(distinct")
+    ) {
+      const row = this.store.exploreListings.get(String(params[0]));
+      return { rows: row ? [rowToPublicListingArray(row, saveCount(this.store, row.id))] : [] };
+    }
+
     // getById: where id = $1, full projection incl. source_*
     if (
       text.startsWith('select "id"') &&
@@ -323,16 +405,19 @@ class QueryEngine {
       return { rows: row ? [rowToListingArray(row)] : [] };
     }
 
-    // listListed feed: status filter + optional keyset + order desc + limit
+    // listListed feed: ranked save activity + recency tie-break + limit.
     if (
       text.startsWith('select "id"') &&
-      text.includes('"status" = $1') &&
+      text.includes('"status"') &&
+      text.includes("ranked_save") &&
       text.includes("order by")
     ) {
-      const status = String(params[0]);
-      let rows = [...this.store.exploreListings.values()].filter(
-        (l) => l.status === status
+      const status = String(params.find((p) => p === "LISTED") ?? "LISTED");
+      const dateParams = params.filter(
+        (p): p is Date => p instanceof Date
       );
+      const rankedAt = dateParams[1]?.toISOString() ?? new Date().toISOString();
+      let rows = [...this.store.exploreListings.values()].filter((l) => l.status === status);
       const cityPlaceholder = /city\.city_id = \$(\d+)/.exec(text);
       if (cityPlaceholder) {
         const cityId = String(params[Number(cityPlaceholder[1]) - 1]);
@@ -340,26 +425,49 @@ class QueryEngine {
           this.store.exploreListingCities.get(l.id)?.has(cityId)
         );
       }
-      if (text.includes("<")) {
-        const cursorListedAt = String(params[1]);
-        const cursorId = String(params[3]);
-        rows = rows.filter(
-          (l) =>
-            l.listedAt < cursorListedAt ||
-            (l.listedAt === cursorListedAt && l.id < cursorId)
+      const ranked = rows.map((listing) => ({
+        listing,
+        rankScore: saveCount(this.store, listing.id, rankedAt),
+      }));
+      const maxRankScore = Math.max(0, ...ranked.map((row) => row.rankScore));
+      const cursorRank = params.filter((p) => typeof p === "number");
+      const listedAtPlaceholder = /"listed_at" < \$(\d+)/.exec(text);
+      const idPlaceholder = /"id" < \$(\d+)/.exec(text);
+      const cursorListedAt = listedAtPlaceholder
+        ? String(params[Number(listedAtPlaceholder[1]) - 1])
+        : undefined;
+      const cursorId = idPlaceholder
+        ? String(params[Number(idPlaceholder[1]) - 1])
+        : undefined;
+      const cursorRankScore = cursorRank.length > 1 ? Number(cursorRank[0]) : undefined;
+      const pageRows = ranked
+        .filter(({ rankScore, listing }) =>
+          cursorRankScore === undefined
+            ? true
+            : rankScore < cursorRankScore ||
+              (rankScore === cursorRankScore &&
+                (listing.listedAt < String(cursorListedAt) ||
+                  (listing.listedAt === cursorListedAt && listing.id < String(cursorId))))
+        )
+        .sort((a, b) =>
+          a.rankScore !== b.rankScore
+            ? b.rankScore - a.rankScore
+            : a.listing.listedAt !== b.listing.listedAt
+              ? a.listing.listedAt < b.listing.listedAt
+                ? 1
+                : -1
+              : a.listing.id < b.listing.id
+                ? 1
+                : -1
         );
-      }
       const limit = Number(params[params.length - 1]);
-      rows.sort((a, b) =>
-        a.listedAt !== b.listedAt
-          ? a.listedAt < b.listedAt
-            ? 1
-            : -1
-          : a.id < b.id
-            ? 1
-            : -1
-      );
-      return { rows: rows.slice(0, limit).map(rowToListingArray) };
+      return {
+        rows: pageRows.slice(0, limit).map(({ listing, rankScore }) => [
+          ...rowToPublicListingArray(listing, saveCount(this.store, listing.id)),
+          rankScore,
+          maxRankScore,
+        ]),
+      };
     }
 
     // select "listing_revision" ... where id=$1 (compareAndSet conflict probe)
@@ -545,11 +653,35 @@ class QueryEngine {
     text: string,
     params: readonly unknown[]
   ): { rows: unknown[][] } {
-    if (text.includes("inner join") || text.includes("deduped_saves")) {
+    if (text.includes("deduped_saves")) {
       return this.executeSavedList(text, params);
     }
 
-    // isSaved/exists: select listing_id where participant_id in (...) and listing_id=$ limit
+    if (text.includes("count(distinct")) {
+      const listingId = String(params[0]);
+      const dateParams = params.filter((p) => p instanceof Date);
+      const asOf = dateParams.length > 0 ? dateParams[1] : undefined;
+      return { rows: [[saveCount(this.store, listingId, asOf?.toISOString())]] };
+    }
+
+    if (text.includes("max(")) {
+      const listingId = String(params[params.length - 1]);
+      const participantIds = params.slice(0, -1).map((p) => String(p));
+      const cycles = this.store.exploreSaves
+        .filter(
+          (save) =>
+            participantIds.includes(save.participantId) &&
+            save.listingId === listingId
+        )
+        .map((save) => save.saveCycle ?? 1);
+      return { rows: [[cycles.length ? Math.max(...cycles) : null]] };
+    }
+
+    if (text.includes("inner join")) {
+      return this.executeSavedList(text, params);
+    }
+
+    // save state / active-save probe.
     if (text.startsWith("select")) {
       const limitStripped = params.slice(0, -1);
       const listingId = String(limitStripped[limitStripped.length - 1]);
@@ -557,37 +689,51 @@ class QueryEngine {
       const found = this.store.exploreSaves.some(
         (s) =>
           participantIds.includes(s.participantId) && s.listingId === listingId
+          && isActiveSave(s)
       );
       return { rows: found ? [["x"]] : [] };
     }
 
-    // insert into explore_plan_saves ... on conflict do nothing
     if (text.startsWith("insert")) {
-      const [participantId, listingId, savedAt] = params as [
+      const [participantId, listingId, saveCycle, savedAt, unsavedAt] = params as [
         string,
         string,
+        number,
         string,
+        string | null,
       ];
       const exists = this.store.exploreSaves.some(
-        (s) => s.participantId === participantId && s.listingId === listingId
+        (s) =>
+          s.participantId === participantId &&
+          s.listingId === listingId &&
+          (s.saveCycle ?? 1) === saveCycle
       );
       if (!exists) {
-        this.store.exploreSaves.push({ participantId, listingId, savedAt });
+        this.store.exploreSaves.push({
+          participantId,
+          listingId,
+          saveCycle,
+          savedAt: iso(savedAt),
+          unsavedAt: unsavedAt == null ? null : iso(unsavedAt),
+        });
       }
       return { rows: [] };
     }
 
-    // delete from explore_plan_saves where participant_id in (...) and listing_id=$
-    if (text.startsWith("delete")) {
+    // unsave closes intervals; history rows are never deleted.
+    if (text.startsWith("update")) {
       const listingId = String(params[params.length - 1]);
-      const participantIds = params.slice(0, -1).map((p) => String(p));
-      this.store.exploreSaves = this.store.exploreSaves.filter(
-        (s) =>
-          !(
-            participantIds.includes(s.participantId) &&
-            s.listingId === listingId
-          )
-      );
+      const participantIds = params.slice(1, -1).map((p) => String(p));
+      const unsavedAt = iso(params[0]);
+      for (const save of this.store.exploreSaves) {
+        if (
+          participantIds.includes(save.participantId) &&
+          save.listingId === listingId &&
+          isActiveSave(save)
+        ) {
+          save.unsavedAt = unsavedAt;
+        }
+      }
       return { rows: [] };
     }
 
@@ -598,7 +744,8 @@ class QueryEngine {
     _text: string,
     params: readonly unknown[]
   ): { rows: unknown[][] } {
-    // params: [...participantIds, 'LISTED', (cursorSavedAt, cursorSavedAt, cursorListingId)?, limit]
+    // params: [...participantIds, 'LISTED', (cursorSavedAt, cursorSavedAt,
+    // cursorListingId)?, limit]
     const listedIdx = params.findIndex((p) => p === "LISTED");
     const participantIds = params.slice(0, listedIdx).map((p) => String(p));
     const rest = params.slice(listedIdx + 1);
@@ -610,7 +757,7 @@ class QueryEngine {
 
     const grouped = new Map<string, string>();
     for (const s of this.store.exploreSaves) {
-      if (!participantIds.includes(s.participantId)) continue;
+      if (!participantIds.includes(s.participantId) || !isActiveSave(s)) continue;
       const existing = grouped.get(s.listingId);
       if (existing === undefined || s.savedAt < existing) {
         grouped.set(s.listingId, s.savedAt);
@@ -658,6 +805,7 @@ class QueryEngine {
       e.listing.listedAt,
       e.listing.updatedAt,
       e.listing.unlistedAt,
+      saveCount(this.store, e.listing.id),
     ]);
     return { rows };
   }
@@ -739,6 +887,7 @@ export const createJourneyHarness = (seed: HarnessSeed): JourneyHarness => {
     exploreListingCities: new Map(),
     exploreSaves: [],
     participantAliases: [],
+    registeredParticipantIds: new Set(),
   };
   for (const room of seed.tripRooms ?? []) {
     store.tripRooms.set(room.id, { ...room });
@@ -749,6 +898,7 @@ export const createJourneyHarness = (seed: HarnessSeed): JourneyHarness => {
   }
   store.exploreSaves = (seed.exploreSaves ?? []).map((s) => ({ ...s }));
   for (const p of seed.participants) {
+    if (p.accountType !== "GUEST") store.registeredParticipantIds.add(p.id);
     for (const alias of p.aliases ?? []) {
       store.participantAliases.push({
         aliasParticipantId: alias,

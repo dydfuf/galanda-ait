@@ -484,9 +484,11 @@ export const listExploreListings = Effect.fn("listExploreListings")(
     yield* requireAuthSession("탐색을 보려면 로그인이 필요합니다.");
 
     const explore = yield* ExplorePlanRepository;
+    const rankedAt = query.cursor?.rankedAt ?? (yield* nowIso);
     const result: ListListedResult = yield* explore.listListed({
       limit: query.limit,
       cursor: query.cursor,
+      rankedAt,
       filters: query.filters,
     });
 
@@ -533,7 +535,7 @@ export const getExploreListingDetail = Effect.fn("getExploreListingDetail")(
     yield* requireAuthSession("탐색을 보려면 로그인이 필요합니다.");
 
     const explore = yield* ExplorePlanRepository;
-    const record = yield* explore.getById(query.listingId);
+    const record = yield* explore.getPublicById(query.listingId);
 
     // 없음: deleted/invalid/never-existed. cached private fallback 없이 NotFound.
     if (!record) {
@@ -546,12 +548,12 @@ export const getExploreListingDetail = Effect.fn("getExploreListingDetail")(
     }
 
     // UNLISTED: 존재하지만 더 이상 공개하지 않음. NotFound와 구분되는 gone(410).
-    if (record.listing.status !== "LISTED") {
+    if (record.status !== "LISTED") {
       return yield* Effect.fail(new ExploreListingUnavailableError());
     }
 
     // LISTED: public envelope + immutable snapshot만 반환한다(source ref 제외).
-    return record.listing;
+    return record;
   }
 );
 

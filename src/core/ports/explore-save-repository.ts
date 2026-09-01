@@ -4,6 +4,10 @@ import type {
   ParticipantId,
 } from "../domain/ids.ts";
 import type { ExplorePlanListing } from "../domain/explore-plan.ts";
+import type {
+  ExploreListingUnavailableError,
+  NotFoundError,
+} from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
 
 /**
@@ -68,6 +72,7 @@ export interface SavedListingCursor {
 export interface SavedListingEntry {
   readonly savedAt: string;
   readonly listing: ExplorePlanListing;
+  readonly saveCount: number;
 }
 
 export interface ListSavedListingsResult {
@@ -78,11 +83,10 @@ export interface ListSavedListingsResult {
 /**
  * Explore save 저장소 port.
  *
- * - `save`: `(participantId, listingId)` composite uniqueness를 이용해 idempotent
- *   하게 저장한다(ON CONFLICT DO NOTHING). alias 집합 중 이미 저장된 row가 있으면
- *   새 row를 만들지 않는다(논리적 중복 방지). 반환값은 "지금 저장돼 있는가"다.
- * - `unsave`: alias 집합 전체에서 해당 listing save를 삭제한다. 대상이 없어도
- *   실패하지 않는다(반복 안전, idempotent).
+ * - `save`: active alias row가 있으면 idempotent하게 유지하고, 없으면 canonical
+ *   participant의 새 save interval을 기록한다. 반환값은 authoritative count다.
+ * - `unsave`: alias 집합 전체의 active interval을 닫는다. 대상이 없어도 실패하지
+ *   않는다(반복 안전, idempotent).
  * - `isSaved`: alias 집합 중 하나라도 해당 listing을 저장했는지 여부.
  * - `listSaved`: alias 집합의 saved 항목을 LISTED listing과 join해 최신순 페이지로
  *   반환한다(UNLISTED/deleted 제외, read-through).
@@ -92,17 +96,27 @@ export class ExploreSaveRepository extends Context.Service<
   {
     readonly save: (
       params: SaveExploreListingParams
-    ) => RepositoryEffect<{ readonly saved: true }>;
+    ) => RepositoryEffect<
+      { readonly saved: true; readonly saveCount: number },
+      NotFoundError | ExploreListingUnavailableError
+    >;
 
     readonly unsave: (params: {
       readonly participantIds: ReadonlyArray<ParticipantId>;
       readonly listingId: ExploreListingId;
-    }) => RepositoryEffect<{ readonly saved: false }>;
+      readonly unsavedAt: string;
+    }) => RepositoryEffect<{
+      readonly saved: false;
+      readonly saveCount: number;
+    }>;
 
     readonly isSaved: (params: {
       readonly participantIds: ReadonlyArray<ParticipantId>;
       readonly listingId: ExploreListingId;
-    }) => RepositoryEffect<boolean>;
+    }) => RepositoryEffect<{
+      readonly saved: boolean;
+      readonly saveCount: number;
+    }>;
 
     readonly listSaved: (
       params: ListSavedListingsParams

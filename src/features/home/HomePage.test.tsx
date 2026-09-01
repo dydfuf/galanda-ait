@@ -34,7 +34,8 @@ const savedItem = (id: string, title: string): SavedListingItem => ({
   listing: {
     listingId: id as SavedListingItem["listing"]["listingId"],
     status: "LISTED",
-    listingRevision: 1 as SavedListingItem["listing"]["listingRevision"],
+  listingRevision: 1 as SavedListingItem["listing"]["listingRevision"],
+  saveCount: 0,
     listedAt: "2026-09-05T00:00:00.000Z",
     updatedAt: "2026-09-05T00:00:00.000Z",
     snapshot: {

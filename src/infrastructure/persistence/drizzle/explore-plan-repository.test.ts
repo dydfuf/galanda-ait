@@ -71,6 +71,27 @@ const row = (overrides?: {
   ];
 };
 
+/** listListed projection order: public columns plus save/rank aggregates. */
+const rankedRow = (overrides?: Parameters<typeof row>[0]) => {
+  const legacy = row(overrides);
+  return [
+    legacy[0],
+    legacy[1],
+    legacy[2],
+    legacy[3],
+    legacy[5],
+    legacy[6],
+    legacy[7],
+    legacy[4],
+    legacy[8],
+    legacy[9],
+    legacy[10],
+    0,
+    0,
+    0,
+  ];
+};
+
 const record = (): ExplorePlanListingRecord => ({
   listing: {
     listingId: ExploreListingIdSchema.make("listing-1"),
@@ -638,14 +659,14 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(error).toMatchObject({ entity: "ExplorePlanListing" });
   });
 
-  it("listListed는 LISTED만 listed_at DESC,id DESC로 조회하고 limit+1로 nextCursor를 만든다", async () => {
+  it("listListed는 save rank와 listed_at/id tie-break로 조회하고 limit+1로 nextCursor를 만든다", async () => {
     const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
     // 3 rows returned for limit 2 -> hasMore, page = first 2, nextCursor from row[1]
     const db = makeDb(() => ({
       rows: [
-        row({ id: "listing-a", listedAt: "2026-09-03T00:00:00.000Z" }),
-        row({ id: "listing-b", listedAt: "2026-09-02T00:00:00.000Z" }),
-        row({ id: "listing-c", listedAt: "2026-09-01T00:00:00.000Z" }),
+        rankedRow({ id: "listing-a", listedAt: "2026-09-03T00:00:00.000Z" }),
+        rankedRow({ id: "listing-b", listedAt: "2026-09-02T00:00:00.000Z" }),
+        rankedRow({ id: "listing-c", listedAt: "2026-09-01T00:00:00.000Z" }),
       ],
     }), calls);
 
@@ -664,19 +685,24 @@ describe("ExplorePlanRepositoryLive", () => {
       "listing-b",
     ]);
     expect(result.nextCursor).toEqual({
+      rankedAt: expect.any(String),
+      rankScore: 0,
       listedAt: "2026-09-02T00:00:00.000Z",
       listingId: "listing-b",
     });
     const select = calls[0];
     expect(select.text).toContain('"status" = $');
     expect(select.params).toContain("LISTED");
-    expect(select.text).toContain('order by "explore_plan_listings"."listed_at" desc, "explore_plan_listings"."id" desc');
+    expect(select.text).toContain('order by (');
+    expect(select.text).toContain(
+      '"explore_plan_listings"."listed_at" desc, "explore_plan_listings"."id" desc'
+    );
     expect(select.params).toContain(3); // limit + 1
   });
 
   it("listListed는 마지막 페이지에서 nextCursor 없이 반환한다", async () => {
     const db = makeDb(() => ({
-      rows: [row({ id: "listing-a" })],
+      rows: [rankedRow({ id: "listing-a" })],
     }));
 
     const result = await Effect.runPromise(
@@ -705,6 +731,8 @@ describe("ExplorePlanRepositoryLive", () => {
           return yield* repository.listListed({
             limit: 2,
             cursor: {
+              rankedAt: "2026-09-03T00:00:00.000Z",
+              rankScore: 0,
               listedAt: "2026-09-02T00:00:00.000Z",
               listingId: ExploreListingIdSchema.make("listing-b"),
             },
@@ -736,6 +764,8 @@ describe("ExplorePlanRepositoryLive", () => {
           return yield* repository.listListed({
             limit: 5,
             cursor: {
+              rankedAt: "2026-09-03T00:00:00.000Z",
+              rankScore: 0,
               listedAt: "2026-09-02T00:00:00.000Z",
               listingId: ExploreListingIdSchema.make("listing-b"),
             },
@@ -769,8 +799,9 @@ describe("ExplorePlanRepositoryLive", () => {
     expect(select.text).toContain('"listed_at" < $');
     expect(select.text).toContain('"listed_at" = $');
     expect(select.text).toContain('"id" < $');
+    expect(select.text).toContain('order by (');
     expect(select.text).toContain(
-      'order by "explore_plan_listings"."listed_at" desc, "explore_plan_listings"."id" desc'
+      '"explore_plan_listings"."listed_at" desc, "explore_plan_listings"."id" desc'
     );
     expect(select.params).toEqual(
       expect.arrayContaining([

@@ -345,12 +345,12 @@ describe("API client", () => {
     let requested: RequestInfo | URL | undefined;
     globalThis.fetch = async (input) => {
       requested = input;
-      return jsonResponse({ items: [] });
+      return jsonResponse({ items: [], rankingMode: "RECENCY_FALLBACK" });
     };
 
     await expect(
       getExploreListings({ themeId: "food", limit: 20 })
-    ).resolves.toEqual({ items: [] });
+    ).resolves.toEqual({ items: [], rankingMode: "RECENCY_FALLBACK" });
     expect(requested).toBe("/api/explore/listings?limit=20&themeId=food");
   });
 
@@ -358,12 +358,12 @@ describe("API client", () => {
     let requested: RequestInfo | URL | undefined;
     globalThis.fetch = async (input) => {
       requested = input;
-      return jsonResponse({ items: [] });
+      return jsonResponse({ items: [], rankingMode: "RECENCY_FALLBACK" });
     };
 
     await expect(
       getExploreListings({ cityId: "osaka", limit: 20 })
-    ).resolves.toEqual({ items: [] });
+    ).resolves.toEqual({ items: [], rankingMode: "RECENCY_FALLBACK" });
     expect(requested).toBe("/api/explore/listings?limit=20&cityId=osaka");
   });
 

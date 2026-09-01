@@ -41,6 +41,7 @@ const listingColumns = (over?: {
     listedAt: new Date(listedAt),
     updatedAt: new Date(listedAt),
     unlistedAt: null,
+    saveCount: 0,
   };
 };
 
@@ -75,9 +76,15 @@ const provide = <A, E>(
 describe("ExploreSaveRepositoryLive", () => {
   it("save는 이미 저장돼 있으면 insert 없이 idempotent하게 성공한다", async () => {
     const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
-    // 첫 select(exists)가 row를 돌려주면 이미 저장된 상태.
+    // listing lock + active-save probe + aggregate count.
     const db = makeDb((config) => {
-      if (config.text.startsWith("select")) return { rows: [["existing"]] };
+      if (config.text.includes('from "explore_plan_listings"')) {
+        return { rows: [["LISTED"]] };
+      }
+      if (config.text.includes('select "listing_id"')) {
+        return { rows: [["existing"]] };
+      }
+      if (config.text.includes("count(distinct")) return { rows: [[0]] };
       return { rows: [] };
     }, calls);
 
@@ -96,7 +103,7 @@ describe("ExploreSaveRepositoryLive", () => {
       )
     );
 
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
     // insert가 발생하지 않았다.
     expect(calls.some((c) => c.text.startsWith("insert"))).toBe(false);
   });
@@ -104,7 +111,10 @@ describe("ExploreSaveRepositoryLive", () => {
   it("save는 미저장 시 canonical participant로 ON CONFLICT DO NOTHING insert한다", async () => {
     const calls: Array<{ readonly text: string; readonly params: unknown[] }> = [];
     const db = makeDb((config) => {
-      if (config.text.startsWith("select")) return { rows: [] };
+      if (config.text.includes('from "explore_plan_listings"')) {
+        return { rows: [["LISTED"]] };
+      }
+      if (config.text.includes("count(distinct")) return { rows: [[0]] };
       return { rows: [] };
     }, calls);
 
@@ -123,7 +133,7 @@ describe("ExploreSaveRepositoryLive", () => {
       )
     );
 
-    expect(result).toEqual({ saved: true });
+    expect(result).toEqual({ saved: true, saveCount: 0 });
     const insert = calls.find((c) => c.text.startsWith("insert"));
     expect(insert).toBeDefined();
     expect(insert!.text).toContain("on conflict");
@@ -147,13 +157,14 @@ describe("ExploreSaveRepositoryLive", () => {
           return yield* repo.unsave({
             participantIds: [participant, aliasParticipant],
             listingId,
+            unsavedAt: "2026-09-03T00:00:00.000Z",
           });
         })
       )
     );
 
-    expect(result).toEqual({ saved: false });
-    const del = calls.find((c) => c.text.startsWith("delete"));
+    expect(result).toEqual({ saved: false, saveCount: 0 });
+    const del = calls.find((c) => c.text.startsWith("update"));
     expect(del).toBeDefined();
     // alias 집합 모두가 삭제 조건에 포함된다.
     expect(del!.params).toContain("participant-canonical");
@@ -178,7 +189,7 @@ describe("ExploreSaveRepositoryLive", () => {
       )
     );
 
-    expect(saved).toBe(true);
+    expect(saved).toEqual({ saved: true, saveCount: 0 });
   });
 
   it("listSaved는 LISTED listing만 join하고 keyset paginate한다", async () => {

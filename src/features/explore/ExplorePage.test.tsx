@@ -37,6 +37,7 @@ const item = (over: { id: string; title?: string }): ExploreListingItem => ({
   listingId: over.id as ExploreListingItem["listingId"],
   status: "LISTED",
   listingRevision: 1 as ExploreListingItem["listingRevision"],
+  saveCount: 0,
   listedAt: "2026-09-05T00:00:00.000Z",
   updatedAt: "2026-09-05T00:00:00.000Z",
   snapshot: {

@@ -128,6 +128,29 @@ const listingRow = (over?: {
   ];
 };
 
+const rankedListingRow = (over?: Parameters<typeof listingRow>[0]): Array<unknown> => {
+  const legacy = listingRow(over);
+  return [
+    legacy[0],
+    legacy[1],
+    legacy[2],
+    legacy[3],
+    legacy[5],
+    legacy[6],
+    legacy[7],
+    legacy[4],
+    legacy[8],
+    legacy[9],
+    legacy[10],
+    0,
+    0,
+    0,
+  ];
+};
+
+const publicListingRow = (over?: Parameters<typeof listingRow>[0]): Array<unknown> =>
+  rankedListingRow(over).slice(0, 12);
+
 interface DbBehavior {
   readonly tripRoomRows?: Array<Array<unknown>>;
   /** rows returned by the create() source-revalidation `select "plans" ... for update` */
@@ -163,7 +186,10 @@ const makeApp = (
       params: unknown[] = []
     ) => {
       const text = config.text;
-      if (text.includes('from "participant_alias"')) return { rows: [] };
+      if (
+        text.includes('from "participant_alias"') &&
+        !text.includes('"explore_plan_saves"')
+      ) return { rows: [] };
       if (/^(begin|commit|rollback)/i.test(text)) return { rows: [] };
       calls.push({ text, params });
 
@@ -481,8 +507,8 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
   it("authenticated session은 다른 Trip membership 없이 공개 feed를 조회한다", async () => {
     const { app, calls } = makeApp({
       exploreSelectRows: [
-        listingRow({ id: "listing-1", listedAt: "2026-08-25T00:00:00.000Z" }),
-        listingRow({ id: "listing-2", listedAt: "2026-08-24T00:00:00.000Z" }),
+        rankedListingRow({ id: "listing-1", listedAt: "2026-08-25T00:00:00.000Z" }),
+        rankedListingRow({ id: "listing-2", listedAt: "2026-08-24T00:00:00.000Z" }),
       ],
     });
     const res = await app.fetch(request("/api/explore/listings"), env);
@@ -498,7 +524,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
 
   it("public shape만 반환하고 source private ID를 노출하지 않는다", async () => {
     const { app } = makeApp({
-      exploreSelectRows: [listingRow({ id: "listing-1" })],
+      exploreSelectRows: [rankedListingRow({ id: "listing-1" })],
     });
     const res = await app.fetch(request("/api/explore/listings"), env);
     expect(res.status).toBe(200);
@@ -559,7 +585,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
   });
 
   it("검색·목적지·경유 도시·테마·기간 filter를 strict DTO로 받아 public listing query에 전달한다", async () => {
-    const { app, calls } = makeApp({ exploreSelectRows: [listingRow()] });
+    const { app, calls } = makeApp({ exploreSelectRows: [rankedListingRow()] });
     const params = new URLSearchParams({
       query: "오사카",
       destination: "일본",
@@ -643,7 +669,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
   });
 
   it("cityId filter는 canonical city aggregate와 sidecar query로 전달한다", async () => {
-    const { app, calls } = makeApp({ exploreSelectRows: [listingRow()] });
+    const { app, calls } = makeApp({ exploreSelectRows: [rankedListingRow()] });
     const res = await app.fetch(
       request("/api/explore/listings?cityId=osaka"),
       env
@@ -704,8 +730,8 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
     // limit=1 요청 + 2 rows → adapter가 limit+1=2를 조회하고 hasMore로 판단.
     const { app } = makeApp({
       exploreSelectRows: [
-        listingRow({ id: "listing-1", listedAt: "2026-08-25T00:00:00.000Z" }),
-        listingRow({ id: "listing-2", listedAt: "2026-08-24T00:00:00.000Z" }),
+        rankedListingRow({ id: "listing-1", listedAt: "2026-08-25T00:00:00.000Z" }),
+        rankedListingRow({ id: "listing-2", listedAt: "2026-08-24T00:00:00.000Z" }),
       ],
     });
     const res = await app.fetch(request("/api/explore/listings?limit=1"), env);
@@ -720,7 +746,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
 
     // 발급된 cursor를 그대로 다시 넘기면 (round-trip decode 성공) 200을 받는다.
     const { app: app2 } = makeApp({
-      exploreSelectRows: [listingRow({ id: "listing-2", listedAt: "2026-08-24T00:00:00.000Z" })],
+      exploreSelectRows: [rankedListingRow({ id: "listing-2", listedAt: "2026-08-24T00:00:00.000Z" })],
     });
     const res2 = await app2.fetch(
       request(`/api/explore/listings?limit=1&cursor=${encodeURIComponent(body.nextCursor!)}`),
@@ -746,7 +772,7 @@ describe("Explore feed read (GET /api/explore/listings) — RAON-260 DISC-4", ()
 describe("Explore listing detail (GET /api/explore/listings/:listingId) — RAON-263 DISC-5", () => {
   it("LISTED listing은 200 + public detail을 반환하고 source private ID를 노출하지 않는다", async () => {
     const { app, calls } = makeApp({
-      exploreSelectRows: [listingRow({ id: "listing-1", status: "LISTED" })],
+      exploreSelectRows: [publicListingRow({ id: "listing-1", status: "LISTED" })],
     });
     const res = await app.fetch(request("/api/explore/listings/listing-1"), env);
     expect(res.status).toBe(200);
@@ -776,7 +802,7 @@ describe("Explore listing detail (GET /api/explore/listings/:listingId) — RAON
   it("UNLISTED listing은 410 LISTING_UNAVAILABLE로 응답한다(cached private fallback 없음)", async () => {
     const { app, calls } = makeApp({
       exploreSelectRows: [
-        listingRow({
+        publicListingRow({
           id: "listing-1",
           status: "UNLISTED",
           listingRevision: 2,

@@ -313,14 +313,14 @@ describe("Journey 2: save → Home saved ideas → unsave", () => {
     expect(before.status).toBe(200);
     expect(((await before.json()) as { items: unknown[] }).items).toHaveLength(0);
 
-    // save (LISTED만 허용) → { saved: true }.
+    // save (LISTED만 허용) → authoritative aggregate.
     const save1 = await harness.requestAs(
       VIEWER.id,
       `/api/explore/listings/${listingId}/save`,
       jsonBody({})
     );
     expect(save1.status).toBe(200);
-    expect((await save1.json()) as unknown).toEqual({ saved: true });
+    expect((await save1.json()) as unknown).toEqual({ saved: true, saveCount: 1 });
 
     // idempotent: 다시 저장해도 중복 row가 생기지 않는다.
     const save2 = await harness.requestAs(
@@ -329,7 +329,7 @@ describe("Journey 2: save → Home saved ideas → unsave", () => {
       jsonBody({})
     );
     expect(save2.status).toBe(200);
-    expect((await save2.json()) as unknown).toEqual({ saved: true });
+    expect((await save2.json()) as unknown).toEqual({ saved: true, saveCount: 1 });
     expect(
       harness.store.exploreSaves.filter(
         (s) => s.participantId === VIEWER.id && s.listingId === listingId
@@ -351,14 +351,14 @@ describe("Journey 2: save → Home saved ideas → unsave", () => {
     const authorSaved = await harness.requestAs(AUTHOR.id, "/api/me/saved");
     expect(((await authorSaved.json()) as { items: unknown[] }).items).toHaveLength(0);
 
-    // unsave → { saved: false }, saved-list에서 사라진다.
+    // unsave → authoritative aggregate, saved-list에서 사라진다.
     const unsave = await harness.requestAs(
       VIEWER.id,
       `/api/explore/listings/${listingId}/save`,
       { method: "DELETE", body: "{}" }
     );
     expect(unsave.status).toBe(200);
-    expect((await unsave.json()) as unknown).toEqual({ saved: false });
+    expect((await unsave.json()) as unknown).toEqual({ saved: false, saveCount: 0 });
 
     const after = await harness.requestAs(VIEWER.id, "/api/me/saved");
     expect(((await after.json()) as { items: unknown[] }).items).toHaveLength(0);
