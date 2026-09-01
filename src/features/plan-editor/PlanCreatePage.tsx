@@ -546,7 +546,6 @@ export function PlanCreatePage(): JSX.Element {
       {/* 화면 하단 고정 CTA (safe-area는 BottomAction이 처리해요) */}
       {!section &&
         !editor.draftConflict &&
-        !isRecommendationPending &&
         !recommendation && (
           <BottomAction
             accessory={
