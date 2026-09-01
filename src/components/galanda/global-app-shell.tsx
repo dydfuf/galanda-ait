@@ -24,10 +24,13 @@ import {
  * - focus-visible ring을 유지한다.
  * - 하단 safe-area(`--safe-bottom`)를 shell이 소유한다.
  *
- * 여백 소유권: shell이 하단 fixed bar를 그리고, 본문 wrapper가 bar 높이만큼
- * padding-bottom을 한 곳(single owner)에서 확보해 콘텐츠가 가려지지 않게 한다.
- * 기존 화면 하단 CTA(BottomAction)와는 다른 역할을 가지며, global surface에서는
- * BottomAction 대신 이 shell nav가 하단을 차지한다.
+ * 여백 소유권: Global nav가 viewport bottom과 safe-bottom의 owner다.
+ * 본문 wrapper가 bar 높이(`--global-nav-height`)만큼 padding-bottom을 확보해
+ * 콘텐츠가 가려지지 않게 한다.
+ * Global route가 contextual fixed action(예: `/trips`의 새 여행 CTA)을 함께 가질 수 있으며,
+ * 그런 action은 `--global-nav-height`만큼 nav 위로 offset한다.
+ * `BottomAction`이 shell 안에 위치할 때 safe-bottom을 중복 소유하지 않도록
+ * `--bottom-action-safe-bottom: 0px`를 사용한다.
  */
 
 const NAV_ICONS: Record<GlobalNavKey, typeof House> = {

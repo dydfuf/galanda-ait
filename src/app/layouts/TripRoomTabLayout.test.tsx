@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PlatformAdapter, PlatformNavigation } from "../../platform/types.ts";
@@ -26,10 +26,35 @@ vi.mock("../../platform/index.ts", () => ({
 
 import { TripRoomTabLayout } from "./TripRoomTabLayout.tsx";
 
-const renderLayout = (initialEntry = "/trips/trip-1/plans") =>
+function LocationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <div>
+      <span data-testid="location-pathname">{location.pathname}</span>
+      <button
+        type="button"
+        data-testid="test-back-btn"
+        onClick={() => navigate(-1)}
+      >
+        뒤로
+      </button>
+    </div>
+  );
+}
+
+const renderLayout = (
+  initialEntries: string[] | string = "/trips/trip-1/plans",
+  initialIndex = 0,
+) =>
   render(
-    <MemoryRouter initialEntries={[initialEntry]}>
+    <MemoryRouter
+      initialEntries={Array.isArray(initialEntries) ? initialEntries : [initialEntries]}
+      initialIndex={initialIndex}
+    >
+      <LocationProbe />
       <Routes>
+        <Route path="/trips" element={<h1>여행 목록 콘텐츠</h1>} />
         <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
           <Route path="plans" element={<h1>계획 콘텐츠</h1>} />
           <Route path="itinerary" element={<h1>일정 콘텐츠</h1>} />
@@ -223,5 +248,122 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "일정 콘텐츠" }),
     ).toBeInTheDocument();
+  });
+
+  it("selects the plans Mode Tab for direct entry with and without trailing slash or uppercase", () => {
+    const { unmount } = renderLayout("/trips/trip-1/plans");
+    expectPlansTabSelected();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    const { unmount: unmount2 } = renderLayout("/trips/trip-1/plans/");
+    expectPlansTabSelected();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+    unmount2();
+
+    renderLayout("/trips/trip-1/PLANS");
+    expectPlansTabSelected();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+  });
+
+  it("selects the itinerary Mode Tab for uppercase direct entry", () => {
+    renderLayout("/trips/trip-1/ITINERARY");
+
+    expect(screen.getByRole("tab", { name: "계획" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "일정 콘텐츠" }),
+    ).toBeInTheDocument();
+  });
+
+  it("계획 → 일정 탭 전환 시 URL이 바뀌고 일정 콘텐츠가 렌더링된다", () => {
+    renderLayout("/trips/trip-1/plans");
+
+    expectPlansTabSelected();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+
+    const itineraryTab = screen.getByRole("tab", { name: "일정" });
+    fireEvent.click(itineraryTab);
+
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent(
+      "/trips/trip-1/itinerary",
+    );
+    expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "계획" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(
+      screen.getByRole("heading", { level: 1, name: "일정 콘텐츠" }),
+    ).toBeInTheDocument();
+  });
+
+  it("일정 → 계획 탭 전환 시 URL이 바뀌고 계획 콘텐츠가 렌더링된다", () => {
+    renderLayout("/trips/trip-1/itinerary");
+
+    expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    const plansTab = screen.getByRole("tab", { name: "계획" });
+    fireEvent.click(plansTab);
+
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent(
+      "/trips/trip-1/plans",
+    );
+    expectPlansTabSelected();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
+    ).toBeInTheDocument();
+  });
+
+  it("탭 전환 시 replace: true 계약이 유지되어 browser back 실행 시 이전 진입점(/trips)으로 복귀한다", () => {
+    renderLayout(["/trips", "/trips/trip-1/plans"], 1);
+
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent(
+      "/trips/trip-1/plans",
+    );
+
+    // 일정 탭으로 전환 (replace: true)
+    const itineraryTab = screen.getByRole("tab", { name: "일정" });
+    fireEvent.click(itineraryTab);
+
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent(
+      "/trips/trip-1/itinerary",
+    );
+
+    // Back 실행
+    fireEvent.click(screen.getByTestId("test-back-btn"));
+
+    // /trips/trip-1/plans 가 아닌 /trips 로 복귀해야 한다
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/trips");
+    expect(
+      screen.getByRole("heading", { level: 1, name: "여행 목록 콘텐츠" }),
+    ).toBeInTheDocument();
+  });
+
+  it("TripRoomTabLayout 단위에서는 Global nav가 렌더되지 않는다", () => {
+    renderLayout("/trips/trip-1/plans");
+    expect(
+      screen.queryByRole("navigation", { name: "주요 화면" }),
+    ).not.toBeInTheDocument();
   });
 });

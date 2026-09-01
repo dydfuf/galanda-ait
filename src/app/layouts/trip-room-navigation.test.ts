@@ -75,12 +75,14 @@ function assertWithCounterexample(
 }
 
 describe("Trip Room mode navigation", () => {
-  it("derives the mode from canonical and trailing-slash URLs", () => {
+  it("derives the mode from canonical, trailing-slash, and uppercase URLs", () => {
     expect(getTripRoomSection("/trips/trip-1/plans")).toBe("plans");
     expect(getTripRoomSection("/trips/trip-1/plans/")).toBe("plans");
+    expect(getTripRoomSection("/trips/trip-1/PLANS")).toBe("plans");
     expect(getTripRoomSection("/trips/trip-1/itinerary")).toBe("itinerary");
     expect(getTripRoomSection("/trips/trip-1/itinerary/")).toBe("itinerary");
     expect(getTripRoomSection("/trips/trip-1/itinerary///")).toBe("itinerary");
+    expect(getTripRoomSection("/trips/trip-1/ITINERARY")).toBe("itinerary");
     expect(getTripRoomSectionPath("trip-1", "itinerary")).toBe(
       "/trips/trip-1/itinerary",
     );
@@ -92,12 +94,16 @@ describe("Trip Room mode navigation", () => {
   it.each([
     ["/trips/trip-1/plans", "여행방"],
     ["/trips/trip-1/plans/", "여행방"],
+    ["/trips/trip-1/PLANS", "여행방"],
     ["/trips/trip-1/itinerary", "여행방"],
     ["/trips/trip-1/itinerary/", "여행방"],
+    ["/trips/trip-1/ITINERARY", "여행방"],
     ["/trips/trip-1/itinerary/edit", "일정 수정"],
     ["/trips/trip-1/itinerary/edit/", "일정 수정"],
+    ["/trips/trip-1/ITINERARY/EDIT", "일정 수정"],
     ["/trips/trip-1/plans/new/basic", "새 여행안"],
     ["/trips/trip-1/plans/new/basic/", "새 여행안"],
+    ["/trips/trip-1/PLANS/NEW/BASIC", "새 여행안"],
     ["/trips/trip-1/plans/compare", "여행안 비교"],
     ["/trips/trip-1/plans/compare/", "여행안 비교"],
     ["/trips/trip-1/plans/plan-1/edit", "여행안 수정"],

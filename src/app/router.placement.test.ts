@@ -3,38 +3,91 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /**
- * Router 배치 계약 (RAON-263 DISC-5).
+ * Router 배치 계약 (RAON-263 DISC-5 / Issue #96).
  *
- * `/explore/:listingId` focused detail route는 GlobalShellLayout **밖**,
- * SessionRoute **안**에 있어야 한다. 그래야 하단 Global 탐색 nav가 렌더되지 않고
- * (nav DOM 없음), 로그인 세션은 계속 요구된다. 컴포넌트 렌더 테스트가 nav 부재를
- * 증명하고, 이 소스 구조 테스트는 route 위치 자체를 고정한다.
+ * GlobalShellLayout은 Global IA 5개 목적지(/home, /explore, /trips, /me, /me/saved)만
+ * 감싸야 한다. Trip room 진입/홈 및 focused 화면은 GlobalShellLayout 밖에 위치해야
+ * 하단 Global nav가 렌더되지 않는다.
  */
 const routerSource = readFileSync(
   fileURLToPath(new URL("./router.tsx", import.meta.url)),
-  "utf8"
+  "utf8",
 );
 
-describe("AppRouter placement (RAON-263 DISC-5)", () => {
-  it("/explore/:listingId route가 GlobalShellLayout 블록 밖에 있다", () => {
-    const detailIdx = routerSource.indexOf('path="/explore/:listingId"');
-    expect(detailIdx).toBeGreaterThan(-1);
+describe("AppRouter placement (Issue #96 / RAON-263 DISC-5)", () => {
+  const shellStartIdx = routerSource.indexOf(
+    "<Route element={<GlobalShellLayout />}>",
+  );
+  const shellEndIdx = routerSource.indexOf("</Route>", shellStartIdx);
+  const globalShellBlock = routerSource.slice(shellStartIdx, shellEndIdx);
 
-    // GlobalShellLayout이 여는 지점과 그 Outlet이 닫히는 지점(다음 </Route>)을 찾는다.
-    const shellOpenIdx = routerSource.indexOf("<GlobalShellLayout />");
-    expect(shellOpenIdx).toBeGreaterThan(-1);
+  const sessionStartIdx = routerSource.indexOf(
+    "<Route element={<SessionRoute />}>",
+  );
+  const notFoundIdx = routerSource.indexOf('path="*"');
+  const sessionEndIdx = routerSource.lastIndexOf("</Route>", notFoundIdx);
+  const sessionBlock = routerSource.slice(sessionStartIdx, sessionEndIdx);
 
-    // GlobalShellLayout 안에 마운트된 destination(/home, /explore feed)은 shell 뒤에
-    // 위치한다. detail route는 shell 블록이 닫힌 이후(focused surface 주석 이후)에
-    // 위치해야 한다.
-    const focusedSurfaceIdx = routerSource.indexOf("focused surface: Global nav를 숨긴다");
-    expect(focusedSurfaceIdx).toBeGreaterThan(-1);
-    expect(detailIdx).toBeGreaterThan(focusedSurfaceIdx);
+  it("GlobalShellLayout 블록 안에 5개 전역 목적지만 정확히 포함된다", () => {
+    expect(shellStartIdx).toBeGreaterThan(-1);
+    expect(shellEndIdx).toBeGreaterThan(shellStartIdx);
+
+    expect(globalShellBlock).toContain('path="/home"');
+    expect(globalShellBlock).toContain('path="/explore"');
+    expect(globalShellBlock).toContain('path="/trips"');
+    expect(globalShellBlock).toContain('path="/me"');
+    expect(globalShellBlock).toContain('path="/me/saved"');
+
+    // Trip room 및 focused 화면은 GlobalShellLayout에 없어야 한다.
+    expect(globalShellBlock).not.toContain("TripRoomEntry");
+    expect(globalShellBlock).not.toContain("TripRoomTabLayout");
+    expect(globalShellBlock).not.toContain('path="/explore/:listingId"');
+    expect(globalShellBlock).not.toContain('path="/trips/new"');
+    expect(globalShellBlock).not.toContain("TripRoomChildLayout");
   });
 
-  it("feed(/explore)와 detail(/explore/:listingId)이 모두 등록되어 있다", () => {
-    expect(routerSource).toContain('path="/explore"');
-    expect(routerSource).toContain('path="/explore/:listingId"');
-    expect(routerSource).toContain("ExploreListingDetailPage");
+  it("Trip Room entry, tab layout, child routes는 Global shell 밖, SessionRoute 안에 있다", () => {
+    expect(sessionBlock).toContain("TripRoomEntry");
+    expect(sessionBlock).toContain("TripRoomTabLayout");
+    expect(sessionBlock).toContain("TripRoomChildLayout");
+    expect(sessionBlock).toContain('path="/explore/:listingId"');
+
+    // shell 블록 이후에 TripRoom / focused 화면들이 위치한다.
+    const tripEntryIdx = routerSource.indexOf(
+      "TripRoomEntry",
+      sessionStartIdx,
+    );
+    const tripTabIdx = routerSource.indexOf(
+      "TripRoomTabLayout",
+      sessionStartIdx,
+    );
+    expect(tripEntryIdx).toBeGreaterThan(shellEndIdx);
+    expect(tripTabIdx).toBeGreaterThan(shellEndIdx);
+  });
+
+  it("새 여행 생성과 동행자 설정은 registered session guard 안에 있다", () => {
+    const registeredStartIdx = routerSource.indexOf(
+      "<Route element={<SessionRoute registered />}>",
+    );
+    expect(registeredStartIdx).toBeGreaterThan(-1);
+    const registeredEndIdx = routerSource.indexOf("</Route>", registeredStartIdx);
+    const registeredBlock = routerSource.slice(
+      registeredStartIdx,
+      registeredEndIdx,
+    );
+
+    expect(registeredBlock).toContain('path="/trips/new"');
+    expect(registeredBlock).toContain('path="/trips/:tripId/setup/companions"');
+  });
+
+  it("standalone 화면(로그인, 초대, 플랫폼 전용, 404)은 Global shell 및 SessionRoute 밖에 있다", () => {
+    const loginIdx = routerSource.indexOf('path="/login"');
+    const inviteIdx = routerSource.indexOf('path="/invites/:inviteToken"');
+    const platformIdx = routerSource.indexOf("platformOnlyRoutes.map");
+
+    expect(loginIdx).toBeLessThan(sessionStartIdx);
+    expect(inviteIdx).toBeLessThan(sessionStartIdx);
+    expect(platformIdx).toBeLessThan(sessionStartIdx);
+    expect(notFoundIdx).toBeGreaterThan(sessionEndIdx);
   });
 });

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Bell, Compass, Plus } from "lucide-react";
+import { Compass, Plus } from "lucide-react";
 
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
@@ -108,21 +108,7 @@ export function HomePage() {
 
   return (
     <PageBody safeTop>
-      <PageTitle
-        title="홈"
-        action={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            disabled
-            aria-label="알림 기능 준비 중"
-            title="알림 기능 준비 중"
-          >
-            <Bell className="size-5" aria-hidden="true" />
-          </Button>
-        }
-      />
+      <PageTitle title="홈" />
 
       <div className="flex flex-col gap-6 px-(--app-inline-padding) pt-2">
         {tripContent}

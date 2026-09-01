@@ -97,27 +97,29 @@ export function AppRouter() {
         ))}
 
         <Route element={<SessionRoute />}>
-          {/*
-            Global 탐색 shell을 함께 보여주는 destination surface.
-            - /home, /explore, /me: honest destination
-            - /trips: 내 여행 목록
-            - /trips/:tripId(진입 리다이렉트), /trips/:tripId/{plans,itinerary}: 여행방 home surface
-          */}
+          {/* Global IA: 이 다섯 route만 Bottom Navigation을 소유한다. */}
           <Route element={<GlobalShellLayout />}>
             <Route path="/home" element={withSuspense(<HomePage />)} />
             <Route path="/explore" element={withSuspense(<ExplorePage />)} />
-            <Route path="/me" element={withSuspense(<MePage />)} />
-            <Route path="/me/saved" element={withSuspense(<SavedListingsPage />)} />
             <Route path="/trips" element={withSuspense(<TripListPage />)} />
+            <Route path="/me" element={withSuspense(<MePage />)} />
+            <Route
+              path="/me/saved"
+              element={withSuspense(<SavedListingsPage />)}
+            />
+          </Route>
 
-            {/* 여행방 진입 자동 리다이렉트 (미확정 -> plans / 확정 -> itinerary) */}
-            <Route path="/trips/:tripId" element={withSuspense(<TripRoomEntry />)} />
-
-            {/* 여행방 탭 레이아웃: 계획 탭 홈 및 일정 탭 홈 */}
-            <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
-              <Route path="plans" element={withSuspense(<PlanHomePage />)} />
-              <Route path="itinerary" element={withSuspense(<ItineraryPage />)} />
-            </Route>
+          {/* Trip entry와 Trip IA는 Global shell 밖이다. */}
+          <Route
+            path="/trips/:tripId"
+            element={withSuspense(<TripRoomEntry />)}
+          />
+          <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
+            <Route path="plans" element={withSuspense(<PlanHomePage />)} />
+            <Route
+              path="itinerary"
+              element={withSuspense(<ItineraryPage />)}
+            />
           </Route>
 
           {/*
