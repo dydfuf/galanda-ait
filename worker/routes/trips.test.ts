@@ -212,6 +212,7 @@ describe("Trip API vertical slice", () => {
     const updated = { ...room, title: "교토와 오사카", revision: RevisionSchema.make(4) };
     const { app, calls } = makeApp([
       [rowValues(room)],
+      [],
       [rowValues(room)],
       [rowValues(created)],
       [rowValues(room)],
@@ -239,7 +240,16 @@ describe("Trip API vertical slice", () => {
     );
 
     expect(listResponse.status).toBe(200);
-    await expect(listResponse.json()).resolves.toEqual([room]);
+    const listBody = (await listResponse.json()) as any;
+    expect(listBody.items).toHaveLength(1);
+    expect(listBody.items[0]).toMatchObject({
+      id: room.id,
+      title: room.title,
+      destination: room.destination,
+      revision: room.revision,
+      isConfirmed: false,
+      memberCount: 1,
+    });
     expect(detailResponse.status).toBe(200);
     await expect(detailResponse.json()).resolves.toEqual(room);
     expect(createResponse.status).toBe(201);
@@ -249,16 +259,17 @@ describe("Trip API vertical slice", () => {
     expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
       "select",
       "select",
+      "select",
       "insert",
       "select",
       "update",
     ]);
-    expect(calls[2].params).toContain(
+    expect(calls[3].params).toContain(
       JSON.stringify([{ id: hostId, name: "Host", role: "HOST" }])
     );
     expect(calls[0].text).toContain('"trip_rooms"."members" @>');
     expect(calls[0].params).toEqual([JSON.stringify([{ id: hostId }])]);
-    expect(calls[4].params.slice(-2)).toEqual([room.id, room.revision]);
+    expect(calls[5].params.slice(-2)).toEqual([room.id, room.revision]);
   });
 
   it("목록은 인증을 요구하고 세션 장애를 구분하며 비멤버 상세를 숨긴다", async () => {

@@ -53,6 +53,10 @@ import {
   type ExploreSaveStateResponse,
   type SavedListingsResponse,
 } from "../contracts/explore-save.ts";
+import {
+  TripOverviewListResponseSchema,
+  type TripOverviewListResponse,
+} from "../contracts/trip-overview.ts";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -137,8 +141,8 @@ export const signInAnonymously = () =>
     { method: "POST", body: "{}" }
   );
 
-export const getTrips = (signal?: AbortSignal) =>
-  requestJson("/api/trips", Schema.Array(TripRoomSchema), { signal });
+export const getTrips = (signal?: AbortSignal): Promise<TripOverviewListResponse> =>
+  requestJson("/api/trips", TripOverviewListResponseSchema, { signal });
 
 export const getTrip = (tripId: TripId, signal?: AbortSignal) =>
   requestJson(tripPath(tripId), TripRoomSchema, {

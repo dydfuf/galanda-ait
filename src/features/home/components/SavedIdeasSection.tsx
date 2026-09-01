@@ -9,7 +9,7 @@ import { useSessionQuery } from "@/hooks/useSession.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 import { useSavedListingsQuery } from "@/features/explore/save-queries.ts";
 import type { SavedListingItem } from "@/contracts/explore-save.ts";
-import { getHomeTripDayLabel } from "./HomeTripDashboard.tsx";
+import { getTravelDateRangeDayLabel } from "./HomeTripDashboard.tsx";
 
 /**
  * Home `저장한 여행 아이디어` section (RAON-256 DISC-9).
@@ -83,7 +83,7 @@ function SavedIdeaRow({ entry }: { entry: SavedListingItem }) {
     snapshot.dateRange.endDate,
   );
   const savedAtText = formatSavedAt(savedAt);
-  const dayLabel = getHomeTripDayLabel(
+  const dayLabel = getTravelDateRangeDayLabel(
     snapshot.dateRange.startDate,
     snapshot.dateRange.endDate,
     toLocalTravelDate(new Date()),

@@ -26,7 +26,14 @@ import { Database, type DatabaseHandle } from "./database.ts";
 import { tripRooms, type NewTripRoomRow, type TripRoomRow } from "./schema/trip-room.ts";
 import { explorePlanListings } from "./schema/explore-plan.ts";
 import { participantAliases } from "./schema/participant.ts";
-import type { DeletePlanAndAutoUnlistParams } from "../../../core/ports/trip-room-repository.ts";
+import { confirmedItineraries, itineraryRevisions } from "./schema/confirmed-itinerary.ts";
+import {
+  ConfirmedItinerarySchema,
+  type ConfirmedItinerary,
+} from "../../../core/domain/confirmed-itinerary.ts";
+import type {
+  DeletePlanAndAutoUnlistParams,
+} from "../../../core/ports/trip-room-repository.ts";
 
 type RoomChanges = Partial<
   Pick<
@@ -231,6 +238,99 @@ export const TripRoomRepositoryLive: Layer.Layer<
           return yield* resolveParticipantAliases(db, rooms, "getRooms");
         }),
 
+      getRoomOverviewRecords: (participantIds) =>
+        Effect.gen(function* () {
+          if (participantIds.length === 0) return [];
+          const rows = yield* databaseEffect("getRoomOverviewRecords", () =>
+            db
+              .select()
+              .from(tripRooms)
+              .where(
+                or(
+                  ...participantIds.map(
+                    (id) =>
+                      sql`${tripRooms.members} @> ${JSON.stringify([{ id }])}::jsonb`
+                  )
+                )
+              )
+              .orderBy(desc(tripRooms.createdAt))
+          );
+          if (rows.length === 0) return [];
+
+          const rooms = yield* Effect.all(
+            rows.map((row) => decodeRoom(row, "getRoomOverviewRecords"))
+          );
+          const resolvedRooms = yield* resolveParticipantAliases(
+            db,
+            rooms,
+            "getRoomOverviewRecords"
+          );
+
+          const roomIds = rows.map((r) => r.id);
+          const itineraryRows = yield* databaseEffect(
+            "getRoomOverviewRecords.itineraries",
+            () =>
+              db
+                .select()
+                .from(confirmedItineraries)
+                .where(inArray(confirmedItineraries.tripId, roomIds))
+          );
+
+          const itineraryMap = new Map<string, ConfirmedItinerary>();
+          if (itineraryRows.length > 0) {
+            const itineraryIds = itineraryRows.map((i) => i.id);
+            const revisionRows = yield* databaseEffect(
+              "getRoomOverviewRecords.revisions",
+              () =>
+                db
+                  .select()
+                  .from(itineraryRevisions)
+                  .where(inArray(itineraryRevisions.itineraryId, itineraryIds))
+            );
+
+            const revisionMap = new Map<string, (typeof revisionRows)[0]>();
+            for (const rev of revisionRows) {
+              const itin = itineraryRows.find((i) => i.id === rev.itineraryId);
+              if (itin && itin.currentRevision === rev.revision) {
+                revisionMap.set(rev.itineraryId, rev);
+              }
+            }
+
+            for (const itin of itineraryRows) {
+              const rev = revisionMap.get(itin.id);
+              if (rev) {
+                const decoded = yield* Schema.decodeUnknownEffect(ConfirmedItinerarySchema)({
+                  ...itin,
+                  createdAt: itin.createdAt.toISOString(),
+                  snapshot: rev.snapshot,
+                  changes: rev.changes,
+                  changedBy: rev.changedBy,
+                  changedAt: rev.createdAt.toISOString(),
+                }).pipe(
+                  Effect.mapError(
+                    () =>
+                      new RepositoryError({
+                        operation: "getRoomOverviewRecords.decodeItinerary",
+                        message: "확정 일정 형식이 올바르지 않습니다.",
+                      })
+                  )
+                );
+                itineraryMap.set(itin.tripId, decoded);
+              }
+            }
+          }
+
+          return resolvedRooms.map((room, idx) => {
+            const row = rows[idx];
+            return {
+              room,
+              roomCreatedAt: row.createdAt.toISOString(),
+              roomUpdatedAt: row.updatedAt.toISOString(),
+              currentItinerary: itineraryMap.get(room.id) ?? null,
+            };
+          });
+        }),
+
       getRoom: (roomId: TripId) => findRoom(db, roomId, "getRoom"),
 
       createRoom: (params: CreateRoomParams) =>
@@ -243,8 +343,6 @@ export const TripRoomRepositoryLive: Layer.Layer<
                 title: params.title.trim(),
                 destination: params.destination?.trim() || "여행지",
                 members: [params.hostUser],
-                // NEW_TRIP import는 room+plan을 단일 INSERT로 atomic하게 저장한다.
-                // initialPlan이 없으면 기존처럼 빈 방을 만든다(partial write 없음).
                 plans: params.initialPlan ? [params.initialPlan] : [],
               })
               .onConflictDoNothing({ target: tripRooms.id })

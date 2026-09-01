@@ -121,6 +121,22 @@ describe("API client", () => {
       plans: [],
       confirmedPlanId: undefined,
     };
+    const overviewDto = {
+      id: "trip-1",
+      title: "교토 여행",
+      destination: "교토",
+      revision: 1,
+      isConfirmed: false,
+      confirmedPeriod: null,
+      memberCount: 1,
+      memberNames: ["User"],
+      candidateCount: 0,
+      opinionParticipantCount: 0,
+      hasUnattributedOpinions: false,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      eligibleActionIds: ["EDIT_PLAN_BASIC"],
+    };
     const responses = [
       jsonResponse({
         participantId: "user-1",
@@ -129,7 +145,7 @@ describe("API client", () => {
         name: "User",
         isAuthenticated: true,
       }),
-      jsonResponse([room]),
+      jsonResponse({ items: [overviewDto] }),
       jsonResponse(room, 201),
       jsonResponse({ ...room, revision: 2 }),
     ];
@@ -144,7 +160,7 @@ describe("API client", () => {
       name: "User",
       isAuthenticated: true,
     });
-    await expect(getTrips()).resolves.toEqual([room]);
+    await expect(getTrips()).resolves.toEqual({ items: [overviewDto] });
     await expect(createTrip({ title: room.title })).resolves.toEqual(room);
     await expect(
       updateTrip(room.id, {

@@ -194,6 +194,21 @@ export const LocalTripRoomRepositoryLayer: Layer.Layer<TripRoomRepository> =
         );
       }),
 
+    getRoomOverviewRecords: (participantIds) =>
+      Effect.gen(function* () {
+        const stored = yield* loadRooms("getRoomOverviewRecords");
+        const rooms = yield* decodeRooms(stored, "getRoomOverviewRecords.decode");
+        const filtered = rooms.filter((room) =>
+          room.members.some(({ id }) => participantIds.includes(id))
+        );
+        return filtered.map((room) => ({
+          room,
+          roomCreatedAt: "2026-08-01T00:00:00.000Z",
+          roomUpdatedAt: "2026-08-01T00:00:00.000Z",
+          currentItinerary: null,
+        }));
+      }),
+
     getRoom: (roomId: TripId) =>
       Effect.gen(function* () {
         const stored = yield* loadRooms("getRoom");

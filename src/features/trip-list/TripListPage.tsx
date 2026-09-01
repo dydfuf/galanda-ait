@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MapPinned, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, MapPinned, Plus, UsersRound } from "lucide-react";
 
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { isPastTravelDate, toLocalTravelDate } from "@/core/domain/room.ts";
+import { toLocalTravelDate } from "@/core/domain/room.ts";
 import { cn } from "@/lib/utils.ts";
 import { toUserMessage } from "../common/error-message.ts";
-import type { TripRoomViewModel } from "../plan-home/plan-home-view-model.ts";
+import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
+import {
+  classifyTrip,
+} from "@/core/calculations/featured-trip.ts";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 
@@ -22,18 +25,17 @@ type TripListTab = "ONGOING" | "PAST";
 const DAY_MS = 86_400_000;
 const PAST_PREVIEW_LIMIT = 2;
 
-const getTripEntryPath = (room: TripRoomViewModel): string =>
-  `/trips/${encodeURIComponent(room.id)}`;
+const getTripEntryPath = (trip: TripOverviewDto): string =>
+  `/trips/${encodeURIComponent(trip.id)}`;
 
-const getTripPeriodText = (room: TripRoomViewModel): string => {
-  if (!room.displayStartDate || !room.displayEndDate) return "일정 미정";
+const formatDate = (date: string): string => {
+  const match = /^(?:\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  return match ? `${Number(match[1])}.${Number(match[2])}` : date;
+};
 
-  const formatDate = (date: string): string => {
-    const match = /^(?:\d{4})-(\d{2})-(\d{2})$/.exec(date);
-    return match ? `${Number(match[1])}.${Number(match[2])}` : date;
-  };
-
-  return `${formatDate(room.displayStartDate)} ~ ${formatDate(room.displayEndDate)}`;
+const getTripPeriodText = (trip: TripOverviewDto): string => {
+  if (!trip.confirmedPeriod) return "일정 미정";
+  return `${formatDate(trip.confirmedPeriod.startDate)} ~ ${formatDate(trip.confirmedPeriod.endDate)}`;
 };
 
 const parseTravelDate = (value: string | undefined): Date | undefined => {
@@ -43,44 +45,67 @@ const parseTravelDate = (value: string | undefined): Date | undefined => {
 };
 
 const getTripDayLabel = (
-  room: TripRoomViewModel,
+  trip: TripOverviewDto,
   today: string,
-): string | undefined => {
-  const start = parseTravelDate(room.displayStartDate);
-  const end = parseTravelDate(room.displayEndDate);
-  const current = parseTravelDate(today);
-  if (!start || !current) return undefined;
+): { label: string; variant: "success" | "info" | "warning" | "neutral" } => {
+  const lifecycle = classifyTrip(trip, today);
 
-  const daysUntilStart = Math.round((start.getTime() - current.getTime()) / DAY_MS);
-  if (daysUntilStart > 0) return `D-${daysUntilStart}`;
-  if (daysUntilStart === 0) return "D-Day";
-  if (end && current.getTime() <= end.getTime()) return "여행 중";
-  return undefined;
+  if (lifecycle === "ONGOING_CONFIRMED") {
+    const start = parseTravelDate(trip.confirmedPeriod?.startDate);
+    const current = parseTravelDate(today);
+    if (start && current && start.getTime() === current.getTime()) {
+      return { label: "D-Day", variant: "success" };
+    }
+    return { label: "여행 중", variant: "success" };
+  }
+
+  if (lifecycle === "UPCOMING_CONFIRMED") {
+    const start = parseTravelDate(trip.confirmedPeriod?.startDate);
+    const current = parseTravelDate(today);
+    if (start && current) {
+      const daysUntilStart = Math.round((start.getTime() - current.getTime()) / DAY_MS);
+      if (daysUntilStart === 0) return { label: "D-Day", variant: "info" };
+      if (daysUntilStart > 0) return { label: `D-${daysUntilStart}`, variant: "info" };
+    }
+    return { label: "예정", variant: "info" };
+  }
+
+  if (lifecycle === "CONFIRMED_DATE_UNKNOWN") {
+    return { label: "확정", variant: "warning" };
+  }
+
+  if (lifecycle === "PLANNING") {
+    return { label: "계획 중", variant: "info" };
+  }
+
+  return { label: "날짜 미정", variant: "neutral" };
 };
 
-const getMemberNames = (room: TripRoomViewModel): ReadonlyArray<string> =>
-  room.memberNames.map((name) => name.trim()).filter(Boolean);
+const getMemberNames = (trip: TripOverviewDto): ReadonlyArray<string> =>
+  trip.memberNames.map((name) => name.trim()).filter(Boolean);
 
 const getInitial = (name: string): string =>
   Array.from(name.trim())[0]?.toUpperCase() ?? "?";
 
-const sortPastRoomsByMostRecent = (
-  rooms: ReadonlyArray<TripRoomViewModel>,
-): ReadonlyArray<TripRoomViewModel> =>
-  [...rooms].sort((left, right) =>
-    (right.displayEndDate ?? "").localeCompare(left.displayEndDate ?? ""),
-  );
+const sortPastTripsByMostRecent = (
+  trips: ReadonlyArray<TripOverviewDto>,
+): ReadonlyArray<TripOverviewDto> =>
+  [...trips].sort((left, right) => {
+    const rightDate = right.confirmedPeriod?.endDate ?? right.updatedAt;
+    const leftDate = left.confirmedPeriod?.endDate ?? left.updatedAt;
+    return rightDate.localeCompare(leftDate);
+  });
 
-function TripParticipantStack({ room }: { readonly room: TripRoomViewModel }) {
-  const memberNames = getMemberNames(room);
+function TripParticipantStack({ trip }: { readonly trip: TripOverviewDto }) {
+  const memberNames = getMemberNames(trip);
   const shownMembers = memberNames.slice(0, 4);
-  const remainingMembers = Math.max(0, room.memberCount - shownMembers.length);
+  const remainingMembers = Math.max(0, trip.memberCount - shownMembers.length);
 
   if (shownMembers.length === 0) {
     return (
       <span className="flex items-center gap-1.5 text-sm text-foreground-muted">
         <UsersRound className="size-4" aria-hidden="true" />
-        {room.memberCount}명
+        {trip.memberCount}명
       </span>
     );
   }
@@ -88,7 +113,7 @@ function TripParticipantStack({ room }: { readonly room: TripRoomViewModel }) {
   return (
     <ul
       className="flex min-w-0 items-center"
-      aria-label={`여행 참여자 ${room.memberCount}명`}
+      aria-label={`여행 참여자 ${trip.memberCount}명`}
     >
       {shownMembers.map((name, index) => (
         <li
@@ -114,95 +139,65 @@ function TripParticipantStack({ room }: { readonly room: TripRoomViewModel }) {
 }
 
 function OngoingTripCard({
-  room,
+  trip,
   today,
 }: {
-  readonly room: TripRoomViewModel;
+  readonly trip: TripOverviewDto;
   readonly today: string;
 }) {
-  const dayLabel = getTripDayLabel(room, today);
-  const hasNoCandidate = room.candidateCount === 0;
-  const isParticipationUnknown =
-    !hasNoCandidate && room.hasUnattributedOpinions;
-  const participationPercent =
-    hasNoCandidate || isParticipationUnknown
-      ? undefined
-      : room.memberCount > 0
-        ? Math.min(
-            100,
-            Math.round((room.participatedMemberCount / room.memberCount) * 100),
-          )
-        : 0;
-  const participationStatus = hasNoCandidate
-    ? "여행안 없음"
-    : isParticipationUnknown
-      ? "집계 전"
-      : `${participationPercent}%`;
+  const { label: dayLabel, variant: badgeVariant } = getTripDayLabel(trip, today);
+  const lifecycle = classifyTrip(trip, today);
 
   return (
     <Link
-      to={getTripEntryPath(room)}
-      aria-label={`${room.title} 여행 열기`}
+      to={getTripEntryPath(trip)}
+      aria-label={`${trip.title} 여행 열기`}
       className="group grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-border bg-card p-3 text-foreground! no-underline! shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary-border hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <div className="flex min-h-32 min-w-0 flex-col items-center justify-center rounded-xl bg-primary-muted px-2 text-center text-primary">
         <MapPinned className="size-7" aria-hidden="true" />
         <span className="mt-2 line-clamp-2 text-xs font-semibold [overflow-wrap:anywhere]">
-          {room.destination || "여행"}
+          {trip.destination || "여행"}
         </span>
       </div>
 
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <h2 className="min-w-0 text-base leading-snug font-bold [overflow-wrap:anywhere]">
-            {room.title}
-          </h2>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3 className="line-clamp-1 min-w-0 text-base font-bold text-foreground [overflow-wrap:anywhere]">
+              {trip.title}
+            </h3>
+          </div>
           <Badge
-            variant={dayLabel === "여행 중" ? "success" : dayLabel ? "info" : "neutral"}
-            className="h-6 px-2.5 text-xs"
+            variant={badgeVariant}
+            className="h-6 shrink-0 px-2.5 text-xs"
           >
-            {dayLabel ?? "일정 미정"}
+            {dayLabel}
           </Badge>
         </div>
         <p className="mt-1 text-sm text-foreground-muted [overflow-wrap:anywhere]">
-          {getTripPeriodText(room)}
+          {getTripPeriodText(trip)}
         </p>
 
-        <div className="mt-3 min-w-0">
-          <div className="mb-1.5 flex min-w-0 items-center justify-between gap-2 text-xs font-medium">
-            <span className="min-w-0 text-foreground-muted [overflow-wrap:anywhere]">
-              여행안 의견 참여율
+        <div className="mt-2 flex flex-col gap-1 text-xs text-foreground-muted">
+          {lifecycle === "PLANNING" ? (
+            <span>
+              {trip.hasUnattributedOpinions
+                ? "후보 여행안 " + trip.candidateCount + "개"
+                : `의견 참여 ${trip.opinionParticipantCount}/${trip.memberCount}명 · 여행안 ${trip.candidateCount}개`}
             </span>
-            <span className="shrink-0 text-foreground">
-              {participationStatus}
-            </span>
-          </div>
-          {participationPercent === undefined ? (
-            <div
-              className="h-1.5 rounded-full bg-muted"
-              aria-label={
-                hasNoCandidate ? "등록된 여행안 없음" : "의견 참여 인원 집계 전"
-              }
-            />
+          ) : lifecycle === "DATE_TBD" ? (
+            <span>여행안 0개</span>
           ) : (
-            <div
-              role="progressbar"
-              aria-label={`${room.title} 여행안 의견 참여율`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={participationPercent}
-              className="h-1.5 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width]"
-                style={{ width: `${participationPercent}%` }}
-              />
-            </div>
+            <span className="flex items-center gap-1 font-medium text-foreground">
+              <CalendarDays className="size-3.5 text-primary" aria-hidden="true" />
+              확정된 여행 일정
+            </span>
           )}
         </div>
 
         <div className="mt-auto pt-3">
-          <TripParticipantStack room={room} />
+          <TripParticipantStack trip={trip} />
         </div>
       </div>
     </Link>
@@ -210,10 +205,10 @@ function OngoingTripCard({
 }
 
 function PastTripList({
-  rooms,
+  trips,
   label,
 }: {
-  readonly rooms: ReadonlyArray<TripRoomViewModel>;
+  readonly trips: ReadonlyArray<TripOverviewDto>;
   readonly label: string;
 }) {
   return (
@@ -221,11 +216,11 @@ function PastTripList({
       aria-label={label}
       className="overflow-hidden rounded-2xl border border-border bg-card"
     >
-      {rooms.map((room) => (
+      {trips.map((trip) => (
         <MobileListItem
-          key={room.id}
-          to={getTripEntryPath(room)}
-          aria-label={`${room.title} 지난 여행 열기`}
+          key={trip.id}
+          to={getTripEntryPath(trip)}
+          aria-label={`${trip.title} 지난 여행 열기`}
           leading={
             <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-primary-muted text-primary">
               <MapPinned className="size-5" aria-hidden="true" />
@@ -234,12 +229,14 @@ function PastTripList({
           trailing={<Badge variant="neutral">완료</Badge>}
           className="px-3 py-3"
         >
-          <ItemTitle className="text-base font-semibold [overflow-wrap:anywhere]">
-            {room.title}
-          </ItemTitle>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <ItemTitle className="text-base font-semibold [overflow-wrap:anywhere]">
+              {trip.title}
+            </ItemTitle>
+          </div>
           <ItemDescription className="[overflow-wrap:anywhere]">
-            {room.destination && `${room.destination} · `}
-            {getTripPeriodText(room)} · {room.memberCount}명
+            {trip.destination && `${trip.destination} · `}
+            {getTripPeriodText(trip)} · {trip.memberCount}명
           </ItemDescription>
         </MobileListItem>
       ))}
@@ -256,7 +253,7 @@ export function TripListPage() {
     refetch: refetchSession,
   } = useSessionQuery();
   const {
-    data: rooms,
+    data: trips,
     isLoading,
     isError,
     error,
@@ -264,12 +261,12 @@ export function TripListPage() {
   } = useTripRoomsQuery();
 
   const today = toLocalTravelDate(new Date());
-  const ongoingRooms =
-    rooms?.filter((room) => !isPastTravelDate(room.displayEndDate, today)) ?? [];
-  const pastRooms = sortPastRoomsByMostRecent(
-    rooms?.filter((room) => isPastTravelDate(room.displayEndDate, today)) ?? [],
+  const ongoingTrips =
+    trips?.filter((t) => classifyTrip(t, today) !== "PAST") ?? [];
+  const pastTrips = sortPastTripsByMostRecent(
+    trips?.filter((t) => classifyTrip(t, today) === "PAST") ?? []
   );
-  const pastPreviewRooms = pastRooms.slice(0, PAST_PREVIEW_LIMIT);
+  const pastPreviewTrips = pastTrips.slice(0, PAST_PREVIEW_LIMIT);
 
   const ongoingContent = (
     <div className="flex flex-col gap-8">
@@ -280,7 +277,7 @@ export function TripListPage() {
         <h2 id="ongoing-trips-heading" className="sr-only">
           진행 중인 여행
         </h2>
-        {ongoingRooms.length === 0 ? (
+        {ongoingTrips.length === 0 ? (
           <PageState
             status="empty"
             title="진행 중인 여행이 없어요"
@@ -288,14 +285,14 @@ export function TripListPage() {
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {ongoingRooms.map((room) => (
-              <OngoingTripCard key={room.id} room={room} today={today} />
+            {ongoingTrips.map((trip) => (
+              <OngoingTripCard key={trip.id} trip={trip} today={today} />
             ))}
           </div>
         )}
       </section>
 
-      {pastRooms.length > 0 && (
+      {pastTrips.length > 0 && (
         <section
           aria-labelledby="past-preview-heading"
           className="px-(--app-inline-padding)"
@@ -304,16 +301,16 @@ export function TripListPage() {
             id="past-preview-heading"
             className="mb-3 text-lg leading-snug font-bold text-foreground"
           >
-            지난 여행 ({pastRooms.length})
+            지난 여행 ({pastTrips.length})
           </h2>
-          <PastTripList rooms={pastPreviewRooms} label="지난 여행 미리보기" />
+          <PastTripList trips={pastPreviewTrips} label="지난 여행 미리보기" />
         </section>
       )}
     </div>
   );
 
   const pastContent =
-    pastRooms.length === 0 ? (
+    pastTrips.length === 0 ? (
       <PageState
         status="empty"
         title="지난 여행이 없어요"
@@ -328,14 +325,14 @@ export function TripListPage() {
           id="past-trips-heading"
           className="mb-3 text-lg leading-snug font-bold text-foreground"
         >
-          지난 여행 ({pastRooms.length})
+          지난 여행 ({pastTrips.length})
         </h2>
-        <PastTripList rooms={pastRooms} label="지난 여행 전체" />
+        <PastTripList trips={pastTrips} label="지난 여행 전체" />
       </section>
     );
 
   const content =
-    isLoading && !rooms ? (
+    isLoading && !trips ? (
       <PageState status="loading" message="여행 목록을 불러오는 중이에요." />
     ) : isSessionError ? (
       <PageState
@@ -345,7 +342,7 @@ export function TripListPage() {
         actionText="다시 시도"
         onAction={() => void refetchSession()}
       />
-    ) : isError && !rooms ? (
+    ) : isError && !trips ? (
       <PageState
         status="error"
         title="여행 목록을 불러오지 못했어요"
@@ -353,7 +350,7 @@ export function TripListPage() {
         actionText="다시 시도"
         onAction={() => void refetchRooms()}
       />
-    ) : !rooms ? (
+    ) : !trips ? (
       <PageState status="loading" message="여행 목록을 불러오는 중이에요." />
     ) : (
       <>
@@ -379,7 +376,6 @@ export function TripListPage() {
       </>
     );
 
-  // 헤더가 없는 최상위 route라 본문이 상단 safe-area를 직접 확보해요(safeTop).
   return (
     <PageBody safeTop withBottomAction data-slot="trip-list-page">
       <PageTitle title="내 여행" />
@@ -397,7 +393,7 @@ export function TripListPage() {
             className="w-full"
           >
             <TabsTrigger value="ONGOING">
-              진행 중 ({ongoingRooms.length})
+              진행 중 ({ongoingTrips.length})
             </TabsTrigger>
             <TabsTrigger value="PAST">지난 여행</TabsTrigger>
           </TabsList>

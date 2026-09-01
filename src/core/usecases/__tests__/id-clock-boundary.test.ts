@@ -33,6 +33,7 @@ describe("Application / Effect Boundary: IdGenerator & Clock", () => {
         return found ? Effect.succeed(found) : Effect.die("not found in test");
       },
       getRooms: () => Effect.succeed(rooms),
+      getRoomOverviewRecords: () => Effect.die("not implemented"),
       createRoom: (params: CreateRoomParams) => {
         const room: TripRoom = {
           id: params.id,

@@ -29,8 +29,8 @@ import {
 } from "../../src/core/usecases/create-room.ts";
 import {
   getTripRoom,
-  getTripRooms,
 } from "../../src/core/usecases/get-room.ts";
+import { listTripOverviews } from "../../src/core/usecases/list-trip-overviews.ts";
 import { confirmTripPlan } from "../../src/core/usecases/confirm-plan.ts";
 import { getTripItinerary } from "../../src/core/usecases/get-itinerary.ts";
 import {
@@ -161,13 +161,17 @@ const makeActiveTripActionRanker = (
 
   try {
     const ranker = makeConfiguredTripActionRanker(c);
-    return typeof caches === "undefined"
-      ? ranker
-      : makeCachedTripActionRanker(
+    const workerCaches =
+      typeof caches !== "undefined"
+        ? (caches as unknown as { readonly default?: Cache })
+        : undefined;
+    return workerCaches?.default
+      ? makeCachedTripActionRanker(
           ranker,
-          caches.default,
+          workerCaches.default,
           (promise) => c.executionCtx.waitUntil(promise)
-        );
+        )
+      : ranker;
   } catch (error) {
     console.error(JSON.stringify({
       message: "nba_active_configuration_invalid",
@@ -322,7 +326,7 @@ invitesRoute.post(
     )
 );
 
-tripsRoute.get("/", (c) => runTripEffect(c, getTripRooms()));
+tripsRoute.get("/", (c) => runTripEffect(c, listTripOverviews()));
 
 tripsRoute.get(
   "/:tripId/itinerary",
