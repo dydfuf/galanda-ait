@@ -134,6 +134,9 @@ const renderHome = () =>
 
 const expectDashboard = () => {
   expect(screen.getByRole("heading", { name: "홈" })).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "알림 기능 준비 중" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByText("안녕하세요, Raon 👋")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "이탈리아 남부 여행" })).toBeInTheDocument();
   expect(screen.getByRole("progressbar", { name: "여행안 의견 참여율" })).toHaveAttribute(

@@ -42,14 +42,28 @@ describe("GlobalAppShell (RAON-248)", () => {
     expect(current[0]!.getAttribute("href")).toBe("/explore");
   });
 
-  it("모든 /trips/** 하위에서 '내 여행'이 active다", () => {
-    renderAt("/trips/trip-1/plans/plan-1/edit");
+  it("/me/saved 에서는 '마이'가 active다", () => {
+    renderAt("/me/saved");
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
     const current = within(nav)
       .getAllByRole("link")
       .filter((a) => a.getAttribute("aria-current") === "page");
     expect(current).toHaveLength(1);
-    expect(current[0]!.getAttribute("href")).toBe("/trips");
+    expect(current[0]!.getAttribute("href")).toBe("/me");
+  });
+
+  it("nav는 정확히 하나의 landmark label을 가지고 icon은 aria-hidden이며 link accessible name이 노출된다", () => {
+    renderAt("/home");
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    const icons = nav.querySelectorAll("svg");
+    expect(icons).toHaveLength(4);
+    for (const icon of icons) {
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+    }
+    expect(within(nav).getByRole("link", { name: "홈" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "탐색" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "내 여행" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "마이" })).toBeInTheDocument();
   });
 
   it("각 link는 44px hit target과 focus-visible ring을 유지한다", () => {
@@ -87,25 +101,21 @@ describe("GlobalAppShell (RAON-248)", () => {
     },
   );
 
-  it.each([
-    "/home",
-    "/explore",
-    "/me",
-    "/me/saved",
-    "/trips/trip-1/plans",
-    "/trips/trip-1/itinerary",
-  ])("%s에서는 기존 bottom chrome surface를 유지한다", (path) => {
-    const { container } = renderAt(path);
-    const shell = container.querySelector<HTMLElement>(
-      '[data-slot="global-app-shell"]',
-    );
-    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+  it.each(["/home", "/explore", "/me", "/me/saved"])(
+    "%s에서는 기존 bottom chrome surface를 유지한다",
+    (path) => {
+      const { container } = renderAt(path);
+      const shell = container.querySelector<HTMLElement>(
+        '[data-slot="global-app-shell"]',
+      );
+      const nav = screen.getByRole("navigation", { name: "주요 화면" });
 
-    expect(shell?.firstElementChild).not.toHaveAttribute(
-      "data-galanda-surface",
-    );
-    expect(nav).toHaveAttribute("data-galanda-surface", "chrome");
-  });
+      expect(shell?.firstElementChild).not.toHaveAttribute(
+        "data-galanda-surface",
+      );
+      expect(nav).toHaveAttribute("data-galanda-surface", "chrome");
+    },
+  );
 
   it("BottomAction이 있으면 nav 위로 offset하고 safe-area는 nav가 한 번만 소유한다", () => {
     const { container } = render(
