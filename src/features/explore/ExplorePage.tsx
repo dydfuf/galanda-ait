@@ -172,10 +172,18 @@ export function ExplorePage() {
       ? popularCitiesData.items
       : [];
 
-  const sectionTitle = hasFilters ? "검색 결과" : "새로 공개된 여행 일정";
+  const hasRecentSaveActivity =
+    data?.pages[0]?.rankingMode === "RECENT_SAVE_ACTIVITY";
+  const sectionTitle = hasFilters
+    ? "검색 결과"
+    : hasRecentSaveActivity
+      ? "최근 저장 반응이 많은 여행 일정"
+      : "새로 공개된 여행 일정";
   const sectionDescription = hasFilters
     ? "선택한 조건에 맞는 최신 공개 일정이에요."
-    : "가장 최근에 공개된 일정부터 둘러보세요.";
+    : hasRecentSaveActivity
+      ? "최근 30일 동안 저장 반응이 있었던 공개 일정이에요."
+      : "가장 최근에 공개된 일정부터 둘러보세요.";
 
   const content = isSessionError ? (
     <PageState

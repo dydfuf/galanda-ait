@@ -209,6 +209,7 @@ const exploreRepoLayer = (
         afterGet?.();
         return record;
       }),
+    getPublicById: () => Effect.die("not implemented"),
     findBySource: (sourceTripId, sourcePlanId) => {
       for (const record of state.records.values()) {
         if (
@@ -272,7 +273,12 @@ const exploreRepoLayer = (
       state.records.set(record.listing.listingId, record);
       return Effect.succeed(record.listing);
     },
-    listListed: () => Effect.succeed({ page: [], nextCursor: undefined }),
+    listListed: () =>
+      Effect.succeed({
+        page: [],
+        nextCursor: undefined,
+        rankingMode: "RECENCY_FALLBACK" as const,
+      }),
     listPopularCities: () => Effect.succeed([]),
   });
 

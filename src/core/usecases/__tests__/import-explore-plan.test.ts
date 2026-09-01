@@ -210,10 +210,16 @@ const exploreRepoLayer = (
       state?.getByIdCalls.push(listingId);
       return Effect.succeed(record);
     },
+    getPublicById: () => Effect.die("not implemented"),
     findBySource: () => Effect.succeed(undefined),
     relist: () => Effect.die("not implemented"),
     compareAndSet: () => Effect.die("not implemented"),
-    listListed: () => Effect.succeed({ page: [], nextCursor: undefined }),
+    listListed: () =>
+      Effect.succeed({
+        page: [],
+        nextCursor: undefined,
+        rankingMode: "RECENCY_FALLBACK" as const,
+      }),
     listPopularCities: () => Effect.succeed([]),
   });
 

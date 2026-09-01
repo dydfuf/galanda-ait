@@ -33,6 +33,7 @@ const item = (over?: ItemOverrides): ExploreListingItem => ({
   listingId: "listing-1" as ExploreListingItem["listingId"],
   status: "LISTED",
   listingRevision: 1 as ExploreListingItem["listingRevision"],
+  saveCount: 0,
   listedAt: over?.listedAt ?? "2026-09-05T00:00:00.000Z",
   updatedAt: "2026-09-05T00:00:00.000Z",
   snapshot: {

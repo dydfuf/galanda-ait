@@ -188,9 +188,16 @@ const ExploreCursorTokenSchema = Schema.String.check(
 
 /**
  * opaque cursor의 서버 내부 payload. public token으로 base64url encode된다.
- * feed order(`listedAt DESC, listingId DESC`)의 keyset tuple이다.
+ * feed order(`rankScore DESC, listedAt DESC, listingId DESC`)의 keyset tuple과
+ * 첫 페이지 anchor를 함께 보존한다.
  */
 export const ExploreListingCursorSchema = Schema.Struct({
+  policy: Schema.Literal("recent-active-save-v1"),
+  rankedAt: ExploreTimestampSchema,
+  rankScore: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(0)
+  ),
   listedAt: ExploreTimestampSchema,
   listingId: ExploreListingIdSchema,
   /** cursor를 발급한 canonical filter set. 다른 filter와 재사용하면 400으로 거부한다. */
@@ -237,6 +244,23 @@ export class InvalidExploreCursorError extends Error {
     if (cause !== undefined) this.cause = cause;
   }
 }
+
+export const EXPLORE_CURSOR_TTL_MS = 30 * 60 * 1000;
+export const EXPLORE_CURSOR_MAX_FUTURE_MS = 60 * 1000;
+
+/** TTL/future validation kept at the HTTP boundary; malformed shape is decode's job. */
+export const validateExploreCursorTime = (
+  payload: ExploreListingCursorPayload,
+  now = Date.now()
+): void => {
+  const rankedAt = Date.parse(payload.rankedAt);
+  if (
+    rankedAt > now + EXPLORE_CURSOR_MAX_FUTURE_MS ||
+    now - rankedAt > EXPLORE_CURSOR_TTL_MS
+  ) {
+    throw new InvalidExploreCursorError();
+  }
+};
 
 /**
  * opaque token → keyset tuple. malformed token은 {@link InvalidExploreCursorError}로
@@ -360,6 +384,10 @@ export const encodeExploreFiltersKey = (
 export const ExploreListingItemSchema = Schema.Struct({
   ...ExploreListingPublicFields,
   status: Schema.Literal("LISTED"),
+  saveCount: Schema.Number.check(
+    Schema.isInt(),
+    Schema.isGreaterThanOrEqualTo(0)
+  ),
 });
 export type ExploreListingItem = typeof ExploreListingItemSchema.Type;
 
@@ -379,6 +407,10 @@ export type ExploreListingDetailResponse =
 export const ExploreListingsResponseSchema = Schema.Struct({
   items: Schema.Array(ExploreListingItemSchema),
   nextCursor: Schema.optional(ExploreCursorTokenSchema),
+  rankingMode: Schema.Literals([
+    "RECENT_SAVE_ACTIVITY",
+    "RECENCY_FALLBACK",
+  ]),
 });
 export type ExploreListingsResponse =
   typeof ExploreListingsResponseSchema.Type;

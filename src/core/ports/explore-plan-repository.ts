@@ -41,6 +41,11 @@ export interface ExplorePopularCity {
   readonly listingCount: number;
 }
 
+/** Public listing read model with the authoritative current save aggregate. */
+export type ExploreListingReadModel = ExplorePlanListing & {
+  readonly saveCount: number;
+};
+
 export interface CreateExploreListingParams {
   readonly record: ExplorePlanListingRecord;
   readonly cityIds: ReadonlyArray<ExploreCityId>;
@@ -49,11 +54,12 @@ export interface CreateExploreListingParams {
 /**
  * `listListed` keyset pagination cursor.
  *
- * feed order는 `listedAt DESC, listingId DESC`이므로 cursor는 마지막으로 본
- * row의 `(listedAt, listingId)` tuple이다. 이 tuple보다 "더 오래된" row만
- * 다음 페이지로 반환하면 중복/누락 없는 deterministic paging이 된다.
+ * feed order는 `rankScore DESC, listedAt DESC, listingId DESC`이므로 cursor는
+ * 마지막으로 본 row의 정렬 tuple과 rank anchor를 담는다.
  */
 export interface ExploreListingCursor {
+  readonly rankedAt: string;
+  readonly rankScore: number;
   readonly listedAt: string;
   readonly listingId: ExploreListingId;
 }
@@ -80,15 +86,18 @@ export interface ListListedParams {
   readonly limit: number;
   /** 이전 페이지의 마지막 cursor. 없으면 첫 페이지. */
   readonly cursor?: ExploreListingCursor;
+  /** First-page server anchor, reused from the cursor on subsequent pages. */
+  readonly rankedAt?: string;
   /** LISTED public snapshot에만 적용하는 검색/공개 facet 조건. */
   readonly filters?: ExploreListingFilters;
 }
 
 export interface ListListedResult {
-  /** `listedAt DESC, listingId DESC`로 정렬된 LISTED listing page. */
-  readonly page: ReadonlyArray<ExplorePlanListing>;
+  /** `rankScore DESC, listedAt DESC, listingId DESC`로 정렬된 page. */
+  readonly page: ReadonlyArray<ExploreListingReadModel>;
   /** 다음 페이지가 있으면 마지막 row의 cursor, 없으면 undefined. */
   readonly nextCursor?: ExploreListingCursor;
+  readonly rankingMode: "RECENT_SAVE_ACTIVITY" | "RECENCY_FALLBACK";
 }
 
 export interface CompareAndSetParams {
@@ -149,6 +158,11 @@ export class ExplorePlanRepository extends Context.Service<
       listingId: ExploreListingId
     ) => RepositoryEffect<ExplorePlanListingRecord | undefined>;
 
+    /** LISTED public listing plus current eligible canonical save count. */
+    readonly getPublicById: (
+      listingId: ExploreListingId
+    ) => RepositoryEffect<ExploreListingReadModel | undefined>;
+
     /**
      * source (tripId, planId)로 기존 listing record를 조회한다.
      * relist/중복 게시 판단에 사용하며 server 내부에서만 호출한다.
@@ -188,10 +202,7 @@ export class ExplorePlanRepository extends Context.Service<
       NotFoundError | RevisionConflictError
     >;
 
-    /**
-     * `LISTED` listing만 `listedAt DESC, listingId DESC`로 keyset paginate한다.
-     * UNLISTED row는 제외되며 결과는 deterministic page/nextCursor다.
-     */
+    /** `LISTED` listing만 rank/recency 순으로 deterministic keyset paginate한다. */
     readonly listListed: (
       params: ListListedParams
     ) => RepositoryEffect<ListListedResult>;

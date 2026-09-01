@@ -1,6 +1,24 @@
-import { and, desc, eq, inArray, lt, min, or } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  max,
+  min,
+  or,
+  sql,
+} from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
-import { RepositoryError } from "../../../core/domain/errors.ts";
+import {
+  ExploreListingUnavailableError,
+  NotFoundError,
+  RepositoryError,
+} from "../../../core/domain/errors.ts";
 import {
   ExplorePlanListingSchema,
   type ExplorePlanListing,
@@ -8,11 +26,12 @@ import {
 import type { ExploreListingId, ParticipantId } from "../../../core/domain/ids.ts";
 import {
   ExploreSaveRepository,
-  type SavedListingCursor,
   type SavedListingEntry,
 } from "../../../core/ports/explore-save-repository.ts";
+import type { DatabaseHandle } from "./database.ts";
 import { Database } from "./database.ts";
 import { explorePlanListings } from "./schema/explore-plan.ts";
+import { participantAliases, participants } from "./schema/participant.ts";
 import { explorePlanSaves } from "./schema/explore-save.ts";
 
 const databaseEffect = <A>(
@@ -37,13 +56,10 @@ const malformed = (operation: string) =>
     message: "저장된 Explore listing 데이터 형식이 올바르지 않습니다.",
   });
 
-/**
- * joined listing row → public envelope decode.
- *
- * saved-list는 현재 listing을 read-through하므로 listing 컬럼을 그대로 decode한다.
- * malformed는 fallback 없이 RepositoryError로 실패한다. source private reference는
- * select하지 않으므로 결과에 애초에 존재하지 않는다.
- */
+const participantIdList = (
+  participantIds: ReadonlyArray<ParticipantId>
+): string[] => [...new Set(participantIds.map((id) => id as string))];
+
 const decodeListing = (
   row: {
     readonly id: string;
@@ -77,9 +93,73 @@ const decodeListing = (
     return listing;
   });
 
-const participantIdList = (
-  participantIds: ReadonlyArray<ParticipantId>
-): string[] => [...new Set(participantIds.map((id) => id as string))];
+type SaveQueryExecutor = Pick<DatabaseHandle, "select">;
+
+const eligibleSaveCount = async (
+  queryable: SaveQueryExecutor,
+  listingId: ExploreListingId,
+  asOf?: Date
+): Promise<number> => {
+  const canonicalId = sql`coalesce(${participantAliases.canonicalParticipantId}, ${explorePlanSaves.participantId})`;
+  const filters = [
+    eq(explorePlanSaves.listingId, listingId),
+    isNotNull(participants.authUserId),
+    ...(asOf
+      ? [
+          gt(
+            explorePlanSaves.savedAt,
+            new Date(asOf.getTime() - 30 * 24 * 60 * 60 * 1000)
+          ),
+          lte(explorePlanSaves.savedAt, asOf),
+          or(
+            isNull(explorePlanSaves.unsavedAt),
+            gt(explorePlanSaves.unsavedAt, asOf)
+          ),
+        ]
+      : [isNull(explorePlanSaves.unsavedAt)]),
+  ];
+  const [row] = await queryable
+    .select({
+      saveCount: sql<number>`count(distinct ${canonicalId})::int`,
+    })
+    .from(explorePlanSaves)
+    .leftJoin(
+      participantAliases,
+      eq(
+        participantAliases.aliasParticipantId,
+        explorePlanSaves.participantId
+      )
+    )
+    .innerJoin(participants, eq(participants.id, canonicalId))
+    .where(and(...filters));
+
+  const count = Number(row?.saveCount ?? 0);
+  if (!Number.isInteger(count) || count < 0) {
+    throw new Error("Invalid Explore save count.");
+  }
+  return count;
+};
+
+const activeSaveExists = async (
+  queryable: SaveQueryExecutor,
+  participantIds: ReadonlyArray<ParticipantId>,
+  listingId: ExploreListingId
+): Promise<boolean> => {
+  const ids = participantIdList(participantIds);
+  if (ids.length === 0) return false;
+  const rows = await queryable
+    .select({ listingId: explorePlanSaves.listingId })
+    .from(explorePlanSaves)
+    .where(
+      and(
+        inArray(explorePlanSaves.participantId, ids),
+        eq(explorePlanSaves.listingId, listingId),
+        isNull(explorePlanSaves.unsavedAt)
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
+};
 
 export const ExploreSaveRepositoryLive: Layer.Layer<
   ExploreSaveRepository,
@@ -90,103 +170,159 @@ export const ExploreSaveRepositoryLive: Layer.Layer<
   Effect.gen(function* () {
     const { db } = yield* Database;
 
-    const isSavedByAny = (
-      participantIds: ReadonlyArray<ParticipantId>,
-      listingId: ExploreListingId
-    ) =>
-      databaseEffect("isExploreListingSaved", () =>
-        db
-          .select({ listingId: explorePlanSaves.listingId })
-          .from(explorePlanSaves)
-          .where(
-            and(
-              inArray(
-                explorePlanSaves.participantId,
-                participantIdList(participantIds)
-              ),
-              eq(explorePlanSaves.listingId, listingId)
-            )
-          )
-          .limit(1)
-      ).pipe(Effect.map((rows) => rows.length > 0));
-
     return {
       save: ({ participantId, participantIds, listingId, savedAt }) =>
         Effect.gen(function* () {
-          // alias 집합 중 이미 저장돼 있으면 새 row를 만들지 않는다(논리적 중복 방지).
-          const alreadySaved = yield* isSavedByAny(participantIds, listingId);
-          if (alreadySaved) {
-            return { saved: true } as const;
-          }
+          const result = yield* databaseEffect("saveExploreListing", () =>
+            db.transaction(async (tx) => {
+              const [listing] = await tx
+                .select({ status: explorePlanListings.status })
+                .from(explorePlanListings)
+                .where(eq(explorePlanListings.id, listingId))
+                .for("update")
+                .limit(1);
 
-          // canonical participant로만 insert. race/재시도는 composite PK
-          // uniqueness가 보호하므로 ON CONFLICT DO NOTHING으로 idempotent하게 흡수한다.
-          yield* databaseEffect("saveExploreListing", () =>
-            db
-              .insert(explorePlanSaves)
-              .values({
-                participantId,
-                listingId,
-                savedAt: new Date(savedAt),
-              })
-              .onConflictDoNothing({
-                target: [
-                  explorePlanSaves.participantId,
-                  explorePlanSaves.listingId,
-                ],
-              })
+              if (!listing) return { _tag: "NotFound" } as const;
+              if (listing.status !== "LISTED") {
+                return { _tag: "Unavailable" } as const;
+              }
+
+              const alreadySaved = await activeSaveExists(
+                tx,
+                participantIds,
+                listingId
+              );
+              if (!alreadySaved) {
+                const [cycle] = await tx
+                  .select({ maxCycle: max(explorePlanSaves.saveCycle) })
+                  .from(explorePlanSaves)
+                  .where(
+                    and(
+                      inArray(
+                        explorePlanSaves.participantId,
+                        participantIdList(participantIds)
+                      ),
+                      eq(explorePlanSaves.listingId, listingId)
+                    )
+                  );
+                const nextCycle = Number(cycle?.maxCycle ?? 0) + 1;
+                if (!Number.isInteger(nextCycle) || nextCycle < 1) {
+                  throw new Error("Invalid Explore save cycle.");
+                }
+                await tx
+                  .insert(explorePlanSaves)
+                  .values({
+                    participantId,
+                    listingId,
+                    saveCycle: nextCycle,
+                    savedAt: new Date(savedAt),
+                    unsavedAt: null,
+                  })
+                  .onConflictDoNothing({
+                    target: [
+                      explorePlanSaves.participantId,
+                      explorePlanSaves.listingId,
+                      explorePlanSaves.saveCycle,
+                    ],
+                  });
+              }
+
+              return {
+                _tag: "Saved",
+                saveCount: await eligibleSaveCount(tx, listingId),
+              } as const;
+            })
           );
-          return { saved: true } as const;
+
+          if (result._tag === "NotFound") {
+            return yield* Effect.fail(
+              new NotFoundError({ entity: "ExplorePlanListing", id: listingId })
+            );
+          }
+          if (result._tag === "Unavailable") {
+            return yield* Effect.fail(new ExploreListingUnavailableError());
+          }
+          return { saved: true, saveCount: result.saveCount } as const;
         }),
 
-      unsave: ({ participantIds, listingId }) =>
+      unsave: ({ participantIds, listingId, unsavedAt }) =>
         Effect.gen(function* () {
-          // alias 집합 전체에서 삭제. 대상이 없어도 성공(반복 안전).
-          yield* databaseEffect("unsaveExploreListing", () =>
-            db
-              .delete(explorePlanSaves)
-              .where(
-                and(
-                  inArray(
-                    explorePlanSaves.participantId,
-                    participantIdList(participantIds)
-                  ),
-                  eq(explorePlanSaves.listingId, listingId)
-                )
-              )
+          const result = yield* databaseEffect("unsaveExploreListing", () =>
+            db.transaction(async (tx) => {
+              const [listing] = await tx
+                .select({ status: explorePlanListings.status })
+                .from(explorePlanListings)
+                .where(eq(explorePlanListings.id, listingId))
+                .for("update")
+                .limit(1);
+
+              const ids = participantIdList(participantIds);
+              if (ids.length > 0) {
+                await tx
+                  .update(explorePlanSaves)
+                  .set({ unsavedAt: new Date(unsavedAt) })
+                  .where(
+                    and(
+                      inArray(explorePlanSaves.participantId, ids),
+                      eq(explorePlanSaves.listingId, listingId),
+                      isNull(explorePlanSaves.unsavedAt)
+                    )
+                  );
+              }
+
+              if (!listing || listing.status !== "LISTED") {
+                return { saveCount: 0 } as const;
+              }
+              return {
+                saveCount: await eligibleSaveCount(tx, listingId),
+              } as const;
+            })
           );
-          return { saved: false } as const;
+          return { saved: false, saveCount: result.saveCount } as const;
         }),
 
       isSaved: ({ participantIds, listingId }) =>
-        isSavedByAny(participantIds, listingId),
+        Effect.gen(function* () {
+          const [listing] = yield* databaseEffect("getExploreSaveState", () =>
+            db
+              .select({ status: explorePlanListings.status })
+              .from(explorePlanListings)
+              .where(eq(explorePlanListings.id, listingId))
+              .limit(1)
+          );
+          const saved = yield* databaseEffect("getExploreSaveState", () =>
+            activeSaveExists(db, participantIds, listingId)
+          );
+          const saveCount =
+            listing?.status === "LISTED"
+              ? yield* databaseEffect("getExploreSaveState", () =>
+                  eligibleSaveCount(db, listingId)
+                )
+              : 0;
+          return { saved, saveCount } as const;
+        }),
 
       listSaved: ({ participantIds, limit, cursor }) =>
         Effect.gen(function* () {
-          const participantFilter = inArray(
-            explorePlanSaves.participantId,
-            participantIdList(participantIds)
-          );
+          const ids = participantIdList(participantIds);
+          if (ids.length === 0) {
+            return { page: [], nextCursor: undefined };
+          }
 
-          // --- alias dedupe subquery -----------------------------------------
-          // canonical과 alias가 같은 listing을 각각 저장했으면 alias 집합 조회 시
-          // 같은 listing에 대한 row가 여러 개 나온다. listing당 하나의 논리적
-          // 항목만 남기기 위해 listing_id로 grouping하고, 대표 savedAt으로
-          // 가장 오래된(원래) 저장 시각 MIN(saved_at)을 선택한다. 이후 pagination은
-          // 이 deduped tuple 위에서만 수행한다(중복 카드/cursor 오염 방지).
           const deduped = db
             .select({
               listingId: explorePlanSaves.listingId,
               savedAt: min(explorePlanSaves.savedAt).as("saved_at"),
             })
             .from(explorePlanSaves)
-            .where(participantFilter)
+            .where(
+              and(
+                inArray(explorePlanSaves.participantId, ids),
+                isNull(explorePlanSaves.unsavedAt)
+              )
+            )
             .groupBy(explorePlanSaves.listingId)
             .as("deduped_saves");
-
-          // keyset predicate는 deduped tuple (saved_at, listing_id)에 대해 동작한다.
-          // order (saved_at DESC, listing_id DESC) 아래에서
-          // (saved_at, listing_id) < (cursor.savedAt, cursor.listingId)와 동치.
           const keyset = cursor
             ? or(
                 lt(deduped.savedAt, new Date(cursor.savedAt)),
@@ -196,13 +332,17 @@ export const ExploreSaveRepositoryLive: Layer.Layer<
                 )
               )
             : undefined;
-
-          // 현재 LISTED listing만 read-through join(UNLISTED/deleted 제외).
-          const listedFilter = eq(explorePlanListings.status, "LISTED");
-          const where = keyset
-            ? and(listedFilter, keyset)
-            : listedFilter;
-
+          const currentCount = sql<number>`(
+            select count(distinct coalesce(alias.canonical_participant_id, active_save.participant_id))::int
+            from "explore_plan_saves" as active_save
+            left join "participant_alias" as alias
+              on alias.alias_participant_id = active_save.participant_id
+            inner join "participant" as canonical
+              on canonical.id = coalesce(alias.canonical_participant_id, active_save.participant_id)
+            where active_save.listing_id = "explore_plan_listings"."id"
+              and active_save.unsaved_at is null
+              and canonical.auth_user_id is not null
+          )`;
           const rows = yield* databaseEffect("listSavedExploreListings", () =>
             db
               .select({
@@ -215,31 +355,31 @@ export const ExploreSaveRepositoryLive: Layer.Layer<
                 listedAt: explorePlanListings.listedAt,
                 updatedAt: explorePlanListings.updatedAt,
                 unlistedAt: explorePlanListings.unlistedAt,
+                saveCount: currentCount,
               })
-              // 외부 pagination은 dedupe 이후에 일어난다(subquery join).
               .from(deduped)
               .innerJoin(
                 explorePlanListings,
                 eq(deduped.listingId, explorePlanListings.id)
               )
-              .where(where)
+              .where(and(eq(explorePlanListings.status, "LISTED"), keyset))
               .orderBy(desc(deduped.savedAt), desc(deduped.listingId))
-              // limit+1로 다음 페이지 존재 여부를 판단한다.
               .limit(limit + 1)
           );
 
           const hasMore = rows.length > limit;
           const pageRows = hasMore ? rows.slice(0, limit) : rows;
-
           const page: SavedListingEntry[] = yield* Effect.forEach(
             pageRows,
             (row) =>
               Effect.gen(function* () {
-                // min(saved_at)은 타입상 nullable이지만, listing과 inner join된
-                // grouped row에는 항상 대표 saved_at이 존재한다. null이면(비정상)
-                // fallback 없이 malformed로 실패한다.
-                const savedAtValue = row.savedAt;
-                if (savedAtValue == null) {
+                if (row.savedAt == null) {
+                  return yield* Effect.fail(
+                    malformed("listSavedExploreListings.decode")
+                  );
+                }
+                const saveCount = Number(row.saveCount);
+                if (!Number.isInteger(saveCount) || saveCount < 0) {
                   return yield* Effect.fail(
                     malformed("listSavedExploreListings.decode")
                   );
@@ -248,21 +388,25 @@ export const ExploreSaveRepositoryLive: Layer.Layer<
                   row,
                   "listSavedExploreListings.decode"
                 );
-                const savedAt =
-                  savedAtValue instanceof Date
-                    ? savedAtValue.toISOString()
-                    : new Date(savedAtValue).toISOString();
-                return { savedAt, listing } satisfies SavedListingEntry;
+                return {
+                  savedAt: row.savedAt.toISOString(),
+                  listing,
+                  saveCount,
+                } satisfies SavedListingEntry;
               })
           );
 
           const last = page[page.length - 1];
-          const nextCursor: SavedListingCursor | undefined =
-            hasMore && last
-              ? { savedAt: last.savedAt, listingId: last.listing.listingId }
-              : undefined;
-
-          return { page, nextCursor };
+          return {
+            page,
+            nextCursor:
+              hasMore && last
+                ? {
+                    savedAt: last.savedAt,
+                    listingId: last.listing.listingId,
+                  }
+                : undefined,
+          };
         }),
     };
   })

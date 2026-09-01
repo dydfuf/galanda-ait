@@ -71,8 +71,9 @@ export const useExploreSaveStateQuery = (listingId: ExploreListingId) => {
  * 가능). 성공/실패 모두 settle 후 실제 persisted 상태로 invalidate해 서버 진실과
  * 일치시킨다. 저장 목록도 함께 invalidate한다.
  *
- * server는 save/unsave 응답으로 실제 저장 상태(`{ saved }`)를 돌려주므로, 성공 시
- * 그 값으로 state cache를 확정한다.
+ * server는 save/unsave 응답으로 실제 저장 상태와 aggregate(`{ saved, saveCount }`)를
+ * 돌려주므로, 성공 시 그 값으로 state cache를 확정한다. count는 optimistic
+ * 변경하지 않는다.
  */
 export const useToggleExploreSaveMutation = (listingId: ExploreListingId) => {
   const queryClient = useQueryClient();
@@ -94,9 +95,12 @@ export const useToggleExploreSaveMutation = (listingId: ExploreListingId) => {
       await queryClient.cancelQueries({ queryKey: stateKey });
       const previous =
         queryClient.getQueryData<ExploreSaveStateResponse>(stateKey);
-      queryClient.setQueryData<ExploreSaveStateResponse>(stateKey, {
-        saved: nextSaved,
-      });
+      if (previous) {
+        queryClient.setQueryData<ExploreSaveStateResponse>(stateKey, {
+          saved: nextSaved,
+          saveCount: previous.saveCount,
+        });
+      }
       return { previous };
     },
     onError: (_error, _variables, context) => {
@@ -113,6 +117,10 @@ export const useToggleExploreSaveMutation = (listingId: ExploreListingId) => {
       // 서버 진실과 최종 동기화 + 저장 목록 갱신.
       void queryClient.invalidateQueries({ queryKey: stateKey });
       void queryClient.invalidateQueries({ queryKey: savedListKey });
+      void queryClient.invalidateQueries({ queryKey: exploreKeys.all });
+      void queryClient.invalidateQueries({
+        queryKey: exploreKeys.detail(listingId),
+      });
     },
   });
 };
