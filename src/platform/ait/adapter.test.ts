@@ -167,4 +167,70 @@ describe("Apps in Toss platform adapter integration", () => {
       nativeError,
     );
   });
+
+  it("handles share fallback chain: native success -> does not call clipboard/web share", async () => {
+    sdkMocks.Share.sendMessage.mockResolvedValue(undefined);
+    const { aitAdapter } = await loadAdapter();
+
+    const outcome = await aitAdapter.share({
+      title: "Galanda",
+      text: "Invite",
+      url: "https://galanda.app/trips/1",
+    });
+
+    expect(outcome).toBe("shared");
+    expect(sdkMocks.Share.sendMessage).toHaveBeenCalledWith({
+      message: "https://galanda.app/trips/1",
+    });
+    expect(sdkMocks.Clipboard.setText).not.toHaveBeenCalled();
+  });
+
+  it("handles share fallback chain: native abort/cancel returns cancelled without clipboard copy", async () => {
+    const abortError = new DOMException("The user aborted a request", "AbortError");
+    sdkMocks.Share.sendMessage.mockRejectedValue(abortError);
+    const { aitAdapter } = await loadAdapter();
+
+    const outcome = await aitAdapter.share({
+      title: "Galanda",
+      text: "Invite",
+      url: "https://galanda.app/trips/1",
+    });
+
+    expect(outcome).toBe("cancelled");
+    expect(sdkMocks.Clipboard.setText).not.toHaveBeenCalled();
+  });
+
+  it("handles share fallback chain: native failure falls through to clipboard", async () => {
+    sdkMocks.Share.sendMessage.mockRejectedValue(new Error("Native share unavailable"));
+    sdkMocks.Clipboard.setText.mockResolvedValue(undefined);
+    const { aitAdapter } = await loadAdapter();
+
+    const outcome = await aitAdapter.share({
+      title: "Galanda",
+      text: "Invite",
+      url: "https://galanda.app/trips/1",
+    });
+
+    expect(outcome).toBe("copied");
+    expect(sdkMocks.Clipboard.setText).toHaveBeenCalledWith("https://galanda.app/trips/1");
+  });
+
+  it("delegates external URL opening to Device.openURL and falls back on error", async () => {
+    sdkMocks.Device.openURL.mockResolvedValue(undefined);
+    const { aitAdapter } = await loadAdapter();
+
+    await aitAdapter.openExternalUrl("https://example.com");
+    expect(sdkMocks.Device.openURL).toHaveBeenCalledWith("https://example.com");
+  });
+
+  it("delegates screen close to Screen.close and returns false on rejection", async () => {
+    sdkMocks.Screen.close.mockResolvedValue(undefined);
+    const { aitAdapter } = await loadAdapter();
+
+    expect(await aitAdapter.requestClose()).toBe(true);
+
+    sdkMocks.Screen.close.mockRejectedValue(new Error("Screen.close unavailable"));
+    expect(await aitAdapter.requestClose()).toBe(false);
+  });
 });
+

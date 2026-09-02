@@ -12,10 +12,20 @@ const session = (accountType: UserSession["accountType"]): UserSession => ({
 
 describe("safeReturnTo", () => {
   it("keeps internal paths and rejects external redirects", () => {
+    expect(safeReturnTo("/trips")).toBe("/trips");
+    expect(safeReturnTo("/trips/trip-1/plans")).toBe("/trips/trip-1/plans");
+    expect(safeReturnTo("/trips/trip-1/plans?source=invite")).toBe("/trips/trip-1/plans?source=invite");
+    expect(safeReturnTo("/trips/trip-1/itinerary#day-2")).toBe("/trips/trip-1/itinerary#day-2");
     expect(safeReturnTo("/invites/token?from=login")).toBe("/invites/token?from=login");
+
+    // Malicious or invalid redirect candidates
     expect(safeReturnTo("https://evil.example")).toBe("/trips");
     expect(safeReturnTo("//evil.example")).toBe("/trips");
+    expect(safeReturnTo("\\\\evil.example")).toBe("/trips");
     expect(safeReturnTo("/\\evil.example")).toBe("/trips");
+    expect(safeReturnTo("javascript:alert(1)")).toBe("/trips");
+    expect(safeReturnTo("")).toBe("/trips");
+    expect(safeReturnTo(null)).toBe("/trips");
   });
 });
 
