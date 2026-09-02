@@ -6,3 +6,4 @@ export * from "./confirmed-itinerary.ts";
 export * from "./explore-plan.ts";
 export * from "./explore-listing-city.ts";
 export * from "./explore-save.ts";
+export * from "./trip-activity.ts";

@@ -24,6 +24,7 @@ vi.mock("../../platform/index.ts", () => ({
   platform: mocks.platform,
 }));
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TripRoomTabLayout } from "./TripRoomTabLayout.tsx";
 
 function LocationProbe() {
@@ -46,22 +47,28 @@ function LocationProbe() {
 const renderLayout = (
   initialEntries: string[] | string = "/trips/trip-1/plans",
   initialIndex = 0,
-) =>
-  render(
-    <MemoryRouter
-      initialEntries={Array.isArray(initialEntries) ? initialEntries : [initialEntries]}
-      initialIndex={initialIndex}
-    >
-      <LocationProbe />
-      <Routes>
-        <Route path="/trips" element={<h1>여행 목록 콘텐츠</h1>} />
-        <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
-          <Route path="plans" element={<h1>계획 콘텐츠</h1>} />
-          <Route path="itinerary" element={<h1>일정 콘텐츠</h1>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter
+        initialEntries={Array.isArray(initialEntries) ? initialEntries : [initialEntries]}
+        initialIndex={initialIndex}
+      >
+        <LocationProbe />
+        <Routes>
+          <Route path="/trips" element={<h1>여행 목록 콘텐츠</h1>} />
+          <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
+            <Route path="plans" element={<h1>계획 콘텐츠</h1>} />
+            <Route path="itinerary" element={<h1>일정 콘텐츠</h1>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
+};
 
 function createNativeNavigation(
   addAccessoryButton: PlatformNavigation["addAccessoryButton"] = vi

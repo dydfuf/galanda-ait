@@ -1,3 +1,4 @@
+/// <reference types="../worker-configuration.d.ts" />
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { routePath } from "hono/route";
@@ -40,7 +41,7 @@ export interface AiRecommendationBindings {
 }
 
 export interface AppEnv {
-  Bindings: Env & BetterAuthEnv & AiRecommendationBindings;
+  Bindings: Cloudflare.Env & BetterAuthEnv & AiRecommendationBindings;
   Variables: AppVariables;
 }
 

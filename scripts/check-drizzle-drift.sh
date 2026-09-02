@@ -22,6 +22,8 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
    fi
 fi
 
+BEFORE=$(git status --porcelain -- drizzle || true)
+
 # Run generate with a temporary name; if schema is in sync, no file is created.
 npx drizzle-kit generate --name _ci_drift_check > /tmp/drizzle-generate.log 2>&1 || true
 cat /tmp/drizzle-generate.log
@@ -29,7 +31,7 @@ cat /tmp/drizzle-generate.log
 # Check git status for drizzle folder - any change means drift
 AFTER=$(git status --porcelain -- drizzle || true)
 
-if [ -n "$AFTER" ]; then
+if [ "$BEFORE" != "$AFTER" ]; then
   echo ""
   echo "❌ Drizzle schema drift detected - migration is missing or drizzle metadata is out of sync."
   echo "Run 'pnpm db:generate' locally and commit the new migration."

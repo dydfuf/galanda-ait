@@ -164,9 +164,18 @@ function OngoingTripCard({
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1.5">
-            <h3 className="line-clamp-1 min-w-0 text-base font-bold text-foreground [overflow-wrap:anywhere]">
+            <h2 className="min-w-0 text-base leading-snug font-bold [overflow-wrap:anywhere]">
               {trip.title}
-            </h3>
+            </h2>
+            {trip.activitySummary && trip.activitySummary.unreadCount > 0 && (
+              <Badge
+                variant="default"
+                className="h-5 shrink-0 px-1.5 text-[10px] font-bold"
+                aria-label={`새 활동 ${trip.activitySummary.unreadCount}개`}
+              >
+                +{trip.activitySummary.unreadCount}
+              </Badge>
+            )}
           </div>
           <Badge
             variant={badgeVariant}
@@ -233,6 +242,15 @@ function PastTripList({
             <ItemTitle className="text-base font-semibold [overflow-wrap:anywhere]">
               {trip.title}
             </ItemTitle>
+            {trip.activitySummary && trip.activitySummary.unreadCount > 0 && (
+              <Badge
+                variant="default"
+                className="h-5 shrink-0 px-1.5 text-[10px] font-bold"
+                aria-label={`새 활동 ${trip.activitySummary.unreadCount}개`}
+              >
+                +{trip.activitySummary.unreadCount}
+              </Badge>
+            )}
           </div>
           <ItemDescription className="[overflow-wrap:anywhere]">
             {trip.destination && `${trip.destination} · `}

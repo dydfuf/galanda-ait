@@ -145,7 +145,7 @@ function StatefulAlertDialogFixture() {
             서버가 저장을 확인할 때까지 이 창을 유지합니다.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {state === "pending" && <p role="status">저장 중입니다.</p>}
+        {state === "pending" && <output>저장 중입니다.</output>}
         {state === "error" && (
           <p role="alert">저장하지 못했습니다. 다시 시도해 주세요.</p>
         )}

@@ -57,6 +57,13 @@ import {
   TripOverviewListResponseSchema,
   type TripOverviewListResponse,
 } from "../contracts/trip-overview.ts";
+import {
+  TripActivityPageResponseSchema,
+  TripActivitySummaryDtoSchema,
+  type ActivitySequence,
+  type TripActivityPageResponse,
+  type TripActivitySummaryDto,
+} from "../contracts/trip-activity.ts";
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -444,3 +451,41 @@ export const getSavedListings = (
   const path = queryString ? `/api/me/saved?${queryString}` : "/api/me/saved";
   return requestJson(path, SavedListingsResponseSchema, { signal });
 };
+
+/**
+ * 여행방 협업 활동 이력 조회 (`/api/trips/:tripId/activity`)
+ */
+export const getTripActivities = (
+  tripId: TripId | string,
+  params: { readonly beforeSequence?: ActivitySequence; readonly limit?: number } = {},
+  signal?: AbortSignal
+): Promise<TripActivityPageResponse> => {
+  const search = new URLSearchParams();
+  if (params.beforeSequence !== undefined) {
+    search.set("beforeSequence", params.beforeSequence);
+  }
+  if (params.limit !== undefined) {
+    search.set("limit", String(params.limit));
+  }
+  const queryString = search.toString();
+  const path = queryString
+    ? `/api/trips/${encodeURIComponent(tripId)}/activity?${queryString}`
+    : `/api/trips/${encodeURIComponent(tripId)}/activity`;
+  return requestJson(path, TripActivityPageResponseSchema, { signal });
+};
+
+/**
+ * 여행방 활동 읽음 처리 (`/api/trips/:tripId/activity/read`)
+ */
+export const markTripActivityRead = (
+  tripId: TripId | string,
+  throughSequence: ActivitySequence
+): Promise<TripActivitySummaryDto> =>
+  requestJson(
+    `/api/trips/${encodeURIComponent(tripId)}/activity/read`,
+    TripActivitySummaryDtoSchema,
+    {
+      method: "PUT",
+      body: JSON.stringify({ throughSequence }),
+    }
+  );

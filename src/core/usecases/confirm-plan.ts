@@ -14,6 +14,7 @@ import {
   mergeParticipantIdentityInRoom,
 } from "../domain/room-transitions.ts";
 import { StateConflictError, ValidationError } from "../domain/errors.ts";
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
   function* (
@@ -35,7 +36,7 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     );
 
     // 3. RBAC: 확정은 방장만 수행할 수 있다.
-    yield* requireRoomHost(
+    const host = yield* requireRoomHost(
       room,
       session.participantIds,
       "방장만 여행안을 확정할 수 있습니다."
@@ -89,10 +90,23 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
     };
 
     const itineraries = yield* ConfirmedItineraryRepository;
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: host.name ?? session.name,
+      event: {
+        type: "PLAN_CONFIRMED",
+        subjectPlanId: plan.id,
+        subjectTitle: plan.title,
+        roomRevision: room.revision + 1,
+        itineraryRevision: 1,
+      },
+    };
+
     return yield* itineraries.confirm({
       room: confirmPlanInRoom(room, plan),
       expectedRoomRevision: expectedRevision,
       itinerary,
+      activity,
     });
   }
 );

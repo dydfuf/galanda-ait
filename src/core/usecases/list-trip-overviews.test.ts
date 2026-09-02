@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Effect, Layer } from "effect";
 import { listTripOverviews, toTripOverviewDto } from "./list-trip-overviews.ts";
 import { TripRoomRepository, type TripOverviewSourceRecord } from "../ports/trip-room-repository.ts";
+import { TripActivityRepository } from "../ports/trip-activity-repository.ts";
 import { SessionService } from "../ports/session.ts";
 import { ParticipantIdSchema, PlanIdSchema, RevisionSchema, TripIdSchema } from "../domain/ids.ts";
 import type { TripRoom } from "../domain/room.ts";
@@ -185,6 +186,10 @@ describe("listTripOverviews usecase", () => {
       getRoomOverviewRecords: () => Effect.succeed(records),
     } as any);
 
+    const MockActivityRepo = Layer.succeed(TripActivityRepository, {
+      getSummariesForTrips: () => Effect.succeed(new Map()),
+    } as any);
+
     const MockSession = Layer.succeed(SessionService, {
       getCurrentUser: () =>
         Effect.succeed({
@@ -206,7 +211,7 @@ describe("listTripOverviews usecase", () => {
 
     const result = await Effect.runPromise(
       listTripOverviews().pipe(
-        Effect.provide(Layer.mergeAll(MockTripRepo, MockSession))
+        Effect.provide(Layer.mergeAll(MockTripRepo, MockActivityRepo, MockSession))
       )
     );
 

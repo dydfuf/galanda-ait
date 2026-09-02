@@ -99,10 +99,21 @@ describe("LocalTripRoomRepository", () => {
         initialPlan: {
           id: PlanIdSchema.make("plan-local-imported"),
           title: "가져온 여행안",
-          status: "VOTING",
+          status: "VOTING" as const,
           revision: RevisionSchema.make(1),
           places: [],
           voteCount: 0,
+        },
+        initialPlanActivity: {
+          actorParticipantId: hostId,
+          actorDisplayName: "Host",
+          event: {
+            type: "PLAN_CREATED",
+            subjectPlanId: PlanIdSchema.make("plan-local-imported"),
+            subjectTitle: "가져온 여행안",
+            roomRevision: 1,
+            itineraryRevision: null,
+          },
         },
       });
     }).pipe(Effect.provide(LocalTripRoomRepositoryLayer));

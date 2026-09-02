@@ -13,6 +13,7 @@ import {
   mergeParticipantIdentityInRoom,
   setPlanOpinionInRoom,
 } from "../domain/room-transitions.ts";
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
 
 /**
  * 의견 제출 입력
@@ -82,9 +83,26 @@ export const submitOpinion = Effect.fn("submitOpinion")(
       reason,
     };
 
-    return yield* repo.saveRoom(
-      setPlanOpinionInRoom(room, plan, sanitizedOpinion),
-      input.expectedRevision
+    const hasExistingOpinion = (plan.memberOpinions ?? []).some((op) =>
+      session.participantIds.includes(op.userId)
     );
+
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: actor.member?.name ?? session.name,
+      event: {
+        type: hasExistingOpinion ? "OPINION_UPDATED" : "OPINION_SUBMITTED",
+        subjectPlanId: plan.id,
+        subjectTitle: plan.title,
+        roomRevision: room.revision + 1,
+        itineraryRevision: null,
+      },
+    };
+
+    return yield* repo.saveRoomWithActivity({
+      room: setPlanOpinionInRoom(room, plan, sanitizedOpinion),
+      expectedRevision: input.expectedRevision,
+      activity,
+    });
   }
 );

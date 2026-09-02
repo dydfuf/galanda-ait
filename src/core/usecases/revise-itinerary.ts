@@ -11,6 +11,8 @@ import { ConfirmedItineraryRepository } from "../ports/confirmed-itinerary-repos
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 
+import type { TripActivityWrite } from "../domain/trip-activity.ts";
+
 export const reviseTripItinerary = Effect.fn("reviseTripItinerary")(
   function* (
     tripId: TripId,
@@ -26,7 +28,7 @@ export const reviseTripItinerary = Effect.fn("reviseTripItinerary")(
       session.participantId,
       session.participantIds
     );
-    yield* requireRoomHost(
+    const host = yield* requireRoomHost(
       room,
       session.participantIds,
       "방장만 확정 일정을 수정할 수 있습니다."
@@ -48,7 +50,22 @@ export const reviseTripItinerary = Effect.fn("reviseTripItinerary")(
     if (typeof revised === "string") {
       return yield* Effect.fail(new ValidationError({ message: revised }));
     }
-    return yield* itineraries.revise({ itinerary: revised, expectedRevision });
+    const activity: TripActivityWrite = {
+      actorParticipantId: session.participantId,
+      actorDisplayName: host.name ?? session.name,
+      event: {
+        type: "ITINERARY_REVISED",
+        subjectPlanId: null,
+        subjectTitle: null,
+        roomRevision: null,
+        itineraryRevision: revised.currentRevision,
+      },
+    };
+    return yield* itineraries.revise({
+      itinerary: revised,
+      expectedRevision,
+      activity,
+    });
   }
 );
 

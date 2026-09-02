@@ -14,6 +14,7 @@ import {
 import { Database } from "./database.ts";
 import { tripInvites } from "./schema/invite.ts";
 import { tripRooms } from "./schema/trip-room.ts";
+import { tripActivityReads } from "./schema/trip-activity.ts";
 
 const repositoryEffect = <A>(
   operation: string,
@@ -161,6 +162,28 @@ export const InviteRepositoryLive: Layer.Layer<
                 )
                 .returning();
               if (!saved) throw new Error("invite join CAS failed");
+
+              // Initialize member activity read cursor with monotonic join boundary so new member does not see past activities as unread
+              const boundaryResult = await tx.execute<{ join_boundary: string | number | bigint }>(
+                sql`SELECT nextval('trip_activity_sequence') AS join_boundary`
+              );
+              const boundaryRow = boundaryResult.rows[0] as { join_boundary?: string | number | bigint } | undefined;
+              const joinBoundary = boundaryRow?.join_boundary !== undefined
+                ? BigInt(boundaryRow.join_boundary)
+                : 0n;
+
+              if (joinBoundary > 0n) {
+                await tx
+                  .insert(tripActivityReads)
+                  .values({
+                    tripId: storedRoom.id,
+                    participantId: params.member.id,
+                    lastSeenSequence: joinBoundary,
+                    seenAt: sql`now()`,
+                  })
+                  .onConflictDoNothing();
+              }
+
               return decodeRoom({
                 ...saved,
                 confirmedPlanId: saved.confirmedPlanId ?? undefined,

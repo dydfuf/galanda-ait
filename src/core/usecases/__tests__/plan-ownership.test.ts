@@ -124,6 +124,26 @@ const createInMemoryRepo = (
       rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
       return Effect.succeed(updated);
     },
+    saveRoomWithActivity: ({
+      room: nextRoom,
+      expectedRevision,
+    }): Effect.Effect<TripRoom, NotFoundError | RevisionConflictError> => {
+      const idx = rooms.findIndex((room) => room.id === nextRoom.id);
+      if (idx === -1) {
+        return Effect.fail(
+          new NotFoundError({ entity: "TripRoom", id: nextRoom.id })
+        );
+      }
+      if (rooms[idx].revision !== expectedRevision) {
+        return Effect.fail(new RevisionConflictError({ message: "conflict", expectedRevision, actualRevision: rooms[idx].revision }));
+      }
+      const updated: TripRoom = {
+        ...nextRoom,
+        revision: RevisionSchema.make(expectedRevision + 1),
+      };
+      rooms = [...rooms.slice(0, idx), updated, ...rooms.slice(idx + 1)];
+      return Effect.succeed(updated);
+    },
     deletePlanAndAutoUnlist: ({
       room: nextRoom,
       sourcePlanId,

@@ -23,6 +23,7 @@ import {
   type TripActionRankerService,
 } from "../../src/core/ports/trip-action-ranker.ts";
 import type { ConfirmedItineraryRepository } from "../../src/core/ports/confirmed-itinerary-repository.ts";
+import type { TripActivityRepository } from "../../src/core/ports/trip-activity-repository.ts";
 import {
   CreateRoomInputSchema,
   createTripRoom,
@@ -45,6 +46,12 @@ import {
 } from "../../src/core/usecases/save-plan.ts";
 import { submitOpinion } from "../../src/core/usecases/submit-opinion.ts";
 import { updateTripRoom } from "../../src/core/usecases/update-room.ts";
+import { listTripActivities } from "../../src/core/usecases/list-trip-activities.ts";
+import { markTripActivityRead } from "../../src/core/usecases/mark-trip-activity-read.ts";
+import {
+  MarkTripActivityReadRequestSchema,
+  TripActivityQuerySchema,
+} from "../../src/contracts/trip-activity.ts";
 import {
   recommendNextTripAction,
   type NextTripActionRecommendation,
@@ -55,6 +62,7 @@ import { InviteRepositoryLive } from "../../src/infrastructure/persistence/drizz
 import { Database } from "../../src/infrastructure/persistence/drizzle/database.ts";
 import { TripRoomRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-room-repository.ts";
 import { ConfirmedItineraryRepositoryLive } from "../../src/infrastructure/persistence/drizzle/confirmed-itinerary-repository.ts";
+import { DrizzleTripActivityRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-activity-repository.ts";
 import type { AppEnv } from "../app.ts";
 import {
   runEffect,
@@ -259,6 +267,7 @@ type TripRequirements =
   | SessionService
   | TripRoomRepository
   | ConfirmedItineraryRepository
+  | TripActivityRepository
   | InviteRepository
   | IdGenerator;
 
@@ -291,6 +300,7 @@ const runTripEffect = <A, E>(
     ConfirmedItineraryRepositoryLive.pipe(
       Layer.provide(Layer.succeed(Database, { db }))
     ),
+    DrizzleTripActivityRepositoryLive(db),
     IdGeneratorLive
   );
   return runEffect(c, effect.pipe(Effect.provide(services)), {
@@ -545,4 +555,116 @@ tripsRoute.delete(
   "/:tripId/invites",
   effectValidator("param", TripParamsSchema),
   (c) => runTripEffect(c, revokeTripInvite(c.req.valid("param").tripId))
+);
+
+const resolveActivityTarget = (event: {
+  tripId: string;
+  type: string;
+  subjectPlanId?: string | null;
+}) => {
+  if (
+    event.type === "PLAN_CREATED" ||
+    event.type === "PLAN_UPDATED" ||
+    event.type === "OPINION_SUBMITTED" ||
+    event.type === "OPINION_UPDATED"
+  ) {
+    if (event.subjectPlanId) {
+      return {
+        type: "PLAN" as const,
+        path: `/trips/${event.tripId}/plans/${event.subjectPlanId}`,
+        planId: event.subjectPlanId,
+      };
+    }
+    return {
+      type: "PLAN_HOME" as const,
+      path: `/trips/${event.tripId}/plans`,
+    };
+  }
+  if (event.type === "PLAN_DELETED") {
+    return {
+      type: "PLAN_HOME" as const,
+      path: `/trips/${event.tripId}/plans`,
+    };
+  }
+  if (event.type === "PLAN_CONFIRMED" || event.type === "ITINERARY_REVISED") {
+    return {
+      type: "ITINERARY" as const,
+      path: `/trips/${event.tripId}/itinerary`,
+    };
+  }
+  return null;
+};
+
+tripsRoute.get(
+  "/:tripId/activity",
+  effectValidator("param", TripParamsSchema),
+  effectValidator("query", TripActivityQuerySchema, strictInput),
+  (c) => {
+    const { beforeSequence, limit } = c.req.valid("query");
+    return runTripEffect(
+      c,
+      listTripActivities({
+        tripId: c.req.valid("param").tripId,
+        beforeSequence: beforeSequence !== undefined ? BigInt(beforeSequence) : undefined,
+        limit,
+      }).pipe(
+        Effect.map((page) => ({
+          items: page.events.map((event) => ({
+            sequence: event.sequence.toString(),
+            tripId: event.tripId,
+            type: event.type,
+            actorParticipantId: event.actorParticipantId,
+            actorDisplayName: event.actorDisplayName ?? null,
+            isOwn: Boolean(event.isOwn),
+            subjectPlanId: event.subjectPlanId ?? null,
+            subjectTitle: event.subjectTitle ?? null,
+            roomRevision: event.roomRevision ?? null,
+            itineraryRevision: event.itineraryRevision ?? null,
+            target: resolveActivityTarget(event),
+            createdAt: event.createdAt,
+          })),
+          hasMore: page.hasMore,
+          nextBeforeSequence:
+            page.nextBeforeSequence !== undefined
+              ? page.nextBeforeSequence.toString()
+              : null,
+          latestSequence:
+            page.latestSequence !== undefined
+              ? page.latestSequence.toString()
+              : null,
+          lastSeenSequence:
+            page.lastSeenSequence !== undefined
+              ? page.lastSeenSequence.toString()
+              : null,
+          unreadCount: page.unreadCount,
+        }))
+      )
+    );
+  }
+);
+
+tripsRoute.put(
+  "/:tripId/activity/read",
+  effectValidator("param", TripParamsSchema),
+  effectValidator("json", MarkTripActivityReadRequestSchema, strictInput),
+  (c) => {
+    const { throughSequence } = c.req.valid("json");
+    return runTripEffect(
+      c,
+      markTripActivityRead({
+        tripId: c.req.valid("param").tripId,
+        throughSequence: BigInt(throughSequence),
+      }).pipe(
+        Effect.map((summary) => ({
+          tripId: summary.tripId,
+          unreadCount: summary.unreadCount,
+          latestUnreadSummary: summary.latestUnreadSummary ?? null,
+          lastSeenSequence:
+            summary.lastSeenSequence !== undefined
+              ? summary.lastSeenSequence.toString()
+              : null,
+        }))
+      )
+    );
+  }
 );

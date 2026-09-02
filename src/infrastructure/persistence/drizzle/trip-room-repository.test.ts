@@ -219,6 +219,17 @@ describe("TripRoomRepositoryLive", () => {
           destination: "오사카",
           hostUser: { id: hostId, name: "Host", role: "HOST" },
           initialPlan,
+          initialPlanActivity: {
+            actorParticipantId: hostId,
+            actorDisplayName: "Host",
+            event: {
+              type: "PLAN_CREATED",
+              subjectPlanId: initialPlan.id,
+              subjectTitle: initialPlan.title,
+              roomRevision: 1,
+              itineraryRevision: null,
+            },
+          },
         });
       }).pipe(
         Effect.provide(
@@ -229,14 +240,16 @@ describe("TripRoomRepositoryLive", () => {
       )
     );
 
-    // 단일 INSERT만 발생하고 후속 UPDATE(plan 추가)는 없다(partial write 없음).
-    expect(calls).toHaveLength(1);
-    expect(calls[0].text.startsWith("insert")).toBe(true);
+    // 단일 room INSERT 및 activity INSERT가 발생하고 후속 UPDATE(plan 추가)는 없다(partial write 없음).
+    const inserts = calls.filter((c) => c.text.startsWith("insert"));
+    expect(inserts).toHaveLength(2);
+    expect(inserts[0].text).toContain('"trip_rooms"');
+    expect(inserts[1].text).toContain('"trip_activity_events"');
     // room+plan이 한 aggregate row로 저장된다.
     expect(created.plans).toHaveLength(1);
     expect(created.plans[0]!.id).toBe("plan-imported-1");
     // insert params의 plans jsonb에 initialPlan이 포함된다.
-    expect(JSON.stringify(calls[0].params)).toContain("plan-imported-1");
+    expect(JSON.stringify(inserts[0].params)).toContain("plan-imported-1");
   });
 
   it("initialPlan이 없으면 빈 방을 만든다 (기존 동작 유지)", async () => {
@@ -448,6 +461,17 @@ describe("TripRoomRepositoryLive.deletePlanAndAutoUnlist", () => {
         sourcePlanId,
         expectedRevision: RevisionSchema.make(expectedRevision),
         unlistedAt,
+        activity: {
+          actorParticipantId: hostId,
+          actorDisplayName: "Host",
+          event: {
+            type: "PLAN_DELETED",
+            subjectPlanId: sourcePlanId,
+            subjectTitle: "First Plan",
+            roomRevision: roomAfterDelete.revision,
+            itineraryRevision: null,
+          },
+        },
       });
     }).pipe(
       Effect.provide(
