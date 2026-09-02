@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Compass, House, Luggage, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { OfflineStatusBanner } from "@/components/galanda/OfflineStatusBanner.tsx";
 import {
   GLOBAL_NAV_ITEMS,
   resolveGlobalNavKey,
@@ -60,6 +61,7 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
       style={shellStyle}
       className="flex min-h-dvh flex-1 flex-col"
     >
+      <OfflineStatusBanner />
       <div
         data-galanda-surface={usesContentSurface ? "content" : undefined}
         className="flex flex-1 flex-col pb-[var(--global-nav-height)]"

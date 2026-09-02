@@ -16,6 +16,9 @@ export const useItineraryQuery = (
   return useQuery({
     queryKey: itineraryKeys.detail(tripId),
     queryFn: ({ signal }) => getTripItinerary(TripIdSchema.make(tripId), signal),
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     enabled: Boolean(tripId) && isSessionReady,
   });
 };

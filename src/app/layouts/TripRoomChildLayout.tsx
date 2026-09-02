@@ -4,6 +4,7 @@ import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx
 import { Result } from "effect";
 import { useAppNavigation } from "../../hooks/useAppNavigation.ts";
 import { PageHeader } from "@/components/galanda/page-header.tsx";
+import { OfflineStatusBanner } from "@/components/galanda/OfflineStatusBanner.tsx";
 import { getTripRoomNavigationTitle } from "./trip-room-navigation.ts";
 
 export function TripRoomChildLayout() {
@@ -20,6 +21,7 @@ export function TripRoomChildLayout() {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
+      <OfflineStatusBanner />
       {/* AIT native navigation이 back/title을 소유하므로 Web/PWA에서만 header를 렌더링해요. */}
       {!platformNavigation && (
         <PageHeader

@@ -144,21 +144,26 @@ const activityEventRowValues = (
   roomRev = 2,
   itinRev = null,
   createdAt = "2026-08-25T00:00:00.000Z"
-): Array<unknown> => [
+): Record<string, unknown> => ({
   sequence,
-  tripId,
-  type,
-  actorId,
-  actorName,
-  planId,
-  title,
-  roomRev,
-  itinRev,
-  createdAt,
-];
+  trip_id: tripId,
+  event_type: type,
+  actor_participant_id: actorId,
+  actor_display_name: actorName,
+  subject_plan_id: planId,
+  subject_title: title,
+  room_revision: roomRev,
+  itinerary_revision: itinRev,
+  created_at: createdAt,
+  latest_sequence: sequence,
+  last_seen_sequence: null,
+  unread_count: 0,
+});
+
+type MockRow = Array<unknown> | Record<string, unknown>;
 
 const makeApp = (
-  responses: Array<Array<Array<unknown>> | Error>,
+  responses: Array<Array<MockRow> | Error>,
   user: { readonly id: string; readonly name: string } | null | Error = {
     id: hostId,
     name: "Host",
@@ -300,7 +305,7 @@ describe("Trip API vertical slice", () => {
     expect(calls.map(({ text }) => text.split(" ", 1)[0])).toEqual([
       "select",
       "select",
-      "select",
+      "WITH",
       "select",
       "insert",
       "select",
@@ -1168,8 +1173,6 @@ describe("Trip API vertical slice", () => {
           "2026-08-25T00:00:00.000Z"
         ),
       ],
-      [[10n]], // latestRow query
-      [[0]], // unreadCount query
     ]);
 
     const response = await app.fetch(
