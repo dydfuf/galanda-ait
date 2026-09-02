@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createAuthenticatedContext, HOST_USER, MEMBER_USER } from "../fixtures/auth.ts";
+import { createTrip } from "../fixtures/trip.ts";
 
 test.describe("Activity Feed and Unread Mark-Read E2E", () => {
   test("협업 변경 시 활동 알림이 표시되고 Drawer에서 모두 확인 클릭 시 읽음 처리된다", async ({ browser, baseURL }) => {
@@ -9,17 +10,7 @@ test.describe("Activity Feed and Unread Mark-Read E2E", () => {
 
     try {
       // 1. Host가 방 생성
-      await host.page.goto(`${origin}/trips/new`);
-      const titleInput = host.page.locator('input[name="title"], input#title').first();
-      await expect(titleInput).toBeVisible();
-      await titleInput.fill("활동 알림 검증 여행");
-
-      const submitBtn = host.page.getByRole("button", { name: /만들기|시작|다음/ }).first();
-      await submitBtn.click();
-
-      await host.page.waitForURL(/\/trips\/([^/]+)/);
-      const tripId = /\/trips\/([^/?#]+)/.exec(host.page.url())![1];
-      expect(tripId).not.toBe("new");
+      const tripId = await createTrip(host.page, origin, "활동 알림 검증 여행");
 
       // 2. Member가 방 진입
       await member.page.goto(`${origin}/trips/${tripId}/plans`);

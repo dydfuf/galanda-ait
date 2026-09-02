@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createAuthenticatedContext, HOST_USER } from "../fixtures/auth.ts";
+import { createTrip } from "../fixtures/trip.ts";
 
 test.describe("Trip Creation and Plan Publication E2E", () => {
   test("Host가 새 여행을 생성하고 첫 여행안을 작성하여 공개한다", async ({ browser, baseURL }) => {
@@ -7,35 +8,71 @@ test.describe("Trip Creation and Plan Publication E2E", () => {
     const { context, page } = await createAuthenticatedContext(browser, HOST_USER, origin);
 
     try {
-      // 1. 새 여행 만들기 페이지 이동
-      await page.goto(`${origin}/trips/new`);
-      await page.waitForLoadState("domcontentloaded");
+      const tripId = await createTrip(page, origin, "도쿄 가을 단풍 여행");
+      await page.getByRole("button", { name: "미정으로 두고 다음" }).click();
+      await page.waitForURL(
+        (url) => url.pathname === `/trips/${tripId}/plans/new/basic`,
+      );
 
-      // 2. 여행 제목 및 여행지 입력
-      const titleInput = page.locator('input[name="title"], input#title').first();
-      await expect(titleInput).toBeVisible();
-      await titleInput.fill("도쿄 가을 단풍 여행");
+      await page.getByLabel("여행안 제목 *").fill("도쿄 가을 단풍 여행안");
+      await page.getByRole("button", { name: "다음: 여행 경로" }).click();
+      await page.getByRole("button", { name: "+ 방문 도시 추가" }).click();
+      await page.locator("#route-0-city").fill("도쿄");
+      await page.locator("#route-0-arrival").fill("2026-09-01");
+      await page.locator("#route-0-departure").fill("2026-09-04");
+      await page.getByRole("button", { name: "다음: 숙소" }).click();
+      await page.getByRole("button", { name: "+ 숙소 구간 추가" }).click();
+      await page.getByRole("button", { name: "다음: 교통" }).click();
 
-      const destinationInput = page.locator('input[name="destination"], input#destination').first();
-      if (await destinationInput.isVisible()) {
-        await destinationInput.fill("도쿄");
-      }
+      const addTransport = page.getByRole("button", {
+        name: "+ 교통 이동 구간 추가",
+      });
+      await addTransport.click();
+      await expect(page.getByLabel("출발지")).toHaveCount(1);
+      await addTransport.click();
+      await expect(page.getByLabel("출발지")).toHaveCount(2);
+      await page.getByLabel("출발지").nth(0).fill("인천");
+      await page.getByLabel("도착지").nth(0).fill("도쿄");
+      await page.getByLabel("출발지").nth(1).fill("도쿄");
+      await page.getByLabel("도착지").nth(1).fill("인천");
+      await page.getByRole("button", { name: "입력 내용 검토하기" }).click();
 
-      const submitButton = page.getByRole("button", { name: /만들기|시작|다음/ }).first();
-      await expect(submitButton).toBeVisible();
-      await submitButton.click();
+      const createPlanResponse = page.waitForResponse((response) => {
+        const request = response.request();
+        return (
+          request.method() === "POST" &&
+          new URL(request.url()).pathname === `/api/trips/${tripId}/plans`
+        );
+      });
+      await page.getByRole("button", { name: "첫 여행안 등록하기" }).click();
+      const response = await createPlanResponse;
+      expect(response.status()).toBe(201);
+      const updatedRoom = (await response.json()) as {
+        plans: ReadonlyArray<{ id: string; title: string; status: string }>;
+      };
+      const createdPlan = updatedRoom.plans.at(-1);
+      expect(createdPlan).toBeDefined();
+      expect(createdPlan).toMatchObject({
+        title: "도쿄 가을 단풍 여행안",
+        status: "VOTING",
+      });
 
-      // 3. 여행 생성 후 생성된 방으로 이동 검증
-      await page.waitForURL(/\/trips\/([^/]+)/);
-      const url = page.url();
-      const tripMatch = /\/trips\/([^/?#]+)/.exec(url);
-      expect(tripMatch).toBeTruthy();
-      const tripId = tripMatch![1];
-      expect(tripId).not.toBe("new");
-      expect(tripId.length).toBeGreaterThan(3);
-
-      // 4. 여행 계획 화면에서 여행 제목 노출 확인
-      await expect(page.getByText("도쿄 가을 단풍 여행").first()).toBeVisible();
+      await page.waitForURL((url) => url.pathname === `/trips/${tripId}/plans`);
+      const planLink = page.getByRole("link", {
+        name: /기본안 도쿄 가을 단풍 여행안/,
+      });
+      await expect(planLink).toBeVisible();
+      await planLink.click();
+      await page.waitForURL(
+        (url) => url.pathname === `/trips/${tripId}/plans/${createdPlan!.id}`,
+      );
+      await expect(
+        page.getByRole("heading", { level: 1, name: "도쿄 가을 단풍 여행안" }),
+      ).toBeVisible();
+      await expect(page.getByText("기본안")).toBeVisible();
+      await page.getByRole("button", { name: "뒤로 가기" }).click();
+      await page.waitForURL((url) => url.pathname === `/trips/${tripId}/plans`);
+      await expect(page.getByText("도쿄 가을 단풍 여행안")).toBeVisible();
     } finally {
       await context.close();
     }

@@ -23,6 +23,7 @@
     "typecheck": "wrangler types --check --env-file=wrangler-types.env && tsc -b --pretty false",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "e2e:seed": "node scripts/seed-e2e-auth.ts",
     "eval:nba": "node scripts/run-trip-action-ranking-eval.ts",
     "db:setup:local": "bash scripts/setup-local-db.sh",
     "db:generate": "drizzle-kit generate",

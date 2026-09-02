@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createAuthenticatedContext, HOST_USER, MEMBER_USER } from "../fixtures/auth.ts";
+import { createTrip } from "../fixtures/trip.ts";
 
 test.describe("Invite & Join Collaboration Journey E2E", () => {
   test("Host가 발급한 초대 링크를 통해 Member가 독립 세션에서 방에 참여한다", async ({ browser, baseURL }) => {
@@ -8,25 +9,63 @@ test.describe("Invite & Join Collaboration Journey E2E", () => {
     const member = await createAuthenticatedContext(browser, MEMBER_USER, origin);
 
     try {
-      // 1. Host가 새 여행 생성
-      await host.page.goto(`${origin}/trips/new`);
-      const titleInput = host.page.locator('input[name="title"], input#title').first();
-      await expect(titleInput).toBeVisible();
-      await titleInput.fill("오사카 우정 여행");
+      const tripId = await createTrip(host.page, origin, "오사카 우정 여행");
 
-      const submitButton = host.page.getByRole("button", { name: /만들기|시작|다음/ }).first();
-      await submitButton.click();
+      const issueResponse = await host.context.request.post(
+        `${origin}/api/trips/${tripId}/invites`,
+      );
+      expect(issueResponse.status()).toBe(201);
+      const invite = (await issueResponse.json()) as {
+        token: string;
+        expiresAt: string;
+      };
+      expect(invite.token.length).toBeGreaterThan(10);
+      expect(invite.expiresAt).toBeTruthy();
 
-      await host.page.waitForURL(/\/trips\/([^/]+)/);
-      const tripId = /\/trips\/([^/?#]+)/.exec(host.page.url())![1];
-      expect(tripId).not.toBe("new");
+      await member.page.goto(`${origin}/invites/${invite.token}`);
+      await member.page.waitForURL(
+        (url) => url.pathname === `/invites/${invite.token}`,
+      );
+      await expect(
+        member.page.getByRole("heading", {
+          name: "오사카 우정 여행에 초대받았어요",
+        }),
+      ).toBeVisible();
+      await member.page.getByLabel("어떤 이름으로 참여할까요?").fill("Member Joined");
 
-      // 2. Member가 여행 계획 페이지 진입
-      await member.page.goto(`${origin}/trips/${tripId}/plans`);
-      await member.page.waitForLoadState("domcontentloaded");
+      const joinResponse = member.page.waitForResponse((response) => {
+        const request = response.request();
+        return (
+          request.method() === "POST" &&
+          new URL(request.url()).pathname === `/api/invites/${invite.token}/join`
+        );
+      });
+      await member.page.getByRole("button", { name: "이 이름으로 참여하기" }).click();
+      const response = await joinResponse;
+      expect(response.status()).toBe(200);
+      await member.page.waitForURL(
+        (url) => url.pathname === `/trips/${tripId}/plans`,
+      );
 
-      // 3. Member 세션에서 여행 제목 확인
-      await expect(member.page.getByText("오사카 우정 여행").first()).toBeVisible();
+      const joinedRoomResponse = await member.context.request.get(
+        `${origin}/api/trips/${tripId}`,
+      );
+      expect(joinedRoomResponse.status()).toBe(200);
+      const joinedRoom = (await joinedRoomResponse.json()) as {
+        members: ReadonlyArray<{ id: string; name: string; role: string }>;
+      };
+      expect(joinedRoom.members).toEqual(
+        expect.arrayContaining([
+          {
+            id: member.session.participantId,
+            name: "Member Joined",
+            role: "MEMBER",
+          },
+        ]),
+      );
+      expect(joinedRoom.members.map(({ id }) => id)).toContain(host.session.participantId);
+      expect(member.session.participantId).not.toBe(host.session.participantId);
+      await expect(member.page.getByText("오사카 우정 여행")).toBeVisible();
     } finally {
       await host.context.close();
       await member.context.close();

@@ -39,6 +39,27 @@ jobs:
     runs-on: ubuntu-latest
     needs: verify
     timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/galanda_e2e
+      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/galanda_e2e
+      BETTER_AUTH_SECRET: galanda-ci-e2e-secret-change-me
+      BETTER_AUTH_URL: http://localhost:5173
+      PLAYWRIGHT_AUTH_SEED_FILE: ${{ runner.temp }}/galanda-e2e-auth.json
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: galanda_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d galanda_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -53,6 +74,15 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - name: Prepare E2E database, worker vars, and Better Auth sessions
+        run: |
+          {
+            printf '%s\n' "DATABASE_URL=${DATABASE_URL}"
+            printf '%s\n' "BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}"
+            printf '%s\n' "BETTER_AUTH_URL=${BETTER_AUTH_URL}"
+          } > .dev.vars
+          pnpm db:migrate
+          pnpm e2e:seed
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4

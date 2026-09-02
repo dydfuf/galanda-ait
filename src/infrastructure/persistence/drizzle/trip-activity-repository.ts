@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, lt, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, notInArray, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import {
   ParticipantIdSchema,
@@ -37,103 +37,163 @@ const databaseEffect = <A>(
       }),
   });
 
+type ActivityListRow = {
+  readonly sequence: string | number | bigint | null;
+  readonly trip_id: string | null;
+  readonly event_type: string | null;
+  readonly actor_participant_id: string | null;
+  readonly actor_display_name: string | null;
+  readonly subject_plan_id: string | null;
+  readonly subject_title: string | null;
+  readonly room_revision: string | number | null;
+  readonly itinerary_revision: string | number | null;
+  readonly created_at: Date | string | null;
+  readonly latest_sequence: string | number | bigint | null;
+  readonly last_seen_sequence: string | number | bigint | null;
+  readonly unread_count: string | number | null;
+};
+
+type ActivitySummaryRow = {
+  readonly trip_id: string;
+  readonly last_seen_sequence: string | number | bigint | null;
+  readonly unread_count: string | number;
+  readonly latest_event_type: string | null;
+  readonly latest_actor_display_name: string | null;
+  readonly latest_subject_title: string | null;
+  readonly latest_created_at: Date | string | null;
+};
+
+const sqlList = (values: ReadonlyArray<string>) =>
+  sql.join(values.map((value) => sql`${value}`), sql`, `);
+
+const toOptionalBigInt = (
+  value: string | number | bigint | null | undefined
+): bigint | undefined => (value === null || value === undefined ? undefined : BigInt(value));
+
+const toIsoString = (value: Date | string): string =>
+  value instanceof Date ? value.toISOString() : value;
+
+const toActivityEvent = (
+  row: ActivityListRow,
+  actorParticipantIds: ReadonlyArray<string>
+): TripActivityEvent => ({
+  sequence: BigInt(row.sequence!),
+  tripId: TripIdSchema.make(row.trip_id!),
+  type: row.event_type as TripActivityType,
+  actorParticipantId: ParticipantIdSchema.make(row.actor_participant_id!),
+  actorDisplayName: row.actor_display_name ?? undefined,
+  isOwn: actorParticipantIds.includes(row.actor_participant_id!),
+  subjectPlanId: row.subject_plan_id
+    ? PlanIdSchema.make(row.subject_plan_id)
+    : undefined,
+  subjectTitle: row.subject_title ?? undefined,
+  roomRevision:
+    row.room_revision !== null && row.room_revision !== undefined
+      ? RevisionSchema.make(Number(row.room_revision))
+      : undefined,
+  itineraryRevision:
+    row.itinerary_revision !== null && row.itinerary_revision !== undefined
+      ? Number(row.itinerary_revision)
+      : undefined,
+  createdAt: row.created_at ? toIsoString(row.created_at) : "",
+});
+
 export const makeDrizzleTripActivityRepository = (
   db: DatabaseHandle
 ): typeof TripActivityRepository.Service => ({
   listForTrip: ({ tripId, actorParticipantIds, beforeSequence, limit }) =>
     databaseEffect("tripActivity.listForTrip", async () => {
       const allActorIds = Array.from(new Set(actorParticipantIds));
-      const conditions = [eq(tripActivityEvents.tripId, tripId)];
-      if (beforeSequence !== undefined) {
-        conditions.push(lt(tripActivityEvents.sequence, beforeSequence));
-      }
+      const beforeFilter =
+        beforeSequence === undefined
+          ? sql``
+          : sql`AND e.sequence < ${beforeSequence}`;
+      const readActorFilter =
+        allActorIds.length > 0
+          ? sql`AND r.participant_id IN (${sqlList(allActorIds)})`
+          : sql`AND FALSE`;
+      const ownEventFilter =
+        allActorIds.length > 0
+          ? sql`AND e.actor_participant_id NOT IN (${sqlList(allActorIds)})`
+          : sql``;
 
-      const rows = await db
-        .select()
-        .from(tripActivityEvents)
-        .where(and(...conditions))
-        .orderBy(desc(tripActivityEvents.sequence))
-        .limit(limit + 1);
+      const result = await db.execute<ActivityListRow>(sql`WITH page AS (
+          SELECT
+            e.sequence,
+            e.trip_id,
+            e.event_type,
+            e.actor_participant_id,
+            e.actor_display_name,
+            e.subject_plan_id,
+            e.subject_title,
+            e.room_revision,
+            e.itinerary_revision,
+            e.created_at
+          FROM trip_activity_events e
+          WHERE e.trip_id = ${tripId}
+            ${beforeFilter}
+          ORDER BY e.sequence DESC
+          LIMIT ${limit + 1}
+        ),
+        effective_read AS (
+          SELECT MAX(r.last_seen_sequence) AS last_seen_sequence
+          FROM trip_activity_reads r
+          WHERE r.trip_id = ${tripId}
+            ${readActorFilter}
+        ),
+        metadata AS (
+          SELECT
+            (
+              SELECT MAX(e.sequence)
+              FROM trip_activity_events e
+              WHERE e.trip_id = ${tripId}
+            ) AS latest_sequence,
+            r.last_seen_sequence,
+            (
+              SELECT COUNT(*)::int
+              FROM trip_activity_events e
+              WHERE e.trip_id = ${tripId}
+                AND e.sequence > COALESCE(r.last_seen_sequence, 0)
+                ${ownEventFilter}
+            ) AS unread_count
+          FROM effective_read r
+        )
+        SELECT
+          p.sequence,
+          p.trip_id,
+          p.event_type,
+          p.actor_participant_id,
+          p.actor_display_name,
+          p.subject_plan_id,
+          p.subject_title,
+          p.room_revision,
+          p.itinerary_revision,
+          p.created_at,
+          m.latest_sequence,
+          m.last_seen_sequence,
+          m.unread_count
+        FROM metadata m
+        LEFT JOIN page p ON TRUE
+        ORDER BY p.sequence DESC NULLS LAST
+      `);
+      const rows = result.rows;
 
-      const hasMore = rows.length > limit;
-      const items = hasMore ? rows.slice(0, limit) : rows;
-
-      const events: TripActivityEvent[] = items.map((row) => ({
-        sequence: BigInt(row.sequence),
-        tripId: TripIdSchema.make(row.tripId),
-        type: row.eventType as TripActivityType,
-        actorParticipantId: ParticipantIdSchema.make(row.actorParticipantId),
-        actorDisplayName: row.actorDisplayName ?? undefined,
-        isOwn: allActorIds.includes(ParticipantIdSchema.make(row.actorParticipantId)),
-        subjectPlanId: row.subjectPlanId ? PlanIdSchema.make(row.subjectPlanId) : undefined,
-        subjectTitle: row.subjectTitle ?? undefined,
-        roomRevision: row.roomRevision !== null ? RevisionSchema.make(row.roomRevision) : undefined,
-        itineraryRevision: row.itineraryRevision ?? undefined,
-        createdAt: row.createdAt.toISOString(),
-      }));
+      const metadata = rows[0];
+      const pageRows = rows.filter((row) => row.sequence !== null);
+      const hasMore = pageRows.length > limit;
+      const items = hasMore ? pageRows.slice(0, limit) : pageRows;
+      const events = items.map((row) => toActivityEvent(row, allActorIds));
 
       const nextBeforeSequence =
-        hasMore && items.length > 0 ? items[items.length - 1].sequence : undefined;
-
-      // 1. Global latest sequence for the trip
-      const [latestRow] = await db
-        .select({ sequence: tripActivityEvents.sequence })
-        .from(tripActivityEvents)
-        .where(eq(tripActivityEvents.tripId, tripId))
-        .orderBy(desc(tripActivityEvents.sequence))
-        .limit(1);
-
-      const latestSequence =
-        latestRow?.sequence !== undefined ? BigInt(latestRow.sequence) : undefined;
-
-      // 2. User effective lastSeenSequence
-      const readRows =
-        allActorIds.length > 0
-          ? await db
-              .select({ lastSeenSequence: tripActivityReads.lastSeenSequence })
-              .from(tripActivityReads)
-              .where(
-                and(
-                  eq(tripActivityReads.tripId, tripId),
-                  inArray(tripActivityReads.participantId, allActorIds as string[])
-                )
-              )
-          : [];
-
-      let lastSeenSequence: bigint | undefined = undefined;
-      for (const r of readRows) {
-        const seq = BigInt(r.lastSeenSequence);
-        if (lastSeenSequence === undefined || seq > lastSeenSequence) {
-          lastSeenSequence = seq;
-        }
-      }
-
-      // 3. User unreadCount (excluding own actions and <= lastSeenSequence)
-      const unreadConditions = [eq(tripActivityEvents.tripId, tripId)];
-      if (lastSeenSequence !== undefined) {
-        unreadConditions.push(gt(tripActivityEvents.sequence, lastSeenSequence));
-      }
-      if (allActorIds.length > 0) {
-        unreadConditions.push(
-          notInArray(tripActivityEvents.actorParticipantId, allActorIds as string[])
-        );
-      }
-
-      const [unreadCountResult] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(tripActivityEvents)
-        .where(and(...unreadConditions));
-
-      const unreadCount = Number(unreadCountResult?.count ?? 0);
+        hasMore && events.length > 0 ? events.at(-1)?.sequence : undefined;
 
       return {
         events,
         hasMore,
-        nextBeforeSequence:
-          nextBeforeSequence !== undefined ? BigInt(nextBeforeSequence) : undefined,
-        latestSequence,
-        lastSeenSequence,
-        unreadCount,
+        nextBeforeSequence,
+        latestSequence: toOptionalBigInt(metadata?.latest_sequence),
+        lastSeenSequence: toOptionalBigInt(metadata?.last_seen_sequence),
+        unreadCount: Number(metadata?.unread_count ?? 0),
       };
     }),
 
@@ -143,73 +203,76 @@ export const makeDrizzleTripActivityRepository = (
         return new Map<TripId, TripActivitySummary>();
       }
 
-      // 1. Fetch read watermarks for the actor across these trips
-      const readRows = actorParticipantIds.length > 0
-        ? await db
-            .select()
-            .from(tripActivityReads)
-            .where(
-              and(
-                inArray(tripActivityReads.tripId, [...tripIds]),
-                inArray(tripActivityReads.participantId, [...actorParticipantIds])
-              )
-            )
-        : [];
-
-      const lastSeenByTrip = new Map<string, bigint>();
-      for (const row of readRows) {
-        const current = lastSeenByTrip.get(row.tripId);
-        const seq = BigInt(row.lastSeenSequence);
-        if (current === undefined || seq > current) {
-          lastSeenByTrip.set(row.tripId, seq);
-        }
-      }
+      const uniqueTripIds = Array.from(new Set(tripIds));
+      const readActorFilter =
+        actorParticipantIds.length > 0
+          ? sql`AND r.participant_id IN (${sqlList(actorParticipantIds)})`
+          : sql`AND FALSE`;
+      const ownEventFilter =
+        actorParticipantIds.length > 0
+          ? sql`AND e.actor_participant_id NOT IN (${sqlList(actorParticipantIds)})`
+          : sql``;
+      const result = await db.execute<ActivitySummaryRow>(sql`WITH requested(trip_id) AS (
+          VALUES ${sql.join(uniqueTripIds.map((tripId) => sql`(${tripId})`), sql`, `)}
+        ),
+        watermarks AS (
+          SELECT
+            t.trip_id,
+            MAX(r.last_seen_sequence) AS last_seen_sequence
+          FROM requested t
+          LEFT JOIN trip_activity_reads r
+            ON r.trip_id = t.trip_id
+            ${readActorFilter}
+          GROUP BY t.trip_id
+        ),
+        unread_events AS (
+          SELECT
+            e.trip_id,
+            e.sequence,
+            e.event_type,
+            e.actor_display_name,
+            e.subject_title,
+            e.created_at,
+            ROW_NUMBER() OVER (
+              PARTITION BY e.trip_id
+              ORDER BY e.sequence DESC
+            ) AS unread_rank
+          FROM trip_activity_events e
+          INNER JOIN watermarks w ON w.trip_id = e.trip_id
+          WHERE e.sequence > COALESCE(w.last_seen_sequence, 0)
+            ${ownEventFilter}
+        )
+        SELECT
+          w.trip_id,
+          w.last_seen_sequence,
+          COUNT(u.sequence)::int AS unread_count,
+          MAX(CASE WHEN u.unread_rank = 1 THEN u.event_type END) AS latest_event_type,
+          MAX(CASE WHEN u.unread_rank = 1 THEN u.actor_display_name END) AS latest_actor_display_name,
+          MAX(CASE WHEN u.unread_rank = 1 THEN u.subject_title END) AS latest_subject_title,
+          MAX(CASE WHEN u.unread_rank = 1 THEN u.created_at END) AS latest_created_at
+        FROM watermarks w
+        LEFT JOIN unread_events u ON u.trip_id = w.trip_id
+        GROUP BY w.trip_id, w.last_seen_sequence
+      `);
 
       const summaries = new Map<TripId, TripActivitySummary>();
-
-      for (const tripId of tripIds) {
-        const lastSeen = lastSeenByTrip.get(tripId);
-        const conditions = [eq(tripActivityEvents.tripId, tripId)];
-        if (lastSeen !== undefined) {
-          conditions.push(gt(tripActivityEvents.sequence, lastSeen));
-        }
-        if (actorParticipantIds.length > 0) {
-          conditions.push(
-            notInArray(tripActivityEvents.actorParticipantId, [...actorParticipantIds])
-          );
-        }
-
-        const [countResult] = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(tripActivityEvents)
-          .where(and(...conditions));
-
-        const unreadCount = Number(countResult?.count ?? 0);
-
-        let latestUnreadSummary: TripActivitySummary["latestUnreadSummary"] = undefined;
-        if (unreadCount > 0) {
-          const [latest] = await db
-            .select()
-            .from(tripActivityEvents)
-            .where(and(...conditions))
-            .orderBy(desc(tripActivityEvents.sequence))
-            .limit(1);
-
-          if (latest) {
-            latestUnreadSummary = {
-              type: latest.eventType as TripActivityType,
-              actorDisplayName: latest.actorDisplayName ?? undefined,
-              subjectTitle: latest.subjectTitle ?? undefined,
-              createdAt: latest.createdAt.toISOString(),
-            };
-          }
-        }
-
-        summaries.set(TripIdSchema.make(tripId), {
-          tripId: TripIdSchema.make(tripId),
+      for (const row of result.rows) {
+        const unreadCount = Number(row.unread_count);
+        summaries.set(TripIdSchema.make(row.trip_id), {
+          tripId: TripIdSchema.make(row.trip_id),
           unreadCount,
-          latestUnreadSummary,
-          lastSeenSequence: lastSeen,
+          latestUnreadSummary:
+            unreadCount > 0 && row.latest_event_type
+              ? {
+                  type: row.latest_event_type as TripActivityType,
+                  actorDisplayName: row.latest_actor_display_name ?? undefined,
+                  subjectTitle: row.latest_subject_title ?? undefined,
+                  createdAt: row.latest_created_at
+                    ? toIsoString(row.latest_created_at)
+                    : "",
+                }
+              : undefined,
+          lastSeenSequence: toOptionalBigInt(row.last_seen_sequence),
         });
       }
 

@@ -253,7 +253,7 @@ class QueryEngine {
     this.store = store;
   }
 
-  execute(rawText: string, params: readonly unknown[]): { rows: unknown[][] } {
+  execute(rawText: string, params: readonly unknown[]): { rows: unknown[] } {
     const text = normalize(rawText);
 
     if (
@@ -295,6 +295,8 @@ class QueryEngine {
     if (
       text.includes('"trip_activity_events"') ||
       text.includes('"trip_activity_reads"') ||
+      text.includes("trip_activity_events") ||
+      text.includes("trip_activity_reads") ||
       text.includes('"confirmed_itineraries"') ||
       text.includes('"itinerary_revisions"') ||
       text.includes("trip_activity_sequence")
@@ -308,10 +310,23 @@ class QueryEngine {
   private executeTripActivities(
     text: string,
     params: readonly unknown[]
-  ): { rows: unknown[][] } {
+  ): { rows: unknown[] } {
+    const lowerText = text.toLowerCase();
+
     if (text.includes("trip_activity_sequence")) {
       this.store.nextActivitySequence += 1n;
+      if (lowerText.includes("as join_boundary")) {
+        return { rows: [{ join_boundary: this.store.nextActivitySequence.toString() }] };
+      }
       return { rows: [[this.store.nextActivitySequence.toString()]] };
+    }
+
+    if (lowerText.startsWith("with page as")) {
+      return this.executeActivityListSnapshot(text, params);
+    }
+
+    if (lowerText.startsWith("with requested(trip_id) as")) {
+      return this.executeActivitySummarySnapshot(text, params);
     }
 
     if (text.startsWith('insert into "trip_activity_events"')) {
@@ -465,6 +480,142 @@ class QueryEngine {
     }
 
     return { rows: [] };
+  }
+
+  private activityClauseValues(
+    text: string,
+    params: readonly unknown[],
+    marker: string,
+  ): string[] {
+    const lowerText = text.toLowerCase();
+    const markerIndex = lowerText.indexOf(marker);
+    if (markerIndex < 0) return [];
+    const clause = lowerText.slice(markerIndex);
+    const values = /\(([^)]*)\)/.exec(clause)?.[1] ?? "";
+    return [...values.matchAll(/\$(\d+)/g)].map((match) =>
+      String(params[Number(match[1]) - 1]),
+    );
+  }
+
+  private executeActivityListSnapshot(
+    text: string,
+    params: readonly unknown[],
+  ): { rows: unknown[] } {
+    const tripId = String(params[0]);
+    const beforeMatch = /e\.sequence < \$(\d+)/i.exec(text);
+    const beforeSequence = beforeMatch
+      ? BigInt(String(params[Number(beforeMatch[1]) - 1]))
+      : undefined;
+    const limitMatch = /limit \$(\d+)/i.exec(text);
+    const pageLimit = limitMatch
+      ? Number(params[Number(limitMatch[1]) - 1]) - 1
+      : 0;
+    const readParticipantIds = this.activityClauseValues(
+      text,
+      params,
+      "r.participant_id in",
+    );
+    const ownParticipantIds = this.activityClauseValues(
+      text,
+      params,
+      "e.actor_participant_id not in",
+    );
+    const lastSeenSequence = this.maxReadSequence(tripId, readParticipantIds);
+    const events = this.store.tripActivityEvents.filter(
+      (event) =>
+        event.tripId === tripId &&
+        (beforeSequence === undefined || event.sequence < beforeSequence),
+    );
+    const latestSequence = this.store.tripActivityEvents
+      .filter((event) => event.tripId === tripId)
+      .reduce<bigint | null>(
+        (latest, event) => (latest === null || event.sequence > latest ? event.sequence : latest),
+        null,
+      );
+    const unreadCount = this.store.tripActivityEvents.filter(
+      (event) =>
+        event.tripId === tripId &&
+        event.sequence > lastSeenSequence &&
+        !ownParticipantIds.includes(event.actorParticipantId),
+    ).length;
+    const page = events
+      .sort((a, b) => (a.sequence < b.sequence ? 1 : -1))
+      .slice(0, pageLimit + 1);
+    const rows = (page.length > 0 ? page : [undefined]).map((event) => ({
+      sequence: event?.sequence ?? null,
+      trip_id: event?.tripId ?? null,
+      event_type: event?.eventType ?? null,
+      actor_participant_id: event?.actorParticipantId ?? null,
+      actor_display_name: event?.actorDisplayName ?? null,
+      subject_plan_id: event?.subjectPlanId ?? null,
+      subject_title: event?.subjectTitle ?? null,
+      room_revision: event?.roomRevision ?? null,
+      itinerary_revision: event?.itineraryRevision ?? null,
+      created_at: event?.createdAt ?? null,
+      latest_sequence: latestSequence,
+      last_seen_sequence: lastSeenSequence === 0n ? null : lastSeenSequence,
+      unread_count: unreadCount,
+    }));
+
+    return { rows };
+  }
+
+  private executeActivitySummarySnapshot(
+    text: string,
+    params: readonly unknown[],
+  ): { rows: unknown[] } {
+    const requested = /values (.*?)\), watermarks as/i.exec(text)?.[1] ?? "";
+    const tripIds = [...requested.matchAll(/\$(\d+)/g)].map((match) =>
+      String(params[Number(match[1]) - 1]),
+    );
+    const readParticipantIds = this.activityClauseValues(
+      text,
+      params,
+      "r.participant_id in",
+    );
+    const ownParticipantIds = this.activityClauseValues(
+      text,
+      params,
+      "e.actor_participant_id not in",
+    );
+
+    return {
+      rows: tripIds.map((tripId) => {
+        const lastSeenSequence = this.maxReadSequence(tripId, readParticipantIds);
+        const unread = this.store.tripActivityEvents
+          .filter(
+            (event) =>
+              event.tripId === tripId &&
+              event.sequence > lastSeenSequence &&
+              !ownParticipantIds.includes(event.actorParticipantId),
+          )
+          .sort((a, b) => (a.sequence < b.sequence ? 1 : -1));
+        const latest = unread[0];
+        return {
+          trip_id: tripId,
+          last_seen_sequence: lastSeenSequence === 0n ? null : lastSeenSequence,
+          unread_count: unread.length,
+          latest_event_type: latest?.eventType ?? null,
+          latest_actor_display_name: latest?.actorDisplayName ?? null,
+          latest_subject_title: latest?.subjectTitle ?? null,
+          latest_created_at: latest?.createdAt ?? null,
+        };
+      }),
+    };
+  }
+
+  private maxReadSequence(
+    tripId: string,
+    participantIds: ReadonlyArray<string>,
+  ): bigint {
+    return [...this.store.tripActivityReads.values()]
+      .filter(
+        (read) => read.tripId === tripId && participantIds.includes(read.participantId),
+      )
+      .reduce<bigint>(
+        (latest, read) => (read.lastSeenSequence > latest ? read.lastSeenSequence : latest),
+        0n,
+      );
   }
 
   private executeTripRooms(
@@ -1034,7 +1185,7 @@ class StatefulClient {
   query = async (
     config: { readonly text: string } | string,
     params: readonly unknown[] = []
-  ): Promise<{ rows: unknown[][] }> => {
+  ): Promise<{ rows: unknown[] }> => {
     const text = typeof config === "string" ? config : config.text;
     const normalized = normalize(text).toLowerCase();
 
