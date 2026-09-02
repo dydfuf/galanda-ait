@@ -60,7 +60,7 @@ test.describe("Itinerary Review and Acknowledgement Web E2E", () => {
         member.page.getByText(/일정이 v2로 변경됐어요/, { exact: true }),
       ).toBeVisible();
       await expect(
-        member.page.getByText("아직 확인하지 않은 참여자 1명", { exact: true }),
+        member.page.getByText("아직 확인하지 않은 참여자 2명", { exact: true }),
       ).toBeVisible();
 
       const activityButton = member.page.getByRole("button", {
