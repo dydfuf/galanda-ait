@@ -23,7 +23,7 @@ vi.mock("../../../hooks/useAppNavigation.ts", () => ({
 }));
 
 import { ApiClientError, getTrips, importExplorePlan } from "../../../app/api-client.ts";
-import type { TripRoom } from "../../../core/domain/room.ts";
+import type { TripOverviewDto } from "../../../contracts/trip-overview.ts";
 import type { ExploreListingId } from "../../../core/domain/ids.ts";
 import { useSessionQuery } from "../../../hooks/useSession.ts";
 import { useAppNavigation } from "../../../hooks/useAppNavigation.ts";
@@ -36,18 +36,26 @@ const mockNav = vi.mocked(useAppNavigation);
 
 const listingId = "listing-1" as ExploreListingId;
 
-const room = (over: Record<string, unknown> = {}): TripRoom =>
+const room = (over: Record<string, unknown> = {}): TripOverviewDto =>
   ({
     id: "trip-1",
     title: "제주 여행",
     destination: "제주",
     members: [{ id: "p-1", name: "나", role: "HOST" }],
+    memberNames: ["나"],
+    memberCount: 1,
     plans: [],
+    candidateCount: 0,
+    opinionParticipantCount: 0,
+    hasUnattributedOpinions: false,
     revision: 7,
+    isConfirmed: false,
+    confirmedPeriod: null,
     createdAt: "2026-08-01T00:00:00.000Z",
     updatedAt: "2026-08-01T00:00:00.000Z",
+    eligibleActionIds: ["EDIT_PLAN_BASIC"],
     ...over,
-  }) as unknown as TripRoom;
+  }) as unknown as TripOverviewDto;
 
 const readySession = (accountType: "REGISTERED" | "GUEST" = "REGISTERED") =>
   ({
@@ -99,7 +107,7 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
       platformNavigation: undefined,
     } as unknown as ReturnType<typeof useAppNavigation>);
     mockUseSession.mockReturnValue(readySession());
-    mockGetTrips.mockResolvedValue([room()]);
+    mockGetTrips.mockResolvedValue({ items: [room()] });
   });
 
   it("NEW_TRIP payload로 import를 호출하고 성공 후에만 navigate한다", async () => {
@@ -176,8 +184,8 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
   it("EXISTING_TRIP은 제출 직전 refetch한 최신 revision으로 payload를 만든다", async () => {
     // 최초 로드 revision=7, 제출 직전 refetch에서 revision=9로 바뀐다.
     mockGetTrips
-      .mockResolvedValueOnce([room({ revision: 7 })])
-      .mockResolvedValue([room({ revision: 9 })]);
+      .mockResolvedValueOnce({ items: [room({ revision: 7 })] })
+      .mockResolvedValue({ items: [room({ revision: 9 })] });
     mockImport.mockResolvedValue({
       tripId: "trip-1" as never,
       planId: "plan-2" as never,
@@ -203,16 +211,17 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
   });
 
   it("확정된 방은 후보에서 제외한다", async () => {
-    mockGetTrips.mockResolvedValue([
-      room({ id: "trip-1", title: "고르는중여행", destination: "" }),
-      room({
-        id: "trip-2",
-        title: "완료된여행",
-        destination: "",
-        confirmedPlanId: "plan-c",
-        plans: [{ id: "plan-c", status: "CONFIRMED" }],
-      }),
-    ]);
+    mockGetTrips.mockResolvedValue({
+      items: [
+        room({ id: "trip-1", title: "고르는중여행", destination: "" }),
+        room({
+          id: "trip-2",
+          title: "완료된여행",
+          destination: "",
+          isConfirmed: true,
+        }),
+      ],
+    });
     renderDrawer();
     selectOption(/기존 여행에 추가/);
     await screen.findByRole("radio", { name: /고르는중여행/ });
@@ -305,7 +314,7 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
         throw new Error("net");
       }
       loaded = true;
-      return [room({ id: "trip-1", title: "제주 여행", revision: 11 })];
+      return { items: [room({ id: "trip-1", title: "제주 여행", revision: 11 })] };
     });
     mockImport.mockResolvedValue({
       tripId: "trip-1" as never,
@@ -487,7 +496,7 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
   });
 
   it("추가할 수 있는 여행이 없으면 정직한 empty 상태를 노출한다", async () => {
-    mockGetTrips.mockResolvedValue([]);
+    mockGetTrips.mockResolvedValue({ items: [] });
     renderDrawer();
     selectOption(/기존 여행에 추가/);
     expect(
@@ -497,15 +506,16 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
 
   it("EXISTING 제출 직전 refetch에서 방이 확정되면 import를 호출하지 않는다", async () => {
     mockGetTrips
-      .mockResolvedValueOnce([room({ id: "trip-1", title: "제주 여행" })])
-      .mockResolvedValue([
-        room({
-          id: "trip-1",
-          title: "제주 여행",
-          confirmedPlanId: "plan-c",
-          plans: [{ id: "plan-c", status: "CONFIRMED" }],
-        }),
-      ]);
+      .mockResolvedValueOnce({ items: [room({ id: "trip-1", title: "제주 여행" })] })
+      .mockResolvedValue({
+        items: [
+          room({
+            id: "trip-1",
+            title: "제주 여행",
+            isConfirmed: true,
+          }),
+        ],
+      });
     renderDrawer();
     selectOption(/기존 여행에 추가/);
     await screen.findByRole("radio", { name: /제주 여행/ });

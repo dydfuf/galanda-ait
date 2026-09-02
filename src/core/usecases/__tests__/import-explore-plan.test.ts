@@ -162,6 +162,7 @@ const tripRepoLayer = (
         : Effect.fail(new NotFoundError({ entity: "TripRoom", id: roomId }));
     },
     getRooms: () => Effect.succeed(rooms),
+    getRoomOverviewRecords: () => Effect.die("not implemented"),
     createRoom: (params) => {
       state.created.push(params);
       return Effect.succeed({

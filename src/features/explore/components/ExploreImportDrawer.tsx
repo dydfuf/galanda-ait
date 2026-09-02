@@ -18,9 +18,9 @@ import { useSessionQuery } from "@/hooks/useSession.ts";
 import { useAppNavigation } from "@/hooks/useAppNavigation.ts";
 import type { ExploreListingId, Revision, TripId } from "@/core/domain/ids.ts";
 import type { ImportExplorePlanRequest } from "@/contracts/explore.ts";
+import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
 
 import { useTripRoomsQuery } from "../../plan-home/queries.ts";
-import type { TripRoomViewModel } from "../../plan-home/plan-home-view-model.ts";
 import { useImportExplorePlanMutation } from "../import-queries.ts";
 
 /**
@@ -110,7 +110,7 @@ export function ExploreImportDrawer({
   const isPending = isSubmitting || mutation.isPending;
 
   // 확정된 방은 plan:create가 불가하므로 후보에서 제외한다.
-  const eligibleRooms: ReadonlyArray<TripRoomViewModel> = (
+  const eligibleRooms: ReadonlyArray<TripOverviewDto> = (
     rooms.data ?? []
   ).filter((room) => !room.isConfirmed);
 
@@ -147,7 +147,7 @@ export function ExploreImportDrawer({
       }
       // EXISTING: 제출 직전 최신 방 목록을 다시 refetch해 최신 revision을 쓴다.
       setIsSubmitting(true);
-      let latest: ReadonlyArray<TripRoomViewModel>;
+      let latest: ReadonlyArray<TripOverviewDto>;
       try {
         const refetched = await rooms.refetch();
         if (refetched.error || !refetched.data) {

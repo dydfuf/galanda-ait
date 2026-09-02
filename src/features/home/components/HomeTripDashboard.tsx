@@ -1,17 +1,22 @@
 import { Link } from "react-router-dom";
 import {
-  BedDouble,
   CalendarDays,
-  CarFront,
-  MapPinned,
+  Columns2,
+  FileText,
   UsersRound,
-  type LucideIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge.tsx";
-import { isPastTravelDate } from "@/core/domain/room.ts";
-import type { TripRoomViewModel } from "@/features/plan-home/plan-home-view-model.ts";
+import { buttonVariants } from "@/components/ui/button.tsx";
+import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
+import {
+  classifyTrip,
+  selectFeaturedTrip,
+  type TripLifecycle,
+} from "@/core/calculations/featured-trip.ts";
 import { cn } from "@/lib/utils.ts";
+
+export { selectFeaturedTrip };
 
 const DAY_MS = 86_400_000;
 const KOREAN_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -40,7 +45,7 @@ export const formatHomeTripPeriod = (
   return start && end ? `${start} ~ ${end}` : "일정 미정";
 };
 
-export const getHomeTripDayLabel = (
+export const getTravelDateRangeDayLabel = (
   startDate: string | undefined,
   endDate: string | undefined,
   today: string,
@@ -57,126 +62,142 @@ export const getHomeTripDayLabel = (
   return undefined;
 };
 
-/**
- * 내 여행 화면과 같은 ongoing 경계를 사용하고 서버의 최신 생성순을 보존한다.
- * 날짜가 확정되지 않은 방도 기존 계약상 ongoing으로 취급한다.
- */
-export const selectHomeTrip = (
-  rooms: ReadonlyArray<TripRoomViewModel>,
+export const getHomeTripDayLabel = (
+  trip: TripOverviewDto,
   today: string,
-): TripRoomViewModel | undefined =>
-  rooms.find((room) => !isPastTravelDate(room.displayEndDate, today));
+): { label: string; variant: "success" | "info" | "warning" | "neutral" } => {
+  const lifecycle = classifyTrip(trip, today);
 
-const getMemberNames = (room: TripRoomViewModel): ReadonlyArray<string> =>
-  room.memberNames.map((name) => name.trim()).filter(Boolean);
+  if (lifecycle === "ONGOING_CONFIRMED") {
+    const start = parseTravelDate(trip.confirmedPeriod?.startDate);
+    const current = parseTravelDate(today);
+    if (start && current && start.getTime() === current.getTime()) {
+      return { label: "D-Day", variant: "success" };
+    }
+    return { label: "여행 중", variant: "success" };
+  }
+
+  if (lifecycle === "UPCOMING_CONFIRMED") {
+    const start = parseTravelDate(trip.confirmedPeriod?.startDate);
+    const current = parseTravelDate(today);
+    if (start && current) {
+      const daysUntilStart = Math.round((start.getTime() - current.getTime()) / DAY_MS);
+      if (daysUntilStart === 0) return { label: "D-Day", variant: "info" };
+      if (daysUntilStart > 0) return { label: `D-${daysUntilStart}`, variant: "info" };
+    }
+    return { label: "예정", variant: "info" };
+  }
+
+  if (lifecycle === "CONFIRMED_DATE_UNKNOWN") {
+    return { label: "확정 · 날짜 확인 필요", variant: "warning" };
+  }
+
+  if (lifecycle === "PLANNING") {
+    return { label: "계획 중", variant: "info" };
+  }
+
+  return { label: "날짜 미정", variant: "neutral" };
+};
+
+const getMemberNames = (trip: TripOverviewDto): ReadonlyArray<string> =>
+  trip.memberNames.map((name) => name.trim()).filter(Boolean);
 
 const getInitial = (name: string): string =>
   Array.from(name.trim())[0]?.toUpperCase() ?? "?";
 
 interface HomeTripCardProps {
-  readonly room: TripRoomViewModel;
-  readonly userName: string;
+  readonly trip: TripOverviewDto;
+  readonly lifecycle: TripLifecycle;
   readonly today: string;
 }
 
-export function HomeTripCard({ room, userName, today }: HomeTripCardProps) {
-  const dayLabel = getHomeTripDayLabel(
-    room.displayStartDate,
-    room.displayEndDate,
-    today,
-  );
-  const hasNoCandidate = room.candidateCount === 0;
-  const isParticipationUnknown =
-    !hasNoCandidate && room.hasUnattributedOpinions;
-  const participationPercent =
-    hasNoCandidate || isParticipationUnknown
-      ? undefined
-      : room.memberCount > 0
-        ? Math.min(
-            100,
-            Math.round((room.participatedMemberCount / room.memberCount) * 100),
-          )
-        : 0;
-  const participationStatus = hasNoCandidate
-    ? "여행안 없음"
-    : isParticipationUnknown
-      ? "집계 전"
-      : `${participationPercent}%`;
-  const memberNames = getMemberNames(room);
+export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
+  const { label: statusLabel, variant: badgeVariant } = getHomeTripDayLabel(trip, today);
+  const memberNames = getMemberNames(trip);
   const shownMembers = memberNames.slice(0, 4);
-  const remainingMembers = Math.max(0, room.memberCount - shownMembers.length);
+  const remainingMembers = Math.max(0, trip.memberCount - shownMembers.length);
+
+  const tripRoot = `/trips/${encodeURIComponent(trip.id)}`;
 
   return (
     <section aria-labelledby="home-trip-heading">
-      <Link
-        to={`/trips/${encodeURIComponent(room.id)}`}
-        className="group flex min-w-0 flex-col gap-4 rounded-3xl border border-primary-border-weak bg-card p-5 text-foreground! no-underline! shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary-border hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
+      <div className="flex min-w-0 flex-col gap-4 rounded-3xl border border-primary-border-weak bg-card p-5 text-foreground shadow-sm">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-lg leading-snug font-bold [overflow-wrap:anywhere]">
-              안녕하세요, {userName} 👋
-            </p>
             <h2
               id="home-trip-heading"
-              className="mt-3 min-w-0 text-lg leading-snug font-bold [overflow-wrap:anywhere]"
+              className="min-w-0 text-lg leading-snug font-bold [overflow-wrap:anywhere]"
             >
-              {room.title}
+              <Link
+                to={tripRoot}
+                className="text-foreground! no-underline! hover:underline"
+              >
+                {trip.title}
+              </Link>
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
-              {formatHomeTripPeriod(room.displayStartDate, room.displayEndDate)}
+              {formatHomeTripPeriod(
+                trip.confirmedPeriod?.startDate,
+                trip.confirmedPeriod?.endDate
+              )}
             </p>
           </div>
           <Badge
-            variant={dayLabel === "여행 중" ? "success" : dayLabel ? "info" : "neutral"}
-            className="mt-9 h-7 px-3 text-sm"
+            variant={badgeVariant}
+            className="h-7 shrink-0 px-3 text-sm"
           >
-            {dayLabel ?? "일정 미정"}
+            {statusLabel}
           </Badge>
         </div>
 
-        <div className="min-w-0">
-          <div className="mb-2 flex min-w-0 items-center justify-between gap-3 text-sm font-medium">
-            <span className="min-w-0 text-foreground-muted [overflow-wrap:anywhere]">
-              여행안 의견 참여율
-            </span>
-            <span className="shrink-0 text-foreground">
-              {participationStatus}
-            </span>
-          </div>
-          {participationPercent === undefined ? (
-            <div
-              className="h-2 rounded-full bg-muted"
-              aria-label={
-                hasNoCandidate ? "등록된 여행안 없음" : "의견 참여 인원 집계 전"
-              }
-            />
+        {/* Factual numbers */}
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-y border-border py-3 text-sm text-foreground-muted">
+          {lifecycle === "PLANNING" ? (
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-foreground">
+                {trip.hasUnattributedOpinions
+                  ? "일부 기존 의견의 참여자를 확인할 수 없어요"
+                  : `의견 참여 ${trip.opinionParticipantCount}/${trip.memberCount}명`}
+              </span>
+              <span className="text-xs text-foreground-muted">
+                후보 여행안 {trip.candidateCount}개
+              </span>
+            </div>
+          ) : lifecycle === "DATE_TBD" ? (
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-foreground">
+                여행안이 아직 없어요
+              </span>
+              <span className="text-xs text-foreground-muted">
+                첫 여행안을 만들어 계획을 시작해보세요
+              </span>
+            </div>
           ) : (
-            <div
-              role="progressbar"
-              aria-label="여행안 의견 참여율"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={participationPercent}
-              className="h-2 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width]"
-                style={{ width: `${participationPercent}%` }}
-              />
+            <div className="flex items-center gap-1.5 font-medium text-foreground">
+              <CalendarDays className="size-4 text-primary" aria-hidden="true" />
+              <span>확정된 여행 일정</span>
             </div>
           )}
+
+          <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+            <UsersRound className="size-4 shrink-0" aria-hidden="true" />
+            <span>참여 {trip.memberCount}명</span>
+          </div>
         </div>
 
+        {/* Members and Actions */}
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-          <ul className="flex min-w-0 items-center" aria-label={`여행 참여자 ${room.memberCount}명`}>
+          <ul
+            className="flex min-w-0 items-center"
+            aria-label={`여행 참여자 ${trip.memberCount}명`}
+          >
             {shownMembers.map((name, index) => (
               <li
                 key={`${name}-${index}`}
                 title={name}
                 className={cn(
                   "grid size-8 shrink-0 place-items-center rounded-full border-2 border-card bg-primary-muted text-xs font-bold text-primary",
-                  index > 0 && "-ml-2",
+                  index > 0 && "-ml-2"
                 )}
               >
                 <span aria-hidden="true">{getInitial(name)}</span>
@@ -192,88 +213,66 @@ export function HomeTripCard({ room, userName, today }: HomeTripCardProps) {
               </li>
             )}
           </ul>
-          <p className="flex min-w-0 items-center gap-1.5 text-sm text-foreground-muted [overflow-wrap:anywhere]">
-            <UsersRound className="size-4 shrink-0" aria-hidden="true" />
-            총 {room.memberCount}명 · 여행안 {room.candidateCount}개
-          </p>
-        </div>
-      </Link>
-    </section>
-  );
-}
 
-interface QuickAction {
-  readonly label: string;
-  readonly description: string;
-  readonly icon: LucideIcon;
-  readonly to?: string;
-}
-
-export function HomeQuickActions({ room }: { readonly room: TripRoomViewModel }) {
-  const tripRoot = `/trips/${encodeURIComponent(room.id)}`;
-  const planDestination = room.isConfirmed
-    ? `${tripRoot}/itinerary`
-    : `${tripRoot}/plans`;
-  const actions: ReadonlyArray<QuickAction> = [
-    {
-      label: "일정",
-      description: "여행 일정 열기",
-      icon: CalendarDays,
-      to: `${tripRoot}/itinerary`,
-    },
-    {
-      label: "숙소",
-      description: "숙소 정보 열기",
-      icon: BedDouble,
-      to: planDestination,
-    },
-    {
-      label: "이동",
-      description: "이동 정보 열기",
-      icon: CarFront,
-      to: planDestination,
-    },
-    {
-      label: "지도",
-      description: "지도 기능 준비 중",
-      icon: MapPinned,
-    },
-  ];
-
-  return (
-    <section aria-labelledby="home-quick-actions-heading" className="min-w-0">
-      <h2
-        id="home-quick-actions-heading"
-        className="text-[17px] leading-snug font-bold text-foreground"
-      >
-        계획 바로가기
-      </h2>
-      <ul className="mt-3 grid grid-cols-4 gap-2" aria-label="여행 계획 바로가기">
-        {actions.map(({ label, description, icon: Icon, to }) => (
-          <li key={label} className="min-w-0">
-            {to ? (
+          <div className="flex items-center gap-2">
+            {lifecycle === "ONGOING_CONFIRMED" || lifecycle === "UPCOMING_CONFIRMED" ? (
+              <>
+                <Link
+                  to={`${tripRoot}/plans`}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
+                >
+                  <FileText className="size-4" aria-hidden="true" />
+                  계획 보기
+                </Link>
+                <Link
+                  to={`${tripRoot}/itinerary`}
+                  className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
+                >
+                  <CalendarDays className="size-4" aria-hidden="true" />
+                  일정 보기
+                </Link>
+              </>
+            ) : lifecycle === "CONFIRMED_DATE_UNKNOWN" ? (
               <Link
-                to={to}
-                aria-label={description}
-                className="flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-2xl bg-primary-muted px-1.5 py-3 text-sm font-semibold text-foreground! no-underline! transition-colors hover:bg-primary-border-weak focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                to={`${tripRoot}/itinerary`}
+                className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
               >
-                <Icon className="size-6 text-primary" aria-hidden="true" />
-                <span>{label}</span>
+                <CalendarDays className="size-4" aria-hidden="true" />
+                일정 보기
               </Link>
+            ) : lifecycle === "PLANNING" ? (
+              <>
+                {trip.candidateCount >= 2 && trip.eligibleActionIds.includes("COMPARE_PLANS") && (
+                  <Link
+                    to={`${tripRoot}/plans/compare`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
+                  >
+                    <Columns2 className="size-4" aria-hidden="true" />
+                    여행안 비교
+                  </Link>
+                )}
+                <Link
+                  to={`${tripRoot}/plans`}
+                  className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
+                >
+                  <FileText className="size-4" aria-hidden="true" />
+                  계획 보기
+                </Link>
+              </>
             ) : (
-              <span
-                aria-disabled="true"
-                title={description}
-                className="flex min-h-20 min-w-0 flex-col items-center justify-center gap-2 rounded-2xl bg-muted px-1.5 py-3 text-sm font-semibold text-foreground-subtle"
+              <Link
+                to={`${tripRoot}/plans`}
+                className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
               >
-                <Icon className="size-6" aria-hidden="true" />
-                <span>{label}</span>
-                <span className="sr-only">준비 중</span>
-              </span>
+                <FileText className="size-4" aria-hidden="true" />
+                {trip.eligibleActionIds.includes("EDIT_PLAN_BASIC")
+                  ? "계획 시작하기"
+                  : "계획 보기"}
+              </Link>
             )}
-          </li>
-        ))}
-      </ul>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

@@ -59,6 +59,7 @@ const createInMemoryRepositoryLayer = (
       return Effect.succeed(room);
     },
     getRooms: (): Effect.Effect<ReadonlyArray<TripRoom>, never> => Effect.succeed(rooms),
+    getRoomOverviewRecords: () => Effect.die("not implemented in test"),
     createRoom: (
       params: CreateRoomParams
     ): Effect.Effect<TripRoom, never> => {

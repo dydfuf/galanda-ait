@@ -176,15 +176,22 @@ function FeatureApp() {
   );
 }
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
 function TabShellApp() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return (
-    <MemoryRouter initialEntries={[ITINERARY_PATH]}>
-      <Routes>
-        <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
-          <Route path="itinerary" element={<ItineraryPage />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[ITINERARY_PATH]}>
+        <Routes>
+          <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
+            <Route path="itinerary" element={<ItineraryPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

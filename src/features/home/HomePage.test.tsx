@@ -16,13 +16,13 @@ vi.mock("../../hooks/useSession.ts", () => ({
 
 import { useSavedListingsQuery } from "../explore/save-queries.ts";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
-import type { TripRoomViewModel } from "../plan-home/plan-home-view-model.ts";
+import type { TripOverviewDto } from "../../contracts/trip-overview.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import type { SavedListingItem } from "../../contracts/explore-save.ts";
 import { HomePage } from "./HomePage.tsx";
 import {
   getHomeTripDayLabel,
-  selectHomeTrip,
+  selectFeaturedTrip,
 } from "./components/HomeTripDashboard.tsx";
 
 const mockSaved = vi.mocked(useSavedListingsQuery);
@@ -34,8 +34,8 @@ const savedItem = (id: string, title: string): SavedListingItem => ({
   listing: {
     listingId: id as SavedListingItem["listing"]["listingId"],
     status: "LISTED",
-  listingRevision: 1 as SavedListingItem["listing"]["listingRevision"],
-  saveCount: 0,
+    listingRevision: 1 as SavedListingItem["listing"]["listingRevision"],
+    saveCount: 0,
     listedAt: "2026-09-05T00:00:00.000Z",
     updatedAt: "2026-09-05T00:00:00.000Z",
     snapshot: {
@@ -58,37 +58,33 @@ const savedItem = (id: string, title: string): SavedListingItem => ({
   },
 });
 
-const room: TripRoomViewModel = {
+const confirmedTrip: TripOverviewDto = {
   id: "trip-italy",
   title: "이탈리아 남부 여행",
   destination: "이탈리아",
-  displayStartDate: "2999-06-15",
-  displayEndDate: "2999-06-23",
-  period: "2999-06-15 ~ 2999-06-23",
+  revision: 1,
+  isConfirmed: true,
+  confirmedPeriod: {
+    startDate: "2999-06-15",
+    endDate: "2999-06-23",
+  },
   memberCount: 5,
   memberNames: ["라온", "민지", "서준", "지수", "하늘"],
-  revision: 1,
-  confirmedPlanId: "plan-1",
-  confirmedPlanTitle: "남부 로드트립",
-  decisionStatusText: "일정이 확정되었어요",
-  decisionSubText: "확정된 일정을 확인해보세요.",
-  decisionBadgeText: "확정됨",
-  decisionBadgeVariant: "success",
   candidateCount: 2,
-  totalOpinionCount: 6,
-  participatedMemberCount: 4,
+  opinionParticipantCount: 4,
   hasUnattributedOpinions: false,
-  isConfirmed: true,
-  plans: [],
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-05T00:00:00.000Z",
+  eligibleActionIds: ["EDIT_PLAN_BASIC"],
 };
 
-const sessionOk = () =>
+const sessionOk = (name = "Raon") =>
   mockSession.mockReturnValue({
     data: {
       participantId: "participant-me",
       participantIds: ["participant-me"],
       accountType: "REGISTERED",
-      name: "Raon",
+      name,
       isAuthenticated: true,
     },
     isSuccess: true,
@@ -99,7 +95,7 @@ const sessionOk = () =>
   } as unknown as ReturnType<typeof useSessionQuery>);
 
 const savedResult = (
-  over: Partial<ReturnType<typeof useSavedListingsQuery>>,
+  over: Partial<ReturnType<typeof useSavedListingsQuery>> = {},
 ) =>
   ({
     data: undefined,
@@ -118,7 +114,7 @@ const roomsResult = (
   over: Partial<ReturnType<typeof useTripRoomsQuery>> = {},
 ) =>
   ({
-    data: [room],
+    data: [confirmedTrip],
     isPending: false,
     isError: false,
     error: null,
@@ -138,21 +134,17 @@ const expectDashboard = () => {
   expect(
     screen.queryByRole("button", { name: "알림 기능 준비 중" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByText("안녕하세요, Raon 👋")).toBeInTheDocument();
+  expect(screen.getByText("Raon님, 안녕하세요 👋")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "이탈리아 남부 여행" })).toBeInTheDocument();
-  expect(screen.getByRole("progressbar", { name: "여행안 의견 참여율" })).toHaveAttribute(
-    "aria-valuenow",
-    "80",
-  );
-  expect(screen.getByRole("link", { name: "여행 일정 열기" })).toHaveAttribute(
+  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /일정 보기/ })).toHaveAttribute(
     "href",
     "/trips/trip-italy/itinerary",
   );
-  expect(screen.getByRole("link", { name: "숙소 정보 열기" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: /계획 보기/ })).toHaveAttribute(
     "href",
-    "/trips/trip-italy/itinerary",
+    "/trips/trip-italy/plans",
   );
-  expect(screen.getByText("지도").closest("span[aria-disabled='true']")).not.toBeNull();
 };
 
 beforeEach(() => {
@@ -164,15 +156,17 @@ beforeEach(() => {
 });
 
 describe("HomePage dashboard", () => {
-  it("미확정 여행에서도 일정 quick action은 일정 route를 직접 가리킨다", () => {
+  it("계획 중인 여행에서는 계획 보기 및 비교 액션을 제공한다", () => {
     mockRooms.mockReturnValue(
       roomsResult({
         data: [
           {
-            ...room,
-            confirmedPlanId: undefined,
-            confirmedPlanTitle: undefined,
+            ...confirmedTrip,
             isConfirmed: false,
+            confirmedPeriod: null,
+            candidateCount: 3,
+            opinionParticipantCount: 2,
+            eligibleActionIds: ["COMPARE_PLANS", "EDIT_PLAN_BASIC"],
           },
         ],
       }),
@@ -183,9 +177,13 @@ describe("HomePage dashboard", () => {
 
     renderHome();
 
-    expect(screen.getByRole("link", { name: "여행 일정 열기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /계획 보기/ })).toHaveAttribute(
       "href",
-      "/trips/trip-italy/itinerary",
+      "/trips/trip-italy/plans",
+    );
+    expect(screen.getByRole("link", { name: /여행안 비교/ })).toHaveAttribute(
+      "href",
+      "/trips/trip-italy/plans/compare",
     );
   });
 
@@ -234,15 +232,42 @@ describe("HomePage dashboard", () => {
     renderHome();
 
     expect(screen.getByText("진행 중인 여행이 없어요.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "새 여행 만들기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /새 여행 만들기/ })).toHaveAttribute(
       "href",
       "/trips/new",
     );
-    expect(screen.getByRole("link", { name: "여행 탐색" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /여행 탐색/ })).toHaveAttribute(
       "href",
       "/explore",
     );
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("과거 여행만 있을 때 전용 다음 여행 안내 카드를 표시한다", () => {
+    mockRooms.mockReturnValue(
+      roomsResult({
+        data: [
+          {
+            ...confirmedTrip,
+            confirmedPeriod: { startDate: "2020-01-01", endDate: "2020-01-05" },
+          },
+        ],
+      }),
+    );
+    mockSaved.mockReturnValue(
+      savedResult({ data: { pages: [{ items: [] }], pageParams: [undefined] } }),
+    );
+    renderHome();
+
+    expect(screen.getByText("다음 여행을 준비해 보세요")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /내 여행 보기/ })).toHaveAttribute(
+      "href",
+      "/trips",
+    );
+    expect(screen.getByRole("link", { name: /새 여행 만들기/ })).toHaveAttribute(
+      "href",
+      "/trips/new",
+    );
   });
 
   it("캐시된 여행을 유지할 때 최신 조회 실패를 밝히고 재시도한다", () => {
@@ -263,14 +288,16 @@ describe("HomePage dashboard", () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("legacy 의견이 섞여 참여 인원을 완전히 집계할 수 없으면 비율로 단정하지 않는다", () => {
+  it("legacy 의견이 섞여 참여 인원을 완전히 집계할 수 없으면 안내 문구를 표시한다", () => {
     mockRooms.mockReturnValue(
       roomsResult({
         data: [
           {
-            ...room,
-            totalOpinionCount: 3,
-            participatedMemberCount: 1,
+            ...confirmedTrip,
+            isConfirmed: false,
+            confirmedPeriod: null,
+            candidateCount: 2,
+            opinionParticipantCount: 1,
             hasUnattributedOpinions: true,
           },
         ],
@@ -281,35 +308,57 @@ describe("HomePage dashboard", () => {
     );
     renderHome();
 
-    expect(screen.getByText("집계 전")).toBeInTheDocument();
+    expect(
+      screen.getByText("일부 기존 의견의 참여자를 확인할 수 없어요"),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("사용자 이름이 없으면 가짜 이름을 사용하지 않고 일반 인사말을 표시한다", () => {
+    sessionOk("");
+    mockRooms.mockReturnValue(roomsResult({ data: [] }));
+    mockSaved.mockReturnValue(
+      savedResult({ data: { pages: [{ items: [] }], pageParams: [undefined] } }),
+    );
+    renderHome();
+
+    expect(screen.getByText("안녕하세요 👋")).toBeInTheDocument();
+    expect(screen.queryByText(/여행자님/)).not.toBeInTheDocument();
   });
 });
 
-describe("Home trip date selection", () => {
-  it("출발 전·당일·여행 중 D-day 경계를 local travel date로 계산한다", () => {
-    expect(getHomeTripDayLabel("2026-09-01", "2026-09-05", "2026-08-30")).toBe("D-2");
-    expect(getHomeTripDayLabel("2026-09-01", "2026-09-05", "2026-09-01")).toBe("D-Day");
-    expect(getHomeTripDayLabel("2026-09-01", "2026-09-05", "2026-09-03")).toBe("여행 중");
-    expect(getHomeTripDayLabel(undefined, undefined, "2026-09-03")).toBeUndefined();
+describe("Home trip date and selection helpers", () => {
+  it("출발 전·당일·여행 중 D-day 경계를 계산한다", () => {
+    const tripWithDates = (start: string, end: string): TripOverviewDto => ({
+      ...confirmedTrip,
+      confirmedPeriod: { startDate: start, endDate: end },
+    });
+
+    expect(
+      getHomeTripDayLabel(tripWithDates("2026-09-01", "2026-09-05"), "2026-08-30").label,
+    ).toBe("D-2");
+    expect(
+      getHomeTripDayLabel(tripWithDates("2026-09-01", "2026-09-05"), "2026-09-01").label,
+    ).toBe("D-Day");
+    expect(
+      getHomeTripDayLabel(tripWithDates("2026-09-01", "2026-09-05"), "2026-09-03").label,
+    ).toBe("여행 중");
   });
 
-  it("종료된 여행을 제외하고 서버 순서의 첫 ongoing 여행을 선택한다", () => {
-    const pastRoom = {
-      ...room,
+  it("종료된 여행을 제외하고 결정론적으로 ongoing 여행을 선택한다", () => {
+    const pastTrip: TripOverviewDto = {
+      ...confirmedTrip,
       id: "trip-past",
-      displayStartDate: "2026-08-01",
-      displayEndDate: "2026-08-03",
+      confirmedPeriod: { startDate: "2026-08-01", endDate: "2026-08-03" },
     };
-    const ongoingRoom = {
-      ...room,
+    const ongoingTrip: TripOverviewDto = {
+      ...confirmedTrip,
       id: "trip-ongoing",
-      displayStartDate: "2026-09-01",
-      displayEndDate: "2026-09-05",
+      confirmedPeriod: { startDate: "2026-09-01", endDate: "2026-09-05" },
     };
 
-    expect(selectHomeTrip([pastRoom, ongoingRoom], "2026-08-30")?.id).toBe(
-      "trip-ongoing",
-    );
+    expect(
+      selectFeaturedTrip([pastTrip, ongoingTrip], "2026-08-30").featured?.id,
+    ).toBe("trip-ongoing");
   });
 });

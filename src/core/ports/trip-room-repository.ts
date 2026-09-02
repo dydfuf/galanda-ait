@@ -1,11 +1,19 @@
 import { Context } from "effect";
 import type { ParticipantId, PlanId, Revision, TripId } from "../domain/ids.ts";
 import type { TripMember, TripPlan, TripRoom } from "../domain/room.ts";
+import type { ConfirmedItinerary } from "../domain/confirmed-itinerary.ts";
 import type {
   NotFoundError,
   RevisionConflictError,
 } from "../domain/errors.ts";
 import type { RepositoryEffect } from "./repository.ts";
+
+export interface TripOverviewSourceRecord {
+  readonly room: TripRoom;
+  readonly roomCreatedAt: string;
+  readonly roomUpdatedAt: string;
+  readonly currentItinerary: ConfirmedItinerary | null;
+}
 
 export interface CreateRoomParams {
   readonly id: TripId;
@@ -59,6 +67,9 @@ export class TripRoomRepository extends Context.Service<
     readonly getRooms: (
       participantIds: ReadonlyArray<ParticipantId>
     ) => RepositoryEffect<ReadonlyArray<TripRoom>>;
+    readonly getRoomOverviewRecords: (
+      participantIds: ReadonlyArray<ParticipantId>
+    ) => RepositoryEffect<ReadonlyArray<TripOverviewSourceRecord>>;
     readonly createRoom: (params: CreateRoomParams) => RepositoryEffect<TripRoom>;
     readonly updateRoom: (
       roomId: TripId,
