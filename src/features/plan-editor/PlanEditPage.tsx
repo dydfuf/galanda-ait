@@ -43,6 +43,8 @@ import { ValidationBanner } from "./components/ValidationBanner.tsx";
 import { useUpdatePlanMutation, useDeletePlanMutation } from "./mutations.ts";
 import type { TripPlan } from "../../core/domain/room.ts";
 import { calculatePlanDifference } from "../../core/calculations/plan-diff.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const loadingContainerStyle = css`
   padding: 40px 0;
@@ -81,6 +83,7 @@ export function PlanEditPage(): JSX.Element {
   const { data: room, isLoading: isRoomLoading, isError, refetch } = useTripRoomRawQuery(tripId);
   const updatePlanMutation = useUpdatePlanMutation();
   const deletePlanMutation = useDeletePlanMutation();
+  const isOnline = useOnlineStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [revisionConflict, setRevisionConflict] = useState<string>();
@@ -180,6 +183,10 @@ export function PlanEditPage(): JSX.Element {
   }
 
   const handleSubmit = async (): Promise<void> => {
+    if (!isOnline) {
+      setActionError(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
     if (!editor.validation.isValid || isSubmitting || isResolvingConflict) return;
 
     setIsSubmitting(true);
@@ -256,6 +263,11 @@ export function PlanEditPage(): JSX.Element {
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
+    if (!isOnline) {
+      setActionError(OFFLINE_MUTATION_MESSAGE);
+      setIsDeleteConfirmOpen(false);
+      return;
+    }
     if (isSubmitting || deletePlanMutation.isPending) {
       return;
     }
@@ -364,8 +376,13 @@ export function PlanEditPage(): JSX.Element {
       ) : !section && !editor.draftConflict ? (
         <BottomAction
           accessory={
-            editor.validation.firstError || actionError ? (
+            editor.validation.firstError || actionError || !isOnline ? (
               <>
+                {!isOnline && (
+                  <span css={actionErrorStyle} role="status">
+                    {OFFLINE_MUTATION_MESSAGE}
+                  </span>
+                )}
                 {actionError && (
                   <span css={actionErrorStyle} role="alert">
                     {actionError}
@@ -385,7 +402,7 @@ export function PlanEditPage(): JSX.Element {
             type="button"
             size="xl"
             variant="destructive"
-            disabled={isSubmitting || deletePlanMutation.isPending}
+            disabled={isSubmitting || deletePlanMutation.isPending || !isOnline}
             onClick={() => setIsDeleteConfirmOpen(true)}
           >
             삭제하기
@@ -394,7 +411,7 @@ export function PlanEditPage(): JSX.Element {
             type="button"
             size="xl"
             aria-busy={updatePlanMutation.isPending || isResolvingConflict}
-            disabled={!editor.validation.isValid || isSubmitting}
+            disabled={!editor.validation.isValid || isSubmitting || !isOnline}
             onClick={() => void handleSubmit()}
           >
             {isSubmitting ? "수정 반영 중..." : "수정안 반영하기"}
@@ -421,7 +438,7 @@ export function PlanEditPage(): JSX.Element {
             <AlertDialogAction
               variant="destructive"
               aria-busy={deletePlanMutation.isPending}
-              disabled={isSubmitting || deletePlanMutation.isPending}
+              disabled={isSubmitting || deletePlanMutation.isPending || !isOnline}
               onClick={() => void handleConfirmDelete()}
             >
               {deletePlanMutation.isPending ? "삭제 중..." : "삭제하기"}

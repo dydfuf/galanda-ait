@@ -39,6 +39,8 @@ import {
   rebaseItineraryPatches,
   type ItineraryEditorField,
 } from "./itinerary-editor-state.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const ITINERARY_EDITOR_FORM_ID = "itinerary-edit-form";
 const ITINERARY_VALIDATION_ID = "itinerary-edit-validation";
@@ -78,6 +80,7 @@ function ItineraryEditor({
 }) {
   const navigate = useNavigate();
   const mutation = useReviseItineraryMutation();
+  const isOnline = useOnlineStatus();
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expectedRevision, setExpectedRevision] = useState(
@@ -118,6 +121,11 @@ function ItineraryEditor({
       isSubmitPending ||
       isSubmittingRef.current
     ) {
+      return;
+    }
+
+    if (!isOnline) {
+      setSaveError(OFFLINE_MUTATION_MESSAGE);
       return;
     }
 
@@ -183,7 +191,9 @@ function ItineraryEditor({
     }
   };
 
-  const completionCondition = !validation.isValid
+  const completionCondition = !isOnline
+    ? OFFLINE_MUTATION_MESSAGE
+    : !validation.isValid
     ? validation.firstError
     : unchanged
       ? "변경할 일정 내용을 입력해주세요."
@@ -421,10 +431,10 @@ function ItineraryEditor({
           size="xl"
           aria-busy={isSubmitPending || undefined}
           aria-live="polite"
-          disabled={!validation.isValid || unchanged || isSubmitPending}
+          disabled={!validation.isValid || unchanged || isSubmitPending || !isOnline}
         >
           {isSubmitPending && <Spinner aria-hidden="true" />}
-          {actionLabel}
+          {!isOnline ? "온라인 연결 후 저장" : actionLabel}
         </Button>
       </BottomAction>
     </PageBody>

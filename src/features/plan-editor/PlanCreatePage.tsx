@@ -50,6 +50,10 @@ import {
 } from "../common/recommendation.ts";
 import { tripActionPresentation } from "../common/trip-action-presentation.ts";
 import { shareTripInvite } from "../invite/share-trip-invite.ts";
+import {
+  OFFLINE_MUTATION_MESSAGE,
+} from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const loadingContainerStyle = css`
   padding: 40px 20px;
@@ -132,6 +136,7 @@ export function PlanCreatePage(): JSX.Element {
   } = useSessionQuery();
   const createPlanMutation = useCreatePlanMutation();
   const isSubmittingRef = useRef(false);
+  const isOnline = useOnlineStatus();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeRecommendation, setActiveRecommendation] = useState<
@@ -294,9 +299,11 @@ export function PlanCreatePage(): JSX.Element {
   ): Promise<void> => {
     if (
       !editor.validation.isValid ||
+      !isOnline ||
       isSubmitPending ||
       isSubmittingRef.current
     ) {
+      if (!isOnline) setErrorMsg(OFFLINE_MUTATION_MESSAGE);
       return;
     }
 
@@ -549,8 +556,13 @@ export function PlanCreatePage(): JSX.Element {
         !recommendation && (
           <BottomAction
             accessory={
-              editor.validation.firstError || errorMsg ? (
+              editor.validation.firstError || errorMsg || !isOnline ? (
                 <>
+                  {!isOnline && (
+                    <span css={errorMessageStyle} role="status">
+                      {OFFLINE_MUTATION_MESSAGE}
+                    </span>
+                  )}
                   {editor.validation.firstError && (
                     <ValidationBanner
                       firstError={editor.validation.firstError}
@@ -581,13 +593,15 @@ export function PlanCreatePage(): JSX.Element {
               size="xl"
               aria-busy={isSubmitPending || undefined}
               aria-live="polite"
-              disabled={!editor.validation.isValid || isSubmitPending}
+              disabled={!editor.validation.isValid || isSubmitPending || !isOnline}
               onClick={() => void handleSubmit()}
             >
               {isSubmitPending && <Spinner aria-hidden="true" />}
               {isSubmitPending
                 ? "등록 중..."
-                : cloneFromPlan
+                : !isOnline
+                  ? "온라인 연결 후 등록"
+                  : cloneFromPlan
                   ? "대안 여행안 제안하기"
                   : "여행안 제안 등록"}
             </Button>

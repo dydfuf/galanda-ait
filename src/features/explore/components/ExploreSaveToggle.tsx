@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { useSessionQuery } from "@/hooks/useSession.ts";
 import type { ExploreListingId } from "@/core/domain/ids.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "@/app/offline-mutation.ts";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus.ts";
 
 import {
   useExploreSaveStateQuery,
@@ -34,6 +36,7 @@ export function ExploreSaveToggle({
   readonly listingId: ExploreListingId;
 }) {
   const { data: session, isSuccess: isSessionReady } = useSessionQuery();
+  const isOnline = useOnlineStatus();
   const state = useExploreSaveStateQuery(listingId);
   const mutation = useToggleExploreSaveMutation(listingId);
 
@@ -49,7 +52,7 @@ export function ExploreSaveToggle({
   const handleToggle = () => {
     // 실제 저장 상태를 아직 모르면(초기 로드 중) 행동하지 않는다(unknown state에
     // 근거해 잘못된 toggle을 하지 않음). 로드가 끝나면 정상 toggle.
-    if (state.isPending || isBusy) return;
+    if (!isOnline || state.isPending || isBusy) return;
     mutation.mutate({ nextSaved: !saved });
   };
 
@@ -63,7 +66,7 @@ export function ExploreSaveToggle({
         size="lg"
         aria-pressed={saved}
         aria-label={label}
-        disabled={isBusy || state.isPending}
+        disabled={isBusy || state.isPending || !isOnline}
         onClick={handleToggle}
         data-slot="explore-save-toggle"
         className="min-w-0"
@@ -81,6 +84,11 @@ export function ExploreSaveToggle({
       {hasFailed && (
         <p role="alert" className="min-w-0 text-sm text-destructive-strong">
           저장 상태를 바꾸지 못했어요. 다시 시도해주세요.
+        </p>
+      )}
+      {!isOnline && (
+        <p role="status" className="min-w-0 text-sm text-foreground-muted">
+          {OFFLINE_MUTATION_MESSAGE}
         </p>
       )}
     </div>

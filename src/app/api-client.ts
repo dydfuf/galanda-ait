@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { assertOnlineForRequest } from "./offline-mutation.ts";
 import type {
   ExploreListingId,
   InviteToken,
@@ -92,6 +93,7 @@ const requestJson = async <S extends Schema.Decoder<any, never>>(
   schema: S,
   init: RequestInit = {}
 ): Promise<S["Type"]> => {
+  assertOnlineForRequest(init.method);
   const response = await fetch(path, {
     ...init,
     credentials: "same-origin",

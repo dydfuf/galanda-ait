@@ -25,7 +25,7 @@ export function OfflineStatusBanner({
         오프라인 상태입니다.
         {lastSyncedAt
           ? ` (마지막 동기화: ${new Date(lastSyncedAt).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })})`
-          : " 저장된 정보만 표시되며 변경사항은 수정할 수 없습니다."}
+          : " 입력 내용은 이 기기에 유지되지만 온라인으로 돌아오기 전에는 저장되지 않습니다."}
       </span>
     </div>
   );

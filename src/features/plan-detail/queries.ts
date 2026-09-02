@@ -10,6 +10,12 @@ import { tripRoomKeys } from "../plan-home/queries.ts";
 
 import { useSessionQuery } from "../../hooks/useSession.ts";
 
+export const TRIP_ROOM_FRESHNESS = {
+  staleTime: 10_000,
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
+} as const;
+
 export const useTripRoomDetailQuery = (
   roomId: string
 ): UseQueryResult<PlanDetailViewModel, Error> => {
@@ -21,6 +27,7 @@ export const useTripRoomDetailQuery = (
       getTrip(TripIdSchema.make(roomId), signal),
     select: (room: TripRoom): PlanDetailViewModel =>
       toPlanDetailViewModel(room, session?.participantIds),
+    ...TRIP_ROOM_FRESHNESS,
     enabled: Boolean(roomId) && isSessionReady,
   });
 };
@@ -34,6 +41,7 @@ export const useTripRoomRawQuery = (
     queryKey: tripRoomKeys.detail(roomId, session?.participantId),
     queryFn: ({ signal }): Promise<TripRoom> =>
       getTrip(TripIdSchema.make(roomId), signal),
+    ...TRIP_ROOM_FRESHNESS,
     enabled: Boolean(roomId) && isSessionReady,
   });
 };

@@ -49,6 +49,8 @@ import {
   getRecommendationActionContext,
   trackRecommendationEvent,
 } from "../common/recommendation.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const getPlanBadgeVariant = (
   isConfirmed: boolean,
@@ -68,6 +70,7 @@ export function PlanDetailPage(): JSX.Element {
   const { data: room, isLoading, isError, error, refetch } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
   const deletePlanMutation = useDeletePlanMutation();
+  const isOnline = useOnlineStatus();
   const [isOpinionSheetOpen, setIsOpinionSheetOpen] = useState(false);
   const [isManagementDrawerOpen, setIsManagementDrawerOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -174,6 +177,11 @@ export function PlanDetailPage(): JSX.Element {
     )
       return;
 
+    if (!isOnline) {
+      setOpinionError(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
+
     setConflictNotice(undefined);
     setOpinionError(undefined);
     try {
@@ -220,6 +228,10 @@ export function PlanDetailPage(): JSX.Element {
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
+    if (!isOnline) {
+      setDeleteError(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
     if (!canManage || deletePlanMutation.isPending || isResolvingConflict)
       return;
 
@@ -462,11 +474,17 @@ export function PlanDetailPage(): JSX.Element {
           <Button
             type="button"
             size="xl"
-            disabled={submitOpinionMutation.isPending || isResolvingConflict}
+            disabled={
+              submitOpinionMutation.isPending || isResolvingConflict || !isOnline
+            }
             aria-busy={submitOpinionMutation.isPending || isResolvingConflict}
             onClick={openOpinionSheet}
           >
-            {plan.myReaction ? "내 의견 수정하기" : "내 의견 남기기"}
+            {!isOnline
+              ? "온라인 연결 후 의견 저장"
+              : plan.myReaction
+                ? "내 의견 수정하기"
+                : "내 의견 남기기"}
           </Button>
         </BottomAction>
       ) : null}
@@ -563,7 +581,9 @@ export function PlanDetailPage(): JSX.Element {
             </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              disabled={deletePlanMutation.isPending || isResolvingConflict}
+              disabled={
+                deletePlanMutation.isPending || isResolvingConflict || !isOnline
+              }
               aria-busy={deletePlanMutation.isPending || isResolvingConflict}
               onClick={() => void handleConfirmDelete()}
             >
@@ -586,6 +606,7 @@ export function PlanDetailPage(): JSX.Element {
           initialReaction={plan.myReaction as ReactionType | undefined}
           initialReason={plan.myOpinionReason ?? ""}
           errorMessage={opinionError}
+          isOffline={!isOnline}
           isSubmitting={submitOpinionMutation.isPending || isResolvingConflict}
           onSubmit={(reaction, reason) =>
             void handleOpinionSubmit(reaction, reason)

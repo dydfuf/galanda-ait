@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/drawer.tsx";
 import type { TripActivityEventDto, TripActivityType } from "@/contracts/trip-activity.ts";
 import { useTripActivitiesInfiniteQuery, useMarkTripActivityReadMutation } from "../queries.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../../hooks/useOnlineStatus.ts";
 
 interface ActivityDrawerProps {
   readonly tripId: string;
@@ -77,6 +79,7 @@ const formatTimeAgo = (isoString: string): string => {
 
 export function ActivityDrawer({ tripId, isOpen, onClose }: ActivityDrawerProps) {
   const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
   const {
     data,
     isLoading,
@@ -100,7 +103,7 @@ export function ActivityDrawer({ tripId, isOpen, onClose }: ActivityDrawerProps)
   const canMarkRead = Boolean(latestSequence) && unreadCount > 0;
 
   const handleMarkAllRead = () => {
-    if (!latestSequence || !canMarkRead || markReadMutation.isPending) return;
+    if (!isOnline || !latestSequence || !canMarkRead || markReadMutation.isPending) return;
     markReadMutation.mutate(latestSequence);
   };
 
@@ -125,7 +128,7 @@ export function ActivityDrawer({ tripId, isOpen, onClose }: ActivityDrawerProps)
                 variant="ghost"
                 size="sm"
                 onClick={handleMarkAllRead}
-                disabled={markReadMutation.isPending}
+                disabled={markReadMutation.isPending || !isOnline}
                 className="h-8 px-2 text-xs text-foreground-muted hover:text-foreground"
               >
                 {markReadMutation.isPending ? "확인 중..." : "현재까지 모두 확인"}
@@ -135,6 +138,11 @@ export function ActivityDrawer({ tripId, isOpen, onClose }: ActivityDrawerProps)
           <DrawerDescription>
             여행방의 최근 협업 활동 내역입니다.
           </DrawerDescription>
+          {!isOnline && (
+            <p role="status" className="text-xs text-foreground-muted">
+              {OFFLINE_MUTATION_MESSAGE}
+            </p>
+          )}
           <p aria-live="polite" className="sr-only">
             {markReadMutation.isSuccess ? "새 변경을 모두 확인했습니다." : ""}
           </p>
@@ -241,4 +249,3 @@ export function ActivityDrawer({ tripId, isOpen, onClose }: ActivityDrawerProps)
     </Drawer>
   );
 }
-

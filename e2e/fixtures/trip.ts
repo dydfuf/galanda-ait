@@ -1,4 +1,7 @@
 import { expect, type Page } from "@playwright/test";
+import { futureTravelPeriod } from "./dates.ts";
+
+const travelPeriod = futureTravelPeriod();
 
 export async function createTrip(
   page: Page,
@@ -23,13 +26,17 @@ export async function createTrip(
 export const publishablePlan = {
   baseHeadcount: 2,
   routes: [
-    { city: "오사카", arrivalDate: "2026-09-01", departureDate: "2026-09-04" },
+    {
+      city: "오사카",
+      arrivalDate: travelPeriod.startDate,
+      departureDate: travelPeriod.endDate,
+    },
   ],
   accommodations: [
     {
       id: "stay-osaka",
       city: "오사카",
-      period: "2026-09-01 ~ 2026-09-04",
+      period: `${travelPeriod.startDate} ~ ${travelPeriod.endDate}`,
       nights: 3,
       hotelName: "",
       isSearching: true,
