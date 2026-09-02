@@ -1,7 +1,13 @@
 import { expect, type Page } from "@playwright/test";
+import { getStayNightCount } from "../../src/core/domain/room.ts";
 import { futureTravelPeriod } from "./dates.ts";
 
 const travelPeriod = futureTravelPeriod();
+const route = {
+  city: "오사카",
+  arrivalDate: travelPeriod.startDate,
+  departureDate: travelPeriod.endDate,
+} as const;
 
 export async function createTrip(
   page: Page,
@@ -25,19 +31,13 @@ export async function createTrip(
 
 export const publishablePlan = {
   baseHeadcount: 2,
-  routes: [
-    {
-      city: "오사카",
-      arrivalDate: travelPeriod.startDate,
-      departureDate: travelPeriod.endDate,
-    },
-  ],
+  routes: [route],
   accommodations: [
     {
       id: "stay-osaka",
-      city: "오사카",
-      period: `${travelPeriod.startDate} ~ ${travelPeriod.endDate}`,
-      nights: 3,
+      city: route.city,
+      period: `${route.arrivalDate} ~ ${route.departureDate}`,
+      nights: getStayNightCount(route),
       hotelName: "",
       isSearching: true,
       bookingStatus: "NOT_CHECKED" as const,

@@ -1,9 +1,19 @@
 import { test, expect } from "@playwright/test";
+import { getStayNightCount } from "../../src/core/domain/room.ts";
 import { createAuthenticatedContext, HOST_USER } from "../fixtures/auth.ts";
-import { createTrip } from "../fixtures/trip.ts";
+import { createTrip, publishablePlan } from "../fixtures/trip.ts";
 import { futureTravelPeriod, uniqueTestTitle } from "../fixtures/dates.ts";
 
 test.describe("Trip Creation and Plan Publication E2E", () => {
+  test("publishablePlan의 숙박 일수가 여행 기간과 일치한다", () => {
+    const route = publishablePlan.routes[0];
+    const stay = publishablePlan.accommodations[0];
+
+    expect(route).toBeDefined();
+    expect(stay).toBeDefined();
+    expect(stay.nights).toBe(getStayNightCount(route));
+  });
+
   test("Host가 새 여행을 생성하고 첫 여행안을 작성하여 공개한다", async ({ browser, baseURL }, testInfo) => {
     const origin = baseURL || "http://localhost:5173";
     const title = uniqueTestTitle("도쿄 가을 단풍 여행", testInfo);

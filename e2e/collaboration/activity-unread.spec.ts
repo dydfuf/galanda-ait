@@ -76,7 +76,10 @@ test.describe("Activity Feed and Unread Mark-Read E2E", () => {
       await drawer.getByRole("button", { name: "현재까지 모두 확인" }).click();
       expect((await markReadResponse).status()).toBe(200);
       host.page.off("request", onRequest);
-      await expect(bellButton).toHaveAccessibleName("활동 알림");
+      await host.page.keyboard.press("Escape");
+      await expect(
+        host.page.getByRole("button", { name: "활동 알림" }),
+      ).toBeVisible();
 
       await host.page.reload();
       await expect(
@@ -93,6 +96,33 @@ test.describe("Activity Feed and Unread Mark-Read E2E", () => {
         await freshHost.context.close();
       }
 
+      await member.page.goto(`${origin}/trips/${tripId}/plans`);
+      const memberBellButton = member.page.getByRole("button", {
+        name: /활동 알림/,
+      });
+      await expect(memberBellButton).toHaveAccessibleName(/새 활동 \d+개/);
+      await memberBellButton.click();
+      const memberDrawer = member.page.getByRole("dialog", {
+        name: "활동 알림",
+      });
+      await expect(memberDrawer).toBeVisible();
+      const memberReadResponse = member.page.waitForResponse((response) => {
+        const request = response.request();
+        return (
+          request.method() === "PUT" &&
+          new URL(request.url()).pathname ===
+            `/api/trips/${tripId}/activity/read`
+        );
+      });
+      await memberDrawer
+        .getByRole("button", { name: "현재까지 모두 확인" })
+        .click();
+      expect((await memberReadResponse).status()).toBe(200);
+      await member.page.keyboard.press("Escape");
+      await expect(
+        member.page.getByRole("button", { name: "활동 알림" }),
+      ).toBeVisible();
+
       await submitOpinionViaUi(host.page, origin, tripId, plan.id);
       await host.page.goto(`${origin}/trips/${tripId}/plans`);
       await expect(
@@ -100,8 +130,46 @@ test.describe("Activity Feed and Unread Mark-Read E2E", () => {
       ).toBeVisible();
 
       await member.page.goto(`${origin}/trips/${tripId}/plans`);
+      const newMemberBellButton = member.page.getByRole("button", {
+        name: /활동 알림/,
+      });
+      await expect(newMemberBellButton).toHaveAccessibleName("활동 알림 (새 활동 1개)");
+      await newMemberBellButton.click();
+      const newMemberDrawer = member.page.getByRole("dialog", {
+        name: "활동 알림",
+      });
+      await expect(newMemberDrawer).toBeVisible();
+      const memberReadWrites: string[] = [];
+      member.page.on("request", (request) => {
+        if (
+          request.method() === "PUT" &&
+          new URL(request.url()).pathname ===
+            `/api/trips/${tripId}/activity/read`
+        ) {
+          memberReadWrites.push(request.url());
+        }
+      });
+      await member.context.setOffline(true);
+      await member.page.evaluate(() => window.dispatchEvent(new Event("offline")));
       await expect(
-        member.page.getByRole("button", { name: /새 활동 \d+개/ }),
+        newMemberDrawer.locator('[role="status"]').filter({
+          hasText: "오프라인 상태에서는 저장할 수 없습니다.",
+        }),
+      ).toBeVisible();
+      const offlineMarkRead = newMemberDrawer.getByRole("button", {
+        name: "현재까지 모두 확인",
+      });
+      await expect(offlineMarkRead).toBeDisabled();
+      expect(memberReadWrites).toHaveLength(0);
+
+      await member.context.setOffline(false);
+      await member.page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await expect(offlineMarkRead).toBeEnabled();
+      expect(memberReadWrites).toHaveLength(0);
+      await expect(
+        newMemberDrawer.getByText(
+          /Host Alice님이 여행안 .*에 의견을 남겼어요/,
+        ),
       ).toBeVisible();
     } finally {
       await host.context.close();
