@@ -9,21 +9,27 @@ test.describe("Offline Detection and Draft Preservation E2E", () => {
     try {
       await page.goto(`${origin}/trips`);
       await page.waitForLoadState("domcontentloaded");
+      await expect(page.locator('[data-slot="trip-list-page"]')).toBeVisible();
+      await expect(
+        page.locator('[data-slot="trip-list-page"] [data-system-state="loading"]'),
+      ).toHaveCount(0);
 
       // 1. 오프라인 모드 전환
       await context.setOffline(true);
       await page.evaluate(() => window.dispatchEvent(new Event("offline")));
 
       // 2. 오프라인 배너 노출 확인
-      await expect(page.getByRole("status")).toBeVisible();
-      await expect(page.getByText(/오프라인 상태입니다/)).toBeVisible();
+      const offlineBanner = page
+        .locator('[role="status"]')
+        .filter({ hasText: "오프라인 상태입니다." });
+      await expect(offlineBanner).toBeVisible();
 
       // 3. 온라인 모드 복귀
       await context.setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event("online")));
 
       // 4. 오프라인 배너 사라짐 확인
-      await expect(page.getByRole("status")).not.toBeVisible();
+      await expect(offlineBanner).not.toBeVisible();
     } finally {
       await context.close();
     }
