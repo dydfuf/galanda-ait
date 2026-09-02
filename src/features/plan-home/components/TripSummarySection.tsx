@@ -1,3 +1,5 @@
+import { MapPin } from "lucide-react";
+
 interface TripSummarySectionProps {
   readonly title: string;
   readonly destination: string;
@@ -15,13 +17,16 @@ export function TripSummarySection({
   return (
     <section
       aria-label="여행 정보"
-      className="mx-(--app-inline-padding) rounded-2xl border border-border bg-surface-raised px-4 py-4"
+      className="bg-surface-raised p-4.5 transition-shadow"
     >
-      <p className="text-sm font-semibold text-foreground-muted">여행 정보</p>
-      <h1 className="mt-1 min-w-0 text-[22px] leading-tight font-bold text-foreground [overflow-wrap:anywhere]">
+      <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground-muted">
+        <MapPin aria-hidden="true" className="size-3.5 text-primary shrink-0" />
+        <span>여행 정보</span>
+      </div>
+      <h1 className="mt-1.5 min-w-0 text-[22px] font-bold leading-tight tracking-tight text-foreground [overflow-wrap:anywhere]">
         {title}
       </h1>
-      <p className="mt-2 min-w-0 text-base leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
+      <p className="mt-2 min-w-0 text-sm font-medium leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
         {destination} · {period} · 참여 {memberCount}명
       </p>
     </section>

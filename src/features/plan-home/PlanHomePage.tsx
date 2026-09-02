@@ -230,37 +230,44 @@ export function PlanHomePage() {
     plans.length > 0 && cta.primaryKind !== null && !hasRecommendationSurface;
 
   return (
-    <PageBody withBottomAction={showBottomPrimary}>
-      <TripSummarySection
-        title={room.title}
-        destination={room.destination}
-        period={room.period}
-        memberCount={room.memberCount}
-      />
+    <PageBody withBottomAction={showBottomPrimary} className="pb-32">
+      <div className="flex flex-col gap-3">
+        {/* 상단 통합 여행 현황 Hero 카드 */}
+        <div className="mx-(--app-inline-padding) overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-xs transition-shadow">
+          <TripSummarySection
+            title={room.title}
+            destination={room.destination}
+            period={room.period}
+            memberCount={room.memberCount}
+          />
+          <div className="border-t border-border/70" />
+          <DecisionSummarySection
+            badgeText={room.decisionBadgeText}
+            badgeVariant={room.decisionBadgeVariant}
+            statusText={room.decisionStatusText}
+            subText={room.decisionSubText}
+            candidateCount={room.candidateCount}
+            totalOpinionCount={room.totalOpinionCount}
+            participatedMemberCount={room.participatedMemberCount}
+            memberCount={room.memberCount}
+          />
+        </div>
 
-      <DecisionSummarySection
-        badgeText={room.decisionBadgeText}
-        badgeVariant={room.decisionBadgeVariant}
-        statusText={room.decisionStatusText}
-        subText={room.decisionSubText}
-        candidateCount={room.candidateCount}
-        totalOpinionCount={room.totalOpinionCount}
-        participatedMemberCount={room.participatedMemberCount}
-        memberCount={room.memberCount}
-      />
+        {recommendation && (
+          <NextActionRecommendation
+            tripId={tripId}
+            surface="PLAN_HOME"
+            recommendation={recommendation}
+            onAction={(context) => void runRecommendationAction(context)}
+            onDismiss={setDismissedRecommendationId}
+          />
+        )}
+        {isRecommendationPending && <NextActionRecommendationPending />}
+      </div>
 
-      {recommendation && (
-        <NextActionRecommendation
-          tripId={tripId}
-          surface="PLAN_HOME"
-          recommendation={recommendation}
-          onAction={(context) => void runRecommendationAction(context)}
-          onDismiss={setDismissedRecommendationId}
-        />
-      )}
-      {isRecommendationPending && <NextActionRecommendationPending />}
+      <div className="mx-(--app-inline-padding) my-5 border-t border-border/70" />
 
-      <section aria-labelledby="plan-candidates-heading" className="pt-5">
+      <section aria-labelledby="plan-candidates-heading">
         <PlanCandidatesHeader
           candidateCount={room.candidateCount}
           showNewProposalAction={
@@ -284,7 +291,7 @@ export function PlanHomePage() {
           />
         ) : (
           <ul
-            className="flex list-none flex-col gap-3 px-(--app-inline-padding) pb-4"
+            className="flex list-none flex-col gap-3.5 px-(--app-inline-padding) pb-6"
             aria-label="제안된 여행안"
           >
             {plans.map((plan) => (
@@ -301,7 +308,7 @@ export function PlanHomePage() {
 
       {showBottomPrimary && (
         <BottomAction>
-          <Button type="button" size="xl" onClick={runPrimaryCta}>
+          <Button type="button" size="xl" className="font-bold shadow-md active:scale-[0.99] transition-transform" onClick={runPrimaryCta}>
             {cta.primaryLabel}
           </Button>
         </BottomAction>
@@ -318,7 +325,7 @@ export function PlanHomePage() {
             <DrawerTitle className="text-left text-lg font-bold">
               비교할 여행안 2개 선택
             </DrawerTitle>
-            <DrawerDescription className="text-left">
+            <DrawerDescription className="text-left text-sm text-foreground-muted">
               {selectedCompareIds.length === 2
                 ? "선택한 2개의 여행안을 비교해요."
                 : `여행안을 ${selectedCompareIds.length}/2개 선택했어요. 하나를 더 선택해주세요.`}
@@ -337,13 +344,14 @@ export function PlanHomePage() {
                     key={plan.id}
                     aria-label={`${plan.title} ${isSelected ? "선택됨" : "선택 안 됨"}`}
                     onClick={() => toggleCompareSelection(plan.id)}
+                    className="transition-colors"
                     leading={
                       <span
                         aria-hidden="true"
                         className={
-                          "flex size-6 items-center justify-center rounded-full border text-xs font-bold " +
+                          "flex size-6 items-center justify-center rounded-full border text-xs font-bold transition-colors " +
                           (isSelected
-                            ? "border-primary bg-primary text-primary-foreground"
+                            ? "border-primary bg-primary text-primary-foreground shadow-2xs"
                             : "border-input bg-background text-muted-foreground")
                         }
                       >
@@ -352,16 +360,16 @@ export function PlanHomePage() {
                     }
                     trailing={
                       isSelected ? (
-                        <Badge variant="info-solid">
+                        <Badge variant="info-solid" className="font-semibold shadow-2xs">
                           선택 {selectedIndex + 1}
                         </Badge>
                       ) : undefined
                     }
                   >
-                    <ItemTitle className="min-w-0 [overflow-wrap:anywhere]">
+                    <ItemTitle className="min-w-0 font-semibold [overflow-wrap:anywhere]">
                       {plan.title}
                     </ItemTitle>
-                    <ItemDescription className="min-w-0 text-base [overflow-wrap:anywhere]">
+                    <ItemDescription className="min-w-0 text-sm [overflow-wrap:anywhere]">
                       {plan.planTagLabel} · {plan.authorName} 제안 ·{" "}
                       {plan.days > 0
                         ? `${plan.nights}박 ${plan.days}일`

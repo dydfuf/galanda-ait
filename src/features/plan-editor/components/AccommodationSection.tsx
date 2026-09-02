@@ -1,208 +1,13 @@
-import { css } from "@emotion/react";
+import { Plus, X } from "lucide-react";
 import {
   getStayNightCount,
   type AccommodationSnapshot,
   type BookingStatus,
   type CityStay,
 } from "../../../core/domain/room.ts";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import { PLAN_EDITOR_SECTION_PRESENTATION } from "../plan-editor-section.ts";
-
-const cardStyle = css`
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 16px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background-color: var(--surface-content);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-
-  @media (min-width: 390px) {
-    padding: 20px;
-  }
-`;
-
-const sectionTitleStyle = css`
-  margin: 0;
-  color: var(--foreground);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.35;
-`;
-
-const itemListStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-`;
-
-const accItemStyle = css`
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background-color: var(--surface-subtle);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const accHeaderStyle = css`
-  min-width: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
-`;
-
-const accCityBadgeStyle = css`
-  min-width: 0;
-  max-width: 100%;
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background-color: var(--info-muted);
-  color: var(--info);
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-`;
-
-const fieldStyle = css`
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const fieldLabelStyle = css`
-  display: block;
-  color: var(--foreground-muted);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.5;
-`;
-
-const inputStyle = css`
-  width: 100%;
-  min-width: 0;
-  min-height: var(--touch-target-min);
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  outline: none;
-  background-color: var(--surface-content);
-  color: var(--foreground);
-  font-size: 16px;
-  line-height: 1.5;
-  transition: border-color var(--motion-duration-fast)
-    var(--motion-ease-standard);
-
-  &:focus-visible {
-    border-color: var(--primary);
-  }
-`;
-
-const selectStyle = css`
-  width: 100%;
-  min-width: 0;
-  min-height: var(--touch-target-min);
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  outline: none;
-  background-color: var(--surface-content);
-  color: var(--foreground);
-  font-size: 16px;
-  line-height: 1.5;
-
-  &:focus-visible {
-    border-color: var(--primary);
-  }
-`;
-
-const checkboxLabelStyle = css`
-  min-height: var(--touch-target-min);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--foreground-muted);
-  font-size: 16px;
-  line-height: 1.5;
-  cursor: pointer;
-
-  input {
-    width: 20px;
-    height: 20px;
-    flex: 0 0 20px;
-    accent-color: var(--primary);
-  }
-`;
-
-const responsiveGridStyle = css`
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-
-  @media (min-width: 390px) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-`;
-
-const removeBtnStyle = css`
-  min-width: var(--touch-target-min);
-  min-height: var(--touch-target-min);
-  padding: 8px 10px;
-  border: none;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--foreground-muted);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    color var(--motion-duration-fast) var(--motion-ease-standard),
-    background-color var(--motion-duration-fast) var(--motion-ease-standard);
-
-  &:hover {
-    background-color: var(--destructive-muted);
-    color: var(--destructive);
-  }
-`;
-
-const addAccButtonStyle = css`
-  width: 100%;
-  min-height: var(--touch-target-min);
-  padding: 10px 14px;
-  border: 1px dashed var(--primary-border);
-  border-radius: 10px;
-  background-color: var(--info-muted);
-  color: var(--info);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.5;
-  cursor: pointer;
-  transition: background-color var(--motion-duration-fast)
-    var(--motion-ease-standard);
-
-  &:hover {
-    background-color: var(--primary-muted);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
 
 interface AccommodationSectionProps {
   readonly accommodations: ReadonlyArray<AccommodationSnapshot>;
@@ -233,35 +38,44 @@ export function AccommodationSection({
   };
 
   return (
-    <section css={cardStyle} data-galanda-surface="content">
-      <h2 css={sectionTitleStyle}>
+    <section
+      data-galanda-surface="content"
+      className="mb-5 flex w-full min-w-0 flex-col gap-5 rounded-2xl border border-border bg-surface-raised p-4.5 shadow-xs sm:p-5"
+    >
+      <h2 className="min-w-0 text-[18px] font-bold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]">
         {PLAN_EDITOR_SECTION_PRESENTATION.accommodation.sectionHeading}
       </h2>
 
-      <div css={itemListStyle}>
+      <div className="flex min-w-0 flex-col gap-3">
         {accommodations.map((acc, idx) => (
-          <div key={acc.id} css={accItemStyle}>
-            <div css={accHeaderStyle}>
-              <h3 css={accCityBadgeStyle}>
+          <div
+            key={acc.id}
+            className="flex min-w-0 flex-col gap-4 rounded-xl border border-border/80 bg-surface/70 p-4 shadow-2xs"
+          >
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <Badge variant="info" className="shrink-0 font-semibold shadow-2xs">
                 구간 {idx + 1} · {acc.city} ({acc.nights}박)
-              </h3>
+              </Badge>
               {accommodations.length > 1 && (
                 <button
                   type="button"
-                  css={removeBtnStyle}
+                  className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-destructive-muted hover:text-destructive active:scale-95"
                   aria-label={`${idx + 1}번째 숙소 구간 삭제`}
                   onClick={() => onRemove(acc.id)}
                 >
-                  삭제
+                  <X aria-hidden="true" className="size-4" />
                 </button>
               )}
             </div>
 
-            <div css={fieldStyle}>
-              <label css={fieldLabelStyle} htmlFor={`${acc.id}-hotel-name`}>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <label
+                htmlFor={`${acc.id}-hotel-name`}
+                className="text-sm font-semibold leading-normal text-foreground-muted"
+              >
                 숙소명 / 호텔명
               </label>
-              <input
+              <Input
                 id={`${acc.id}-hotel-name`}
                 type="text"
                 placeholder="예: 그랜드 조선 호텔 제주"
@@ -272,11 +86,11 @@ export function AccommodationSection({
                     isSearching: false,
                   })
                 }
-                css={inputStyle}
+                className="h-10 rounded-xl text-base"
               />
             </div>
 
-            <label css={checkboxLabelStyle}>
+            <label className="flex min-h-(--touch-target-min) cursor-pointer items-center gap-2.5 text-sm font-semibold text-foreground select-none">
               <input
                 type="checkbox"
                 checked={Boolean(acc.isSearching)}
@@ -286,16 +100,20 @@ export function AccommodationSection({
                     hotelName: e.target.checked ? "" : acc.hotelName,
                   })
                 }
+                className="size-4.5 rounded-sm accent-primary"
               />
-              숙소 찾는 중 (미정)
+              <span>숙소 찾는 중 (미정)</span>
             </label>
 
-            <div css={responsiveGridStyle}>
-              <div css={fieldStyle}>
-                <label css={fieldLabelStyle} htmlFor={`${acc.id}-price-min`}>
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <label
+                  htmlFor={`${acc.id}-price-min`}
+                  className="text-sm font-semibold leading-normal text-foreground-muted"
+                >
                   예상 최소 금액(원)
                 </label>
-                <input
+                <Input
                   id={`${acc.id}-price-min`}
                   type="number"
                   placeholder="0"
@@ -313,14 +131,17 @@ export function AccommodationSection({
                       },
                     });
                   }}
-                  css={inputStyle}
+                  className="h-10 rounded-xl text-base"
                 />
               </div>
-              <div css={fieldStyle}>
-                <label css={fieldLabelStyle} htmlFor={`${acc.id}-price-max`}>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <label
+                  htmlFor={`${acc.id}-price-max`}
+                  className="text-sm font-semibold leading-normal text-foreground-muted"
+                >
                   예상 최대 금액(원)
                 </label>
-                <input
+                <Input
                   id={`${acc.id}-price-max`}
                   type="number"
                   placeholder="0"
@@ -338,16 +159,16 @@ export function AccommodationSection({
                       },
                     });
                   }}
-                  css={inputStyle}
+                  className="h-10 rounded-xl text-base"
                 />
               </div>
             </div>
 
-            <div css={responsiveGridStyle}>
-              <div css={fieldStyle}>
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <label
-                  css={fieldLabelStyle}
                   htmlFor={`${acc.id}-booking-status`}
+                  className="text-sm font-semibold leading-normal text-foreground-muted"
                 >
                   예약 상태
                 </label>
@@ -359,7 +180,7 @@ export function AccommodationSection({
                       bookingStatus: e.target.value as BookingStatus,
                     })
                   }
-                  css={selectStyle}
+                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-base text-foreground shadow-xs outline-none transition-colors focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
                 >
                   <option value="AVAILABLE">예약 가능</option>
                   <option value="NEED_CHECK">확인 필요</option>
@@ -368,11 +189,14 @@ export function AccommodationSection({
                 </select>
               </div>
 
-              <div css={fieldStyle}>
-                <label css={fieldLabelStyle} htmlFor={`${acc.id}-booking-url`}>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <label
+                  htmlFor={`${acc.id}-booking-url`}
+                  className="text-sm font-semibold leading-normal text-foreground-muted"
+                >
                   예약 링크 (선택)
                 </label>
-                <input
+                <Input
                   id={`${acc.id}-booking-url`}
                   type="url"
                   placeholder="https://"
@@ -380,7 +204,7 @@ export function AccommodationSection({
                   onChange={(e) =>
                     onUpdate(acc.id, { bookingUrl: e.target.value })
                   }
-                  css={inputStyle}
+                  className="h-10 rounded-xl text-base"
                 />
               </div>
             </div>
@@ -393,9 +217,10 @@ export function AccommodationSection({
             routes.length === 0 || accommodations.length >= routes.length
           }
           onClick={handleAddNew}
-          css={addAccButtonStyle}
+          className="flex h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-primary/50 bg-primary-muted/20 text-sm font-semibold text-primary transition-all duration-150 hover:bg-primary-muted/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          + 숙소 구간 추가
+          <Plus aria-hidden="true" className="size-4 shrink-0" />
+          <span>+ 숙소 구간 추가</span>
         </button>
       </div>
     </section>

@@ -456,9 +456,9 @@ describe("ItineraryPage Web/PWA and AIT shell ownership", () => {
         name: "여행 초대 링크 공유",
       }),
     ).not.toBeInTheDocument();
-    expect(aitHeader).toContainElement(
+    expect(
       screen.getByRole("tablist", { name: "여행방 화면" }),
-    );
+    ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "일정" })).toHaveAttribute(
       "aria-selected",
       "true",

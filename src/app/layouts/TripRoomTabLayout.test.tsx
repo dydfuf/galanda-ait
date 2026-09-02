@@ -113,11 +113,14 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     vi.clearAllMocks();
   });
 
-  it("Web/PWA owns one sticky chrome for safe-area back, title, share, and Mode Tab", () => {
+  it("Web/PWA owns one sticky chrome for safe-area back, title, and share, and floating Mode Tab", () => {
     const { container } = renderLayout();
 
     const header = screen.getByRole("banner");
     expect(header.className).toContain("pt-(--safe-top)");
+    expect(header).toHaveAttribute("data-galanda-surface", "chrome");
+    expect(header.className).toContain("sticky");
+    expect(header.className).toContain("border-b");
     expect(
       within(header).getByRole("button", { name: "뒤로 가기" }),
     ).toBeInTheDocument();
@@ -127,23 +130,18 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     ).toBeInTheDocument();
 
     const tablist = screen.getByRole("tablist", { name: "여행방 화면" });
-    const chromeOwner = header.parentElement;
     expect(tablist).toHaveAttribute("data-variant", "chrome");
-    expect(header).not.toHaveAttribute("data-galanda-surface");
-    expect(tablist).not.toHaveAttribute("data-galanda-surface");
-    expect(chromeOwner).toHaveAttribute("data-galanda-surface", "chrome");
-    expect(chromeOwner?.className).toContain("sticky");
-    expect(chromeOwner?.className).toContain("border-b");
+    expect(tablist).toHaveAttribute("data-galanda-surface", "chrome");
     expect(
       container.querySelectorAll('[data-galanda-surface="chrome"]'),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expectPlansTabSelected();
     expect(
       screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
     ).toBeInTheDocument();
   });
 
-  it("AIT keeps one web chrome below native navigation and applies its inset once", async () => {
+  it("AIT keeps one web chrome below native navigation and applies its inset once with floating Mode Tab", async () => {
     const { emitInset, navigation, removeInsetListener } =
       createNativeNavigation();
     mocks.platform.navigation = navigation;
@@ -165,13 +163,12 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     expect(
       within(header).queryByRole("button", { name: "여행 초대 링크 공유" }),
     ).not.toBeInTheDocument();
-    expect(header).toContainElement(tablist);
     expect(header).toHaveAttribute("data-galanda-surface", "chrome");
     expect(tablist).toHaveAttribute("data-variant", "chrome");
-    expect(tablist).not.toHaveAttribute("data-galanda-surface");
+    expect(tablist).toHaveAttribute("data-galanda-surface", "chrome");
     expect(
       container.querySelectorAll('[data-galanda-surface="chrome"]'),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expectPlansTabSelected();
 
     await waitFor(() =>
@@ -232,12 +229,10 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     expect(within(header).queryByText("여행방")).not.toBeInTheDocument();
     expect(header).toHaveStyle({ paddingTop: "54px" });
     expect(header.className).not.toContain("pt-(--safe-top)");
-    expect(header).toContainElement(
-      screen.getByRole("tablist", { name: "여행방 화면" }),
-    );
+    expect(screen.getByRole("tablist", { name: "여행방 화면" })).toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-galanda-surface="chrome"]'),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
     expectPlansTabSelected();
   });
 

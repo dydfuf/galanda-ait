@@ -13,8 +13,8 @@ export function Pill({ className, children }: { readonly className?: string; rea
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-1",
-        "text-sm font-medium text-foreground-muted whitespace-nowrap",
+        "inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/80 px-2.5 py-1",
+        "text-xs font-semibold text-foreground-muted whitespace-nowrap transition-colors",
         className,
       )}
     >
@@ -48,31 +48,40 @@ export function PlanOpinionSummary({ opinions, myReaction }: PlanOpinionSummaryP
   const isEmpty = entries.length === 0 && !myReactionLabel;
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5 gap-y-1 border-t border-border pt-3 text-sm leading-relaxed">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 gap-y-2 border-t border-border/70 pt-3 text-sm leading-relaxed">
       {isEmpty ? (
         // 의견이 하나도 없으면 한 문장만 남긴다 – 매달린 구분자나 중복된 "내 의견 없음"을 만들지 않는다.
-        <span className="min-w-0 break-words text-foreground-muted">
+        <span className="min-w-0 text-xs font-medium break-words text-foreground-muted">
           아직 의견이 없어요
         </span>
       ) : (
         <>
-          {entries.map(({ key, label, Icon, count }) => (
-            // 시각은 [아이콘] 2, accessible text는 "좋아요 2명" – 아이콘만으로 의미를 전달하지 않는다.
-            // label과 숫자 사이 공백은 sr-only span "바깥"의 text node여야 한다.
-            // accessible name 합성은 요소 단위로 trim하므로 span 안의 공백은 사라지고,
-            // flex container에서 공백뿐인 text run은 렌더되지 않아 시각 폭에는 영향이 없다.
-            <Pill key={key}>
-              <Icon aria-hidden="true" className="size-3 shrink-0" />
-              <span className="sr-only">{label}</span>{" "}
-              <span className="tabular-nums">{count}</span>
-              <span className="sr-only">명</span>
-            </Pill>
-          ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {entries.map(({ key, label, Icon, count }) => (
+              // 시각은 [아이콘] 2, accessible text는 "좋아요 2명" – 아이콘만으로 의미를 전달하지 않는다.
+              // label과 숫자 사이 공백은 sr-only span "바깥"의 text node여야 한다.
+              // accessible name 합성은 요소 단위로 trim하므로 span 안의 공백은 사라지고,
+              // flex container에서 공백뿐인 text run은 렌더되지 않아 시각 폭에는 영향이 없다.
+              <Pill key={key}>
+                <Icon aria-hidden="true" className="size-3.5 shrink-0 text-foreground-muted" />
+                <span className="sr-only">{label}</span>{" "}
+                <span className="tabular-nums">{count}</span>
+                <span className="sr-only">명</span>
+              </Pill>
+            ))}
+          </div>
           {/*
            * 남들의 반응은 채움 pill, 내 의견은 아웃라인 chip – 형태 대비가 층위를 구분한다.
-           * ml-auto는 여유가 있을 때만 "왼쪽=남들 / 오른쪽=나" 공간 구분을 주고 wrap되면 자연히 무력화된다.
+           * 내 의견이 없을 때는 버튼으로 오인되지 않도록 은은한 점선 테두리 적용.
            */}
-          <Pill className="ml-auto border border-border-strong bg-background font-semibold text-foreground">
+          <Pill
+            className={cn(
+              "font-semibold shadow-2xs transition-colors",
+              myReactionLabel
+                ? "border border-border-strong/90 bg-background/90 text-foreground"
+                : "border border-dashed border-border text-foreground-muted bg-muted/40 font-medium",
+            )}
+          >
             {myReactionLabel
               ? `내 의견 ${myReactionLabel}`
               : "내 의견 아직 없음"}

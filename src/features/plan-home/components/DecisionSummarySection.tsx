@@ -29,39 +29,55 @@ export function DecisionSummarySection({
 }: DecisionSummarySectionProps) {
   const hasCandidates = candidateCount > 0;
 
+  const participatePercent =
+    memberCount > 0
+      ? Math.min(100, Math.round((participatedMemberCount / memberCount) * 100))
+      : 0;
+
   return (
     <section
       aria-labelledby="decision-status-heading"
-      className="mx-(--app-inline-padding) mt-4 rounded-2xl border border-border bg-surface-raised px-4 py-4"
+      className="bg-muted/30 p-4.5 transition-colors"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <h2
           id="decision-status-heading"
-          className="min-w-0 text-lg leading-snug font-bold text-foreground [overflow-wrap:anywhere]"
+          className="min-w-0 text-[15px] font-bold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]"
         >
           진행 상태
         </h2>
-        <Badge variant={badgeVariant} className="shrink-0">
+        <Badge variant={badgeVariant} className="shrink-0 font-semibold shadow-2xs">
           {badgeText}
         </Badge>
       </div>
       {hasCandidates ? (
         <>
           <p
-            className="mt-2 min-w-0 text-base leading-relaxed font-semibold text-foreground [overflow-wrap:anywhere]"
+            className="mt-2 min-w-0 text-[15px] font-semibold leading-snug text-foreground [overflow-wrap:anywhere]"
             aria-live="polite"
           >
             {statusText}
           </p>
           {subText ? (
-            <p className="mt-1 min-w-0 text-base leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
+            <p className="mt-1 min-w-0 text-sm leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
               {subText}
             </p>
           ) : null}
-          <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-            참여 {participatedMemberCount}/{memberCount}명 · 의견{" "}
-            {totalOpinionCount}개
-          </p>
+          <div className="mt-3.5 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+            <p className="text-xs font-medium text-foreground-muted">
+              참여 {participatedMemberCount}/{memberCount}명 · 의견{" "}
+              {totalOpinionCount}개
+            </p>
+            <div
+              aria-hidden="true"
+              className="h-1.5 w-16 overflow-hidden rounded-full bg-border shrink-0"
+            >
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${participatePercent}%` }}
+              />
+            </div>
+          </div>
         </>
       ) : null}
     </section>
