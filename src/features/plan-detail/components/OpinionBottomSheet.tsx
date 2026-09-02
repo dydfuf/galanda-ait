@@ -22,6 +22,7 @@ interface OpinionBottomSheetProps {
   readonly initialReason?: string;
   readonly onSubmit: (reaction: ReactionType, reason?: string) => void;
   readonly isSubmitting?: boolean;
+  readonly isOffline?: boolean;
   readonly errorMessage?: string;
 }
 
@@ -48,6 +49,7 @@ export function OpinionBottomSheet({
   initialReason = "",
   onSubmit,
   isSubmitting = false,
+  isOffline = false,
   errorMessage,
 }: OpinionBottomSheetProps) {
   const [reaction, setReaction] = useState<ReactionType | undefined>(
@@ -67,7 +69,7 @@ export function OpinionBottomSheet({
   const isFormValid =
     Boolean(reaction) && (reaction !== "HARD" || reason.trim().length > 0);
   const handleSubmit = (): void => {
-    if (!reaction || !isFormValid || isSubmitting) return;
+    if (!reaction || !isFormValid || isSubmitting || isOffline) return;
     onSubmit(reaction, reaction === "HARD" ? reason.trim() : undefined);
   };
 
@@ -163,17 +165,26 @@ export function OpinionBottomSheet({
               {errorMessage}
             </p>
           )}
+          {isOffline && (
+            <p role="status" className="mt-4 text-sm text-foreground-muted">
+              오프라인 상태에서는 저장할 수 없습니다. 입력 내용은 유지됩니다.
+            </p>
+          )}
         </div>
 
         <DrawerFooter>
           <Button
             type="button"
             size="xl"
-            disabled={!isFormValid || isSubmitting}
+            disabled={!isFormValid || isSubmitting || isOffline}
             aria-busy={isSubmitting}
             onClick={handleSubmit}
           >
-            {isSubmitting ? "저장 중..." : "의견 저장하기"}
+            {isSubmitting
+              ? "저장 중..."
+              : isOffline
+                ? "온라인 연결 후 저장"
+                : "의견 저장하기"}
           </Button>
         </DrawerFooter>
       </DrawerContent>

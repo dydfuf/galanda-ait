@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const MAX_TITLE_LENGTH = 30;
 
@@ -20,6 +22,7 @@ export function TripCreatePage() {
   const { goBack, platformNavigation } = useAppNavigation();
   const inputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRef = useRef(false);
+  const isOnline = useOnlineStatus();
 
   const [title, setTitle] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -32,7 +35,15 @@ export function TripCreatePage() {
   const trimmedTitle = title.trim();
   const isValid = trimmedTitle.length >= 1 && trimmedTitle.length <= MAX_TITLE_LENGTH;
   const handleSubmit = async () => {
-    if (!isValid || createRoomMutation.isPending || isSubmittingRef.current) return;
+    if (
+      !isValid ||
+      !isOnline ||
+      createRoomMutation.isPending ||
+      isSubmittingRef.current
+    ) {
+      if (!isOnline) setErrorMsg(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
 
     isSubmittingRef.current = true;
     setErrorMsg(null);
@@ -140,17 +151,31 @@ export function TripCreatePage() {
         </PageBody>
       </main>
 
-      <BottomAction surface="content" className="border-border">
+      <BottomAction
+        surface="content"
+        className="border-border"
+        accessory={
+          !isOnline ? (
+            <p role="status" className="text-center text-sm text-foreground-muted">
+              {OFFLINE_MUTATION_MESSAGE}
+            </p>
+          ) : undefined
+        }
+      >
         <Button
           type="submit"
           form="trip-create-form"
           size="xl"
           aria-busy={createRoomMutation.isPending || undefined}
           aria-live="polite"
-          disabled={!isValid || createRoomMutation.isPending}
+          disabled={!isValid || createRoomMutation.isPending || !isOnline}
         >
           {createRoomMutation.isPending && <Spinner aria-hidden="true" />}
-          {createRoomMutation.isPending ? "여행방 만드는 중..." : "여행 만들고 계속"}
+          {createRoomMutation.isPending
+            ? "여행방 만드는 중..."
+            : isOnline
+              ? "여행 만들고 계속"
+              : "온라인 연결 후 만들기"}
         </Button>
       </BottomAction>
     </div>

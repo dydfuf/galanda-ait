@@ -35,6 +35,8 @@ import { useSessionQuery, sessionKeys } from "../../hooks/useSession.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const inviteKeys = {
   detail: (token: string) => ["invite", token] as const,
@@ -48,6 +50,7 @@ export function InvitePage(): JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
+  const isOnline = useOnlineStatus();
   const submittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const storageKey = `galanda:invite-nickname:${inviteToken ?? "invalid"}`;
@@ -153,8 +156,10 @@ export function InvitePage(): JSX.Element {
       (!summary.alreadyJoined && !nicknameIsValid) ||
       sessionQuery.isLoading ||
       sessionQuery.isError ||
+      !isOnline ||
       submittingRef.current
     ) {
+      if (!isOnline) setErrorMessage(OFFLINE_MUTATION_MESSAGE);
       return;
     }
 
@@ -189,7 +194,9 @@ export function InvitePage(): JSX.Element {
     ? "참여 가능 여부를 확인하고 있어요."
     : sessionQuery.isError
       ? "인증 서비스 재확인이 필요해요."
-      : !summary.alreadyJoined && !nicknameIsValid
+      : !isOnline
+        ? OFFLINE_MUTATION_MESSAGE
+        : !summary.alreadyJoined && !nicknameIsValid
         ? "닉네임을 입력해 주세요."
         : undefined;
 
@@ -342,14 +349,17 @@ export function InvitePage(): JSX.Element {
             (!summary.alreadyJoined && !nicknameIsValid) ||
             sessionQuery.isLoading ||
             sessionQuery.isError ||
-            isSubmitting
+            isSubmitting ||
+            !isOnline
           }
           onClick={() => void handleJoin()}
         >
           {isSubmitting && <Spinner aria-hidden="true" />}
           {isSubmitting
             ? "참여하는 중..."
-            : summary.alreadyJoined
+            : !isOnline
+              ? "온라인 연결 후 참여하기"
+              : summary.alreadyJoined
               ? "여행방으로 돌아가기"
               : "이 이름으로 참여하기"}
         </Button>

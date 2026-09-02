@@ -22,6 +22,8 @@ import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
 
 import { useTripRoomsQuery } from "../../plan-home/queries.ts";
 import { useImportExplorePlanMutation } from "../import-queries.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "@/app/offline-mutation.ts";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus.ts";
 
 /**
  * Explore snapshot import 대상 선택 drawer (RAON-262 DISC-8).
@@ -68,6 +70,7 @@ export function ExploreImportDrawer({
   onClose,
 }: ExploreImportDrawerProps) {
   const { data: session } = useSessionQuery();
+  const isOnline = useOnlineStatus();
   const { navigate } = useAppNavigation();
   const isGuest = session?.accountType === "GUEST";
 
@@ -127,6 +130,10 @@ export function ExploreImportDrawer({
     if (isPending) return;
     if (!option) return;
     if (!confirmedCopy) return;
+    if (!isOnline) {
+      setPreflightError(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
     // 이 지점 이후로는 어떤 preflight/mutation도 단일 실행만 허용한다.
     submitLockRef.current = true;
 
@@ -207,7 +214,8 @@ export function ExploreImportDrawer({
     !option ||
     !confirmedCopy ||
     (option === "NEW_TRIP" && isGuest) ||
-    (option === "EXISTING_TRIP" && !selectedTripId);
+    (option === "EXISTING_TRIP" && !selectedTripId) ||
+    !isOnline;
 
   return (
     <Drawer open={isOpen} onOpenChange={handleOpenChange} showSwipeHandle>

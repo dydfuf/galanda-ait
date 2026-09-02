@@ -31,6 +31,8 @@ import {
   getRecommendationActionContext,
   trackRecommendationEvent,
 } from "../common/recommendation.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 export function ItineraryPage(): JSX.Element {
   const params = useParams();
@@ -52,6 +54,7 @@ export function ItineraryPage(): JSX.Element {
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
   const [isChangeReviewOpen, setIsChangeReviewOpen] = useState(false);
   const acknowledgeMutation = useAcknowledgeItineraryMutation();
+  const isOnline = useOnlineStatus();
   const [conflictNotice, setConflictNotice] = useState<string>();
   const [drawerConflictNotice, setDrawerConflictNotice] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
@@ -206,7 +209,7 @@ export function ItineraryPage(): JSX.Element {
                     type="button"
                     size="sm"
                     disabled={
-                      acknowledgeMutation.isPending || isResolvingConflict
+                      acknowledgeMutation.isPending || isResolvingConflict || !isOnline
                     }
                     onClick={() => {
                       acknowledgeMutation.reset();
@@ -248,6 +251,11 @@ export function ItineraryPage(): JSX.Element {
                   )}
                 </p>
               )
+            )}
+            {!isOnline && (
+              <p className="mt-2 text-sm text-foreground-muted" role="status">
+                {OFFLINE_MUTATION_MESSAGE}
+              </p>
             )}
           </div>
         </section>
@@ -665,9 +673,15 @@ export function ItineraryPage(): JSX.Element {
             <Button
               type="button"
               size="xl"
-              disabled={acknowledgeMutation.isPending || isResolvingConflict}
+              disabled={
+                acknowledgeMutation.isPending || isResolvingConflict || !isOnline
+              }
               onClick={() => {
-                if (acknowledgeMutation.isPending || isResolvingConflict)
+                if (
+                  !isOnline ||
+                  acknowledgeMutation.isPending ||
+                  isResolvingConflict
+                )
                   return;
                 setConflictNotice(undefined);
                 setDrawerConflictNotice(undefined);

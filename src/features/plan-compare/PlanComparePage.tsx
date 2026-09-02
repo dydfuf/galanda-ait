@@ -51,6 +51,8 @@ import {
   getRecommendationActionContext,
   trackRecommendationEvent,
 } from "../common/recommendation.ts";
+import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
 const getPlanBadgeVariant = (
   planTag: string,
@@ -83,6 +85,7 @@ export function PlanComparePage() {
     refetch,
   } = useTripRoomDetailQuery(tripId);
   const confirmPlanMutation = useConfirmPlanMutation();
+  const isOnline = useOnlineStatus();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
@@ -195,6 +198,10 @@ export function PlanComparePage() {
         : "두 여행안의 핵심 구성이 같아요. 마음에 드는 안을 선택하세요.";
 
   const openConfirmSheet = (): void => {
+    if (!isOnline) {
+      setConfirmError(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
     if (
       !canSubmitConfirm({
         state: confirmState,
@@ -208,6 +215,11 @@ export function PlanComparePage() {
 
   const handleConfirmSubmit = async (): Promise<void> => {
     if (confirmPlanMutation.isPending || isResolvingConflict) return;
+
+    if (!isOnline) {
+      setConfirmError(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
 
     setConfirmError(null);
     try {
@@ -473,20 +485,34 @@ export function PlanComparePage() {
       {confirmState.kind === "CONFIRMABLE" && (
         <BottomAction
           accessory={
-            confirmError ? (
-              <span
-                role="alert"
-                className="block text-center text-base leading-relaxed text-destructive-strong"
-              >
-                {confirmError}
-              </span>
+            confirmError || !isOnline ? (
+              <>
+                {!isOnline && (
+                  <span
+                    role="status"
+                    className="block text-center text-base leading-relaxed text-foreground-muted"
+                  >
+                    {OFFLINE_MUTATION_MESSAGE}
+                  </span>
+                )}
+                {confirmError && (
+                  <span
+                    role="alert"
+                    className="block text-center text-base leading-relaxed text-destructive-strong"
+                  >
+                    {confirmError}
+                  </span>
+                )}
+              </>
             ) : undefined
           }
         >
           <Button
             type="button"
             size="xl"
-            disabled={confirmPlanMutation.isPending || isResolvingConflict}
+            disabled={
+              confirmPlanMutation.isPending || isResolvingConflict || !isOnline
+            }
             aria-busy={
               confirmPlanMutation.isPending || isResolvingConflict
                 ? "true"
@@ -496,7 +522,9 @@ export function PlanComparePage() {
           >
             {confirmPlanMutation.isPending
               ? "일정 확정 중..."
-              : `선택한 '${selectedPlan.title}'으로 여행 확정하기`}
+              : !isOnline
+                ? "온라인 연결 후 확정"
+                : `선택한 '${selectedPlan.title}'으로 여행 확정하기`}
           </Button>
         </BottomAction>
       )}
@@ -599,7 +627,9 @@ export function PlanComparePage() {
             <Button
               type="button"
               size="xl"
-              disabled={confirmPlanMutation.isPending || isResolvingConflict}
+              disabled={
+                confirmPlanMutation.isPending || isResolvingConflict || !isOnline
+              }
               aria-busy={
                 confirmPlanMutation.isPending || isResolvingConflict
                   ? "true"
