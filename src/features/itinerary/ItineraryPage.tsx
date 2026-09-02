@@ -159,14 +159,16 @@ export function ItineraryPage(): JSX.Element {
     itineraryState.itinerary.currentRevision;
 
   return (
-    <PageBody data-system-state="success">
+    <PageBody data-system-state="success" className="pb-24">
       {/* 1. 상단 확정 Summary */}
       <section
-        className="flex min-w-0 flex-col gap-2 bg-surface-content"
+        className="flex min-w-0 flex-col gap-2 bg-surface-content pt-2 pb-1"
         aria-label="확정 일정 요약"
       >
         <div className="mt-1 px-(--app-inline-padding)">
-          <Badge variant="success">최종 확정</Badge>
+          <Badge variant="success" className="font-semibold shadow-2xs">
+            최종 확정
+          </Badge>
         </div>
         <PageTitle
           className="py-1"
@@ -177,7 +179,7 @@ export function ItineraryPage(): JSX.Element {
 
       {/* 경로 레일 (RouteRail) */}
       {viewModel.route.length > 0 && (
-        <div className="px-(--app-inline-padding) pb-4">
+        <div className="px-(--app-inline-padding) pb-3">
           <RouteRail
             route={viewModel.route}
             differenceSummary={viewModel.differenceSummary}
@@ -191,7 +193,7 @@ export function ItineraryPage(): JSX.Element {
           className="mb-4 px-(--app-inline-padding)"
           aria-label="일정 변경 확인"
         >
-          <div className="min-w-0 rounded-2xl border border-border bg-surface-content p-4 [overflow-wrap:anywhere]">
+          <div className="min-w-0 rounded-2xl border border-border bg-surface-content p-4 shadow-xs [overflow-wrap:anywhere]">
             <p className="text-base font-bold leading-snug text-foreground [overflow-wrap:anywhere]">
               {itineraryState.itinerary.currentRevision > 1
                 ? `일정이 v${itineraryState.itinerary.currentRevision}로 변경됐어요`
@@ -266,7 +268,7 @@ export function ItineraryPage(): JSX.Element {
         <section className="mb-4" aria-label="확인 필요 예약 요약">
           <MobileList
             aria-label="확인 필요 예약"
-            className="overflow-hidden border-y border-border bg-surface-content sm:mx-(--app-inline-padding) sm:rounded-2xl sm:border"
+            className="overflow-hidden border-y border-border bg-surface-content shadow-xs sm:mx-(--app-inline-padding) sm:rounded-2xl sm:border"
             data-galanda-surface="content"
           >
             <MobileListItem
@@ -276,6 +278,7 @@ export function ItineraryPage(): JSX.Element {
               leading={
                 <Badge
                   variant={viewModel.hasNeedCheckDanger ? "danger" : "warning"}
+                  className="font-semibold shadow-2xs"
                 >
                   확인 필요
                 </Badge>
@@ -283,6 +286,7 @@ export function ItineraryPage(): JSX.Element {
               trailing={
                 <Badge
                   variant={viewModel.hasNeedCheckDanger ? "danger" : "warning"}
+                  className="font-semibold"
                 >
                   {viewModel.needCheckCount}건
                 </Badge>
@@ -311,15 +315,17 @@ export function ItineraryPage(): JSX.Element {
               className="mb-4 min-w-0"
               aria-labelledby={headingId}
             >
-              <h2
-                id={headingId}
-                className="px-(--app-inline-padding) pt-4 pb-2 text-lg font-bold leading-snug text-foreground [overflow-wrap:anywhere]"
-              >
-                {section.dateHeader}
-              </h2>
+              <div className="flex items-center px-(--app-inline-padding) pt-4 pb-2">
+                <h2
+                  id={headingId}
+                  className="text-base font-bold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]"
+                >
+                  {section.dateHeader}
+                </h2>
+              </div>
               <MobileList
                 aria-labelledby={headingId}
-                className="overflow-hidden border-y border-border bg-surface-content sm:mx-(--app-inline-padding) sm:rounded-2xl sm:border"
+                className="overflow-hidden border-y border-border bg-surface-content shadow-xs sm:mx-(--app-inline-padding) sm:rounded-2xl sm:border"
                 data-galanda-surface="content"
               >
                 {section.items.map((item) => {
@@ -330,31 +336,32 @@ export function ItineraryPage(): JSX.Element {
                     <MobileListItem
                       key={item.id}
                       chevron
-                      className="items-start"
+                      className="items-start transition-colors"
                       onClick={() => setSelectedItem(item)}
                       aria-label={`${title}, ${item.subText}`}
                       leading={
                         <Badge
                           variant={item.type === "STAY" ? "info" : "neutral"}
+                          className="font-semibold"
                         >
                           {item.type === "STAY" ? "숙소" : "이동"}
                         </Badge>
                       }
                       trailing={
-                        <Badge variant={item.statusTone}>
+                        <Badge variant={item.statusTone} className="font-semibold">
                           {item.statusLabel}
                         </Badge>
                       }
                     >
-                      <ItemTitle className="items-start text-base leading-snug">
+                      <ItemTitle className="items-start text-base font-semibold leading-snug">
                         <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                           {title}
                         </span>
                         {changedItemIds.has(item.id) && (
-                          <Badge variant="warning">변경됨</Badge>
+                          <Badge variant="warning" className="font-semibold">변경됨</Badge>
                         )}
                       </ItemTitle>
-                      <ItemDescription className="text-base leading-relaxed [overflow-wrap:anywhere]">
+                      <ItemDescription className="text-sm leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
                         {item.subText}
                       </ItemDescription>
                     </MobileListItem>

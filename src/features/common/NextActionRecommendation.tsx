@@ -17,7 +17,7 @@ import {
 } from "./recommendation.ts";
 
 const recommendationCardClassName =
-  "mx-(--app-inline-padding) mb-5 min-w-0 rounded-2xl border border-border bg-muted/45 p-4";
+  "mx-(--app-inline-padding) min-w-0 rounded-2xl border border-primary-border/60 bg-surface-raised p-4.5 shadow-xs transition-all";
 
 export function NextActionRecommendationPending({
   className,
@@ -31,11 +31,11 @@ export function NextActionRecommendationPending({
       aria-live="polite"
       className={cn(recommendationCardClassName, className)}
     >
-      <div className="flex items-center gap-2 text-primary">
-        <Sparkles aria-hidden="true" className="size-4 shrink-0" />
-        <h2 className="text-sm font-bold">다음으로 하면 좋은 일</h2>
+      <div className="flex items-center gap-1.5 text-primary">
+        <Sparkles aria-hidden="true" className="size-4 shrink-0 text-primary" />
+        <h2 className="text-xs font-bold tracking-wide">다음으로 하면 좋은 일</h2>
       </div>
-      <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
+      <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">
         여행 상태에 맞는 다음 행동을 확인하고 있어요.
       </p>
     </section>
@@ -90,29 +90,30 @@ export function NextActionRecommendation({
       aria-labelledby={titleId}
       className={cn(recommendationCardClassName, className)}
     >
-      <div className="flex items-center gap-2 text-primary">
-        <Sparkles aria-hidden="true" className="size-4 shrink-0" />
-        <h2 id={titleId} className="text-sm font-bold">
+      <div className="flex items-center gap-1.5 text-primary">
+        <Sparkles aria-hidden="true" className="size-4 shrink-0 text-primary" />
+        <h2 id={titleId} className="text-xs font-bold tracking-wide">
           다음으로 하면 좋은 일
         </h2>
       </div>
-      <p className="mt-2 text-[15px] leading-relaxed font-semibold text-foreground">
+      <p className="mt-2 min-w-0 text-[15px] font-semibold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]">
         {tripActionReasonPresentation[recommendation.primary.reasonCode]}
       </p>
       <Button
         type="button"
         size="lg"
-        className="mt-4 w-full"
+        className="mt-3.5 w-full font-semibold shadow-2xs active:scale-[0.99] transition-transform"
         onClick={() => selectAction(recommendation.primary.actionId, false)}
       >
         {tripActionPresentation[recommendation.primary.actionId].label}
       </Button>
-      <div className="mt-2 flex min-w-0 flex-wrap items-center justify-center gap-x-2">
+      <div className="mt-1.5 flex min-w-0 flex-wrap items-center justify-center gap-x-2">
         {alternative && (
           <Button
             type="button"
             variant="ghost"
-            className="min-w-0 whitespace-normal text-primary"
+            size="sm"
+            className="min-w-0 whitespace-normal text-xs font-semibold text-primary hover:text-primary hover:bg-primary-muted/60"
             onClick={() => selectAction(alternative, true)}
           >
             대신 {tripActionPresentation[alternative].label}
@@ -121,7 +122,8 @@ export function NextActionRecommendation({
         <Button
           type="button"
           variant="ghost"
-          className="text-muted-foreground"
+          size="sm"
+          className="text-xs font-medium text-muted-foreground hover:text-foreground"
           onClick={() => {
             trackRecommendationEvent(
               tripId,
