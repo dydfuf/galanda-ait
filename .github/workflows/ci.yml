@@ -44,7 +44,7 @@ jobs:
       MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/galanda_e2e
       BETTER_AUTH_SECRET: galanda-ci-e2e-secret-change-me
       BETTER_AUTH_URL: http://localhost:5173
-      PLAYWRIGHT_AUTH_SEED_FILE: ${{ runner.temp }}/galanda-e2e-auth.json
+      PLAYWRIGHT_AUTH_SEED_FILE: ${{ github.workspace }}/.e2e-auth-seed.json
 
     services:
       postgres:
