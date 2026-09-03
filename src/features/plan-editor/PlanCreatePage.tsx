@@ -673,8 +673,7 @@ export function PlanCreatePage(): JSX.Element {
       />
 
       {(!section || isWizardMode) &&
-        !editor.draftConflict &&
-        !recommendation && (
+        !editor.draftConflict && (
           <BottomAction
             accessory={
               editor.validation.firstError || errorMsg || !isOnline ? (

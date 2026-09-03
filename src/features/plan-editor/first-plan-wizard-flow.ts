@@ -532,3 +532,65 @@ export function mapValidationErrorToCursor(
 
   return { section: "basic", question: "title" };
 }
+
+export function getWizardQuestionSequence(
+  formData: PlanEditorFormData
+): ReadonlyArray<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> {
+  const list: Array<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> = [
+    { section: "basic", question: "title" },
+    { section: "basic", question: "proposal-reason" },
+    { section: "basic", question: "headcount" },
+  ];
+
+  const routeCount = Math.max(1, formData.routes.length);
+  for (let i = 0; i < routeCount; i++) {
+    list.push({ section: "route", question: "city", index: i });
+    list.push({ section: "route", question: "arrival-date", index: i });
+    list.push({ section: "route", question: "departure-date", index: i });
+    list.push({ section: "route", question: "add-city", index: i });
+  }
+
+  for (let i = 0; i < routeCount; i++) {
+    list.push({ section: "accommodation", question: "status", index: i });
+    const acc = formData.accommodations[i];
+    if (acc ? !acc.isSearching : true) {
+      list.push({ section: "accommodation", question: "hotel-name", index: i });
+    }
+  }
+
+  const totalLegs = routeCount + 1;
+  for (let i = 0; i < totalLegs; i++) {
+    list.push({ section: "transport", question: "endpoints", index: i });
+    list.push({ section: "transport", question: "status", index: i });
+    const tr = formData.transports[i];
+    if (tr && tr.bookingStatus !== "NOT_CHECKED") {
+      list.push({ section: "transport", question: "mode", index: i });
+      list.push({ section: "transport", question: "duration", index: i });
+    }
+  }
+
+  return list;
+}
+
+export function getWizardSubStepProgress(
+  cursor: FirstPlanWizardCursor,
+  formData: PlanEditorFormData
+): { current: number; total: number } | undefined {
+  if (cursor.section === "review" || cursor.returnToReview) {
+    return undefined;
+  }
+
+  const sequence = getWizardQuestionSequence(formData);
+  const foundIndex = sequence.findIndex(
+    (item) =>
+      item.section === cursor.section &&
+      item.question === cursor.question &&
+      (cursor.index === undefined || item.index === cursor.index)
+  );
+
+  const current = foundIndex !== -1 ? foundIndex + 1 : 1;
+  const total = sequence.length;
+
+  return { current, total };
+}
+

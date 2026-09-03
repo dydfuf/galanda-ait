@@ -112,7 +112,6 @@ describe("TripCreatePage", () => {
     expect(form).toHaveClass("rounded-2xl", "border-border", "bg-card");
     expect(bottomAction).toHaveAttribute("data-galanda-surface", "content");
     expect(input).toHaveAttribute("aria-describedby", "trip-title-help");
-    expect(input).toHaveAttribute("maxLength", "30");
     expect(submit).toBeDisabled();
     expect(screen.getByText("여행 이름을 입력해 주세요.")).toBeInTheDocument();
 
@@ -123,6 +122,35 @@ describe("TripCreatePage", () => {
     expect(
       screen.queryByText("여행 이름을 입력해 주세요."),
     ).not.toBeInTheDocument();
+  });
+
+  it("30자 초과 입력 시 경고 메시지를 표시하고 버튼을 비활성화한다", () => {
+    renderPage();
+    const input = screen.getByLabelText("여행 이름 *");
+    const submit = screen.getByRole("button", { name: "여행 만들고 계속" });
+
+    fireEvent.change(input, {
+      target: { value: "가".repeat(31) },
+    });
+
+    expect(submit).toBeDisabled();
+    expect(
+      screen.getByText("여행 이름은 최대 30자까지 입력할 수 있어요."),
+    ).toBeInTheDocument();
+  });
+
+  it("공백만 입력 시 카운터는 0으로 유지되고 공백 에러를 표시한다", () => {
+    renderPage();
+    const input = screen.getByLabelText("여행 이름 *");
+    const submit = screen.getByRole("button", { name: "여행 만들고 계속" });
+
+    fireEvent.change(input, { target: { value: "   " } });
+
+    expect(submit).toBeDisabled();
+    expect(
+      screen.getByText("공백을 제외하고 1자 이상 입력해주세요."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("0/30")).toBeInTheDocument();
   });
 
   it("pending 동안 label/aria-busy를 표시하고 중복 제출을 막으며 서버 resolve 이후에만 이동한다", async () => {

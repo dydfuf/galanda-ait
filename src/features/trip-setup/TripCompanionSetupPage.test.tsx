@@ -182,7 +182,7 @@ describe("TripCompanionSetupPage", () => {
     renderPage();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "여행 설정 닫기" }),
+      screen.getByRole("button", { name: "뒤로 가기" }),
     );
 
     expect(mocks.goBack).toHaveBeenCalledTimes(1);

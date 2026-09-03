@@ -204,7 +204,7 @@ describe("TripListPage", () => {
     const noPlanCard = screen.getByRole("link", {
       name: "여행안 없는 여행 여행 열기",
     });
-    expect(within(noPlanCard).getByText("여행안 0개")).toBeVisible();
+    expect(within(noPlanCard).getByText("여행안 0개 · 첫 여행안을 작성해주세요")).toBeVisible();
     const participantList = within(noPlanCard).getByRole("list", {
       name: "여행 참여자 1명",
     });

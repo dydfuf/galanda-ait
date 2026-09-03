@@ -194,4 +194,26 @@ describe("PlanCreatePage recommendation fallback", () => {
     ).toBeEnabled();
     expect(screen.getByRole("button", { name: "이전: 교통" })).toBeEnabled();
   });
+
+  it("AI 추천 카드가 표시되어도 검토·등록 CTA(여행안 제안 등록)가 하단에 항상 노출된다", async () => {
+    mockUseNextTripActionRecommendation.mockReturnValue({
+      data: {
+        id: "rec-1",
+        title: "숙소 확인 추천",
+        description: "숙소 예약 상태를 확인해보세요.",
+        actionType: "CHECK_BOOKING",
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useNextTripActionRecommendation>);
+
+    renderReview();
+
+    expect(
+      await screen.findByRole("button", { name: "여행안 제안 등록" }),
+    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "이전: 교통" })).toBeEnabled();
+  });
 });
+

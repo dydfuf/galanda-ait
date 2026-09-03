@@ -112,9 +112,9 @@ export function TripCompanionSetupPage() {
     >
       {!platformNavigation && (
         <PageHeader
-          title="새 여행 만들기"
+          title="여행 만들기"
           back={{
-            label: "여행 설정 닫기",
+            label: "뒤로 가기",
             onClick: () => void goBack(`/trips/${tripId}/plans`),
           }}
           surface="none"
@@ -170,7 +170,7 @@ export function TripCompanionSetupPage() {
 
               <PageTitle
                 title="함께 여행할 사람을 초대할까요?"
-                description="초대는 선택 사항이에요. 지금 공유하거나 여행방에서 나중에 다시 공유할 수 있어요."
+                description="여행방이 저장되었어요. 지금 초대하지 않아도 '내 여행'에서 언제든 다시 초대하거나 첫 여행안을 작성할 수 있어요."
                 className="pt-5 pb-2"
               />
 

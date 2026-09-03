@@ -196,7 +196,7 @@ function OngoingTripCard({
                 : `의견 참여 ${trip.opinionParticipantCount}/${trip.memberCount}명 · 여행안 ${trip.candidateCount}개`}
             </span>
           ) : lifecycle === "DATE_TBD" ? (
-            <span>여행안 0개</span>
+            <span>여행안 0개 · 첫 여행안을 작성해주세요</span>
           ) : (
             <span className="flex items-center gap-1 font-medium text-foreground">
               <CalendarDays className="size-3.5 text-primary" aria-hidden="true" />
