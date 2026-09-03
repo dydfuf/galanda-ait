@@ -2,40 +2,75 @@ import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils.ts";
 
-const TRIP_CREATION_STEPS = [
-  { id: "trip-info", label: "여행 정보" },
-  { id: "companions", label: "동행자" },
-  { id: "plan-basic", label: "기본 정보" },
-  { id: "plan-route", label: "여행 경로" },
-  { id: "plan-accommodation", label: "숙소" },
-  { id: "plan-transport", label: "교통" },
-  { id: "plan-review", label: "검토·등록" },
+export type TripCreationStep =
+  | "trip-info"
+  | "companions"
+  | "plan-basic"
+  | "plan-route"
+  | "plan-accommodation"
+  | "plan-transport"
+  | "plan-review";
+
+interface StageDefinition {
+  readonly id: "trip-room" | "companions" | "first-plan" | "review";
+  readonly label: string;
+  readonly steps: readonly TripCreationStep[];
+}
+
+export const TRIP_CREATION_STAGES: readonly StageDefinition[] = [
+  {
+    id: "trip-room",
+    label: "여행방",
+    steps: ["trip-info"],
+  },
+  {
+    id: "companions",
+    label: "동행자",
+    steps: ["companions"],
+  },
+  {
+    id: "first-plan",
+    label: "첫 여행안",
+    steps: ["plan-basic", "plan-route", "plan-accommodation", "plan-transport"],
+  },
+  {
+    id: "review",
+    label: "검토",
+    steps: ["plan-review"],
+  },
 ] as const;
 
-export type TripCreationStep = (typeof TRIP_CREATION_STEPS)[number]["id"];
-
-interface TripCreationProgressProps {
+export interface TripCreationProgressProps {
   readonly currentStep: TripCreationStep;
+  readonly subStepLabel?: string;
   readonly className?: string;
 }
 
 /**
- * 여행방 생성부터 첫 여행안 등록까지 이어지는 진행 표시예요.
- * 보이는 현재 단계명과 semantic ordered list를 함께 제공해 점만으로 상태를 전달하지 않아요.
+ * 여행방 생성부터 첫 여행안 등록까지 4개 메인 단계로 진행을 안내하는 컴포넌트예요.
+ * 여행방(1) → 동행자(2) → 첫 여행안(3) → 검토(4) 4단계를 시각적·스크린리더로 전달해요.
  */
 export function TripCreationProgress({
   currentStep,
+  subStepLabel,
   className,
 }: TripCreationProgressProps) {
-  const currentStepIndex = TRIP_CREATION_STEPS.findIndex(
-    (step) => step.id === currentStep,
+  const stageIndex = TRIP_CREATION_STAGES.findIndex((stage) =>
+    stage.steps.includes(currentStep),
   );
-  const current = TRIP_CREATION_STEPS[currentStepIndex]!;
+  const currentStage =
+    stageIndex >= 0 ? TRIP_CREATION_STAGES[stageIndex]! : TRIP_CREATION_STAGES[0]!;
+  const currentStageIndex = stageIndex >= 0 ? stageIndex : 0;
+
+  const displayedTitle = subStepLabel
+    ? `${currentStage.label} · ${subStepLabel}`
+    : currentStage.label;
+
   const progressRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     progressRef.current?.focus({ preventScroll: true });
-  }, [currentStep]);
+  }, [currentStep, subStepLabel]);
 
   return (
     <nav
@@ -54,21 +89,21 @@ export function TripCreationProgress({
         aria-atomic="true"
       >
         <p className="shrink-0 text-sm font-bold text-primary tabular-nums">
-          {currentStepIndex + 1}/{TRIP_CREATION_STEPS.length}
+          {currentStageIndex + 1}/{TRIP_CREATION_STAGES.length}
         </p>
         <p className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
-          {current.label}
+          {displayedTitle}
         </p>
       </div>
 
       <ol className="mt-3 flex min-w-0 items-center">
-        {TRIP_CREATION_STEPS.map((step, index) => {
-          const isCurrent = step.id === currentStep;
-          const isPrevious = index < currentStepIndex;
+        {TRIP_CREATION_STAGES.map((stage, index) => {
+          const isCurrent = index === currentStageIndex;
+          const isPrevious = index < currentStageIndex;
 
           return (
             <li
-              key={step.id}
+              key={stage.id}
               aria-current={isCurrent ? "step" : undefined}
               data-state={
                 isCurrent ? "current" : isPrevious ? "previous" : "upcoming"
@@ -85,7 +120,7 @@ export function TripCreationProgress({
                   isCurrent && "ring-4 ring-primary/15",
                 )}
               />
-              {index < TRIP_CREATION_STEPS.length - 1 && (
+              {index < TRIP_CREATION_STAGES.length - 1 && (
                 <span
                   aria-hidden="true"
                   className={cn(
@@ -95,7 +130,7 @@ export function TripCreationProgress({
                 />
               )}
               <span className="sr-only">
-                {index + 1}. {step.label}
+                {index + 1}. {stage.label}
                 {isCurrent ? " 현재 단계" : isPrevious ? " 이전 단계" : " 예정"}
               </span>
             </li>

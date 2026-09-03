@@ -183,6 +183,7 @@ function LocationProbe() {
   return (
     <>
       <output data-testid="location-path">{location.pathname}</output>
+      <output data-testid="location-search">{location.search}</output>
       <output data-testid="location-state">
         {JSON.stringify(location.state)}
       </output>
@@ -239,73 +240,103 @@ beforeEach(() => {
 });
 
 describe("PlanCreatePage", () => {
-  it("미완료 입력을 만들지 않고 각 Plan 단계를 미정으로 두어 검토까지 진행한다", async () => {
+  it("미완료 입력을 만들지 않고 각 Plan 단계를 건너뛰어 검토까지 진행한다", async () => {
+    // Draft with 1 route but skippable/empty optional fields
+    localStorage.setItem(
+      getPlanEditorDraftKey(hostId, tripId, "new"),
+      JSON.stringify({
+        ownerId: hostId,
+        title: "",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "제주", arrivalDate: "2026-10-01", departureDate: "2026-10-04" }],
+        accommodations: [{ id: "acc-1", city: "제주", period: "2026-10-01 ~ 2026-10-04", nights: 3, hotelName: "", isSearching: true, bookingStatus: "NOT_CHECKED" }],
+        transports: [
+          { id: "tr-1", fromCity: "김포", toCity: "제주", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" },
+          { id: "tr-2", fromCity: "제주", toCity: "김포", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" },
+        ],
+        updatedAt: "2026-08-18T00:00:00.000Z",
+      }),
+    );
+
     const mutateAsync = vi.fn().mockResolvedValue(createdRoom);
     mockUseCreatePlanMutation.mockReturnValue(mutationResult(mutateAsync));
     renderPage(`${summaryPath}/basic`);
 
-    const progress = screen.getByRole("navigation", {
+    const progress = await screen.findByRole("navigation", {
       name: "여행 만들기 진행 단계",
     });
-    expect(progress).toHaveTextContent("3/7");
-    expect(progress).toHaveTextContent("기본 정보");
-    expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent(
-      "3. 기본 정보 현재 단계",
+    expect(progress).toHaveTextContent("3/4");
+    expect(progress).toHaveTextContent("첫 여행안 · 기본 정보");
+
+    // 1. Basic - Title: 입력 후 다음
+    const titleInput = await screen.findByLabelText("여행안 제목 *");
+    fireEvent.change(titleInput, { target: { value: "제주 힐링 여행" } });
+    const nextFromTitle = screen.getByRole("button", { name: "다음" });
+    expect(nextFromTitle).toBeEnabled();
+    fireEvent.click(nextFromTitle);
+
+    // 2. Basic - Proposal Reason: 건너뛰기
+    await waitFor(() =>
+      expect(screen.getByLabelText("제안 이유 / 한 줄 요약 (선택)")).toBeInTheDocument(),
     );
+    const skipProposal = screen.getByRole("button", { name: "건너뛰기" });
+    fireEvent.click(skipProposal);
 
-    const skipBasic = screen.getByRole("button", {
-      name: "미정으로 두고 다음",
-    });
-    expect(skipBasic).toBeEnabled();
-    fireEvent.click(skipBasic);
+    // 3. Basic - Headcount: 다음: 여행 경로
+    await waitFor(() =>
+      expect(screen.getByRole("group", { name: /비용 기준 인원/ })).toBeInTheDocument(),
+    );
+    const nextFromHeadcount = screen.getByRole("button", { name: "다음: 여행 경로" });
+    fireEvent.click(nextFromHeadcount);
 
+    // 4. Route (city -> arrival-date -> departure-date -> add-city -> accommodation)
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
         `${summaryPath}/route`,
       ),
     );
-    expect(screen.getByTestId("location-state")).toHaveTextContent(
-      '"allowIncompleteWizardProgress":true',
-    );
-    expect(progress).toHaveTextContent("4/7");
-    fireEvent.click(
-      screen.getByRole("button", { name: "미정으로 두고 다음" }),
-    );
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("3/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("첫 여행안 · 여행 경로");
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음: 숙소" }));
 
+    // 5. Accommodation (status isSearching -> transport)
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
         `${summaryPath}/accommodation`,
       ),
     );
-    expect(progress).toHaveTextContent("5/7");
-    fireEvent.click(
-      screen.getByRole("button", { name: "미정으로 두고 다음" }),
-    );
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("3/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("첫 여행안 · 숙소");
+    fireEvent.click(screen.getByRole("button", { name: "다음: 교통" }));
 
+    // 6. Transport Leg 0 (endpoints -> status NOT_CHECKED -> Leg 1)
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
         `${summaryPath}/transport`,
       ),
     );
-    expect(progress).toHaveTextContent("6/7");
-    fireEvent.click(
-      screen.getByRole("button", { name: "미정으로 두고 다음" }),
-    );
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("3/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("첫 여행안 · 교통");
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
 
+    // Transport Leg 1 (endpoints -> status NOT_CHECKED -> review)
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "입력 내용 검토하기" }));
+
+    // 7. Review stage
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
     );
-    expect(progress).toHaveTextContent("7/7");
-    expect(screen.getByText("여행안 이름을 입력해주세요.")).toBeVisible();
-    expect(screen.getByText("방문 도시와 날짜를 정해주세요.")).toBeVisible();
-    expect(screen.getAllByText("아직 추가하지 않았어요")).toHaveLength(2);
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("4/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("검토");
     expect(
       screen.getByRole("button", { name: "여행안 제안 등록" }),
-    ).toBeDisabled();
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "여행안 제목을 입력해주세요.",
-    );
-    expect(mutateAsync).not.toHaveBeenCalled();
+    ).toBeEnabled();
   });
 
   it("미완료 section을 건너뛴 deep link는 첫 미완료 단계로 복귀시킨다", async () => {
@@ -313,14 +344,14 @@ describe("PlanCreatePage", () => {
 
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
-        `${summaryPath}/basic`,
+        `${summaryPath}/route`,
       ),
     );
     const progress = screen.getByRole("navigation", {
       name: "여행 만들기 진행 단계",
     });
-    expect(progress).toHaveTextContent("3/7");
-    expect(progress).toHaveTextContent("기본 정보");
+    expect(progress).toHaveTextContent("3/4");
+    expect(progress).toHaveTextContent("첫 여행안 · 여행 경로");
   });
 
   it("명시적인 이전 단계로 section을 거슬러 올라가고 basic에서 여행방으로 돌아간다", async () => {
@@ -334,7 +365,7 @@ describe("PlanCreatePage", () => {
     });
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "이전 단계" }),
+      await screen.findByRole("button", { name: "이전" }),
     );
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
@@ -342,7 +373,19 @@ describe("PlanCreatePage", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "이전 단계" }));
+    // From headcount -> proposal-reason -> title
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("제안 이유 / 한 줄 요약 (선택)")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("여행안 제목 *")).toBeInTheDocument(),
+    );
+
+    // From title -> plans
+    fireEvent.click(screen.getByRole("button", { name: "이전" }));
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
         `/trips/${tripId}/plans`,
@@ -358,48 +401,73 @@ describe("PlanCreatePage", () => {
     const progress = await screen.findByRole("navigation", {
       name: "여행 만들기 진행 단계",
     });
-    const basicAction = await screen.findByRole("button", {
-      name: "다음: 여행 경로",
-    });
-    await waitFor(() => expect(basicAction).toBeEnabled());
-    expect(progress).toHaveTextContent("3/7");
-    fireEvent.click(basicAction);
+    expect(progress).toHaveTextContent("3/4");
+    expect(progress).toHaveTextContent("첫 여행안 · 기본 정보");
 
-    const routeAction = await screen.findByRole("button", {
-      name: "다음: 숙소",
-    });
-    expect(screen.getByTestId("location-path")).toHaveTextContent(
-      `${summaryPath}/route`,
+    // Title -> Next
+    const titleAction = await screen.findByRole("button", { name: "다음" });
+    await waitFor(() => expect(titleAction).toBeEnabled());
+    fireEvent.click(titleAction);
+
+    // Proposal Reason -> Next
+    const proposalAction = await screen.findByRole("button", { name: "다음" });
+    expect(proposalAction).toBeEnabled();
+    fireEvent.click(proposalAction);
+
+    // Headcount -> Next
+    const headcountAction = await screen.findByRole("button", { name: "다음: 여행 경로" });
+    expect(headcountAction).toBeEnabled();
+    fireEvent.click(headcountAction);
+
+    // Route (city -> arrival-date -> departure-date -> add-city -> accommodation)
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/route`,
+      ),
     );
-    expect(progress).toHaveTextContent("4/7");
-    expect(routeAction).toBeEnabled();
-    fireEvent.click(routeAction);
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("3/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("첫 여행안 · 여행 경로");
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음: 숙소" }));
 
-    const accommodationAction = await screen.findByRole("button", {
-      name: "다음: 교통",
-    });
-    expect(screen.getByTestId("location-path")).toHaveTextContent(
-      `${summaryPath}/accommodation`,
+    // Accommodation (status -> hotel-name -> transport)
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/accommodation`,
+      ),
     );
-    expect(progress).toHaveTextContent("5/7");
-    expect(accommodationAction).toBeEnabled();
-    fireEvent.click(accommodationAction);
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("3/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("첫 여행안 · 숙소");
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음: 교통" }));
 
-    const transportAction = await screen.findByRole("button", {
-      name: "입력 내용 검토하기",
-    });
-    expect(screen.getByTestId("location-path")).toHaveTextContent(
-      `${summaryPath}/transport`,
+    // Transport Leg 0 (endpoints -> status -> mode -> duration -> Leg 1)
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `${summaryPath}/transport`,
+      ),
     );
-    expect(progress).toHaveTextContent("6/7");
-    expect(transportAction).toBeEnabled();
-    fireEvent.click(transportAction);
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("3/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("첫 여행안 · 교통");
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
 
+    // Transport Leg 1 (endpoints -> status -> mode -> duration -> review)
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "입력 내용 검토하기" }));
+
+    // Review stage
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
     );
-    expect(progress).toHaveTextContent("7/7");
-    expect(progress).toHaveTextContent("검토·등록");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("4/4");
+    expect(screen.getByRole("navigation", { name: "여행 만들기 진행 단계" })).toHaveTextContent("검토");
     expect(screen.getByRole("button", { name: "이전: 교통" })).toBeEnabled();
     expect(
       screen.getByRole("button", { name: "여행안 제안 등록" }),
@@ -478,7 +546,11 @@ describe("PlanCreatePage", () => {
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath),
     );
-    expect(screen.getByText("검토·등록")).toBeVisible();
+    const progress = screen.getByRole("navigation", {
+      name: "여행 만들기 진행 단계",
+    });
+    expect(progress).toHaveTextContent("4/4");
+    expect(progress).toHaveTextContent("검토");
     expect(
       screen.getByRole("button", { name: "여행안 제안 등록" }),
     ).toBeDisabled();
@@ -555,5 +627,153 @@ describe("PlanCreatePage", () => {
     expect(await screen.findByLabelText("여행안 제목 *")).toHaveValue(
       editedTitle,
     );
+  });
+
+  it("검토 화면에서 여행 경로 항목 수정 시 returnToReview 상태로 순차 진행 후 검토로 복귀한다", async () => {
+    writeValidDraft();
+    renderPage();
+
+    // Review stage
+    expect(await screen.findByRole("button", { name: "여행안 제안 등록" })).toBeEnabled();
+
+    // Click '여행 경로' jump link
+    fireEvent.click(screen.getByRole("button", { name: /여행 경로/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(`${summaryPath}/route`);
+      expect(screen.getByTestId("location-search")).toHaveTextContent("question=city&index=0&returnToReview=true");
+    });
+
+    // city -> arrival-date -> departure-date -> review
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search")).toHaveTextContent("question=arrival-date&index=0&returnToReview=true");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search")).toHaveTextContent("question=departure-date&index=0&returnToReview=true");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath);
+      expect(screen.getByTestId("location-search")).toHaveTextContent("");
+    });
+    expect(screen.getByRole("button", { name: "여행안 제안 등록" })).toBeEnabled();
+  });
+
+  it("검토 화면에서 숙소에 오류가 있을 때 숙소 수정 링크를 누르면 정확한 오류 질문으로 이동한다", async () => {
+    // Draft with missing hotel name
+    localStorage.setItem(
+      getPlanEditorDraftKey(hostId, tripId, "new"),
+      JSON.stringify({
+        ownerId: hostId,
+        ...validEditorData,
+        accommodations: [
+          {
+            id: "stay-1",
+            city: "도쿄와 하코네를 잇는 아주 긴 목적지 이름",
+            period: "2026-12-10 ~ 2026-12-12",
+            nights: 2,
+            hotelName: "", // missing
+            isSearching: false,
+            bookingStatus: "AVAILABLE",
+          },
+        ],
+        updatedAt: "2026-08-18T00:00:00.000Z",
+      }),
+    );
+
+    renderPage();
+
+    // Review stage should show disabled submit button
+    const submitBtn = await screen.findByRole("button", { name: "여행안 제안 등록" });
+    expect(submitBtn).toBeDisabled();
+
+    // Click '숙소' jump link
+    fireEvent.click(screen.getByRole("button", { name: /숙소/ }));
+
+    // Should jump straight to hotel-name question
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(`${summaryPath}/accommodation`);
+      expect(screen.getByTestId("location-search")).toHaveTextContent("question=hotel-name&index=0&returnToReview=true");
+    });
+
+    const hotelInput = await screen.findByLabelText("숙소명 / 호텔명 *");
+    fireEvent.change(hotelInput, { target: { value: "하코네 료칸" } });
+
+    // Click '다음' to return to review
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(summaryPath);
+      expect(screen.getByTestId("location-search")).toHaveTextContent("");
+    });
+    expect(screen.getByRole("button", { name: "여행안 제안 등록" })).toBeEnabled();
+  });
+
+  it("다른 참여자가 첫 여행안을 등록한 방에서 기존 초안을 작성 중인 경우 '대안 여행안 등록하기'로 등록된다", async () => {
+    // Room has an existing plan
+    mockUseTripRoomRawQuery.mockReturnValue(queryResult(createdRoom));
+
+    // User has an active draft with wizardCursor
+    localStorage.setItem(
+      getPlanEditorDraftKey(hostId, tripId, "new"),
+      JSON.stringify({
+        ownerId: hostId,
+        ...validEditorData,
+        title: "두 번째 대안 여행안",
+        updatedAt: "2026-08-18T00:00:00.000Z",
+        wizardCursor: {
+          section: "review",
+          question: "title",
+        },
+      }),
+    );
+
+    const alternativePlan: TripPlan = {
+      ...createdPlan,
+      id: PlanIdSchema.make("plan-alternative"),
+      title: "두 번째 대안 여행안",
+    };
+    const roomWithAlternative: TripRoom = {
+      ...createdRoom,
+      revision: RevisionSchema.make(9),
+      plans: [...createdRoom.plans, alternativePlan],
+    };
+
+    const mutateAsync = vi.fn().mockResolvedValue(roomWithAlternative);
+    mockUseCreatePlanMutation.mockReturnValue(mutationResult(mutateAsync));
+
+    renderPage({
+      pathname: summaryPath,
+      state: {
+        tripCreationWizard: true,
+        wizardReview: true,
+      },
+    });
+
+    const submitBtn = await screen.findByRole("button", { name: "대안 여행안 등록하기" });
+    expect(submitBtn).toBeEnabled();
+
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          roomId: tripId,
+          expectedRevision: 8,
+          title: "두 번째 대안 여행안",
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/${alternativePlan.id}`,
+      );
+    });
+    expect(screen.getByText("완료 화면")).toBeVisible();
   });
 });

@@ -2,6 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { getPlanPublishValidationErrors, getStayNightCount, type AccommodationSnapshot, type CityStay, type TransportSnapshot, type TripPlan, type TripRoom } from "../../../core/domain/room.ts";
 import { calculatePlanCost } from "../../../core/calculations/plan-cost.ts";
 import { calculatePlanDifference } from "../../../core/calculations/plan-diff.ts";
+import {
+  isFirstPlanWizardQuestion,
+  isFirstPlanWizardSection,
+  type FirstPlanWizardCursor,
+} from "../first-plan-wizard-flow.ts";
 
 export interface PlanEditorFormData {
   readonly title: string;
@@ -82,6 +87,7 @@ export interface StoredPlanEditorDraft extends PlanEditorFormData {
   readonly ownerId: string;
   readonly basePlanFingerprint?: string;
   readonly updatedAt: string;
+  readonly wizardCursor?: FirstPlanWizardCursor;
 }
 
 export function getPlanEditorInitialData(
@@ -185,6 +191,16 @@ function isTransport(value: unknown): boolean {
     hasPriceRange(value.priceRange);
 }
 
+function isWizardCursor(value: unknown): value is FirstPlanWizardCursor {
+  return (
+    isRecord(value) &&
+    isFirstPlanWizardSection(value.section) &&
+    isFirstPlanWizardQuestion(value.question) &&
+    (value.index === undefined || (Number.isInteger(value.index) && Number(value.index) >= 0)) &&
+    (value.returnToReview === undefined || typeof value.returnToReview === "boolean")
+  );
+}
+
 export function parsePlanEditorDraft(raw: string | null): StoredPlanEditorDraft | undefined {
   if (!raw) return undefined;
 
@@ -210,7 +226,8 @@ export function parsePlanEditorDraft(raw: string | null): StoredPlanEditorDraft 
       !draft.transports.every(isTransport) ||
       typeof draft.updatedAt !== "string" ||
       (draft.basePlanFingerprint !== undefined && typeof draft.basePlanFingerprint !== "string") ||
-      (draft.clonedFromPlanId !== undefined && typeof draft.clonedFromPlanId !== "string")
+      (draft.clonedFromPlanId !== undefined && typeof draft.clonedFromPlanId !== "string") ||
+      (draft.wizardCursor !== undefined && !isWizardCursor(draft.wizardCursor))
     ) {
       return undefined;
     }
@@ -226,7 +243,8 @@ export function usePlanEditorState(
   initialPlan?: TripPlan,
   cloneFromPlan?: TripPlan,
   userId?: string,
-  pauseDraftSave = false
+  pauseDraftSave = false,
+  wizardCursor?: FirstPlanWizardCursor
 ) {
   const initialData = useMemo(
     () => getPlanEditorInitialData(room, initialPlan, cloneFromPlan),
@@ -238,6 +256,7 @@ export function usePlanEditorState(
   const [routes, setRoutes] = useState<ReadonlyArray<CityStay>>(initialData.routes);
   const [accommodations, setAccommodations] = useState<ReadonlyArray<AccommodationSnapshot>>(initialData.accommodations);
   const [transports, setTransports] = useState<ReadonlyArray<TransportSnapshot>>(initialData.transports);
+  const [savedWizardCursor, setSavedWizardCursor] = useState<FirstPlanWizardCursor | undefined>();
   const [draftSaveStatus, setDraftSaveStatus] = useState<DraftSaveStatus>("IDLE");
   const [hydratedEditorId, setHydratedEditorId] = useState<string>();
   const [draftConflict, setDraftConflict] = useState<StoredPlanEditorDraft>();
@@ -256,6 +275,7 @@ export function usePlanEditorState(
     setRoutes(initialData.routes);
     setAccommodations(initialData.accommodations);
     setTransports(initialData.transports);
+    setSavedWizardCursor(undefined);
     setDraftSaveStatus("IDLE");
   }, [initialData]);
 
@@ -281,6 +301,7 @@ export function usePlanEditorState(
       hasDraftBaseChanged(draft.basePlanFingerprint, basePlanFingerprint)
     ) {
       resetToInitialData();
+      setSavedWizardCursor(draft.wizardCursor);
       setDraftConflict(draft);
     } else if (draft && draft.ownerId === userId && draft.clonedFromPlanId === cloneFromPlan?.id) {
       setTitle(draft.title);
@@ -289,9 +310,11 @@ export function usePlanEditorState(
       setRoutes(draft.routes);
       setAccommodations(draft.accommodations);
       setTransports(draft.transports);
+      setSavedWizardCursor(draft.wizardCursor);
       setDraftSaveStatus("SAVED");
     } else {
       resetToInitialData();
+      setSavedWizardCursor(undefined);
     }
     setHydratedEditorId(editorId);
   }, [draftKey, editorId, hydratedEditorId, cloneFromPlan, userId, basePlanFingerprint, resetToInitialData]);
@@ -351,6 +374,11 @@ export function usePlanEditorState(
       const next = [...prev];
       if (next[index]) {
         next[index] = { ...next[index], ...updated };
+      } else {
+        while (next.length < index) {
+          next.push({ city: "", arrivalDate: "", departureDate: "" });
+        }
+        next[index] = { city: "", arrivalDate: "", departureDate: "", ...updated };
       }
       return next;
     });
@@ -403,7 +431,7 @@ export function usePlanEditorState(
     if (!draftKey || !userId || hydratedEditorId !== editorId || draftConflict || pauseDraftSave) return;
     setDraftSaveStatus("SAVING");
     const updatedAt = new Date().toISOString();
-    const draftData = {
+    const draftData: StoredPlanEditorDraft = {
       ownerId: userId,
       basePlanFingerprint,
       title,
@@ -414,10 +442,27 @@ export function usePlanEditorState(
       transports,
       clonedFromPlanId: cloneFromPlan?.id,
       updatedAt,
+      ...(wizardCursor ? { wizardCursor } : {}),
     };
     const status = savePlanEditorDraft(localStorage, draftKey, draftData);
     setDraftSaveStatus(status);
-  }, [draftKey, editorId, hydratedEditorId, draftConflict, pauseDraftSave, userId, basePlanFingerprint, cloneFromPlan, title, proposalReason, baseHeadcount, routes, accommodations, transports]);
+  }, [
+    draftKey,
+    editorId,
+    hydratedEditorId,
+    draftConflict,
+    pauseDraftSave,
+    userId,
+    basePlanFingerprint,
+    cloneFromPlan,
+    title,
+    proposalReason,
+    baseHeadcount,
+    routes,
+    accommodations,
+    transports,
+    wizardCursor,
+  ]);
 
   const discardDraft = useCallback(() => {
     if (!draftKey) return;
@@ -426,6 +471,7 @@ export function usePlanEditorState(
     } catch {
       // ignore
     }
+    setSavedWizardCursor(undefined);
   }, [draftKey]);
 
   const clearDraft = useCallback(() => {
@@ -441,6 +487,9 @@ export function usePlanEditorState(
     setRoutes(draftConflict.routes);
     setAccommodations(draftConflict.accommodations);
     setTransports(draftConflict.transports);
+    if (draftConflict.wizardCursor) {
+      setSavedWizardCursor(draftConflict.wizardCursor);
+    }
     markDraftSaving();
     setDraftConflict(undefined);
   }, [draftConflict, markDraftSaving]);
@@ -451,13 +500,16 @@ export function usePlanEditorState(
     setDraftConflict(undefined);
   }, [discardDraft, resetToInitialData]);
 
-  const replaceFormData = useCallback((data: PlanEditorFormData) => {
+  const replaceFormData = useCallback((data: PlanEditorFormData, cursor?: FirstPlanWizardCursor) => {
     setTitle(data.title);
     setProposalReason(data.proposalReason);
     setBaseHeadcount(data.baseHeadcount);
     setRoutes(data.routes);
     setAccommodations(data.accommodations);
     setTransports(data.transports);
+    if (cursor) {
+      setSavedWizardCursor(cursor);
+    }
     markDraftSaving();
   }, [markDraftSaving]);
 
@@ -487,6 +539,7 @@ export function usePlanEditorState(
     validation,
     draftSaveStatus,
     isDraftHydrated: !editorId || hydratedEditorId === editorId,
+    savedWizardCursor,
     clearDraft,
     discardDraft,
     draftConflict: Boolean(draftConflict),

@@ -299,6 +299,11 @@ describe("trip creation navigation history", () => {
         `${planEditorPath}/basic`,
       ),
     );
+    fireEvent.change(await screen.findByLabelText("여행안 제목 *"), {
+      target: { value: "제주 힐링 코스" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "다음: 여행 경로" }),
     );
@@ -308,7 +313,10 @@ describe("trip creation navigation history", () => {
         `${planEditorPath}/route`,
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "다음: 숙소" }));
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음: 숙소" }));
 
     await waitFor(() =>
       expect(screen.getByTestId("location-path")).toHaveTextContent(
@@ -322,8 +330,11 @@ describe("trip creation navigation history", () => {
         `${planEditorPath}/transport`,
       ),
     );
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "입력 내용 검토하기" }),
+      await screen.findByRole("button", { name: "입력 내용 검토하기" }),
     );
 
     await waitFor(() =>

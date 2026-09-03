@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTripRoomRawQuery } from "../plan-detail/queries.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
@@ -38,6 +38,11 @@ import {
   type RecommendationActionContext,
 } from "../common/recommendation.ts";
 import { shareTripInvite } from "../invite/share-trip-invite.ts";
+import {
+  getPlanEditorDraftKey,
+  parsePlanEditorDraft,
+} from "../plan-editor/hooks/usePlanEditorState.ts";
+import { serializeWizardCursor } from "../plan-editor/first-plan-wizard-flow.ts";
 
 export function PlanHomePage() {
   const params = useParams();
@@ -73,6 +78,23 @@ export function PlanHomePage() {
     rawRoom?.revision,
     Boolean(rawRoom && session),
   );
+
+  const userDraftKey =
+    session?.participantId && tripId
+      ? getPlanEditorDraftKey(session.participantId, tripId, "new")
+      : undefined;
+  const userDraft = useMemo(() => {
+    if (!userDraftKey || !session?.participantId) return undefined;
+    try {
+      const parsed = parsePlanEditorDraft(localStorage.getItem(userDraftKey));
+      if (parsed && parsed.ownerId === session.participantId) {
+        return parsed;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }, [userDraftKey, session?.participantId]);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -204,6 +226,19 @@ export function PlanHomePage() {
         navigate(`/trips/${tripId}/itinerary`, { replace: true });
         return;
       case "create-first":
+        if (userDraft?.wizardCursor) {
+          const { pathname, search } = serializeWizardCursor(
+            userDraft.wizardCursor,
+            tripId,
+          );
+          navigate(`${pathname}${search}`, {
+            state: {
+              tripCreationWizard: true,
+              wizardEntrySource: "plans",
+            },
+          });
+          return;
+        }
         navigate(`/trips/${tripId}/plans/new/basic`, {
           state: {
             tripCreationWizard: true,
@@ -286,7 +321,13 @@ export function PlanHomePage() {
                 ? "첫 여행안을 만들어 친구들과 함께 골라보세요."
                 : "여행 참여자가 첫 여행안을 만들면 여기에 표시돼요."
             }
-            actionText={hasRecommendationSurface ? undefined : cta.primaryLabel ?? undefined}
+            actionText={
+              hasRecommendationSurface
+                ? undefined
+                : userDraft?.wizardCursor && canCreatePlan
+                  ? "이어서 작성하기"
+                  : (cta.primaryLabel ?? undefined)
+            }
             onAction={hasRecommendationSurface || !cta.primaryKind ? undefined : runPrimaryCta}
           />
         ) : (
