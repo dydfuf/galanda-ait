@@ -292,6 +292,15 @@ describe("normalizeWizardCursor", () => {
     expect(cursor).toEqual({ section: "accommodation", question: "status", index: 1 });
   });
 
+  it("clamps hotel-name to status when accommodation array is empty (defaults to searching)", () => {
+    const emptyAccForm = createMockFormData({ accommodations: [] });
+    const cursor = normalizeWizardCursor(
+      { section: "accommodation", question: "hotel-name", index: 0 },
+      emptyAccForm
+    );
+    expect(cursor).toEqual({ section: "accommodation", question: "status", index: 0 });
+  });
+
   it("clamps mode/duration to status when transport is bookingStatus: NOT_CHECKED", () => {
     const cursor = normalizeWizardCursor(
       { section: "transport", question: "duration", index: 1 },
@@ -377,6 +386,13 @@ describe("getNextWizardCursor", () => {
     });
     // Skips hotel-name when searching
     expect(getNextWizardCursor({ section: "accommodation", question: "status", index: 0 }, searchingStayForm))
+      .toEqual({ section: "transport", question: "endpoints", index: 0 });
+
+    const unpopulatedStayForm = createMockFormData({
+      accommodations: [],
+    });
+    // Defaults to isSearching: true, skipping hotel-name when unpopulated
+    expect(getNextWizardCursor({ section: "accommodation", question: "status", index: 0 }, unpopulatedStayForm))
       .toEqual({ section: "transport", question: "endpoints", index: 0 });
   });
 
@@ -550,6 +566,15 @@ describe("getPreviousWizardCursor", () => {
   it("steps backward from transport(0) to last accommodation stop (considering searching status)", () => {
     expect(getPreviousWizardCursor({ section: "transport", question: "endpoints", index: 0 }, multiStopForm))
       .toEqual({ section: "accommodation", question: "status", index: 1 });
+  });
+
+  it("steps backward from transport(0) to accommodation status when accommodations array is empty", () => {
+    const noAccForm = createMockFormData({
+      routes: [{ city: "제주", arrivalDate: "2026-10-01", departureDate: "2026-10-04" }],
+      accommodations: [],
+    });
+    expect(getPreviousWizardCursor({ section: "transport", question: "endpoints", index: 0 }, noAccForm))
+      .toEqual({ section: "accommodation", question: "status", index: 0 });
   });
 
   it("steps backward from transport(2) to transport(1) (considering unchecked status)", () => {

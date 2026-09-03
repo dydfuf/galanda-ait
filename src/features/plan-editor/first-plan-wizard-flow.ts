@@ -189,7 +189,9 @@ export function normalizeWizardCursor(
       const rawIdx = typeof cursor.index === "number" && !Number.isNaN(cursor.index) ? cursor.index : 0;
       index = Math.max(0, Math.min(rawIdx, maxAccIndex));
 
-      if (question === "hotel-name" && formData.accommodations[index]?.isSearching === true) {
+      const stay = formData.accommodations[index];
+      const isSearching = stay ? stay.isSearching === true : true;
+      if (question === "hotel-name" && isSearching) {
         question = "status";
       }
       break;
@@ -302,7 +304,8 @@ export function getNextWizardCursor(
 
       if (norm.question === "status") {
         const stay = formData.accommodations[idx];
-        if (stay?.isSearching === true) {
+        const isSearching = stay ? stay.isSearching === true : true;
+        if (isSearching) {
           return isLastStay
             ? { section: "transport", question: "endpoints", index: 0 }
             : { section: "accommodation", question: "status", index: idx + 1 };
@@ -329,7 +332,8 @@ export function getNextWizardCursor(
 
       if (norm.question === "status") {
         const tr = formData.transports[idx];
-        if (tr?.bookingStatus === "NOT_CHECKED") {
+        const isNotChecked = tr ? tr.bookingStatus === "NOT_CHECKED" : true;
+        if (isNotChecked) {
           return isLastLeg
             ? { section: "review", question: "title" }
             : { section: "transport", question: "endpoints", index: idx + 1 };
@@ -394,7 +398,8 @@ export function getPreviousWizardCursor(
       if (norm.question === "status") {
         if (idx > 0) {
           const prevStay = formData.accommodations[idx - 1];
-          if (prevStay?.isSearching === true) {
+          const isSearching = prevStay ? prevStay.isSearching === true : true;
+          if (isSearching) {
             return { section: "accommodation", question: "status", index: idx - 1 };
           }
           return { section: "accommodation", question: "hotel-name", index: idx - 1 };
@@ -413,14 +418,16 @@ export function getPreviousWizardCursor(
       if (norm.question === "endpoints") {
         if (idx > 0) {
           const prevLeg = formData.transports[idx - 1];
-          if (prevLeg?.bookingStatus === "NOT_CHECKED") {
+          const isNotChecked = prevLeg ? prevLeg.bookingStatus === "NOT_CHECKED" : true;
+          if (isNotChecked) {
             return { section: "transport", question: "status", index: idx - 1 };
           }
           return { section: "transport", question: "duration", index: idx - 1 };
         }
         const lastStayIndex = Math.max(0, formData.routes.length - 1);
         const lastStay = formData.accommodations[lastStayIndex];
-        if (lastStay?.isSearching === true) {
+        const isSearching = lastStay ? lastStay.isSearching === true : true;
+        if (isSearching) {
           return { section: "accommodation", question: "status", index: lastStayIndex };
         }
         return { section: "accommodation", question: "hotel-name", index: lastStayIndex };
@@ -431,7 +438,8 @@ export function getPreviousWizardCursor(
     case "review": {
       const lastLegIndex = formData.routes.length;
       const lastLeg = formData.transports[lastLegIndex];
-      if (lastLeg?.bookingStatus === "NOT_CHECKED") {
+      const isNotChecked = lastLeg ? lastLeg.bookingStatus === "NOT_CHECKED" : true;
+      if (isNotChecked) {
         return { section: "transport", question: "status", index: lastLegIndex };
       }
       return { section: "transport", question: "duration", index: lastLegIndex };

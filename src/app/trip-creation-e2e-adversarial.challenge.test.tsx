@@ -550,4 +550,244 @@ describe("End-to-End Adversarial Trip Creation Flow", () => {
     };
     expect(mutationArgs.expectedRevision).toBe(2);
   });
+
+  it("5. Issue #108: default '알아보는 중' accommodation commits cleanly without card click and unblocks review, while blank hotel name is blocked", async () => {
+    localStorage.clear();
+    currentRoom = { ...baseRoom, plans: [] };
+
+    render(<TestApp initialEntry={`/trips/${tripId}/plans/new/basic?question=title`} />);
+
+    // Basic Info
+    const titleInput = await screen.findByLabelText("여행안 제목 *");
+    fireEvent.change(titleInput, { target: { value: "제주도 힐링 여행" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    // Proposal Reason (skip)
+    await screen.findByLabelText("제안 이유 / 한 줄 요약 (선택)");
+    fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
+
+    // Headcount
+    await screen.findByRole("group", { name: /비용 기준 인원/ });
+    fireEvent.click(screen.getByRole("button", { name: "다음: 여행 경로" }));
+
+    // Route - City 0
+    const cityInput = await screen.findByLabelText("방문 도시 *");
+    fireEvent.change(cityInput, { target: { value: "제주" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    // Route - Arrival Date 0
+    const arrivalInput = await screen.findByLabelText("도착일 *");
+    fireEvent.change(arrivalInput, { target: { value: "2026-10-15" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    // Route - Departure Date 0
+    const departureInput = await screen.findByLabelText("출발일 *");
+    fireEvent.change(departureInput, { target: { value: "2026-10-18" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    // Route - Add City Prompt -> Next to Accommodation
+    const nextAccBtn = await screen.findByRole("button", { name: "다음: 숙소" });
+    fireEvent.click(nextAccBtn);
+
+    // Accommodation - Status 0
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new/accommodation`,
+      ),
+    );
+    // Crucial check from Issue #108: User DOES NOT click the radio card!
+    // "알아보는 중" is already checked by default. User directly clicks "다음: 교통".
+    const nextTrBtn = await screen.findByRole("button", { name: "다음: 교통" });
+    fireEvent.click(nextTrBtn);
+
+    // Transport - Leg 0
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new/transport`,
+      ),
+    );
+    // Endpoints Leg 0: 서울 -> 제주
+    const fromInputLeg0 = await screen.findByLabelText("출발지 *");
+    fireEvent.change(fromInputLeg0, { target: { value: "서울" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    // Status Leg 0: 아직 안 정함
+    const notCheckedLeg0 = await screen.findByRole("radio", { name: /아직 안 정함/ });
+    fireEvent.click(notCheckedLeg0);
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    // Transport - Leg 1 (Return: 제주 -> 서울)
+    const toInputLeg1 = await screen.findByLabelText("도착지 *");
+    fireEvent.change(toInputLeg1, { target: { value: "서울" } });
+    fireEvent.click(await screen.findByRole("button", { name: "다음" }));
+    // Status Leg 1: 아직 안 정함 -> Review
+    const notCheckedLeg1 = await screen.findByRole("radio", { name: /아직 안 정함/ });
+    fireEvent.click(notCheckedLeg1);
+    fireEvent.click(screen.getByRole("button", { name: "입력 내용 검토하기" }));
+
+    // Stage 4: Review
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new`,
+      ),
+    );
+
+    // Verify Issue #108 blocker is RESOLVED:
+    // 1) NO "각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요." validation error banner
+    expect(
+      screen.queryByText(/각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요/),
+    ).not.toBeInTheDocument();
+
+    // 2) Can successfully publish the plan!
+    const publishBtn = screen.getByRole("button", { name: "여행안 제안 등록" });
+    expect(publishBtn).toBeEnabled();
+    fireEvent.click(publishBtn);
+
+    await waitFor(() => expect(mocks.createPlan).toHaveBeenCalledTimes(1));
+    const payload = mocks.createPlan.mock.calls[0][0];
+    expect(payload.accommodations).toHaveLength(1);
+    expect(payload.accommodations[0]).toMatchObject({
+      city: "제주",
+      nights: 3,
+      isSearching: true,
+      hotelName: "",
+    });
+  });
+
+  it("6. Issue #108: selecting '정했어요' strictly blocks blank or whitespace hotel name at step 3, while filling hotel name succeeds", async () => {
+    localStorage.clear();
+    currentRoom = { ...baseRoom, plans: [] };
+
+    // Seed draft with basic info and route so we start right at accommodation status
+    const draftKey = `galanda_draft_${hostId}_${tripId}_new`;
+    localStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        ownerId: hostId,
+        title: "제주도 탐방",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "제주", arrivalDate: "2026-10-15", departureDate: "2026-10-18" }],
+        accommodations: [],
+        transports: [],
+        wizardCursor: { section: "accommodation", question: "status", index: 0 },
+        updatedAt: "2026-09-03T00:00:00.000Z",
+      }),
+    );
+
+    render(<TestApp initialEntry={`/trips/${tripId}/plans/new/accommodation?question=status&index=0`} />);
+
+    // Select "정했어요"
+    const decidedRadio = await screen.findByRole("radio", { name: /정했어요/ });
+    fireEvent.click(decidedRadio);
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    // Now at accommodation/hotel-name
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search")).toHaveTextContent("question=hotel-name"),
+    );
+
+    const hotelInput = await screen.findByLabelText("숙소명 / 호텔명 *");
+    const nextBtn = screen.getByRole("button", { name: "다음: 교통" });
+
+    // 1) Empty hotel name -> Button is strictly disabled at step 3!
+    expect(hotelInput).toHaveValue("");
+    expect(nextBtn).toBeDisabled();
+
+    // 2) Whitespace only -> Button remains strictly disabled!
+    fireEvent.change(hotelInput, { target: { value: "    " } });
+    expect(nextBtn).toBeDisabled();
+
+    // 3) Press Enter while empty/whitespace -> inline error shown and does NOT advance
+    fireEvent.keyDown(hotelInput, { key: "Enter", isComposing: false });
+    expect(await screen.findByText("숙소 이름을 입력해주세요.")).toBeInTheDocument();
+    expect(screen.getByTestId("location-search")).toHaveTextContent("question=hotel-name");
+
+    // 4) Valid hotel name -> Button is enabled and advances to transport
+    fireEvent.change(hotelInput, { target: { value: "그랜드 하얏트 제주" } });
+    expect(nextBtn).toBeEnabled();
+    fireEvent.click(nextBtn);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new/transport`,
+      ),
+    );
+  });
+
+  it("7. Issue #108: jumping from review to edit accommodation and returning preserves '알아보는 중' without validation deadlock", async () => {
+    localStorage.clear();
+    currentRoom = { ...baseRoom, plans: [] };
+
+    // Seed draft in Review state with 1 route, 2 transports, but NO accommodation
+    const draftKey = `galanda_draft_${hostId}_${tripId}_new`;
+    localStorage.setItem(
+      draftKey,
+      JSON.stringify({
+        ownerId: hostId,
+        title: "제주도 탐방",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "제주", arrivalDate: "2026-10-15", departureDate: "2026-10-18" }],
+        accommodations: [],
+        transports: [
+          { id: "tr-1", fromCity: "서울", toCity: "제주", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" },
+          { id: "tr-2", fromCity: "제주", toCity: "서울", mode: "", hasTransfer: false, durationText: "", bookingStatus: "NOT_CHECKED" },
+        ],
+        wizardCursor: { section: "review", question: "title" },
+        updatedAt: "2026-09-03T00:00:00.000Z",
+      }),
+    );
+
+    render(<TestApp initialEntry={`/trips/${tripId}/plans/new`} />);
+
+    // Initially at Review stage
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new`,
+      ),
+    );
+
+    // Jump to edit accommodation by clicking accommodation item
+    const accItem = await screen.findByText("숙소");
+    fireEvent.click(accItem);
+
+    // Now in Accommodation status step with returnToReview=true
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new/accommodation`,
+      ),
+    );
+    expect(screen.getByTestId("location-search")).toHaveTextContent("returnToReview=true");
+
+    // Click "검토로 돌아가기" (the back button in review jump mode)
+    const returnBtn = await screen.findByRole("button", { name: "검토로 돌아가기" });
+    fireEvent.click(returnBtn);
+
+    // Should return to Review screen
+    await waitFor(() =>
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${tripId}/plans/new`,
+      ),
+    );
+
+    // Check that Issue #108 error is resolved:
+    expect(
+      screen.queryByText(/각 방문 도시의 숙소 또는 숙소 찾는 중 상태를 추가해주세요/),
+    ).not.toBeInTheDocument();
+
+    // Publish succeeds
+    const publishBtn = screen.getByRole("button", { name: "여행안 제안 등록" });
+    expect(publishBtn).toBeEnabled();
+    fireEvent.click(publishBtn);
+
+    await waitFor(() => expect(mocks.createPlan).toHaveBeenCalledTimes(1));
+    const payload = mocks.createPlan.mock.calls[0][0];
+    expect(payload.accommodations).toHaveLength(1);
+    expect(payload.accommodations[0]).toMatchObject({
+      city: "제주",
+      nights: 3,
+      isSearching: true,
+      hotelName: "",
+    });
+  });
 });

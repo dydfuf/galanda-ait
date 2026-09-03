@@ -613,7 +613,7 @@ export function FirstPlanWizard({
     currentRoute.departureDate <= currentRoute.arrivalDate
   );
   const isDepartureDateValid = Boolean(currentRoute.departureDate) && !isDepartureBeforeOrSame;
-  const isHotelNameValid = currentAcc.isSearching ? true : currentAcc.hotelName.trim().length >= 1;
+  const isHotelNameValid = currentAcc.hotelName.trim().length >= 1;
   const isEndpointsValid = currentTrFrom.trim().length >= 1 && currentTrTo.trim().length >= 1;
   const isModeValid = currentTr.bookingStatus === "NOT_CHECKED" ? true : currentTr.mode.trim().length >= 1;
   const isDurationValid = currentTr.bookingStatus === "NOT_CHECKED" ? true : currentTr.durationText.trim().length >= 1;
@@ -752,6 +752,15 @@ export function FirstPlanWizard({
       if (isDurationValid) onNext();
       else setDurationTouched(true);
     }
+  };
+
+  const handleNext = () => {
+    if (cursor.section === "accommodation" && cursor.question === "status") {
+      if (!accommodations[accIndex]) {
+        handleAccommodationStatusSelect(accIndex, true);
+      }
+    }
+    onNext();
   };
 
   const headerInfo = getQuestionHeaderInfo(cursor, routes, accommodations, transports);
@@ -1464,7 +1473,7 @@ export function FirstPlanWizard({
           type="button"
           size="xl"
           disabled={!isNextValid}
-          onClick={onNext}
+          onClick={handleNext}
         >
           {nextButtonLabel}
         </Button>
