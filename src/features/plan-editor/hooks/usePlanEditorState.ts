@@ -392,7 +392,13 @@ export function usePlanEditorState(
 
   // 숙소 관리 핸들러
   const handleAddAccommodation = useCallback((acc: AccommodationSnapshot) => {
-    setAccommodations((prev) => [...prev, acc]);
+    setAccommodations((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === acc.id);
+      if (existingIndex !== -1) {
+        return prev.map((item, idx) => (idx === existingIndex ? { ...item, ...acc } : item));
+      }
+      return [...prev, acc];
+    });
     markDraftSaving();
   }, [markDraftSaving]);
 
@@ -410,7 +416,13 @@ export function usePlanEditorState(
 
   // 교통 관리 핸들러
   const handleAddTransport = useCallback((trans: TransportSnapshot) => {
-    setTransports((prev) => [...prev, trans]);
+    setTransports((prev) => {
+      const existingIndex = prev.findIndex((item) => item.id === trans.id);
+      if (existingIndex !== -1) {
+        return prev.map((item, idx) => (idx === existingIndex ? { ...item, ...trans } : item));
+      }
+      return [...prev, trans];
+    });
     markDraftSaving();
   }, [markDraftSaving]);
 

@@ -41,7 +41,12 @@ import {
 } from "../../core/domain/auth-guards.ts";
 import { resolveEligibleTripActions } from "../../core/domain/trip-action-resolver.ts";
 import { toFirstPlanDecisionContext } from "../../core/domain/trip-decision.ts";
-import { getPlanPublishCompletion } from "../../core/domain/room.ts";
+import {
+  getPlanPublishCompletion,
+  getStayNightCount,
+  type AccommodationSnapshot,
+  type TransportSnapshot,
+} from "../../core/domain/room.ts";
 import { useNextTripActionRecommendation } from "../common/use-next-trip-action-recommendation.ts";
 import {
   getRecommendationActionContext,
@@ -183,7 +188,55 @@ export function PlanCreatePage(): JSX.Element {
 
   // Forward Navigation Handler
   const handleNextQuestion = (): void => {
-    const nextCursor = getNextWizardCursor(currentCursor, editor);
+    let updatedEditor = editor;
+
+    if (currentCursor.section === "accommodation" && currentCursor.question === "status") {
+      const idx = currentCursor.index ?? 0;
+      if (!editor.accommodations[idx]) {
+        const route = editor.routes[idx];
+        const newAcc: AccommodationSnapshot = {
+          id: `acc-${idx + 1}`,
+          city: route?.city ?? "",
+          period: route?.arrivalDate && route?.departureDate ? `${route.arrivalDate} ~ ${route.departureDate}` : "",
+          nights: Math.max(0, getStayNightCount(route ?? { city: "", arrivalDate: "", departureDate: "" })),
+          hotelName: "",
+          isSearching: true,
+          bookingStatus: "NOT_CHECKED",
+        };
+        editor.handleAddAccommodation(newAcc);
+        updatedEditor = {
+          ...editor,
+          accommodations: [...editor.accommodations, newAcc],
+        };
+      }
+    }
+
+    if (currentCursor.section === "transport") {
+      const idx = currentCursor.index ?? 0;
+      if (!editor.transports[idx]) {
+        const totalLegs = Math.max(1, editor.routes.length + 1);
+        const defaultProposedFrom = idx === 0 ? "" : (editor.routes[idx - 1]?.city ?? "");
+        const defaultProposedTo = idx === totalLegs - 1 ? "" : (editor.routes[idx]?.city ?? "");
+        if (defaultProposedFrom && defaultProposedTo) {
+          const newTr: TransportSnapshot = {
+            id: `tr-${idx + 1}`,
+            fromCity: defaultProposedFrom,
+            toCity: defaultProposedTo,
+            mode: "",
+            hasTransfer: false,
+            durationText: "",
+            bookingStatus: "NOT_CHECKED",
+          };
+          editor.handleAddTransport(newTr);
+          updatedEditor = {
+            ...updatedEditor,
+            transports: [...updatedEditor.transports, newTr],
+          };
+        }
+      }
+    }
+
+    const nextCursor = getNextWizardCursor(currentCursor, updatedEditor);
     const { pathname, search } = serializeWizardCursor(nextCursor, tripId);
     navigate(`${pathname}${search}`, {
       replace: true,
@@ -231,6 +284,21 @@ export function PlanCreatePage(): JSX.Element {
     }
 
     if (currentCursor.returnToReview) {
+      if (currentCursor.section === "accommodation" && currentCursor.question === "status") {
+        const idx = currentCursor.index ?? 0;
+        if (!editor.accommodations[idx]) {
+          const route = editor.routes[idx];
+          editor.handleAddAccommodation({
+            id: `acc-${idx + 1}`,
+            city: route?.city ?? "",
+            period: route?.arrivalDate && route?.departureDate ? `${route.arrivalDate} ~ ${route.departureDate}` : "",
+            nights: Math.max(0, getStayNightCount(route ?? { city: "", arrivalDate: "", departureDate: "" })),
+            hotelName: "",
+            isSearching: true,
+            bookingStatus: "NOT_CHECKED",
+          });
+        }
+      }
       navigate(editorBasePath, {
         replace: true,
         state: {

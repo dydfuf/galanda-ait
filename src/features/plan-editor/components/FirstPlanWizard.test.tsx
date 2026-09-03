@@ -450,6 +450,25 @@ describe("FirstPlanWizard - Accommodation Questions", () => {
 
       expect(screen.getByRole("button", { name: "다음: 교통" })).toBeInTheDocument();
     });
+    it("commits default searching status when clicking next without manually selecting a card", () => {
+      const onAccommodationStatusChange = vi.fn();
+      const onNext = vi.fn();
+      renderWizard({
+        cursor: { section: "accommodation", question: "status", index: 0 },
+        formData: {
+          routes: [{ city: "제주", arrivalDate: "2026-10-01", departureDate: "2026-10-04" }],
+          accommodations: [],
+        },
+        onAccommodationStatusChange,
+        onNext,
+      });
+
+      const nextBtn = screen.getByRole("button", { name: "다음: 교통" });
+      fireEvent.click(nextBtn);
+
+      expect(onAccommodationStatusChange).toHaveBeenCalledWith(0, true);
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("Hotel Name Question (`accommodation/hotel-name`)", () => {
@@ -477,6 +496,18 @@ describe("FirstPlanWizard - Accommodation Questions", () => {
           accommodations: [
             { id: "acc-1", city: "제주", period: "2026-10-01 ~ 2026-10-04", nights: 3, hotelName: "", isSearching: false, bookingStatus: "AVAILABLE" },
           ],
+        },
+      });
+
+      expect(screen.getByRole("button", { name: "다음: 교통" })).toBeDisabled();
+    });
+
+    it("disables next button when hotel name is empty even if accommodations is unpopulated", () => {
+      renderWizard({
+        cursor: { section: "accommodation", question: "hotel-name", index: 0 },
+        formData: {
+          routes: [{ city: "제주", arrivalDate: "2026-10-01", departureDate: "2026-10-04" }],
+          accommodations: [],
         },
       });
 
