@@ -1,5 +1,14 @@
 # Project: Granular Trip Creation Wizard (First Plan Single-Question Flow)
 
+## Product Contract Status
+
+- **Implementation delivery:** COMPLETE
+- **Canonical product contract:** [`ADR-002-trip-creation-wizard-product-contract.md`](docs/adr/ADR-002-trip-creation-wizard-product-contract.md)
+- **Product validation:** ONGOING during MVP/private beta
+- **Superseded baseline:** the former 7-step section-based first-trip Wizard recorded by PR #90 / RAON-285
+
+The current baseline is the shipped **4-stage creation shell + single-question first-plan sub-wizard**. Future simplification should be driven by completion, resume, validation/backtracking, abandonment, and qualitative mobile-usability evidence rather than raw screen count.
+
 ## Architecture
 The Granular Trip Creation Wizard transforms the initial plan creation experience (`/trips/:tripRoomId/plans/new/*`) into a single-question-per-screen flow while preserving existing section-based editing for subsequent plan creation, edits, and clones.
 
@@ -25,6 +34,7 @@ Key Architectural Invariants:
 2. **Deterministic URL Cursor Model**: URL query parameters (`?question=...&index=...`) track sub-question progress with `replace` navigation, preserving browser and AIT back navigation anchors to the Trip Room.
 3. **Local Draft Auto-Save & Resume**: Seamless persistence in `StoredPlanEditorDraft` with full backward compatibility for legacy drafts.
 4. **Collaboration Boundary Isolation**: Safe transition to alternative plan ("대안 여행안") when a peer participant publishes a plan concurrently.
+5. **Deterministic Completion Path**: AI recommendation loading/failure never owns or blocks editor, back, review, or publish actions.
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
@@ -49,7 +59,24 @@ Key Architectural Invariants:
 | M2 | Question Shell & Basic Info Questions | `FirstPlanWizard.tsx` (Shell + Basic Questions), `PlanCreatePage.tsx` first-plan branch & query normalization, tests | M1 | DONE |
 | M3 | Route, Accommodation & Transport Questions | Route repeated questions, accommodation questions, N+1 transport questions, synchronization logic & tests | M2 | DONE |
 | M4 | Review Navigation, Draft Resume & Collaboration Isolation | Review jump & return-to-review, `PlanHomePage.tsx` resume CTA, concurrent plan alternative transition & tests | M3 | DONE |
-| M5 | E2E Navigation Verification & Project Quality Gate | `trip-creation-navigation.test.tsx`, all component tests, acceptance criteria check, `pnpm check`, `git diff --check` | M4 | IN_PROGRESS |
+| M5 | E2E Navigation Verification & Project Quality Gate | `trip-creation-navigation.test.tsx`, all component tests, acceptance criteria check, `pnpm check`, `git diff --check` | M4 | DONE (PR #113: 140 files / 1,369 tests + `pnpm check`) |
+
+Delivery milestones are complete. Ongoing beta validation is a product-learning loop, not an unfinished implementation milestone.
+
+## MVP / Beta Validation
+
+Do not optimize this flow by raw screen count alone. The current first-plan sequence can dynamically span roughly 13–17 question screens depending on trip data; the sub-step counter exists for orientation, not as a KPI.
+
+Evaluate changes against:
+
+1. creation start → review → publish completion
+2. correct cursor restoration and completion after draft resume
+3. repeated validation errors or late surprises at review
+4. repeated backtracking between particular questions
+5. abandonment concentrated at particular questions/sections
+6. qualitative mobile usability: whether the user understands the one decision required now versus information that can be decided later
+
+If telemetry is required, extend the existing RAON-222 product-event infrastructure rather than introducing a Wizard-specific analytics stack.
 
 ## Interface Contracts
 
@@ -103,6 +130,10 @@ export type TripCreationStep =
 export interface TripCreationProgressProps {
   readonly currentStep: TripCreationStep;
   readonly subStepLabel?: string;
+  readonly subStepProgress?: {
+    readonly current: number;
+    readonly total: number;
+  };
   readonly className?: string;
 }
 ```
@@ -115,7 +146,7 @@ export interface TripCreationProgressProps {
 - `src/features/plan-editor/hooks/usePlanEditorState.ts` — Draft persistence hook
 - `src/features/plan-editor/PlanCreatePage.tsx` — Plan creation page with wizard / section bifurcation
 - `src/features/plan-editor/components/PlanEditorSections.tsx` — Section editor & review summary
-- `src/components/galanda/trip-creation-progress.tsx` — 4-stage main progress bar
+- `src/components/galanda/trip-creation-progress.tsx` — 4-stage main progress bar with optional question-level progress
 - `src/components/galanda/trip-creation-progress.test.tsx` — Progress bar accessibility & state tests
 - `src/features/plan-home/PlanHomePage.tsx` — Plan home with draft resume CTA
 - `src/app/trip-creation-navigation.test.tsx` — End-to-end trip creation navigation integration tests
