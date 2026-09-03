@@ -287,7 +287,7 @@ export function TripListPage() {
   const pastPreviewTrips = pastTrips.slice(0, PAST_PREVIEW_LIMIT);
 
   const ongoingContent = (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-8 pb-12">
       <section
         aria-labelledby="ongoing-trips-heading"
         className="px-(--app-inline-padding)"
@@ -337,7 +337,7 @@ export function TripListPage() {
     ) : (
       <section
         aria-labelledby="past-trips-heading"
-        className="px-(--app-inline-padding)"
+        className="px-(--app-inline-padding) pb-12"
       >
         <h2
           id="past-trips-heading"
@@ -395,7 +395,12 @@ export function TripListPage() {
     );
 
   return (
-    <PageBody safeTop withBottomAction data-slot="trip-list-page">
+    <PageBody
+      safeTop
+      withBottomAction
+      className="scroll-pb-[calc(var(--global-nav-height,64px)+5.5rem)]"
+      data-slot="trip-list-page"
+    >
       <PageTitle title="내 여행" />
 
       <div className="mt-4 mb-4 px-(--app-inline-padding)">
@@ -424,7 +429,7 @@ export function TripListPage() {
         className="pointer-events-none fixed inset-x-0 z-30 px-(--app-inline-padding)"
         style={{ bottom: "calc(var(--global-nav-height, 0px) + 1rem)" }}
       >
-        <div className="mx-auto flex w-full max-w-(--content-max-width) justify-end">
+        <div className="mx-auto flex w-full max-w-(--content-max-width) justify-end min-[960px]:max-w-[calc(var(--content-max-width)+20rem)]">
           <Button
             type="button"
             size="lg"

@@ -250,6 +250,9 @@ describe("TripListPage", () => {
     expect(pageBody?.className).toContain(
       "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]",
     );
+    expect(pageBody?.className).toContain(
+      "scroll-pb-[calc(var(--global-nav-height,64px)+5.5rem)]",
+    );
     expect(pageBody?.className).not.toContain("pb-(--app-page-padding-bottom)");
 
     const primaryActions = screen.getAllByRole("button", {
@@ -262,6 +265,10 @@ describe("TripListPage", () => {
     expect(floatingLayer).toHaveStyle({
       bottom: "calc(var(--global-nav-height, 0px) + 1rem)",
     });
+    const fabContainer = primaryActions[0].parentElement;
+    expect(fabContainer?.className).toContain(
+      "min-[960px]:max-w-[calc(var(--content-max-width)+20rem)]",
+    );
     fireEvent.click(primaryActions[0]);
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       "/trips/new",

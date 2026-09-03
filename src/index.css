@@ -20,6 +20,7 @@
   --app-page-padding-top: 16px;
   --app-page-padding-bottom: calc(24px + var(--safe-bottom));
   --app-cta-space: calc(104px + var(--safe-bottom));
+  --global-nav-height: calc(64px + var(--safe-bottom));
 
   font-family: var(--sans);
   color: var(--foreground);
