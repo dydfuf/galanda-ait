@@ -45,8 +45,7 @@ const mockUseCreatePlanMutation = vi.mocked(useCreatePlanMutation);
 const tripId = TripIdSchema.make("trip-1");
 const hostId = ParticipantIdSchema.make("participant-host");
 const summaryPath = `/trips/${tripId}/plans/new`;
-const longDraftTitle =
-  "도쿄와 하코네의 온천·미술관·긴 산책로를 모두 포함하는 겨울 여행안";
+const longDraftTitle = "도쿄·하코네 온천과 미술관 겨울 여행안";
 
 const validEditorData = {
   title: longDraftTitle,
@@ -599,7 +598,7 @@ describe("PlanCreatePage", () => {
     fireEvent.click(basicRow);
 
     const titleInput = await screen.findByLabelText("여행안 제목 *");
-    const editedTitle = `${longDraftTitle} - 사용자가 수정한 제목`;
+    const editedTitle = `${longDraftTitle} - 수정`;
     fireEvent.change(titleInput, { target: { value: editedTitle } });
 
     Object.defineProperty(window, "innerWidth", {

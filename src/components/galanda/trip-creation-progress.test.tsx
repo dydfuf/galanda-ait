@@ -146,4 +146,30 @@ describe("TripCreationProgress", () => {
     expect(progress).toHaveClass("custom-class");
     expect(progress).toHaveClass("rounded-2xl");
   });
+
+  it("subStepProgress가 전달되면 3/4 · 5/13 형태의 서브 카운터를 렌더링한다", () => {
+    const { rerender } = render(
+      <TripCreationProgress
+        currentStep="plan-basic"
+        subStepLabel="기본 정보"
+        subStepProgress={{ current: 1, total: 13 }}
+      />,
+    );
+    const progress = screen.getByRole("navigation", {
+      name: "여행 만들기 진행 단계",
+    });
+    expect(progress).toHaveTextContent("3/4 · 1/13");
+    expect(progress).toHaveTextContent("첫 여행안 · 기본 정보");
+
+    rerender(
+      <TripCreationProgress
+        currentStep="plan-route"
+        subStepLabel="여행 경로"
+        subStepProgress={{ current: 5, total: 13 }}
+      />,
+    );
+    expect(progress).toHaveTextContent("3/4 · 5/13");
+    expect(progress).toHaveTextContent("첫 여행안 · 여행 경로");
+  });
 });
+

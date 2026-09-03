@@ -318,17 +318,17 @@ export function PlanHomePage() {
             title="아직 여행안이 없어요"
             description={
               canCreatePlan
-                ? "첫 여행안을 만들어 친구들과 함께 골라보세요."
+                ? userDraft?.wizardCursor
+                  ? "작성 중인 첫 여행안의 임시 내용이 안전하게 보관되어 있어요. 언제든 이어서 작성할 수 있어요."
+                  : "첫 여행안을 만들어 친구들과 함께 골라보세요."
                 : "여행 참여자가 첫 여행안을 만들면 여기에 표시돼요."
             }
             actionText={
-              hasRecommendationSurface
-                ? undefined
-                : userDraft?.wizardCursor && canCreatePlan
-                  ? "이어서 작성하기"
-                  : (cta.primaryLabel ?? undefined)
+              userDraft?.wizardCursor && canCreatePlan
+                ? "이어서 작성하기"
+                : (cta.primaryLabel ?? undefined)
             }
-            onAction={hasRecommendationSurface || !cta.primaryKind ? undefined : runPrimaryCta}
+            onAction={!cta.primaryKind ? undefined : runPrimaryCta}
           />
         ) : (
           <ul

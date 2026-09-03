@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
+import { cn } from "@/lib/utils.ts";
 import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
@@ -33,8 +34,27 @@ export function TripCreatePage() {
   }, []);
 
   const trimmedTitle = title.trim();
-  const isValid = trimmedTitle.length >= 1 && trimmedTitle.length <= MAX_TITLE_LENGTH;
+  const isOverLimit = trimmedTitle.length > MAX_TITLE_LENGTH;
+  const isWhitespaceOnly = title.length > 0 && trimmedTitle.length === 0;
+  const isValid = trimmedTitle.length >= 1 && !isOverLimit;
+
+  const inlineError = isOverLimit
+    ? "여행 이름은 최대 30자까지 입력할 수 있어요."
+    : isWhitespaceOnly
+      ? "공백을 제외하고 1자 이상 입력해주세요."
+      : null;
+
+  const displayedError = errorMsg || inlineError;
+
   const handleSubmit = async () => {
+    if (isOverLimit) {
+      setErrorMsg("여행 이름은 최대 30자까지 입력할 수 있어요.");
+      return;
+    }
+    if (isWhitespaceOnly) {
+      setErrorMsg("공백을 제외하고 1자 이상 입력해주세요.");
+      return;
+    }
     if (
       !isValid ||
       !isOnline ||
@@ -42,6 +62,7 @@ export function TripCreatePage() {
       isSubmittingRef.current
     ) {
       if (!isOnline) setErrorMsg(OFFLINE_MUTATION_MESSAGE);
+      else if (!isValid) setErrorMsg("여행 이름을 입력해 주세요.");
       return;
     }
 
@@ -63,7 +84,7 @@ export function TripCreatePage() {
     }
   };
 
-  const counterText = `${title.length}/${MAX_TITLE_LENGTH}`;
+  const counterText = `${trimmedTitle.length}/${MAX_TITLE_LENGTH}`;
   const helperText = !isValid
     ? "여행 이름을 입력해 주세요."
     : "다음 단계에서 동행자를 초대하거나 바로 여행안을 작성할 수 있어요.";
@@ -76,7 +97,7 @@ export function TripCreatePage() {
       {!platformNavigation && (
         <PageHeader
           title="여행 만들기"
-          back={{ onClick: () => void goBack() }}
+          back={{ label: "뒤로 가기", onClick: () => void goBack() }}
           surface="none"
         />
       )}
@@ -103,7 +124,7 @@ export function TripCreatePage() {
             className="mx-(--app-inline-padding) mt-3 flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
           >
             <Field
-              data-invalid={Boolean(errorMsg) || undefined}
+              data-invalid={Boolean(displayedError) || undefined}
               className="gap-3"
             >
               <FieldLabel
@@ -117,23 +138,29 @@ export function TripCreatePage() {
                 ref={inputRef}
                 placeholder="예: 일본 여행, 2026 제주 힐링"
                 value={title}
-                maxLength={MAX_TITLE_LENGTH}
                 onChange={(e) => {
                   setTitle(e.target.value);
                   if (errorMsg) setErrorMsg(null);
                 }}
                 aria-describedby="trip-title-help"
-                aria-invalid={Boolean(errorMsg) || undefined}
+                aria-invalid={Boolean(displayedError) || undefined}
                 required
                 className="h-14 rounded-xl border-border bg-background px-4 text-base"
               />
-              {errorMsg ? (
+              {displayedError ? (
                 <FieldError
                   id="trip-title-help"
                   className="flex items-start justify-between gap-3"
                 >
-                  <span className="min-w-0 flex-1">{errorMsg}</span>
-                  <span className="shrink-0 tabular-nums">{counterText}</span>
+                  <span className="min-w-0 flex-1">{displayedError}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular-nums",
+                      isOverLimit && "text-destructive font-semibold",
+                    )}
+                  >
+                    {counterText}
+                  </span>
                 </FieldError>
               ) : (
                 <FieldDescription

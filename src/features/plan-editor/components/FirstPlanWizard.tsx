@@ -24,6 +24,7 @@ import {
   type TransportSnapshot,
 } from "../../../core/domain/room.ts";
 import {
+  getWizardSubStepProgress,
   type FirstPlanWizardCursor,
   type FirstPlanWizardSection,
 } from "../first-plan-wizard-flow.ts";
@@ -597,9 +598,15 @@ export function FirstPlanWizard({
   };
 
   // Validations
-  const isTitleValid = title.trim().length >= 1;
+  const trimmedTitle = title.trim();
+  const isTitleOverLimit = trimmedTitle.length > 30;
+  const isTitleValid = trimmedTitle.length >= 1 && !isTitleOverLimit;
   const isHeadcountValid = baseHeadcount >= 1 && baseHeadcount <= 20;
-  const isCityValid = currentRoute.city.trim().length >= 1;
+
+  const trimmedCity = currentRoute.city.trim();
+  const isCityOverLimit = trimmedCity.length > 30;
+  const isCityValid = trimmedCity.length >= 1 && !isCityOverLimit;
+
   const isArrivalOverlap = Boolean(
     routeIndex > 0 &&
     prevRoute?.departureDate &&
@@ -766,14 +773,30 @@ export function FirstPlanWizard({
   const headerInfo = getQuestionHeaderInfo(cursor, routes, accommodations, transports);
 
   // Field error visibility flags
-  const showTitleError = titleTouched && !isTitleValid;
-  const showCityError = cityTouched && !isCityValid;
-  const showArrivalError = arrivalTouched && !isArrivalDateValid;
-  const showDepartureError = departureTouched && !isDepartureDateValid;
+  const showTitleError = (titleTouched && !isTitleValid) || isTitleOverLimit;
+  const showCityError = (cityTouched && !isCityValid) || isCityOverLimit;
+  const showArrivalError = (arrivalTouched && !isArrivalDateValid) || isArrivalOverlap;
+  const showDepartureError = (departureTouched && !isDepartureDateValid) || isDepartureBeforeOrSame;
   const showHotelError = hotelTouched && !isHotelNameValid;
-  const showEndpointsError = endpointsTouched && !isEndpointsValid;
   const showModeError = modeTouched && !isModeValid;
   const showDurationError = durationTouched && !isDurationValid;
+
+  const titleErrorMessage = isTitleOverLimit
+    ? "여행안 제목은 최대 30자까지 입력할 수 있어요."
+    : "여행안 제목을 입력해주세요.";
+
+  const cityErrorMessage = isCityOverLimit
+    ? "도시 이름은 최대 30자까지 입력할 수 있어요."
+    : "도시 이름을 입력해주세요.";
+
+  const subStepProgress = getWizardSubStepProgress(cursor, {
+    title,
+    proposalReason,
+    baseHeadcount,
+    routes,
+    accommodations,
+    transports,
+  });
 
   return (
     <div data-galanda-surface="content" className="flex min-h-dvh flex-1 flex-col">
@@ -781,6 +804,7 @@ export function FirstPlanWizard({
         <TripCreationProgress
           currentStep={SECTION_TO_STEP[cursor.section]}
           subStepLabel={SECTION_TO_SUBSTEP_LABEL[cursor.section]}
+          subStepProgress={subStepProgress}
           className="mx-(--app-inline-padding) mt-1"
         />
 
@@ -825,7 +849,6 @@ export function FirstPlanWizard({
                 type="text"
                 placeholder="예: 힐링 카페 & 호캉스 코스"
                 value={title}
-                maxLength={30}
                 onChange={(e) => handleTitleInputChange(e.target.value)}
                 onKeyDown={handleTitleKeyDown}
                 onBlur={() => setTitleTouched(true)}
@@ -836,13 +859,18 @@ export function FirstPlanWizard({
               />
               {showTitleError ? (
                 <FieldError id="wizard-title-help" className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 flex-1">여행안 제목을 입력해주세요.</span>
-                  <span className="shrink-0 tabular-nums">{`${title.length}/30`}</span>
+                  <span className="min-w-0 flex-1">{titleErrorMessage}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular-nums",
+                      isTitleOverLimit && "text-destructive font-semibold",
+                    )}
+                  >{`${trimmedTitle.length}/30`}</span>
                 </FieldError>
               ) : (
                 <FieldDescription id="wizard-title-help" className="flex items-start justify-between gap-3">
                   <span className="min-w-0 flex-1">최대 30자까지 입력할 수 있어요.</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{`${title.length}/30`}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{`${trimmedTitle.length}/30`}</span>
                 </FieldDescription>
               )}
             </Field>
@@ -958,7 +986,6 @@ export function FirstPlanWizard({
                 type="text"
                 placeholder="예: 제주시 / 도쿄 / 파리"
                 value={currentRoute.city}
-                maxLength={30}
                 onChange={(e) => handleCityInputChange(routeIndex, e.target.value)}
                 onKeyDown={handleCityKeyDown}
                 onBlur={() => setCityTouched(true)}
@@ -969,13 +996,18 @@ export function FirstPlanWizard({
               />
               {showCityError ? (
                 <FieldError id="wizard-route-city-help" className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 flex-1">도시 이름을 입력해주세요.</span>
-                  <span className="shrink-0 tabular-nums">{`${currentRoute.city.length}/30`}</span>
+                  <span className="min-w-0 flex-1">{cityErrorMessage}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular-nums",
+                      isCityOverLimit && "text-destructive font-semibold",
+                    )}
+                  >{`${trimmedCity.length}/30`}</span>
                 </FieldError>
               ) : (
                 <FieldDescription id="wizard-route-city-help" className="flex items-start justify-between gap-3">
                   <span className="min-w-0 flex-1">최대 30자까지 입력할 수 있어요.</span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{`${currentRoute.city.length}/30`}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{`${trimmedCity.length}/30`}</span>
                 </FieldDescription>
               )}
             </Field>
@@ -1225,7 +1257,7 @@ export function FirstPlanWizard({
               이동 {trIndex + 1}/{totalLegs}
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field data-invalid={endpointsTouched && !currentTrFrom.trim() || undefined} className="gap-2">
+              <Field data-invalid={(endpointsTouched && !currentTrFrom.trim()) || undefined} className="gap-2">
                 <FieldLabel htmlFor="wizard-transport-from" className="text-sm font-semibold text-foreground">
                   출발지 *
                 </FieldLabel>
@@ -1239,11 +1271,18 @@ export function FirstPlanWizard({
                   onChange={(e) => handleTransportFromChange(trIndex, e.target.value)}
                   onKeyDown={handleTransportEndpointsKeyDown}
                   onBlur={() => setEndpointsTouched(true)}
+                  aria-describedby="wizard-transport-from-help"
+                  aria-invalid={(endpointsTouched && !currentTrFrom.trim()) || undefined}
                   className="h-12 rounded-xl border-border bg-background px-4 text-base"
                 />
+                {endpointsTouched && !currentTrFrom.trim() && (
+                  <FieldError id="wizard-transport-from-help">
+                    출발지를 입력해주세요.
+                  </FieldError>
+                )}
               </Field>
 
-              <Field data-invalid={endpointsTouched && !currentTrTo.trim() || undefined} className="gap-2">
+              <Field data-invalid={(endpointsTouched && !currentTrTo.trim()) || undefined} className="gap-2">
                 <FieldLabel htmlFor="wizard-transport-to" className="text-sm font-semibold text-foreground">
                   도착지 *
                 </FieldLabel>
@@ -1256,16 +1295,17 @@ export function FirstPlanWizard({
                   onChange={(e) => handleTransportToChange(trIndex, e.target.value)}
                   onKeyDown={handleTransportEndpointsKeyDown}
                   onBlur={() => setEndpointsTouched(true)}
+                  aria-describedby="wizard-transport-to-help"
+                  aria-invalid={(endpointsTouched && !currentTrTo.trim()) || undefined}
                   className="h-12 rounded-xl border-border bg-background px-4 text-base"
                 />
+                {endpointsTouched && !currentTrTo.trim() && (
+                  <FieldError id="wizard-transport-to-help">
+                    도착지를 입력해주세요.
+                  </FieldError>
+                )}
               </Field>
             </div>
-
-            {showEndpointsError && (
-              <p className="mt-3 text-xs font-semibold text-destructive">
-                출발지와 도착지를 모두 입력해주세요.
-              </p>
-            )}
           </form>
         )}
 

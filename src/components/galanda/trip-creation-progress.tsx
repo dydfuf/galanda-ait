@@ -43,6 +43,10 @@ export const TRIP_CREATION_STAGES: readonly StageDefinition[] = [
 export interface TripCreationProgressProps {
   readonly currentStep: TripCreationStep;
   readonly subStepLabel?: string;
+  readonly subStepProgress?: {
+    readonly current: number;
+    readonly total: number;
+  };
   readonly className?: string;
 }
 
@@ -53,6 +57,7 @@ export interface TripCreationProgressProps {
 export function TripCreationProgress({
   currentStep,
   subStepLabel,
+  subStepProgress,
   className,
 }: TripCreationProgressProps) {
   const stageIndex = TRIP_CREATION_STAGES.findIndex((stage) =>
@@ -66,11 +71,16 @@ export function TripCreationProgress({
     ? `${currentStage.label} · ${subStepLabel}`
     : currentStage.label;
 
+  const stageCounter = `${currentStageIndex + 1}/${TRIP_CREATION_STAGES.length}`;
+  const counterText = subStepProgress
+    ? `${stageCounter} · ${subStepProgress.current}/${subStepProgress.total}`
+    : stageCounter;
+
   const progressRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     progressRef.current?.focus({ preventScroll: true });
-  }, [currentStep, subStepLabel]);
+  }, [currentStep, subStepLabel, subStepProgress?.current]);
 
   return (
     <nav
@@ -89,7 +99,7 @@ export function TripCreationProgress({
         aria-atomic="true"
       >
         <p className="shrink-0 text-sm font-bold text-primary tabular-nums">
-          {currentStageIndex + 1}/{TRIP_CREATION_STAGES.length}
+          {counterText}
         </p>
         <p className="min-w-0 text-sm font-semibold text-foreground [overflow-wrap:anywhere]">
           {displayedTitle}

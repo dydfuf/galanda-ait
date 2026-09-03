@@ -177,6 +177,7 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     expect(plan.bookingRisks).toEqual([
       {
         level: "WARNING",
+        kind: "UNCHECKED",
         message: "도쿄 숙소(숙소 찾는 중) 예약 상태를 아직 확인하지 않았어요",
         snapshotInfo: "아직 예약 상태를 확인하지 않았어요",
       },

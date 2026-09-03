@@ -532,3 +532,94 @@ export function mapValidationErrorToCursor(
 
   return { section: "basic", question: "title" };
 }
+
+export function getWizardQuestionSequence(
+  formData: PlanEditorFormData
+): ReadonlyArray<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> {
+  const list: Array<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> = [];
+  let current: FirstPlanWizardCursor = { section: "basic", question: "title" };
+
+  const maxSteps = 100;
+  let steps = 0;
+
+  while (current.section !== "review" && steps < maxSteps) {
+    list.push({
+      section: current.section,
+      question: current.question,
+      ...(current.index !== undefined ? { index: current.index } : {}),
+    });
+    const next = getNextWizardCursor(current, formData);
+    if (
+      next.section === current.section &&
+      next.question === current.question &&
+      next.index === current.index
+    ) {
+      break;
+    }
+    current = next;
+    steps++;
+  }
+
+  return list;
+}
+
+export function getWizardSubStepProgress(
+  cursor: FirstPlanWizardCursor,
+  formData: PlanEditorFormData
+): { current: number; total: number } | undefined {
+  if (cursor.section === "review" || cursor.returnToReview) {
+    return undefined;
+  }
+
+  let effectiveFormData = formData;
+  if (cursor.section === "accommodation" && cursor.question === "hotel-name") {
+    const idx = cursor.index ?? 0;
+    const stay = formData.accommodations[idx];
+    if (!stay || stay.isSearching) {
+      const updatedAccs = [...formData.accommodations];
+      updatedAccs[idx] = {
+        id: stay?.id ?? `acc-${idx}`,
+        city: stay?.city ?? formData.routes[idx]?.city ?? "",
+        period: stay?.period ?? "",
+        nights: stay?.nights ?? 1,
+        hotelName: stay?.hotelName ?? "",
+        isSearching: false,
+        bookingStatus: stay?.bookingStatus ?? "AVAILABLE",
+      };
+      effectiveFormData = { ...formData, accommodations: updatedAccs };
+    }
+  } else if (
+    cursor.section === "transport" &&
+    (cursor.question === "mode" || cursor.question === "duration")
+  ) {
+    const idx = cursor.index ?? 0;
+    const tr = formData.transports[idx];
+    if (!tr || tr.bookingStatus === "NOT_CHECKED") {
+      const updatedTrs = [...formData.transports];
+      updatedTrs[idx] = {
+        id: tr?.id ?? `tr-${idx}`,
+        fromCity: tr?.fromCity ?? "",
+        toCity: tr?.toCity ?? "",
+        mode: tr?.mode ?? "항공",
+        hasTransfer: tr?.hasTransfer ?? false,
+        durationText: tr?.durationText ?? "",
+        bookingStatus: "AVAILABLE",
+      };
+      effectiveFormData = { ...formData, transports: updatedTrs };
+    }
+  }
+
+  const sequence = getWizardQuestionSequence(effectiveFormData);
+  const foundIndex = sequence.findIndex(
+    (item) =>
+      item.section === cursor.section &&
+      item.question === cursor.question &&
+      (cursor.index === undefined || item.index === cursor.index)
+  );
+
+  const current = foundIndex !== -1 ? foundIndex + 1 : 1;
+  const total = sequence.length;
+
+  return { current, total };
+}
+
