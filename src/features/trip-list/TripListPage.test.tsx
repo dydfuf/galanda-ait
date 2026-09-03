@@ -262,6 +262,10 @@ describe("TripListPage", () => {
     expect(floatingLayer).toHaveStyle({
       bottom: "calc(var(--global-nav-height, 0px) + 1rem)",
     });
+    const fabContainer = primaryActions[0].parentElement;
+    expect(fabContainer?.className).toContain(
+      "min-[960px]:max-w-[calc(var(--content-max-width)+20rem)]",
+    );
     fireEvent.click(primaryActions[0]);
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       "/trips/new",

@@ -72,7 +72,7 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
       <nav
         aria-label="주요 화면"
         data-galanda-surface={usesContentSurface ? "content" : "chrome"}
-        className="fixed inset-x-0 bottom-0 z-20 bg-background pb-[var(--safe-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-20 bg-background shadow-chrome pb-[var(--safe-bottom)]"
       >
         <ul className="mx-auto flex h-16 w-full max-w-(--content-max-width) items-stretch">
           {GLOBAL_NAV_ITEMS.map((item) => {
