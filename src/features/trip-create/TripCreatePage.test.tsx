@@ -99,10 +99,10 @@ describe("TripCreatePage", () => {
       name: "여행 만들기 진행 단계",
     });
 
-    expect(progress).toHaveTextContent("1/7");
-    expect(progress).toHaveTextContent("여행 정보");
+    expect(progress).toHaveTextContent("1/4");
+    expect(progress).toHaveTextContent("여행방");
     expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent(
-      "1. 여행 정보 현재 단계",
+      "1. 여행방 현재 단계",
     );
 
     expect(main.parentElement).toHaveAttribute("data-galanda-surface", "content");

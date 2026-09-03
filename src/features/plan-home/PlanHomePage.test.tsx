@@ -7,12 +7,13 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 import { PlanIdSchema, RecommendationIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../core/domain/ids.ts";
 import type { TripRoom, UserSession } from "../../core/domain/room.ts";
 import type { RecommendNextActionResponse } from "../../contracts/recommendation.ts";
+import { getPlanEditorDraftKey } from "../plan-editor/hooks/usePlanEditorState.ts";
 
 vi.mock("../plan-detail/queries.ts", () => ({
   useTripRoomRawQuery: vi.fn<(roomId: string) => UseQueryResult<TripRoom, Error>>(),
@@ -39,6 +40,7 @@ const mockUseTripRoomRawQuery = vi.mocked(useTripRoomRawQuery);
 const mockUseRecommendation = vi.mocked(useNextTripActionRecommendation);
 
 beforeEach(() => {
+  localStorage.clear();
   mockUseRecommendation.mockReturnValue(
     toQueryResult<RecommendNextActionResponse | null>(null),
   );
@@ -93,11 +95,27 @@ const toQueryResult = <T,>(data: T): UseQueryResult<T, Error> =>
     refetch: vi.fn<() => void>(),
   }) as unknown as UseQueryResult<T, Error>;
 
-const renderPage = () =>
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div style={{ display: "none" }}>
+      <span data-testid="location-path">{location.pathname}</span>
+      <span data-testid="location-search">{location.search}</span>
+      <span data-testid="location-state">
+        {JSON.stringify(location.state)}
+      </span>
+    </div>
+  );
+}
+
+const renderPage = (initialEntries = ["/trips/trip-1/plans"]) =>
   render(
-    <MemoryRouter initialEntries={["/trips/trip-1/plans"]}>
+    <MemoryRouter initialEntries={initialEntries}>
+      <LocationProbe />
       <Routes>
         <Route path="/trips/:tripId/plans" element={<PlanHomePage />} />
+        <Route path="/trips/:tripId/plans/new" element={<p>검토 화면</p>} />
+        <Route path="/trips/:tripId/plans/new/:section" element={<p>위자드 질문 화면</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -531,5 +549,172 @@ describe("PlanHomePage regression contract (RAON-229)", () => {
 
     expect(screen.getByRole("link", { name: /확정안 plan-1 여행안/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "확정 일정 보기" })).toBeInTheDocument();
+  });
+});
+
+describe("PlanHomePage draft resume ('이어서 작성하기')", () => {
+  it("사용자 소유의 첫 여행안 초안(wizardCursor 포함)이 있으면 '이어서 작성하기'를 노출하고 저장된 질문으로 이동한다", async () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(0)));
+
+    localStorage.setItem(
+      getPlanEditorDraftKey(memberSession.participantId, baseRoom.id, "new"),
+      JSON.stringify({
+        ownerId: memberSession.participantId,
+        title: "제주 여행안",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "제주", arrivalDate: "2026-10-01", departureDate: "2026-10-04" }],
+        accommodations: [],
+        transports: [],
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        wizardCursor: {
+          section: "route",
+          question: "arrival-date",
+          index: 0,
+        },
+      }),
+    );
+
+    renderPage();
+
+    const resumeBtn = screen.getByRole("button", { name: "이어서 작성하기" });
+    expect(resumeBtn).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "첫 여행안 만들기" })).not.toBeInTheDocument();
+
+    fireEvent.click(resumeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${baseRoom.id}/plans/new/route`,
+      );
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "?question=arrival-date&index=0",
+      );
+      expect(screen.getByTestId("location-state")).toHaveTextContent(
+        '"tripCreationWizard":true',
+      );
+      expect(screen.getByTestId("location-state")).toHaveTextContent(
+        '"wizardEntrySource":"plans"',
+      );
+    });
+  });
+
+  it("사용자 소유의 초안이 검토 단계(review)이면 '이어서 작성하기' 클릭 시 검토 경로로 이동한다", async () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(0)));
+
+    localStorage.setItem(
+      getPlanEditorDraftKey(memberSession.participantId, baseRoom.id, "new"),
+      JSON.stringify({
+        ownerId: memberSession.participantId,
+        title: "완성된 초안",
+        proposalReason: "충분한 휴식",
+        baseHeadcount: 2,
+        routes: [{ city: "제주", arrivalDate: "2026-10-01", departureDate: "2026-10-04" }],
+        accommodations: [],
+        transports: [],
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        wizardCursor: {
+          section: "review",
+          question: "title",
+        },
+      }),
+    );
+
+    renderPage();
+
+    const resumeBtn = screen.getByRole("button", { name: "이어서 작성하기" });
+    expect(resumeBtn).toBeInTheDocument();
+
+    fireEvent.click(resumeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location-path")).toHaveTextContent(
+        `/trips/${baseRoom.id}/plans/new`,
+      );
+      expect(screen.getByTestId("location-search")).toHaveTextContent("");
+    });
+  });
+
+  it("다른 사용자 소유의 초안은 무시하고 '첫 여행안 만들기'를 노출한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(0)));
+
+    localStorage.setItem(
+      getPlanEditorDraftKey("other-user-id", baseRoom.id, "new"),
+      JSON.stringify({
+        ownerId: "other-user-id",
+        title: "다른 사람 초안",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [],
+        accommodations: [],
+        transports: [],
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        wizardCursor: {
+          section: "basic",
+          question: "title",
+        },
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "첫 여행안 만들기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이어서 작성하기" })).not.toBeInTheDocument();
+  });
+
+  it("wizardCursor가 없는 레거시 초안은 '첫 여행안 만들기'를 노출한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(0)));
+
+    localStorage.setItem(
+      getPlanEditorDraftKey(memberSession.participantId, baseRoom.id, "new"),
+      JSON.stringify({
+        ownerId: memberSession.participantId,
+        title: "레거시 초안",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [],
+        accommodations: [],
+        transports: [],
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "첫 여행안 만들기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이어서 작성하기" })).not.toBeInTheDocument();
+  });
+
+  it("이미 여행안이 등록된 방에서는 초안 유무와 무관하게 정상 여행안 목록/CTA를 노출한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(1)));
+
+    localStorage.setItem(
+      getPlanEditorDraftKey(memberSession.participantId, baseRoom.id, "new"),
+      JSON.stringify({
+        ownerId: memberSession.participantId,
+        title: "작성 중이던 초안",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [],
+        accommodations: [],
+        transports: [],
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        wizardCursor: {
+          section: "route",
+          question: "city",
+          index: 0,
+        },
+      }),
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("button", { name: "새 여행안 제안하기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이어서 작성하기" })).not.toBeInTheDocument();
   });
 });

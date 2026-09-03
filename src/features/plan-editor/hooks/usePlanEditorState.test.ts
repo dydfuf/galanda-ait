@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   getPlanEditorInitialData,
   getPlanEditorDraftKey,
@@ -7,13 +9,15 @@ import {
   parsePlanEditorDraft,
   rebasePlanEditorData,
   savePlanEditorDraft,
+  usePlanEditorState,
   type PlanEditorFormData,
   type StoredPlanEditorDraft,
 } from "./usePlanEditorState.ts";
 import type { TripPlan, TripRoom } from "../../../core/domain/room.ts";
 import { RevisionSchema } from "../../../core/domain/ids.ts";
+import type { FirstPlanWizardCursor } from "../first-plan-wizard-flow.ts";
 
-const validDraft = {
+const validDraft: StoredPlanEditorDraft = {
   ownerId: "user-a",
   basePlanFingerprint: "base-v1",
   title: "도쿄 여행",
@@ -49,6 +53,60 @@ describe("parsePlanEditorDraft", () => {
     expect(parsePlanEditorDraft("{broken")).toBeUndefined();
     expect(parsePlanEditorDraft(JSON.stringify({ ...validDraft, routes: [{ city: "도쿄" }] }))).toBeUndefined();
     expect(parsePlanEditorDraft(JSON.stringify({ ...validDraft, transports: [{ id: "broken" }] }))).toBeUndefined();
+  });
+
+  it("정상적인 wizardCursor가 포함된 draft를 안전하게 복원한다", () => {
+    const draftWithCursor: StoredPlanEditorDraft = {
+      ...validDraft,
+      wizardCursor: {
+        section: "route",
+        question: "arrival-date",
+        index: 0,
+        returnToReview: false,
+      },
+    };
+    const parsed = parsePlanEditorDraft(JSON.stringify(draftWithCursor));
+    expect(parsed?.wizardCursor).toEqual({
+      section: "route",
+      question: "arrival-date",
+      index: 0,
+      returnToReview: false,
+    });
+  });
+
+  it("wizardCursor가 없는 legacy draft를 정상 복원하고 wizardCursor는 undefined이다", () => {
+    const legacyDraft = { ...validDraft };
+    delete (legacyDraft as Record<string, unknown>).wizardCursor;
+    const parsed = parsePlanEditorDraft(JSON.stringify(legacyDraft));
+    expect(parsed?.title).toBe("도쿄 여행");
+    expect(parsed?.wizardCursor).toBeUndefined();
+  });
+
+  it("손상되거나 유효하지 않은 section/question을 가진 wizardCursor는 복원하지 않는다", () => {
+    expect(parsePlanEditorDraft(JSON.stringify({
+      ...validDraft,
+      wizardCursor: { section: "invalid_section", question: "title" },
+    }))).toBeUndefined();
+
+    expect(parsePlanEditorDraft(JSON.stringify({
+      ...validDraft,
+      wizardCursor: { section: "basic", question: "unknown_question" },
+    }))).toBeUndefined();
+
+    expect(parsePlanEditorDraft(JSON.stringify({
+      ...validDraft,
+      wizardCursor: { section: "route", question: "city", index: -1 },
+    }))).toBeUndefined();
+
+    expect(parsePlanEditorDraft(JSON.stringify({
+      ...validDraft,
+      wizardCursor: { section: "route", question: "city", index: 1.5 },
+    }))).toBeUndefined();
+
+    expect(parsePlanEditorDraft(JSON.stringify({
+      ...validDraft,
+      wizardCursor: { section: "basic", question: "title", returnToReview: "true" },
+    }))).toBeUndefined();
   });
 
   it("사용자별 key를 분리한다", () => {
@@ -177,5 +235,166 @@ describe("draft persistence status", () => {
     expect(savePlanEditorDraft(storage, "draft", draft)).toBe("ERROR");
     shouldFail = false;
     expect(savePlanEditorDraft(storage, "draft", draft)).toBe("SAVED");
+  });
+
+  it("wizardCursor가 포함된 StoredPlanEditorDraft를 정상적으로 JSON 직렬화하여 저장한다", () => {
+    const storageData: Record<string, string> = {};
+    const mockStorage = {
+      setItem: (k: string, v: string) => { storageData[k] = v; },
+    };
+    const draft: StoredPlanEditorDraft = {
+      ...validDraft,
+      wizardCursor: {
+        section: "accommodation",
+        question: "status",
+        index: 1,
+      },
+    };
+
+    const status = savePlanEditorDraft(mockStorage, "draft_key", draft);
+    expect(status).toBe("SAVED");
+    const parsed = JSON.parse(storageData["draft_key"]!);
+    expect(parsed.wizardCursor).toEqual({
+      section: "accommodation",
+      question: "status",
+      index: 1,
+    });
+  });
+});
+
+describe("usePlanEditorState hook lifecycle", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("저장된 draft의 wizardCursor를 savedWizardCursor로 복원한다", () => {
+    const draftKey = getPlanEditorDraftKey("user-1", "room-1", "new");
+    const storedDraft: StoredPlanEditorDraft = {
+      ownerId: "user-1",
+      title: "오사카 여행",
+      proposalReason: "",
+      baseHeadcount: 2,
+      routes: [{ city: "오사카", arrivalDate: "2026-10-01", departureDate: "2026-10-03" }],
+      accommodations: [],
+      transports: [],
+      updatedAt: new Date().toISOString(),
+      wizardCursor: {
+        section: "route",
+        question: "departure-date",
+        index: 0,
+      },
+    };
+    localStorage.setItem(draftKey, JSON.stringify(storedDraft));
+
+    const room = { id: "room-1", revision: 1, members: [], plans: [] } as unknown as TripRoom;
+    const { result } = renderHook(() =>
+      usePlanEditorState(room, undefined, undefined, "user-1")
+    );
+
+    expect(result.current.title).toBe("오사카 여행");
+    expect(result.current.savedWizardCursor).toEqual({
+      section: "route",
+      question: "departure-date",
+      index: 0,
+    });
+  });
+
+  it("다른 사용자의 draft는 무시하고 초기 상태로 유지한다", () => {
+    const draftKey = getPlanEditorDraftKey("user-2", "room-1", "new");
+    const storedDraft: StoredPlanEditorDraft = {
+      ownerId: "user-2",
+      title: "다른 사용자 여행안",
+      proposalReason: "",
+      baseHeadcount: 2,
+      routes: [],
+      accommodations: [],
+      transports: [],
+      updatedAt: new Date().toISOString(),
+      wizardCursor: { section: "basic", question: "title" },
+    };
+    localStorage.setItem(draftKey, JSON.stringify(storedDraft));
+
+    const room = { id: "room-1", revision: 1, members: [], plans: [] } as unknown as TripRoom;
+    const { result } = renderHook(() =>
+      usePlanEditorState(room, undefined, undefined, "user-1")
+    );
+
+    expect(result.current.title).toBe("");
+    expect(result.current.savedWizardCursor).toBeUndefined();
+  });
+
+  it("wizardCursor가 전달되면 draft에 포함하여 자동 저장한다", () => {
+    const draftKey = getPlanEditorDraftKey("user-1", "room-1", "new");
+    const room = { id: "room-1", revision: 1, members: [], plans: [] } as unknown as TripRoom;
+
+    const initialCursor: FirstPlanWizardCursor = { section: "basic", question: "title" };
+    const { result, rerender } = renderHook(
+      ({ cursor }) => usePlanEditorState(room, undefined, undefined, "user-1", false, cursor),
+      { initialProps: { cursor: initialCursor } }
+    );
+
+    act(() => {
+      result.current.setTitle("후쿠오카 온천 여행");
+    });
+
+    const savedRaw = localStorage.getItem(draftKey);
+    expect(savedRaw).not.toBeNull();
+    const parsed = JSON.parse(savedRaw!);
+    expect(parsed.title).toBe("후쿠오카 온천 여행");
+    expect(parsed.wizardCursor).toEqual({ section: "basic", question: "title" });
+
+    // Step advancement
+    const nextCursor: FirstPlanWizardCursor = { section: "basic", question: "proposal-reason" };
+    rerender({ cursor: nextCursor });
+
+    const updatedRaw = localStorage.getItem(draftKey);
+    const updatedParsed = JSON.parse(updatedRaw!);
+    expect(updatedParsed.wizardCursor).toEqual({ section: "basic", question: "proposal-reason" });
+  });
+
+  it("discardDraft 호출 시 localStorage와 savedWizardCursor를 함께 초기화한다", () => {
+    const draftKey = getPlanEditorDraftKey("user-1", "room-1", "new");
+    const room = { id: "room-1", revision: 1, members: [], plans: [] } as unknown as TripRoom;
+    const cursor: FirstPlanWizardCursor = { section: "basic", question: "title" };
+
+    const { result } = renderHook(() =>
+      usePlanEditorState(room, undefined, undefined, "user-1", false, cursor)
+    );
+
+    act(() => {
+      result.current.setTitle("제주 여행");
+    });
+    expect(localStorage.getItem(draftKey)).not.toBeNull();
+
+    act(() => {
+      result.current.discardDraft();
+    });
+
+    expect(localStorage.getItem(draftKey)).toBeNull();
+    expect(result.current.savedWizardCursor).toBeUndefined();
+  });
+
+  it("replaceFormData 호출 시 폼 데이터와 savedWizardCursor를 함께 갱신한다", () => {
+    const room = { id: "room-1", revision: 1, members: [], plans: [] } as unknown as TripRoom;
+    const { result } = renderHook(() =>
+      usePlanEditorState(room, undefined, undefined, "user-1")
+    );
+
+    const newFormData: PlanEditorFormData = {
+      title: "부산 여행",
+      proposalReason: "해산물 투어",
+      baseHeadcount: 3,
+      routes: [{ city: "부산", arrivalDate: "2026-11-01", departureDate: "2026-11-03" }],
+      accommodations: [],
+      transports: [],
+    };
+    const newCursor: FirstPlanWizardCursor = { section: "route", question: "city", index: 0 };
+
+    act(() => {
+      result.current.replaceFormData(newFormData, newCursor);
+    });
+
+    expect(result.current.title).toBe("부산 여행");
+    expect(result.current.savedWizardCursor).toEqual(newCursor);
   });
 });

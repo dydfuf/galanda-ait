@@ -162,7 +162,7 @@ describe("TripCompanionSetupPage", () => {
     const progress = screen.getByRole("navigation", {
       name: "여행 만들기 진행 단계",
     });
-    expect(progress).toHaveTextContent("2/7");
+    expect(progress).toHaveTextContent("2/4");
     expect(progress).toHaveTextContent("동행자");
     expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent(
       "2. 동행자 현재 단계",
