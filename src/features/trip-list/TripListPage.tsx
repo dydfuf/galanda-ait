@@ -395,12 +395,7 @@ export function TripListPage() {
     );
 
   return (
-    <PageBody
-      safeTop
-      withBottomAction
-      className="scroll-pb-[calc(var(--global-nav-height,64px)+5.5rem)]"
-      data-slot="trip-list-page"
-    >
+    <PageBody safeTop withBottomAction data-slot="trip-list-page">
       <PageTitle title="내 여행" />
 
       <div className="mt-4 mb-4 px-(--app-inline-padding)">

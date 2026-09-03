@@ -250,9 +250,6 @@ describe("TripListPage", () => {
     expect(pageBody?.className).toContain(
       "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]",
     );
-    expect(pageBody?.className).toContain(
-      "scroll-pb-[calc(var(--global-nav-height,64px)+5.5rem)]",
-    );
     expect(pageBody?.className).not.toContain("pb-(--app-page-padding-bottom)");
 
     const primaryActions = screen.getAllByRole("button", {
