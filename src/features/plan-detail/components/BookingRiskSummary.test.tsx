@@ -31,6 +31,7 @@ describe("BookingRiskSummary", () => {
         items={[
           {
             level: "DANGER",
+            kind: "DANGER",
             message: "도쿄 숙소가 현재 만실 상태예요",
             snapshotInfo: "예약 불가 확인",
           },
@@ -40,5 +41,39 @@ describe("BookingRiskSummary", () => {
 
     expect(screen.getByText("확인이 필요한 항목 1개")).toBeInTheDocument();
     expect(screen.getByText("예약 어려움")).toBeInTheDocument();
+  });
+
+  it("확인 필요 항목과 확인 전 항목이 함께 있을 때 각각의 개수를 정확히 분리하여 표시한다", () => {
+    render(
+      <BookingRiskSummary
+        hasDetails={true}
+        items={[
+          {
+            level: "WARNING",
+            kind: "WARNING",
+            message: "도쿄 숙소 잔여 객실 확인이 필요해요",
+            snapshotInfo: "잔여 객실 소량",
+          },
+          {
+            level: "WARNING",
+            kind: "UNCHECKED",
+            message: "서울 → 도쿄 교통 예약 상태를 아직 확인하지 않았어요",
+            snapshotInfo: "아직 예약 상태를 확인하지 않았어요",
+          },
+          {
+            level: "WARNING",
+            kind: "UNCHECKED",
+            message: "도쿄 → 서울 교통 예약 상태를 아직 확인하지 않았어요",
+            snapshotInfo: "아직 예약 상태를 확인하지 않았어요",
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText("확인이 필요한 항목 1개 · 확인 전 2개"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("확인 필요")).toBeInTheDocument();
+    expect(screen.getAllByText("확인 전")).toHaveLength(2);
   });
 });

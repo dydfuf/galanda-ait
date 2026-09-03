@@ -667,3 +667,32 @@ describe("FirstPlanWizard - Review Mode and Return Navigation", () => {
     expect(onPrevious).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("FirstPlanWizard - 30-character Validation", () => {
+  it("30자 초과 여행안 제목 입력 시 인라인 에러를 노출하고 다음 버튼을 비활성화한다", () => {
+    renderWizard({
+      cursor: { section: "basic", question: "title" },
+      formData: {
+        title: "가".repeat(31),
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+    expect(screen.getByText("여행안 제목은 최대 30자까지 입력할 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByText("31/30")).toBeInTheDocument();
+  });
+
+  it("30자 초과 도시 이름 입력 시 인라인 에러를 노출하고 다음 버튼을 비활성화한다", () => {
+    renderWizard({
+      cursor: { section: "route", question: "city", index: 0 },
+      formData: {
+        routes: [{ city: "나".repeat(31), arrivalDate: "", departureDate: "" }],
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
+    expect(screen.getByText("도시 이름은 최대 30자까지 입력할 수 있어요.")).toBeInTheDocument();
+    expect(screen.getByText("31/30")).toBeInTheDocument();
+  });
+});
+

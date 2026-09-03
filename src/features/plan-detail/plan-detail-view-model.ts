@@ -179,8 +179,17 @@ export const toPlanDetailViewModel = (
       }: BookingConfirmationInput & { readonly message: string }): void => {
         if (status === "AVAILABLE" && !isSearching) return;
 
+        const isUnchecked = status === "NOT_CHECKED" || isSearching;
+        const kind: "UNCHECKED" | "WARNING" | "DANGER" =
+          status === "FULL"
+            ? "DANGER"
+            : isUnchecked
+              ? "UNCHECKED"
+              : "WARNING";
+
         bookingRisks.push({
           level: status === "FULL" ? "DANGER" : "WARNING",
+          kind,
           message,
           snapshotInfo: formatBookingConfirmation({
             status,

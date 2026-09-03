@@ -7,6 +7,7 @@ import {
 
 export interface BookingRiskItem {
   readonly level: "DANGER" | "WARNING" | "SUCCESS";
+  readonly kind?: "UNCHECKED" | "WARNING" | "DANGER";
   readonly message: string;
   readonly snapshotInfo: string;
 }
@@ -18,8 +19,10 @@ interface BookingRiskSummaryProps {
 }
 
 const isUncheckedItem = (item: BookingRiskItem): boolean =>
-  item.snapshotInfo.includes("아직 예약 상태를 확인하지 않았어요") ||
-  item.message.includes("예약 상태를 아직 확인하지 않았어요");
+  item.kind === "UNCHECKED" ||
+  (!item.kind &&
+    (item.snapshotInfo.includes("아직 예약 상태를 확인하지 않았어요") ||
+      item.message.includes("예약 상태를 아직 확인하지 않았어요")));
 
 const getRiskState = (
   items: ReadonlyArray<BookingRiskItem>,
@@ -41,19 +44,25 @@ const getRiskState = (
     };
   }
 
-  const hasDanger = items.some((item) => item.level === "DANGER");
+  const hasDanger = items.some((item) => (item.kind ?? item.level) === "DANGER");
   const hasWarning = items.some(
-    (item) => item.level === "WARNING" && !isUncheckedItem(item)
+    (item) =>
+      item.kind === "WARNING" ||
+      (!item.kind && item.level === "WARNING" && !isUncheckedItem(item))
   );
   const uncheckedCount = items.filter(isUncheckedItem).length;
   const needCheckCount = items.length - uncheckedCount;
 
+  const description =
+    needCheckCount > 0 && uncheckedCount > 0
+      ? `확인이 필요한 항목 ${needCheckCount}개 · 확인 전 ${uncheckedCount}개`
+      : needCheckCount > 0
+        ? `확인이 필요한 항목 ${needCheckCount}개`
+        : `확인 전인 항목 ${uncheckedCount}개`;
+
   return {
     label: `${items.length}개`,
-    description:
-      needCheckCount > 0
-        ? `확인이 필요한 항목 ${items.length}개`
-        : `확인 전인 항목 ${items.length}개`,
+    description,
     variant: hasDanger ? "danger" : hasWarning ? "warning" : "neutral",
   };
 };
@@ -74,14 +83,15 @@ export function BookingRiskSummary({ items, hasDetails, onClick }: BookingRiskSu
       </MobileListItem>
       {items.map((item, index) => {
         const unchecked = isUncheckedItem(item);
+        const isDanger = item.kind === "DANGER" || item.level === "DANGER";
         const itemVariant =
-          item.level === "DANGER"
+          isDanger
             ? "danger"
             : unchecked
               ? "neutral"
               : "warning";
         const itemLabel =
-          item.level === "DANGER"
+          isDanger
             ? "예약 어려움"
             : unchecked
               ? "확인 전"

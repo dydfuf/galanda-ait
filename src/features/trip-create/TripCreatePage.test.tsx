@@ -153,6 +153,22 @@ describe("TripCreatePage", () => {
     expect(screen.getByText("0/30")).toBeInTheDocument();
   });
 
+  it("30자 제목 뒤에 공백이 있어도 trimmed 기준 30/30으로 유효하게 처리된다", () => {
+    renderPage();
+    const input = screen.getByLabelText("여행 이름 *");
+    const submit = screen.getByRole("button", { name: "여행 만들고 계속" });
+
+    fireEvent.change(input, {
+      target: { value: "가".repeat(30) + " " },
+    });
+
+    expect(submit).toBeEnabled();
+    expect(
+      screen.queryByText("여행 이름은 최대 30자까지 입력할 수 있어요."),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("30/30")).toBeInTheDocument();
+  });
+
   it("pending 동안 label/aria-busy를 표시하고 중복 제출을 막으며 서버 resolve 이후에만 이동한다", async () => {
     const createRequest = deferred<TripRoom>();
     const mutateAsync = vi.fn(() => createRequest.promise);

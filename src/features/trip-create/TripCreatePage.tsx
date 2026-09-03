@@ -34,7 +34,7 @@ export function TripCreatePage() {
   }, []);
 
   const trimmedTitle = title.trim();
-  const isOverLimit = title.length > MAX_TITLE_LENGTH;
+  const isOverLimit = trimmedTitle.length > MAX_TITLE_LENGTH;
   const isWhitespaceOnly = title.length > 0 && trimmedTitle.length === 0;
   const isValid = trimmedTitle.length >= 1 && !isOverLimit;
 

@@ -599,11 +599,13 @@ export function FirstPlanWizard({
 
   // Validations
   const trimmedTitle = title.trim();
-  const isTitleValid = trimmedTitle.length >= 1;
+  const isTitleOverLimit = trimmedTitle.length > 30;
+  const isTitleValid = trimmedTitle.length >= 1 && !isTitleOverLimit;
   const isHeadcountValid = baseHeadcount >= 1 && baseHeadcount <= 20;
 
   const trimmedCity = currentRoute.city.trim();
-  const isCityValid = trimmedCity.length >= 1;
+  const isCityOverLimit = trimmedCity.length > 30;
+  const isCityValid = trimmedCity.length >= 1 && !isCityOverLimit;
 
   const isArrivalOverlap = Boolean(
     routeIndex > 0 &&
@@ -771,13 +773,21 @@ export function FirstPlanWizard({
   const headerInfo = getQuestionHeaderInfo(cursor, routes, accommodations, transports);
 
   // Field error visibility flags
-  const showTitleError = titleTouched && !isTitleValid;
-  const showCityError = cityTouched && !isCityValid;
+  const showTitleError = (titleTouched && !isTitleValid) || isTitleOverLimit;
+  const showCityError = (cityTouched && !isCityValid) || isCityOverLimit;
   const showArrivalError = (arrivalTouched && !isArrivalDateValid) || isArrivalOverlap;
   const showDepartureError = (departureTouched && !isDepartureDateValid) || isDepartureBeforeOrSame;
   const showHotelError = hotelTouched && !isHotelNameValid;
   const showModeError = modeTouched && !isModeValid;
   const showDurationError = durationTouched && !isDurationValid;
+
+  const titleErrorMessage = isTitleOverLimit
+    ? "여행안 제목은 최대 30자까지 입력할 수 있어요."
+    : "여행안 제목을 입력해주세요.";
+
+  const cityErrorMessage = isCityOverLimit
+    ? "도시 이름은 최대 30자까지 입력할 수 있어요."
+    : "도시 이름을 입력해주세요.";
 
   const subStepProgress = getWizardSubStepProgress(cursor, {
     title,
@@ -849,8 +859,13 @@ export function FirstPlanWizard({
               />
               {showTitleError ? (
                 <FieldError id="wizard-title-help" className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 flex-1">여행안 제목을 입력해주세요.</span>
-                  <span className="shrink-0 tabular-nums">{`${trimmedTitle.length}/30`}</span>
+                  <span className="min-w-0 flex-1">{titleErrorMessage}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular-nums",
+                      isTitleOverLimit && "text-destructive font-semibold",
+                    )}
+                  >{`${trimmedTitle.length}/30`}</span>
                 </FieldError>
               ) : (
                 <FieldDescription id="wizard-title-help" className="flex items-start justify-between gap-3">
@@ -981,8 +996,13 @@ export function FirstPlanWizard({
               />
               {showCityError ? (
                 <FieldError id="wizard-route-city-help" className="flex items-start justify-between gap-3">
-                  <span className="min-w-0 flex-1">도시 이름을 입력해주세요.</span>
-                  <span className="shrink-0 tabular-nums">{`${trimmedCity.length}/30`}</span>
+                  <span className="min-w-0 flex-1">{cityErrorMessage}</span>
+                  <span
+                    className={cn(
+                      "shrink-0 tabular-nums",
+                      isCityOverLimit && "text-destructive font-semibold",
+                    )}
+                  >{`${trimmedCity.length}/30`}</span>
                 </FieldError>
               ) : (
                 <FieldDescription id="wizard-route-city-help" className="flex items-start justify-between gap-3">

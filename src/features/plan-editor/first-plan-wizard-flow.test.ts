@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getNextWizardCursor,
   getPreviousWizardCursor,
+  getWizardQuestionSequence,
   getWizardSubStepProgress,
   isFirstPlanWizardQuestion,
   isFirstPlanWizardSection,
@@ -812,7 +813,7 @@ describe("End-to-End State Machine Scenarios", () => {
   });
 
   describe("getWizardSubStepProgress", () => {
-    it("기본 1개 도시 기준 13개 질문에서 순서에 맞는 current/total을 반환한다", () => {
+    it("기본 1개 도시(숙소 탐색 기본값) 기준 12개 질문에서 순서에 맞는 current/total을 반환한다", () => {
       const initialForm: PlanEditorFormData = {
         title: "",
         proposalReason: "",
@@ -822,103 +823,181 @@ describe("End-to-End State Machine Scenarios", () => {
         transports: [],
       };
 
-      // 1. basic title -> 1/13
+      // 1. basic title -> 1/12
       expect(getWizardSubStepProgress({ section: "basic", question: "title" }, initialForm)).toEqual({
         current: 1,
-        total: 13,
+        total: 12,
       });
 
-      // 2. basic proposal-reason -> 2/13
+      // 2. basic proposal-reason -> 2/12
       expect(getWizardSubStepProgress({ section: "basic", question: "proposal-reason" }, initialForm)).toEqual({
         current: 2,
-        total: 13,
+        total: 12,
       });
 
-      // 3. basic headcount -> 3/13
+      // 3. basic headcount -> 3/12
       expect(getWizardSubStepProgress({ section: "basic", question: "headcount" }, initialForm)).toEqual({
         current: 3,
-        total: 13,
+        total: 12,
       });
 
-      // 4. route city -> 4/13
+      // 4. route city -> 4/12
       expect(getWizardSubStepProgress({ section: "route", question: "city", index: 0 }, initialForm)).toEqual({
         current: 4,
-        total: 13,
+        total: 12,
       });
 
-      // 5. route arrival-date -> 5/13 (이슈 #110의 예시 3/4 · 5/13 도착일 화면)
+      // 5. route arrival-date -> 5/12
       expect(getWizardSubStepProgress({ section: "route", question: "arrival-date", index: 0 }, initialForm)).toEqual({
         current: 5,
-        total: 13,
+        total: 12,
       });
 
-      // 6. route departure-date -> 6/13
+      // 6. route departure-date -> 6/12
       expect(getWizardSubStepProgress({ section: "route", question: "departure-date", index: 0 }, initialForm)).toEqual({
         current: 6,
-        total: 13,
+        total: 12,
       });
 
-      // 7. route add-city -> 7/13
+      // 7. route add-city -> 7/12
       expect(getWizardSubStepProgress({ section: "route", question: "add-city", index: 0 }, initialForm)).toEqual({
         current: 7,
-        total: 13,
+        total: 12,
       });
 
-      // 8. accommodation status -> 8/13
+      // 8. accommodation status -> 8/12
       expect(getWizardSubStepProgress({ section: "accommodation", question: "status", index: 0 }, initialForm)).toEqual({
         current: 8,
-        total: 13,
+        total: 12,
       });
 
-      // 9. accommodation hotel-name -> 9/13
-      expect(getWizardSubStepProgress({ section: "accommodation", question: "hotel-name", index: 0 }, initialForm)).toEqual({
+      // 9. transport endpoints (0) -> 9/12 (hotel-name 건너뜀)
+      expect(getWizardSubStepProgress({ section: "transport", question: "endpoints", index: 0 }, initialForm)).toEqual({
+        current: 9,
+        total: 12,
+      });
+
+      // 10. transport status (0) -> 10/12
+      expect(getWizardSubStepProgress({ section: "transport", question: "status", index: 0 }, initialForm)).toEqual({
+        current: 10,
+        total: 12,
+      });
+
+      // 11. transport endpoints (1 - 귀환) -> 11/12
+      expect(getWizardSubStepProgress({ section: "transport", question: "endpoints", index: 1 }, initialForm)).toEqual({
+        current: 11,
+        total: 12,
+      });
+
+      // 12. transport status (1 - 귀환 상태) -> 12/12
+      expect(getWizardSubStepProgress({ section: "transport", question: "status", index: 1 }, initialForm)).toEqual({
+        current: 12,
+        total: 12,
+      });
+    });
+
+    it("숙소를 확정(isSearching=false)한 경우 hotel-name 단계가 추가되어 13개로 계산된다", () => {
+      const hotelDecidedForm: PlanEditorFormData = {
+        title: "도쿄 여행",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "도쿄", arrivalDate: "2026-10-01", departureDate: "2026-10-03" }],
+        accommodations: [
+          {
+            id: "acc-1",
+            city: "도쿄",
+            period: "2026-10-01 ~ 2026-10-03",
+            nights: 2,
+            hotelName: "그랜드 호텔",
+            isSearching: false,
+            bookingStatus: "AVAILABLE",
+          },
+        ],
+        transports: [],
+      };
+
+      // accommodation hotel-name -> 9/13
+      expect(
+        getWizardSubStepProgress({ section: "accommodation", question: "hotel-name", index: 0 }, hotelDecidedForm),
+      ).toEqual({
         current: 9,
         total: 13,
       });
 
-      // 10. transport endpoints (0) -> 10/13
-      expect(getWizardSubStepProgress({ section: "transport", question: "endpoints", index: 0 }, initialForm)).toEqual({
+      // transport endpoints (0) -> 10/13
+      expect(
+        getWizardSubStepProgress({ section: "transport", question: "endpoints", index: 0 }, hotelDecidedForm),
+      ).toEqual({
         current: 10,
-        total: 13,
-      });
-
-      // 11. transport status (0) -> 11/13
-      expect(getWizardSubStepProgress({ section: "transport", question: "status", index: 0 }, initialForm)).toEqual({
-        current: 11,
-        total: 13,
-      });
-
-      // 12. transport endpoints (1 - 귀환) -> 12/13
-      expect(getWizardSubStepProgress({ section: "transport", question: "endpoints", index: 1 }, initialForm)).toEqual({
-        current: 12,
-        total: 13,
-      });
-
-      // 13. transport status (1 - 귀환 상태) -> 13/13
-      expect(getWizardSubStepProgress({ section: "transport", question: "status", index: 1 }, initialForm)).toEqual({
-        current: 13,
         total: 13,
       });
     });
 
-    it("교통편을 정한 경우 mode, duration이 추가되어 total이 계산된다", () => {
-      const decidedForm = createMockFormData();
-      expect(getWizardSubStepProgress({ section: "basic", question: "title" }, decidedForm)).toEqual({
-        current: 1,
+    it("교통편 예약 확정 시 mode/duration 단계가 추가되어 17개(숙소 포함)로 확장된다", () => {
+      const decidedTransportForm: PlanEditorFormData = {
+        title: "",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "도쿄", arrivalDate: "2026-05-01", departureDate: "2026-05-03" }],
+        accommodations: [
+          {
+            id: "acc-1",
+            city: "도쿄",
+            period: "2026-05-01 ~ 2026-05-03",
+            nights: 2,
+            hotelName: "호텔",
+            isSearching: false,
+            bookingStatus: "AVAILABLE",
+          },
+        ],
+        transports: [
+          {
+            id: "tr-0",
+            fromCity: "서울",
+            toCity: "도쿄",
+            mode: "비행기",
+            hasTransfer: false,
+            durationText: "2시간",
+            bookingStatus: "AVAILABLE",
+          },
+          {
+            id: "tr-1",
+            fromCity: "도쿄",
+            toCity: "서울",
+            mode: "비행기",
+            hasTransfer: false,
+            durationText: "2시간",
+            bookingStatus: "AVAILABLE",
+          },
+        ],
+      };
+
+      expect(getWizardQuestionSequence(decidedTransportForm)).toHaveLength(17);
+      expect(
+        getWizardSubStepProgress({ section: "transport", question: "duration", index: 0 }, decidedTransportForm),
+      ).toEqual({
+        current: 13,
         total: 17,
       });
     });
 
-    it("review 단계 또는 returnToReview인 경우 undefined를 반환한다", () => {
-      const form = createMockFormData();
+    it("review 화면이거나 returnToReview인 경우 subStepProgress는 undefined를 반환한다", () => {
+      const form: PlanEditorFormData = {
+        title: "제주 여행",
+        proposalReason: "",
+        baseHeadcount: 2,
+        routes: [{ city: "제주", arrivalDate: "2026-06-01", departureDate: "2026-06-03" }],
+        accommodations: [],
+        transports: [],
+      };
+
       expect(getWizardSubStepProgress({ section: "review", question: "title" }, form)).toBeUndefined();
       expect(
         getWizardSubStepProgress(
           { section: "route", question: "city", index: 0, returnToReview: true },
-          form
-        )
+          form,
+        ),
       ).toBeUndefined();
     });
   });
 });
-

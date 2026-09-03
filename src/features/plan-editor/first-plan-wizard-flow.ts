@@ -536,37 +536,28 @@ export function mapValidationErrorToCursor(
 export function getWizardQuestionSequence(
   formData: PlanEditorFormData
 ): ReadonlyArray<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> {
-  const list: Array<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> = [
-    { section: "basic", question: "title" },
-    { section: "basic", question: "proposal-reason" },
-    { section: "basic", question: "headcount" },
-  ];
+  const list: Array<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> = [];
+  let current: FirstPlanWizardCursor = { section: "basic", question: "title" };
 
-  const routeCount = Math.max(1, formData.routes.length);
-  for (let i = 0; i < routeCount; i++) {
-    list.push({ section: "route", question: "city", index: i });
-    list.push({ section: "route", question: "arrival-date", index: i });
-    list.push({ section: "route", question: "departure-date", index: i });
-    list.push({ section: "route", question: "add-city", index: i });
-  }
+  const maxSteps = 100;
+  let steps = 0;
 
-  for (let i = 0; i < routeCount; i++) {
-    list.push({ section: "accommodation", question: "status", index: i });
-    const acc = formData.accommodations[i];
-    if (acc ? !acc.isSearching : true) {
-      list.push({ section: "accommodation", question: "hotel-name", index: i });
+  while (current.section !== "review" && steps < maxSteps) {
+    list.push({
+      section: current.section,
+      question: current.question,
+      ...(current.index !== undefined ? { index: current.index } : {}),
+    });
+    const next = getNextWizardCursor(current, formData);
+    if (
+      next.section === current.section &&
+      next.question === current.question &&
+      next.index === current.index
+    ) {
+      break;
     }
-  }
-
-  const totalLegs = routeCount + 1;
-  for (let i = 0; i < totalLegs; i++) {
-    list.push({ section: "transport", question: "endpoints", index: i });
-    list.push({ section: "transport", question: "status", index: i });
-    const tr = formData.transports[i];
-    if (tr && tr.bookingStatus !== "NOT_CHECKED") {
-      list.push({ section: "transport", question: "mode", index: i });
-      list.push({ section: "transport", question: "duration", index: i });
-    }
+    current = next;
+    steps++;
   }
 
   return list;
@@ -580,7 +571,45 @@ export function getWizardSubStepProgress(
     return undefined;
   }
 
-  const sequence = getWizardQuestionSequence(formData);
+  let effectiveFormData = formData;
+  if (cursor.section === "accommodation" && cursor.question === "hotel-name") {
+    const idx = cursor.index ?? 0;
+    const stay = formData.accommodations[idx];
+    if (!stay || stay.isSearching) {
+      const updatedAccs = [...formData.accommodations];
+      updatedAccs[idx] = {
+        id: stay?.id ?? `acc-${idx}`,
+        city: stay?.city ?? formData.routes[idx]?.city ?? "",
+        period: stay?.period ?? "",
+        nights: stay?.nights ?? 1,
+        hotelName: stay?.hotelName ?? "",
+        isSearching: false,
+        bookingStatus: stay?.bookingStatus ?? "AVAILABLE",
+      };
+      effectiveFormData = { ...formData, accommodations: updatedAccs };
+    }
+  } else if (
+    cursor.section === "transport" &&
+    (cursor.question === "mode" || cursor.question === "duration")
+  ) {
+    const idx = cursor.index ?? 0;
+    const tr = formData.transports[idx];
+    if (!tr || tr.bookingStatus === "NOT_CHECKED") {
+      const updatedTrs = [...formData.transports];
+      updatedTrs[idx] = {
+        id: tr?.id ?? `tr-${idx}`,
+        fromCity: tr?.fromCity ?? "",
+        toCity: tr?.toCity ?? "",
+        mode: tr?.mode ?? "항공",
+        hasTransfer: tr?.hasTransfer ?? false,
+        durationText: tr?.durationText ?? "",
+        bookingStatus: "AVAILABLE",
+      };
+      effectiveFormData = { ...formData, transports: updatedTrs };
+    }
+  }
+
+  const sequence = getWizardQuestionSequence(effectiveFormData);
   const foundIndex = sequence.findIndex(
     (item) =>
       item.section === cursor.section &&
