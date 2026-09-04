@@ -424,7 +424,7 @@ Vitest 또는 repository script로 다음을 검사한다.
 
 ### 12.3 Browser/visual verification matrix
 
-현재 repository에는 전용 browser E2E/visual dependency가 없으므로 production runtime dependency를 추가하지 않는다. 기존 build를 사용해 실제 browser/AIT dev environment에서 다음 evidence를 수집한다.
+현재 repository에는 전용 browser/visual 자동화 dependency가 없으므로 production runtime dependency를 추가하지 않는다. 기존 build를 사용해 실제 browser/AIT dev environment에서 다음 evidence를 수집한다.
 
 | 축       | 값                                                         |
 | -------- | ---------------------------------------------------------- |
