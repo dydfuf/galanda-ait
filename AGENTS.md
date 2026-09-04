@@ -296,6 +296,8 @@ focused unit/domain test
 
 bug fix는 가능하면 실패를 재현하는 regression test를 추가한다.
 
+Do not write tests for reversible, low-impact changes that mirror the implementation. If you do choose to verify your work with tests, make sure that the tests are meaningful and necessary to verify implementation.
+
 authorization, persistence, concurrency 같은 중요한 계약을
 UI test만으로 검증하지 않는다.
 
@@ -306,6 +308,8 @@ pnpm check
 ```
 
 현재 command 이름과 세부 단계는 항상 `package.json`을 source of truth로 사용한다.
+
+Run tests appropriate to the change and complete required checks. Once those pass, broaden or repeat testing only when new changes, failures, or unresolved concerns justify it; otherwise, continue toward completing the task.
 
 required check를 통과시키기 위해:
 
