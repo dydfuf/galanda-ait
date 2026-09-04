@@ -31,9 +31,15 @@ const basePlan: PlanHomePlanSummaryData = {
     maxPerPerson: 100_000,
   },
   perPersonCostText: "2명 기준 1인 10만원",
-  bookingNeedCheckCount: 0,
-  hasBookingDetails: true,
-  bookingRiskText: "예약 확인 완료",
+  booking: {
+    state: "READY",
+    fullCount: 0,
+    needCheckCount: 0,
+    uncheckedCount: 0,
+    hasAnyBookingInformation: true,
+    isBookingComplete: true,
+    text: "예약 확인 완료",
+  },
   respondentCount: 2,
   eligibleResponseCount: 3,
   responseText: "이 여행안에 2/3명 응답",
@@ -299,20 +305,50 @@ describe("PlanDecisionCard Decision Cockpit (RAON-293)", () => {
 
   it("예약 확인 필요가 있으면 경고 스타일로 건수를 표시한다", () => {
     renderCard({
-      bookingNeedCheckCount: 2,
-      hasBookingDetails: true,
-      bookingRiskText: "확인 필요 2건",
+      booking: {
+        state: "NEEDS_CHECK",
+        fullCount: 0,
+        needCheckCount: 2,
+        uncheckedCount: 0,
+        hasAnyBookingInformation: true,
+        isBookingComplete: false,
+        text: "확인 필요 2건",
+      },
     });
     const risk = screen.getByText("확인 필요 2건");
     expect(risk).toBeInTheDocument();
     expect(risk.className).toMatch(/bg-warning-muted/);
   });
 
+  it("FULL은 확인 필요가 아니라 예약 불가와 danger 스타일로 표시한다", () => {
+    renderCard({
+      booking: {
+        state: "UNAVAILABLE",
+        fullCount: 1,
+        needCheckCount: 1,
+        uncheckedCount: 0,
+        hasAnyBookingInformation: true,
+        isBookingComplete: false,
+        text: "예약 불가 1건",
+      },
+    });
+    const risk = screen.getByText("예약 불가 1건");
+    expect(risk).toBeInTheDocument();
+    expect(risk.className).toMatch(/bg-destructive-muted/);
+    expect(risk.className).toMatch(/text-destructive-strong/);
+  });
+
   it("예약 정보가 없으면 없음을 숨기지 않고 표시한다", () => {
     renderCard({
-      bookingNeedCheckCount: 0,
-      hasBookingDetails: false,
-      bookingRiskText: "예약 정보 없음",
+      booking: {
+        state: "NO_INFORMATION",
+        fullCount: 0,
+        needCheckCount: 0,
+        uncheckedCount: 0,
+        hasAnyBookingInformation: false,
+        isBookingComplete: false,
+        text: "예약 정보 없음",
+      },
     });
     expect(screen.getByText("예약 정보 없음")).toBeInTheDocument();
   });
@@ -327,11 +363,17 @@ describe("PlanDecisionCard Decision Cockpit (RAON-293)", () => {
       perPersonCostText: longCost,
       responseText: "이 여행안에 0/6명 응답",
       nonRespondentText:
-        "아주 긴 이름을 가진 참여자 외 5명은 아직 의견이 없어요",
+        "아주 긴 이름을 가진 참여자님 외 5명은 아직 의견이 없어요",
     });
     const card = screen.getByRole("link");
     expect(card.className).toMatch(/overflow-hidden/);
     expect(card.className).toMatch(/min-w-0/);
-    expect(screen.getByText(longCost)).toBeInTheDocument();
+    // 비용 행은 nowrap pill이 아니라 줄바꿈 행이라 한정 문구까지 잘리지 않는다
+    const costEl = screen.getByText(longCost);
+    expect(costEl.tagName).toBe("P");
+    expect(costEl.className).toMatch(/break-words/);
+    expect(costEl.className).toMatch(/\[overflow-wrap:anywhere\]/);
+    expect(costEl.className).not.toMatch(/whitespace-nowrap/);
+    expect(costEl.className).not.toMatch(/rounded-full/);
   });
 });

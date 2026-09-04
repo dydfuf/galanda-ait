@@ -4,7 +4,10 @@ import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 
-import type { PlanHomePlanSummaryData } from "../plan-home-view-model.ts";
+import type {
+  PlanBookingState,
+  PlanHomePlanSummaryData,
+} from "../plan-home-view-model.ts";
 import { Pill, PlanOpinionSummary } from "./PlanOpinionSummary.tsx";
 
 interface PlanDecisionCardProps {
@@ -22,7 +25,17 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   const durationLabel = hasDuration ? `${plan.nights}박 ${plan.days}일` : undefined;
   const periodText = plan.period !== "일정 미정" ? plan.period : undefined;
   const hasDifferenceSummary = Boolean(plan.differenceSummary?.trim());
-  const hasBookingRisk = plan.bookingNeedCheckCount > 0;
+  const bookingPillClassName = (state: PlanBookingState): string => {
+    switch (state) {
+      case "UNAVAILABLE":
+        return "bg-destructive-muted font-semibold text-destructive-strong";
+      case "NEEDS_CHECK":
+      case "INCOMPLETE":
+        return "border border-warning-border bg-warning-muted font-semibold text-warning";
+      default:
+        return "font-semibold";
+    }
+  };
 
   const cardVariantClass = isConfirmed
     ? "border-success/80 bg-surface-raised hover:border-success hover:shadow-md"
@@ -80,17 +93,14 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         {plan.authorName} 제안
       </p>
 
-      {/* 3.5 비용·예약·응답 – 현재 데이터로 계산 가능한 값만, 320px에서도 wrap */}
+      {/* 3.5 비용 – 범위·미정 한정 문구가 길어질 수 있어 pill이 아닌 줄바꿈 행으로 둔다 */}
+      <p className="min-w-0 break-words text-sm font-semibold tabular-nums leading-snug text-foreground [overflow-wrap:anywhere]">
+        {plan.perPersonCostText}
+      </p>
+      {/* 3.6 예약·응답 – 짧은 상태 pill만 유지해 320px에서도 잘리지 않는다 */}
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <Pill className="font-semibold tabular-nums">{plan.perPersonCostText}</Pill>
-        <Pill
-          className={
-            hasBookingRisk
-              ? "border border-warning-border bg-warning-muted font-semibold text-warning"
-              : "font-semibold"
-          }
-        >
-          {plan.bookingRiskText}
+        <Pill className={bookingPillClassName(plan.booking.state)}>
+          {plan.booking.text}
         </Pill>
         <Pill className="font-semibold tabular-nums">{plan.responseText}</Pill>
       </div>

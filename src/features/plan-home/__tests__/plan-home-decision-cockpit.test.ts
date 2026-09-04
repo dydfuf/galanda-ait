@@ -8,9 +8,8 @@ import {
 import type { TripRoom } from "../../../core/domain/room.ts";
 import {
   formatNonRespondentText,
-  getBookingRiskText,
-  getPlanBookingNeedCheckCount,
   getPlanRouteText,
+  summarizePlanBooking,
   toTripRoomViewModel,
 } from "../plan-home-view-model.ts";
 
@@ -50,6 +49,39 @@ const planWith = (
   voteCount: 0,
   ...overrides,
 });
+
+const stay = (
+  id: string,
+  overrides: Record<string, unknown> = {},
+): NonNullable<TripRoom["plans"][number]["accommodations"]>[number] => ({
+  id,
+  city: "도쿄",
+  period: "2026-12-12 ~ 2026-12-14",
+  nights: 2,
+  hotelName: "도쿄 호텔",
+  bookingStatus: "AVAILABLE",
+  ...overrides,
+}) as NonNullable<TripRoom["plans"][number]["accommodations"]>[number];
+
+const transport = (
+  id: string,
+  fromCity = "서울",
+  toCity = "도쿄",
+  overrides: Record<string, unknown> = {},
+): NonNullable<TripRoom["plans"][number]["transports"]>[number] => ({
+  id,
+  fromCity,
+  toCity,
+  mode: "항공",
+  hasTransfer: false,
+  durationText: "2시간",
+  bookingStatus: "AVAILABLE",
+  ...overrides,
+}) as NonNullable<TripRoom["plans"][number]["transports"]>[number];
+
+const tokyoRoute = [
+  { city: "도쿄", arrivalDate: "2026-12-12", departureDate: "2026-12-14" },
+];
 
 describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
   it("0 후보: 참여 합집합이 0명이고 확정·위험 요약이 없다", () => {
@@ -103,12 +135,14 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
     const plan = vm.plans[0];
     expect(plan.routeText).toBe("도쿄 2박 · 오사카 1박");
     expect(plan.perPersonCostText).toBe("2명 기준 1인 10만원");
-    expect(plan.bookingNeedCheckCount).toBe(1);
-    expect(plan.bookingRiskText).toBe("확인 필요 1건");
+    expect(plan.booking.state).toBe("NEEDS_CHECK");
+    expect(plan.booking.needCheckCount).toBe(1);
+    expect(plan.booking.fullCount).toBe(0);
+    expect(plan.booking.text).toBe("확인 필요 1건");
     expect(plan.responseText).toBe("이 여행안에 2/6명 응답");
     expect(plan.nonRespondentNames).toEqual(["준호", "서준", "지우", "하린"]);
     expect(plan.nonRespondentText).toBe(
-      "준호, 서준님 외 2명은 아직 의견이 없어요",
+      "준호님, 서준님 외 2명은 아직 의견이 없어요",
     );
     expect(vm.totalUnresolvedBookingCount).toBe(1);
     expect(vm.bookingSummaryText).toBe("예약 확인 필요 1건");
@@ -174,16 +208,13 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
     const confirmedPlan = planWith("plan-1", {
       status: "CONFIRMED",
       baseHeadcount: 2,
+      routes: tokyoRoute,
       accommodations: [
-        {
-          id: "stay-1",
-          city: "도쿄",
-          period: "2026-12-12 ~ 2026-12-14",
-          nights: 2,
-          hotelName: "도쿄 호텔",
-          bookingStatus: "AVAILABLE",
-          priceRange: { min: 100_000, max: 100_000 },
-        },
+        { ...stay("stay-1"), priceRange: { min: 100_000, max: 100_000 } },
+      ],
+      transports: [
+        transport("transport-1", "서울", "도쿄"),
+        transport("transport-2", "도쿄", "서울"),
       ],
       memberOpinions: [
         { userId: UserIdSchema.make("user-host"), userName: "호스트", reaction: "LIKE" },
@@ -198,9 +229,13 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
     expect(vm.isConfirmed).toBe(true);
     expect(vm.decisionBadgeText).toBe("확정됨");
     expect(vm.plans[0].isConfirmed).toBe(true);
-    expect(vm.plans[0].perPersonCostText).toBe("2명 기준 1인 5만원");
-    expect(vm.plans[0].bookingRiskText).toBe("예약 확인 완료");
+    expect(vm.plans[0].perPersonCostText).toBe(
+      "2명 기준 1인 5만원 (가격 미정 2건 별도)",
+    );
+    expect(vm.plans[0].booking.state).toBe("READY");
+    expect(vm.plans[0].booking.text).toBe("예약 확인 완료");
     expect(vm.plans[0].responseText).toBe("이 여행안에 1/6명 응답");
+    expect(vm.bookingSummaryText).toBeUndefined();
   });
 
   it("비용 미입력은 0원이 아니라 비용 미정으로 표시하고 명시적 0원과 구분한다", () => {
@@ -280,6 +315,9 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
     expect(vm.overallParticipationText).toBe(
       "6명 중 1명이 한 번 이상 의견을 남겼어요",
     );
+    // 카드 반응에는 현재 멤버 의견만 집계한다
+    expect(vm.plans[0].opinions).toEqual({ likeCount: 0, okayCount: 0, hardCount: 0 });
+    expect(vm.plans[1].opinions).toEqual({ likeCount: 1, okayCount: 0, hardCount: 0 });
   });
 
   it("탈퇴 멤버 의견만으로는 참여율을 올리지 않는다", () => {
@@ -296,8 +334,290 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
     const vm = toTripRoomViewModel(room);
     expect(vm.totalOpinionCount).toBe(1);
     expect(vm.participatedMemberCount).toBe(0);
+    expect(vm.plans[0].opinions).toEqual({ likeCount: 0, okayCount: 0, hardCount: 0 });
     expect(vm.plans[0].respondentCount).toBe(0);
     expect(vm.plans[0].responseText).toBe("이 여행안에 0/6명 응답");
+  });
+
+  it("탈퇴 멤버 HARD는 카드 반응과 상단 장애물에서 제외하고 과거 의견에만 포함한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-1", {
+          memberOpinions: [
+            { userId: UserIdSchema.make("user-ghost"), userName: "탈퇴", reaction: "HARD" },
+          ],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].opinions).toEqual({ likeCount: 0, okayCount: 0, hardCount: 0 });
+    expect(vm.totalHardCount).toBe(0);
+    expect(vm.hardSummaryText).toBeUndefined();
+    expect(vm.totalOpinionCount).toBe(1);
+    expect(vm.unattributedOpinionCount).toBe(1);
+    expect(vm.unattributedNoticeText).toBe(
+      "과거 의견 1개는 회원과 연결되지 않아 응답률에서 제외했어요",
+    );
+  });
+
+  it("legacy voteCount를 현재 좋아요 수처럼 표시하지 않는다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        {
+          id: PlanIdSchema.make("plan-legacy"),
+          title: "legacy",
+          status: "DRAFT",
+          places: [],
+          voteCount: 4,
+        },
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].opinions).toEqual({ likeCount: 0, okayCount: 0, hardCount: 0 });
+    expect(vm.totalOpinionCount).toBe(4);
+    expect(vm.participatedMemberCount).toBe(0);
+  });
+
+  it("부분 숙소만 AVAILABLE이어도 예약 확인 완료로 표시하지 않는다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-partial", {
+          title: "부분 예약안",
+          baseHeadcount: 2,
+          routes: [
+            { city: "도쿄", arrivalDate: "2026-12-12", departureDate: "2026-12-14" },
+            { city: "오사카", arrivalDate: "2026-12-14", departureDate: "2026-12-15" },
+          ],
+          accommodations: [{ ...stay("stay-1"), bookingStatus: "AVAILABLE" }],
+          transports: [],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    // 존재하는 1건은 AVAILABLE이지만 오사카 숙소와 교통 3개가 누락됐다
+    expect(vm.plans[0].booking.state).toBe("INCOMPLETE");
+    expect(vm.plans[0].booking.text).toBe("예약 정보 미완성");
+    expect(vm.bookingSummaryText).toBe("예약 정보 미완성 1개 여행안");
+  });
+
+  it("필수 교통 구간이 누락되면 예약 정보 미완성으로 표시한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-no-transport", {
+          title: "교통 누락안",
+          baseHeadcount: 2,
+          routes: tokyoRoute,
+          accommodations: [{ ...stay("stay-1"), bookingStatus: "AVAILABLE" }],
+          transports: [],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].booking.state).toBe("INCOMPLETE");
+    expect(vm.plans[0].booking.text).toBe("예약 정보 미완성");
+  });
+
+  it("필수 정보가 모두 있고 전부 AVAILABLE일 때만 예약 확인 완료로 표시한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-ready", {
+          title: "완성안",
+          baseHeadcount: 2,
+          routes: tokyoRoute,
+          accommodations: [{ ...stay("stay-1"), bookingStatus: "AVAILABLE" }],
+          transports: [
+            transport("transport-1", "서울", "도쿄"),
+            transport("transport-2", "도쿄", "서울"),
+          ],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].booking.state).toBe("READY");
+    expect(vm.plans[0].booking.text).toBe("예약 확인 완료");
+    expect(vm.plans[0].booking.isBookingComplete).toBe(true);
+    expect(vm.bookingSummaryText).toBeUndefined();
+  });
+
+  it("FULL 숙소는 예약 불가와 danger 상태로 표시한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-full-stay", {
+          title: "만실안",
+          baseHeadcount: 2,
+          routes: tokyoRoute,
+          accommodations: [{ ...stay("stay-1"), bookingStatus: "FULL" }],
+          transports: [
+            transport("transport-1", "서울", "도쿄"),
+            transport("transport-2", "도쿄", "서울"),
+          ],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].booking.state).toBe("UNAVAILABLE");
+    expect(vm.plans[0].booking.fullCount).toBe(1);
+    expect(vm.plans[0].booking.text).toBe("예약 불가 1건");
+    expect(vm.totalUnresolvedBookingCount).toBe(1);
+    expect(vm.bookingSummaryText).toBe("예약 불가 1건");
+  });
+
+  it("FULL 교통편은 예약 불가로 표시한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-full-transport", {
+          title: "매진안",
+          baseHeadcount: 2,
+          routes: tokyoRoute,
+          accommodations: [{ ...stay("stay-1"), bookingStatus: "AVAILABLE" }],
+          transports: [
+            transport("transport-1", "서울", "도쿄", { bookingStatus: "FULL" }),
+            transport("transport-2", "도쿄", "서울"),
+          ],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].booking.state).toBe("UNAVAILABLE");
+    expect(vm.plans[0].booking.text).toBe("예약 불가 1건");
+  });
+
+  it("FULL과 NEED_CHECK가 함께 있으면 FULL을 우선한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-mixed", {
+          title: "혼합안",
+          baseHeadcount: 2,
+          routes: tokyoRoute,
+          accommodations: [
+            { ...stay("stay-1"), bookingStatus: "FULL" },
+            {
+              ...stay("stay-2"),
+              city: "도쿄",
+              hotelName: "제2 호텔",
+              bookingStatus: "NEED_CHECK",
+            },
+          ],
+          transports: [
+            transport("transport-1", "서울", "도쿄"),
+            transport("transport-2", "도쿄", "서울"),
+          ],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.plans[0].booking.state).toBe("UNAVAILABLE");
+    expect(vm.plans[0].booking.fullCount).toBe(1);
+    expect(vm.plans[0].booking.needCheckCount).toBe(1);
+    expect(vm.plans[0].booking.text).toBe("예약 불가 1건");
+  });
+
+  it("NOT_CHECKED·찾는 중은 확인 전으로 NEED_CHECK와 구분한다", () => {
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [
+        planWith("plan-unchecked", {
+          title: "미확인안",
+          baseHeadcount: 2,
+          routes: tokyoRoute,
+          accommodations: [
+            { ...stay("stay-1"), hotelName: "", isSearching: true, bookingStatus: "AVAILABLE" },
+          ],
+          transports: [
+            transport("transport-1", "서울", "도쿄", { bookingStatus: "NOT_CHECKED" }),
+            transport("transport-2", "도쿄", "서울"),
+          ],
+        }),
+      ],
+    };
+    const vm = toTripRoomViewModel(room);
+    // 찾는 중(AVAILABLE 기록보다 확인 전 의미 우선) + NOT_CHECKED 교통
+    expect(vm.plans[0].booking.state).toBe("UNCHECKED");
+    expect(vm.plans[0].booking.uncheckedCount).toBe(2);
+    expect(vm.plans[0].booking.needCheckCount).toBe(0);
+    expect(vm.plans[0].booking.text).toBe("확인 전 2건");
+    expect(vm.bookingSummaryText).toBe("예약 확인 전 2건");
+  });
+
+  it("확정 후 상단 위험은 확정안만 집계하고 탈락 후보 위험은 카드에만 남긴다", () => {
+    const loser = planWith("plan-loser", {
+      title: "탈락안",
+      status: "DRAFT",
+      baseHeadcount: 2,
+      routes: tokyoRoute,
+      accommodations: [{ ...stay("stay-loser"), bookingStatus: "FULL" }],
+      transports: [
+        transport("transport-loser-1", "서울", "도쿄"),
+        transport("transport-loser-2", "도쿄", "서울"),
+      ],
+      memberOpinions: [
+        { userId: UserIdSchema.make("user-a"), userName: "민지", reaction: "HARD" },
+        { userId: UserIdSchema.make("user-b"), userName: "준호", reaction: "HARD" },
+      ],
+    });
+    const winner = planWith("plan-winner", {
+      title: "확정안",
+      status: "CONFIRMED",
+      baseHeadcount: 2,
+      routes: tokyoRoute,
+      accommodations: [{ ...stay("stay-winner"), bookingStatus: "AVAILABLE" }],
+      transports: [
+        transport("transport-winner-1", "서울", "도쿄"),
+        transport("transport-winner-2", "도쿄", "서울"),
+      ],
+      memberOpinions: [
+        { userId: UserIdSchema.make("user-host"), userName: "호스트", reaction: "LIKE" },
+      ],
+    });
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [loser, winner],
+      confirmedPlanId: winner.id,
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.isConfirmed).toBe(true);
+    // 상단에는 확정안 기준으로 경고가 없다
+    expect(vm.totalHardCount).toBe(0);
+    expect(vm.hardSummaryText).toBeUndefined();
+    expect(vm.hardAffectedCandidateCount).toBe(0);
+    expect(vm.totalUnresolvedBookingCount).toBe(0);
+    expect(vm.bookingSummaryText).toBeUndefined();
+    // 탈락 후보 카드에는 위험이 그대로 남는다
+    expect(vm.plans[0].opinions.hardCount).toBe(2);
+    expect(vm.plans[0].booking.state).toBe("UNAVAILABLE");
+    expect(vm.plans[0].booking.text).toBe("예약 불가 1건");
+    expect(vm.plans[1].booking.state).toBe("READY");
+  });
+
+  it("확정안 자체가 FULL이면 상단 경고가 유지된다", () => {
+    const winner = planWith("plan-winner", {
+      title: "확정안",
+      status: "CONFIRMED",
+      baseHeadcount: 2,
+      routes: tokyoRoute,
+      accommodations: [{ ...stay("stay-winner"), bookingStatus: "FULL" }],
+      transports: [
+        transport("transport-1", "서울", "도쿄"),
+        transport("transport-2", "도쿄", "서울"),
+      ],
+      memberOpinions: [],
+    });
+    const room: TripRoom = {
+      ...baseRoom,
+      plans: [winner],
+      confirmedPlanId: winner.id,
+    };
+    const vm = toTripRoomViewModel(room);
+    expect(vm.bookingSummaryText).toBe("예약 불가 1건");
+    expect(vm.totalUnresolvedBookingCount).toBe(1);
   });
 
   it("긴 이름도 의미를 잃지 않고 요약된다", () => {
@@ -307,7 +627,10 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
     );
     expect(
       formatNonRespondentText(["a", "b", "c", "d"]),
-    ).toBe("a, b님 외 2명은 아직 의견이 없어요");
+    ).toBe("a님, b님 외 2명은 아직 의견이 없어요");
+    expect(
+      formatNonRespondentText(["a", "b"]),
+    ).toBe("a님, b님은 아직 의견이 없어요");
     expect(formatNonRespondentText([])).toBeUndefined();
   });
 
@@ -320,11 +643,16 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
         ],
       }),
     ).toBe("도쿄 2박");
-    expect(getBookingRiskText(0, false)).toBe("예약 정보 없음");
-    expect(getBookingRiskText(0, true)).toBe("예약 확인 완료");
-    expect(getBookingRiskText(2, true)).toBe("확인 필요 2건");
     expect(
-      getPlanBookingNeedCheckCount({
+      summarizePlanBooking({ title: "t", baseHeadcount: 1 }).state,
+    ).toBe("NO_INFORMATION");
+    expect(
+      summarizePlanBooking({ title: "t", baseHeadcount: 1 }).text,
+    ).toBe("예약 정보 없음");
+    expect(
+      summarizePlanBooking({
+        title: "t",
+        baseHeadcount: 1,
         accommodations: [
           {
             id: "s1",
@@ -337,7 +665,7 @@ describe("DEC-1 Decision Cockpit view-model (RAON-293)", () => {
           },
         ],
         transports: [{ id: "t1", fromCity: "a", toCity: "b", mode: "m", hasTransfer: false, durationText: "d", bookingStatus: "AVAILABLE" }],
-      }),
-    ).toBe(1);
+      }).state,
+    ).toBe("UNCHECKED");
   });
 });
