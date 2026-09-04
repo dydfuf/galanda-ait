@@ -8,8 +8,10 @@ import {
 import type { TripRoom } from "../../../core/domain/room.ts";
 import { toPlanDetailViewModel } from "../../plan-detail/plan-detail-view-model.ts";
 import {
+  buildCompareOpinionSummary,
   buildConfirmPlanSummary,
   buildPlanCompareDifferences,
+  buildPlanCompareRows,
   canSubmitConfirm,
   getCompareConfirmState,
 } from "../plan-compare-view-model.ts";
@@ -174,8 +176,8 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
 
     expect(differences.map((difference) => difference.kind)).toEqual([
       "SCHEDULE",
-      "BOOKING",
       "COST",
+      "BOOKING",
     ]);
     expect(differences.find((difference) => difference.kind === "BOOKING")?.leftValue).toContain("1건");
   });
@@ -304,7 +306,7 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
       (difference) => difference.kind === "COST"
     );
 
-    expect(costDifference?.deltaText).toBe("1인 기준 +1만원");
+    expect(costDifference?.deltaText).toBe("기본안이 1인 기준 1만원 저렴해요.");
   });
 
   it("가격 미정 항목이 있으면 부분 합계의 차액을 확정값처럼 표시하지 않는다", (): void => {
@@ -321,6 +323,97 @@ describe("변경 항목 우선 비교 (RAON-166)", (): void => {
 
     expect(difference?.rightValue).toContain("가격 미정 1건 별도");
     expect(difference?.deltaText).toBeUndefined();
+  });
+});
+
+describe("근거 우선 비교 응답률", (): void => {
+  it("두 후보 응답자의 stable participant 교집합만 세고 레거시 voteCount는 제외한다", (): void => {
+    const orphanId = UserIdSchema.make("deleted-participant");
+    const room = makeRoom();
+    const [basic, alternative] = room.plans;
+    if (!basic || !alternative) throw new Error("fixture에 비교할 두 여행안이 있어야 한다");
+
+    const vm = toPlanDetailViewModel(
+      {
+        ...room,
+        plans: [
+          {
+            ...basic,
+            memberOpinions: [
+              { userId: HOST_ID, userName: "방장", reaction: "LIKE" },
+              { userId: MEMBER_ID, userName: "참여자", reaction: "HARD" },
+              { userId: orphanId, userName: "탈퇴자", reaction: "LIKE" },
+            ],
+            voteCount: 99,
+          },
+          {
+            ...alternative,
+            memberOpinions: [
+              { userId: MEMBER_ID, userName: "참여자", reaction: "OKAY" },
+              { userId: orphanId, userName: "탈퇴자", reaction: "LIKE" },
+            ],
+            voteCount: 99,
+          },
+        ],
+      },
+      HOST_ID,
+    );
+    const left = vm.plans[0];
+    const right = vm.plans[1];
+    if (!left || !right) throw new Error("fixture에 비교할 두 view model이 있어야 한다");
+
+    const summary = buildCompareOpinionSummary(left, right, vm.memberParticipants);
+
+    expect(summary).toMatchObject({
+      bothRespondedCount: 1,
+      eligibleParticipantCount: 2,
+      responseText: "두 안을 모두 평가한 사람 1/2명",
+      nonRespondentText: "비교 쌍 미응답자: 방장",
+    });
+    expect(summary.nonRespondentNames).toEqual(["방장"]);
+  });
+
+  it("member identity가 없는 legacy voteCount는 응답률에서 제외했다고 알린다", (): void => {
+    const room = makeRoom();
+    const vm = toPlanDetailViewModel(
+      {
+        ...room,
+        plans: room.plans.map((plan) => ({ ...plan, voteCount: 2 })),
+      },
+      HOST_ID,
+    );
+    const left = vm.plans[0];
+    const right = vm.plans[1];
+    if (!left || !right) throw new Error("fixture에 비교할 두 여행안이 있어야 한다");
+
+    const summary = buildCompareOpinionSummary(left, right, vm.memberParticipants);
+
+    expect(summary.responseText).toBe("두 안을 모두 평가한 사람 0/2명");
+    expect(summary.limitationText).toBe(
+      "회원과 연결되지 않은 과거 의견 4개는 비교 응답률에서 제외했어요.",
+    );
+  });
+
+  it("전체 row와 차이 row가 같은 source에서 그룹 의견, 일정, 비용, 예약 순서를 공유한다", (): void => {
+    const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const left = vm.plans[0];
+    const right = vm.plans[1];
+    if (!left || !right) throw new Error("fixture에 비교할 두 여행안이 있어야 한다");
+
+    const rows = buildPlanCompareRows(left, right, vm.memberParticipants);
+    const differences = buildPlanCompareDifferences(
+      left,
+      right,
+      vm.memberParticipants,
+    );
+
+    expect(rows.map((row) => row.kind)).toEqual([
+      "OPINIONS",
+      "SCHEDULE",
+      "COST",
+      "BOOKING",
+    ]);
+    expect(differences.map((row) => row.kind)).toEqual(rows.map((row) => row.kind));
   });
 });
 

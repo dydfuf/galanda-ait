@@ -121,6 +121,32 @@ export function ConfirmPlanSummaryView({ summary }: ConfirmPlanSummaryViewProps)
         </p>
       </div>
 
+      {summary.comparisonResponseText && (
+        <div css={rowStyle}>
+          <span css={rowLabelStyle}>비교 쌍 응답</span>
+          <p css={rowValueStyle}>{summary.comparisonResponseText}</p>
+        </div>
+      )}
+
+      {summary.comparisonNonRespondentText && (
+        <div css={rowStyle}>
+          <span css={rowLabelStyle}>미응답자</span>
+          <p css={rowValueStyle}>{summary.comparisonNonRespondentText}</p>
+        </div>
+      )}
+
+      {summary.comparisonLimitationText && (
+        <div css={rowStyle}>
+          <span css={rowLabelStyle}>응답률 기준</span>
+          <p css={rowValueStyle}>{summary.comparisonLimitationText}</p>
+        </div>
+      )}
+
+      <div css={rowStyle}>
+        <span css={rowLabelStyle}>어려워요 의견</span>
+        <p css={rowValueStyle}>{summary.hardOpinionText}</p>
+      </div>
+
       {summary.needCheckMessages.length > 0 && (
         <div css={needCheckBoxStyle}>
           <p css={needCheckTitleStyle}>
