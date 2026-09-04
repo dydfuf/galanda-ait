@@ -59,7 +59,7 @@ Key Architectural Invariants:
 | M2 | Question Shell & Basic Info Questions | `FirstPlanWizard.tsx` (Shell + Basic Questions), `PlanCreatePage.tsx` first-plan branch & query normalization, tests | M1 | DONE |
 | M3 | Route, Accommodation & Transport Questions | Route repeated questions, accommodation questions, N+1 transport questions, synchronization logic & tests | M2 | DONE |
 | M4 | Review Navigation, Draft Resume & Collaboration Isolation | Review jump & return-to-review, `PlanHomePage.tsx` resume CTA, concurrent plan alternative transition & tests | M3 | DONE |
-| M5 | E2E Navigation Verification & Project Quality Gate | `trip-creation-navigation.test.tsx`, all component tests, acceptance criteria check, `pnpm check`, `git diff --check` | M4 | DONE (PR #113: 140 files / 1,369 tests + `pnpm check`) |
+| M5 | Navigation Verification & Project Quality Gate | `trip-creation-navigation.test.tsx`, all component tests, acceptance criteria check, `pnpm check`, `git diff --check` | M4 | DONE (PR #113: 140 files / 1,369 tests + `pnpm check`) |
 
 Delivery milestones are complete. Ongoing beta validation is a product-learning loop, not an unfinished implementation milestone.
 

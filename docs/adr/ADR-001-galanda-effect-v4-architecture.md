@@ -880,8 +880,6 @@ Use Case tests with test Layers
 Repository adapter tests
   ↓
 HTTP adapter / contract tests
-  ↓
-Browser E2E
 Domain
 
 Layer 없이 deterministic하게 테스트한다.
