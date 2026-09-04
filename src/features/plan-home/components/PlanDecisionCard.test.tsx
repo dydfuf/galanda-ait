@@ -19,6 +19,26 @@ const basePlan: PlanHomePlanSummaryData = {
   opinions: { likeCount: 2, okayCount: 1, hardCount: 0 },
   myReaction: undefined,
   isConfirmed: false,
+  routeText: "도쿄 2박 · 오사카 1박",
+  costSummary: {
+    minTotal: 200_000,
+    maxTotal: 200_000,
+    hasCost: true,
+    isRange: false,
+    unpricedCount: 0,
+    baseHeadcount: 2,
+    minPerPerson: 100_000,
+    maxPerPerson: 100_000,
+  },
+  perPersonCostText: "2명 기준 1인 10만원",
+  bookingNeedCheckCount: 0,
+  hasBookingDetails: true,
+  bookingRiskText: "예약 확인 완료",
+  respondentCount: 2,
+  eligibleResponseCount: 3,
+  responseText: "이 여행안에 2/3명 응답",
+  nonRespondentNames: ["준호"],
+  nonRespondentText: "준호님은 아직 의견이 없어요",
 };
 
 const renderCard = (
@@ -91,10 +111,10 @@ describe("PlanDecisionCard (RAON-226)", () => {
   });
 
   it("differenceSummary가 없으면 빈 값을 만들지 않고 명시적인 미정 문구를 표시한다", () => {
-    renderCard({ differenceSummary: undefined });
+    renderCard({ differenceSummary: undefined, routeText: "경로 미정" });
 
     expect(screen.getByText("핵심 차이 미정")).toBeInTheDocument();
-    expect(screen.queryByText(/오사카/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/오사카 1박 추가/)).not.toBeInTheDocument();
     const fallback = screen.getByText("핵심 차이 미정");
     expect(fallback.parentElement?.className).not.toMatch(
       /border-primary-border-weak/,
@@ -188,13 +208,19 @@ describe("PlanDecisionCard (RAON-226)", () => {
   });
 
   it("의견이 없을 때 '아직 의견이 없어요'만 표시하고 내 의견 chip을 렌더하지 않는다 (RAON-227)", () => {
-    renderCard({ opinions: { likeCount: 0, okayCount: 0, hardCount: 0 }, myReaction: undefined });
+    renderCard({
+      opinions: { likeCount: 0, okayCount: 0, hardCount: 0 },
+      myReaction: undefined,
+      nonRespondentText: undefined,
+      nonRespondentNames: [],
+    });
     expect(screen.getByText("아직 의견이 없어요")).toBeInTheDocument();
     const link = screen.getByRole("link");
     // 내 의견도 aggregate에 집계되므로 합이 0이면 "내 의견" 표시는 같은 사실의 중복이다
     expect(link.textContent).not.toMatch(/내 의견/);
-    // 매달린 가운데점도 남지 않는다
-    expect(link.textContent).not.toMatch(/·/);
+    // 의견 행 안에 매달린 가운데점이 남지 않는다 (경로·비용의 구분자는 별도 영역)
+    const emptyEl = screen.getByText("아직 의견이 없어요");
+    expect(emptyEl.parentElement?.textContent).not.toMatch(/·/);
   });
 
   it("aggregate가 0이어도 myReaction이 있으면 내 의견 chip을 표시한다 (legacy voteCount 폴백 방어)", () => {
@@ -234,5 +260,78 @@ describe("PlanDecisionCard (RAON-226)", () => {
     // 아이콘은 텍스트를 갖지 않고, pill이 읽히는 내용은 sr-only 한글 label + 숫자 + 단위뿐이다
     expect(icon?.textContent).toBe("");
     expect(pill.textContent).toBe("좋아요 2명");
+  });
+});
+
+describe("PlanDecisionCard Decision Cockpit (RAON-293)", () => {
+  it("1인 비용·예약 위험·후보별 응답률을 카드에서 확인한다", () => {
+    renderCard();
+    expect(screen.getByText("2명 기준 1인 10만원")).toBeInTheDocument();
+    expect(screen.getByText("예약 확인 완료")).toBeInTheDocument();
+    expect(screen.getByText("이 여행안에 2/3명 응답")).toBeInTheDocument();
+    expect(screen.getByText("준호님은 아직 의견이 없어요")).toBeInTheDocument();
+    expect(screen.getByText("도쿄 2박 · 오사카 1박")).toBeInTheDocument();
+  });
+
+  it("비용 미입력은 0원이 아니라 비용 미정으로 표시한다", () => {
+    renderCard({
+      perPersonCostText: "비용 미정",
+      costSummary: {
+        minTotal: 0,
+        maxTotal: 0,
+        hasCost: false,
+        isRange: false,
+        unpricedCount: 2,
+        baseHeadcount: 2,
+        minPerPerson: 0,
+        maxPerPerson: 0,
+      },
+    });
+    expect(screen.getByText("비용 미정")).toBeInTheDocument();
+    const link = screen.getByRole("link");
+    expect(link.textContent).not.toMatch(/0원/);
+  });
+
+  it("명시적 0원은 비용 미정과 구분해 0원으로 표시한다", () => {
+    renderCard({ perPersonCostText: "2명 기준 1인 0원" });
+    expect(screen.getByText("2명 기준 1인 0원")).toBeInTheDocument();
+  });
+
+  it("예약 확인 필요가 있으면 경고 스타일로 건수를 표시한다", () => {
+    renderCard({
+      bookingNeedCheckCount: 2,
+      hasBookingDetails: true,
+      bookingRiskText: "확인 필요 2건",
+    });
+    const risk = screen.getByText("확인 필요 2건");
+    expect(risk).toBeInTheDocument();
+    expect(risk.className).toMatch(/bg-warning-muted/);
+  });
+
+  it("예약 정보가 없으면 없음을 숨기지 않고 표시한다", () => {
+    renderCard({
+      bookingNeedCheckCount: 0,
+      hasBookingDetails: false,
+      bookingRiskText: "예약 정보 없음",
+    });
+    expect(screen.getByText("예약 정보 없음")).toBeInTheDocument();
+  });
+
+  it("긴 이름·경로·비용 문구도 카드 밖 overflow를 만들지 않는다", () => {
+    const longTitle = "아주 긴 여행안 제목 ".repeat(15).trim();
+    const longRoute = "아주 긴 도시 이름 ".repeat(15).trim();
+    const longCost = "12명 기준 1인 123만원 ~ 456만원 (가격 미정 7건 별도)";
+    renderCard({
+      title: longTitle,
+      routeText: longRoute,
+      perPersonCostText: longCost,
+      responseText: "이 여행안에 0/6명 응답",
+      nonRespondentText:
+        "아주 긴 이름을 가진 참여자 외 5명은 아직 의견이 없어요",
+    });
+    const card = screen.getByRole("link");
+    expect(card.className).toMatch(/overflow-hidden/);
+    expect(card.className).toMatch(/min-w-0/);
+    expect(screen.getByText(longCost)).toBeInTheDocument();
   });
 });

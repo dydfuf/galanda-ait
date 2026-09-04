@@ -22,6 +22,7 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   const durationLabel = hasDuration ? `${plan.nights}박 ${plan.days}일` : undefined;
   const periodText = plan.period !== "일정 미정" ? plan.period : undefined;
   const hasDifferenceSummary = Boolean(plan.differenceSummary?.trim());
+  const hasBookingRisk = plan.bookingNeedCheckCount > 0;
 
   const cardVariantClass = isConfirmed
     ? "border-success/80 bg-surface-raised hover:border-success hover:shadow-md"
@@ -52,7 +53,7 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         />
       </div>
 
-      {/* 2. 여행안 제목 + 기간 – title is primary, period one step below but before difference/opinion */}
+      {/* 2. 여행안 제목 + 기간·경로 – title is primary, period/route one step below */}
       <div className="flex min-w-0 flex-col gap-1.5">
         <h3 className="min-w-0 break-words text-[17px] font-bold leading-snug tracking-tight text-foreground line-clamp-2">
           {plan.title}
@@ -69,12 +70,35 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
             </span>
           )}
         </div>
+        <p className="min-w-0 break-words text-[13px] font-medium leading-normal text-foreground-muted line-clamp-1 [overflow-wrap:anywhere]">
+          {plan.routeText}
+        </p>
       </div>
 
       {/* 3. 작성자 – 13px 보조 텍스트는 AA 대비를 만족하는 foreground-muted 사용 */}
       <p className="min-w-0 break-words text-[13px] font-medium leading-normal text-foreground-muted line-clamp-1">
         {plan.authorName} 제안
       </p>
+
+      {/* 3.5 비용·예약·응답 – 현재 데이터로 계산 가능한 값만, 320px에서도 wrap */}
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <Pill className="font-semibold tabular-nums">{plan.perPersonCostText}</Pill>
+        <Pill
+          className={
+            hasBookingRisk
+              ? "border border-warning-border bg-warning-muted font-semibold text-warning"
+              : "font-semibold"
+          }
+        >
+          {plan.bookingRiskText}
+        </Pill>
+        <Pill className="font-semibold tabular-nums">{plan.responseText}</Pill>
+      </div>
+      {plan.nonRespondentText ? (
+        <p className="min-w-0 break-words text-[13px] font-medium leading-normal text-foreground-muted line-clamp-1 [overflow-wrap:anywhere]">
+          {plan.nonRespondentText}
+        </p>
+      ) : null}
 
       {/* 4. 핵심 차이 – 입력값 또는 명시적인 미정 상태를 의견보다 먼저 표시한다. */}
       <div
