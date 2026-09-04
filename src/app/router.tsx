@@ -71,6 +71,11 @@ const NotFoundPage = lazy(() =>
 const LoginPage = lazy(() =>
   import("../features/auth/LoginPage.tsx").then((m) => ({ default: m.LoginPage })),
 );
+const DevDesignPage = lazy(() =>
+  import("../features/dev/DevDesignPage.tsx").then((m) => ({
+    default: m.DevDesignPage,
+  })),
+);
 
 function RouteFallback() {
   return <PageState status="loading" message="화면을 불러오는 중이에요." />;
@@ -95,6 +100,14 @@ export function AppRouter() {
         {platformOnlyRoutes.map(({ path, Component }) => (
           <Route key={path} path={path} element={<Component />} />
         ))}
+
+        {/*
+          개발 전용 디자인 카탈로그. DEV 빌드에서만 등록돼요.
+          프로덕션에서는 이 route가 없어 `/dev`가 404가 돼요.
+        */}
+        {import.meta.env.DEV && (
+          <Route path="/dev" element={withSuspense(<DevDesignPage />)} />
+        )}
 
         <Route element={<SessionRoute />}>
           {/* Global IA: 이 다섯 route만 Bottom Navigation을 소유한다. */}
