@@ -68,6 +68,19 @@ describe("Page chrome geometry contracts", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps sticky headers working by clipping horizontal overflow instead of hiding it", () => {
+    // overflow-x: hidden은 조상을 scroll container로 만들어 sticky가 viewport가
+    // 아니라 늘어난 조상 기준으로 고정되게 해요. 가로 넘침만 막는 clip을 써요.
+    expect(indexCss).toMatch(/overflow-x:\s*clip;/);
+    expect(indexCss).not.toMatch(/overflow-x:\s*hidden;/);
+    const appRootSource = readFileSync(
+      path.resolve(process.cwd(), "src/app/layouts/AppRootLayout.tsx"),
+      "utf8",
+    );
+    expect(appRootSource).toMatch(/overflow-x:\s*clip;/);
+    expect(appRootSource).not.toMatch(/overflow-x:\s*hidden;/);
+  });
+
   it("applies Web safe-top only when an explicit native top inset is absent", () => {
     const { container, rerender } = render(<PageHeader title="여행 만들기" />);
 
@@ -99,9 +112,17 @@ describe("Page chrome geometry contracts", () => {
     expect(body.className).toContain(dynamicClearance);
     expect(body.className).not.toContain("scroll-pb-");
     expect(body.className).not.toContain("pb-(--app-page-padding-bottom)");
-    expect(indexCss).toMatch(
-      /html\s*\{\s*scroll-padding-bottom:\s*var\(--app-bottom-action-height,\s*0px\);\s*\}/,
-    );
+    expect(indexCss).toMatch(/--app-keyboard-inset:\s*0px;/);
+    // 고정 UI 공간은 scroller의 scroll-padding에서 한 번만 예약해요.
+    // PageHeader 본체 h-14(56px) + safe-top, 하단은 실측 CTA 높이 + 키보드예요.
+    expect(indexCss).toMatch(/scroll-padding-top:\s*calc\(56px \+ var\(--safe-top\)\)/);
+    expect(indexCss).toMatch(/scroll-padding-bottom:\s*calc\(\s*var\(--app-bottom-action-height/);
+    expect(indexCss).toMatch(/var\(--app-keyboard-inset/);
+    // 대상의 scroll-margin은 작은 시각적 여백만 둬요(이중 예약 금지).
+    expect(indexCss).toMatch(/scroll-margin-top:\s*8px;/);
+    expect(indexCss).toMatch(/scroll-margin-bottom:\s*16px;/);
+    // BottomAction 실측 높이에 safe-area가 포함되므로 scroll-padding에 중복 가산하지 않아요.
+    expect(indexCss).not.toMatch(/scroll-padding-bottom:[^}]*var\(--safe-bottom\)/);
     expect(
       screen.getByRole("button", { name: "마지막 본문 행동" }),
     ).toBeInTheDocument();
@@ -127,10 +148,12 @@ describe("Page chrome geometry contracts", () => {
     expect(actionChrome?.className).toContain("fixed");
     expect(actionChrome?.className).toContain("inset-x-0");
     expect(actionChrome).toHaveStyle({
-      bottom: "var(--global-nav-height, 0px)",
+      bottom:
+        "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
       paddingBottom:
         "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
     });
+    expect(actionChrome?.className).toContain("transition-[bottom]");
     expect(actionChrome?.className).toContain("border-t");
 
     const innerColumn = actionChrome?.firstElementChild as HTMLElement;

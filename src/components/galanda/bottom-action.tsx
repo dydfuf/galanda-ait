@@ -18,6 +18,7 @@ const BOTTOM_ACTION_HEIGHT_PROPERTY = "--app-bottom-action-height";
  * 화면 하단 고정 CTA shell이에요.
  *
  * - `env(safe-area-inset-bottom)`을 반영해요 (`--safe-bottom`).
+ * - 가상 키보드가 열리면 `--app-keyboard-inset`만큼 위로 올라가요.
  * - 실제 높이를 document root의 `--app-bottom-action-height`로 공유해요.
  * - 본문이 CTA에 가려지지 않도록, 이 컴포넌트를 쓰는 화면은
  *   `PageBody withBottomAction` 여백 계약을 지켜야 해요.
@@ -67,12 +68,12 @@ export function BottomAction({
       data-slot="bottom-action"
       data-galanda-surface={surface}
       style={{
-        bottom: "var(--global-nav-height, 0px)",
+        bottom: "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
         paddingBottom:
           "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
       }}
       className={cn(
-        "fixed inset-x-0 z-30 border-t px-5 pt-2",
+        "fixed inset-x-0 z-30 border-t px-5 pt-2 transition-[bottom] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] motion-reduce:transition-none",
         className,
       )}
     >

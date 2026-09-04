@@ -96,9 +96,10 @@ export function TripCreatePage() {
     >
       {!platformNavigation && (
         <PageHeader
+          sticky
+          bordered
           title="여행 만들기"
           back={{ label: "뒤로 가기", onClick: () => void goBack() }}
-          surface="none"
         />
       )}
 

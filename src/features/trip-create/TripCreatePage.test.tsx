@@ -106,9 +106,10 @@ describe("TripCreatePage", () => {
     );
 
     expect(main.parentElement).toHaveAttribute("data-galanda-surface", "content");
-    expect(container.querySelector("header")).not.toHaveAttribute(
-      "data-galanda-surface",
-    );
+    const header = container.querySelector("header");
+    expect(header).toHaveAttribute("data-galanda-surface", "chrome");
+    expect(header?.className).toContain("sticky");
+    expect(header?.className).toContain("top-0");
     expect(form).toHaveClass("rounded-2xl", "border-border", "bg-card");
     expect(bottomAction).toHaveAttribute("data-galanda-surface", "content");
     expect(input).toHaveAttribute("aria-describedby", "trip-title-help");

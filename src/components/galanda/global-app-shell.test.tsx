@@ -144,7 +144,8 @@ describe("GlobalAppShell (RAON-248)", () => {
       "pb-[var(--global-nav-height)]",
     );
     expect(action).toHaveStyle({
-      bottom: "var(--global-nav-height, 0px)",
+      bottom:
+        "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
       paddingBottom:
         "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
     });
