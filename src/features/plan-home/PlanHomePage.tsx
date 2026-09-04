@@ -285,6 +285,11 @@ export function PlanHomePage() {
             totalOpinionCount={room.totalOpinionCount}
             participatedMemberCount={room.participatedMemberCount}
             memberCount={room.memberCount}
+            overallParticipationText={room.overallParticipationText}
+            overallNonRespondentText={room.overallNonRespondentText}
+            hardSummaryText={room.hardSummaryText}
+            bookingSummaryText={room.bookingSummaryText}
+            unattributedNoticeText={room.unattributedNoticeText}
           />
         </div>
 
