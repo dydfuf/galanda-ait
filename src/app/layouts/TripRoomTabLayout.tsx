@@ -128,6 +128,7 @@ export function TripRoomTabLayout() {
 
   const modeSwitcher = (
     <div
+      data-slot="trip-mode-switcher"
       style={{
         bottom:
           "calc(var(--app-bottom-action-height, 0px) + 1.25rem + var(--app-keyboard-inset, 0px))",

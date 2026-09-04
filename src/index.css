@@ -183,11 +183,17 @@
 }
 
 html {
-  /* sticky 헤더 아래로 본문이 숨지 않고, 고정 CTA/키보드 위로 포커스가 오게 해요. */
-  scroll-padding-top: calc(64px + var(--safe-top));
+  /*
+   * 고정 UI가 가리는 공간은 scroller의 scroll-padding에서 한 번만 예약해요.
+   * 대상의 scroll-margin과 합산되므로(둘 중 큰 값이 아님) obstruction 자체를
+   * 양쪽에 중복해서 더하지 않아요.
+   * 상단: PageHeader 본체 h-14(56px) + Web safe-top.
+   * 하단: BottomAction 실측 높이(getBoundingClientRect에 safe-area padding 포함)
+   *   + 키보드 inset. safe-bottom을 별도로 더하면 중복이에요.
+   */
+  scroll-padding-top: calc(56px + var(--safe-top));
   scroll-padding-bottom: calc(
-    var(--app-bottom-action-height, 0px) + var(--app-keyboard-inset, 0px) +
-      var(--safe-bottom)
+    var(--app-bottom-action-height, 0px) + var(--app-keyboard-inset, 0px)
   );
 }
 
@@ -203,14 +209,16 @@ body,
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+  /* hidden은 scroll container를 만들어 sticky를 깨뜨리므로 clip을 써요. */
+  overflow-x: clip;
 }
 
 #root {
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow-x: hidden;
+  /* hidden은 scroll container를 만들어 sticky를 깨뜨리므로 clip을 써요. */
+  overflow-x: clip;
 }
 
 [data-galanda-surface="content"] {
@@ -238,14 +246,15 @@ button, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 키보드가 올라와도 포커스된 입력이 고정 헤더/CTA에 가려지지 않게 해요. */
+/*
+ * 포커스된 입력 주변의 작은 시각적 여백만 둬요. 고정 UI 공간은 위
+ * html scroll-padding이 소유하므로 여기서는 obstruction을 더하지 않아요.
+ */
 input,
 textarea,
 select {
-  scroll-margin-top: calc(64px + var(--safe-top));
-  scroll-margin-bottom: calc(
-    var(--app-bottom-action-height, 0px) + var(--app-keyboard-inset, 0px) + 16px
-  );
+  scroll-margin-top: 8px;
+  scroll-margin-bottom: 16px;
 }
 
 /*
