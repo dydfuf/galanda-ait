@@ -99,9 +99,11 @@ describe("Page chrome geometry contracts", () => {
     expect(body.className).toContain(dynamicClearance);
     expect(body.className).not.toContain("scroll-pb-");
     expect(body.className).not.toContain("pb-(--app-page-padding-bottom)");
-    expect(indexCss).toMatch(
-      /html\s*\{\s*scroll-padding-bottom:\s*var\(--app-bottom-action-height,\s*0px\);\s*\}/,
-    );
+    expect(indexCss).toMatch(/--app-keyboard-inset:\s*0px;/);
+    expect(indexCss).toMatch(/scroll-padding-top:\s*calc\(64px \+ var\(--safe-top\)\)/);
+    expect(indexCss).toMatch(/scroll-padding-bottom:\s*calc\(\s*var\(--app-bottom-action-height/);
+    expect(indexCss).toMatch(/var\(--app-keyboard-inset/);
+    expect(indexCss).toMatch(/scroll-margin-bottom:\s*calc\(/);
     expect(
       screen.getByRole("button", { name: "마지막 본문 행동" }),
     ).toBeInTheDocument();
@@ -127,10 +129,12 @@ describe("Page chrome geometry contracts", () => {
     expect(actionChrome?.className).toContain("fixed");
     expect(actionChrome?.className).toContain("inset-x-0");
     expect(actionChrome).toHaveStyle({
-      bottom: "var(--global-nav-height, 0px)",
+      bottom:
+        "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
       paddingBottom:
         "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
     });
+    expect(actionChrome?.className).toContain("transition-[bottom]");
     expect(actionChrome?.className).toContain("border-t");
 
     const innerColumn = actionChrome?.firstElementChild as HTMLElement;

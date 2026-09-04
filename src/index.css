@@ -20,6 +20,8 @@
   --app-page-padding-top: 16px;
   --app-page-padding-bottom: calc(24px + var(--safe-bottom));
   --app-cta-space: calc(104px + var(--safe-bottom));
+  /* 가상 키보드가 올린 하단 inset. useVisualKeyboardInset이 게시해요. */
+  --app-keyboard-inset: 0px;
 
   font-family: var(--sans);
   color: var(--foreground);
@@ -181,7 +183,12 @@
 }
 
 html {
-  scroll-padding-bottom: var(--app-bottom-action-height, 0px);
+  /* sticky 헤더 아래로 본문이 숨지 않고, 고정 CTA/키보드 위로 포커스가 오게 해요. */
+  scroll-padding-top: calc(64px + var(--safe-top));
+  scroll-padding-bottom: calc(
+    var(--app-bottom-action-height, 0px) + var(--app-keyboard-inset, 0px) +
+      var(--safe-bottom)
+  );
 }
 
 html,
@@ -229,6 +236,16 @@ body {
 button, input, textarea, select {
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* 키보드가 올라와도 포커스된 입력이 고정 헤더/CTA에 가려지지 않게 해요. */
+input,
+textarea,
+select {
+  scroll-margin-top: calc(64px + var(--safe-top));
+  scroll-margin-bottom: calc(
+    var(--app-bottom-action-height, 0px) + var(--app-keyboard-inset, 0px) + 16px
+  );
 }
 
 /*

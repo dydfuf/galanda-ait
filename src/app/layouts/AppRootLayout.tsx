@@ -1,5 +1,6 @@
 import { css } from "@emotion/react";
 import { Outlet } from "react-router-dom";
+import { useVisualKeyboardInset } from "../../hooks/useVisualKeyboardInset.ts";
 
 const containerStyle = css`
   width: 100%;
@@ -15,6 +16,7 @@ const containerStyle = css`
 `;
 
 export function AppRootLayout() {
+  useVisualKeyboardInset();
   return (
     <div css={containerStyle}>
       <Outlet />
