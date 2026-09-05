@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -12,10 +14,12 @@ export type PageStateProps =
       readonly message: string;
     }
   | ({
-      readonly status: "empty" | "error";
       readonly title: string;
       readonly description?: string;
-    } & PageStateAction);
+    } & PageStateAction & (
+      | { readonly status: "empty"; readonly illustration?: ReactNode }
+      | { readonly status: "error" }
+    ));
 
 /**
  * query 결과의 loading / empty / error 상태를 배타적으로 표현해요.
@@ -46,6 +50,7 @@ export function PageState(props: PageStateProps) {
       data-system-state={props.status}
       className="flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center"
     >
+      {props.status === "empty" && props.illustration}
       <div
         className="flex max-w-80 flex-col items-center gap-2"
         role={isError ? "alert" : "status"}

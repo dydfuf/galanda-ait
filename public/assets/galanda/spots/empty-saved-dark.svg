@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>저장한 여행안이 없어요</title><g stroke-linecap="round" stroke-linejoin="round"><rect x="62" y="46" width="126" height="159" rx="16" fill="#182B47"/>
+  <rect x="53" y="39" width="126" height="159" rx="16" fill="#171D24" stroke="#3E689F" stroke-width="2.2"/>
+  <path d="M80 72h22m-22 19h64" stroke="#303842" stroke-width="7"/>
+  <path d="M80 143h65m-56-28h47a9 9 0 0 1 9 9v37a9 9 0 0 1-9 9H89a9 9 0 0 1-9-9v-37a9 9 0 0 1 9-9Z" stroke="#3E689F" stroke-width="2.2" stroke-dasharray="4 7" fill="none"/>
+  <path d="M138 34h39a7 7 0 0 1 7 7v74l-26.5-16-26.5 16V41a7 7 0 0 1 7-7Z" fill="#182B47" stroke="#7AA7FF" stroke-width="3"/>
+  <path d="M146 53h23" stroke="#7AA7FF" stroke-width="3"/></g></svg>

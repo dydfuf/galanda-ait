@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>아직 여행이 없어요</title><g stroke-linecap="round" stroke-linejoin="round"><path d="M86 71v-9a12 12 0 0 1 12-12h44a12 12 0 0 1 12 12v9" stroke="#8BB4FF" stroke-width="6" fill="none"/>
+  <rect x="40" y="72" width="160" height="113" rx="18" fill="#182B47" stroke="#3E689F" stroke-width="2.2"/>
+  <path d="m70 83 29-9 44 12 27-9v73l-27 9-44-12-29 9Z" fill="#171D24" stroke="#3E689F" stroke-width="2.2"/>
+  <path d="M99 76v70m44-59v71" stroke="#3E689F" stroke-width="2"/>
+  <path d="M84 127c10-14 18-6 31-15" stroke="#3E689F" stroke-width="3" stroke-dasharray="3 8" fill="none"/>
+  <path d="M35 128h170v57a16 16 0 0 1-16 16H51a16 16 0 0 1-16-16Z" fill="#7AA7FF"/>
+  <path d="M58 129v70m124-70v70" stroke="#8BB4FF" stroke-width="3"/>
+  <rect x="103" y="120" width="34" height="18" rx="6" fill="#171D24" stroke="#3E689F" stroke-width="2"/>
+  <path d="M58 204v6m124-6v6" stroke="#8BB4FF" stroke-width="7"/></g></svg>

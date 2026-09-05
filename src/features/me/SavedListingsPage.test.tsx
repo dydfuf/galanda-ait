@@ -90,8 +90,9 @@ describe("SavedListingsPage (RAON-254 DISC-6)", () => {
     mockSaved.mockReturnValue(
       result({ data: { pages: [{ items: [] }], pageParams: [undefined] } })
     );
-    renderPage();
+    const { container } = renderPage();
     expect(screen.getByText("아직 저장한 여행 일정이 없어요")).toBeInTheDocument();
+    expect(container.querySelector('img[src$="empty-saved-light.svg"]')).not.toBeNull();
   });
 
   it("저장한 LISTED 항목만 카드로 노출한다(read-through)", () => {
