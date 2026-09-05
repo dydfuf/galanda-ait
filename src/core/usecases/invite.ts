@@ -12,6 +12,7 @@ import { IdGenerator } from "../ports/id-generator.ts";
 import { InviteRepository } from "../ports/invite-repository.ts";
 import { getOptionalSession, requireAuthSession } from "../ports/session.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
+import { logDecisionFunnelEvent } from "./decision-funnel.ts";
 
 const requireHostRoom = (roomId: TripId) =>
   Effect.gen(function* () {
@@ -87,7 +88,9 @@ export const joinTripByInvite = Effect.fn("joinTripByInvite")(function* (
     },
     participantIds: session.participantIds,
   });
-  return room ?? (yield* invalidInvite());
+  if (!room) return yield* invalidInvite();
+  yield* logDecisionFunnelEvent("invite_joined", room, session.participantIds);
+  return room;
 });
 
 export const getPublicInviteSummary = Effect.fn("getPublicInviteSummary")(
@@ -116,6 +119,8 @@ export const getPublicInviteSummary = Effect.fn("getPublicInviteSummary")(
     const dateRange = confirmedPlan
       ? getPlanDateRange(confirmedPlan)
       : undefined;
+
+    yield* logDecisionFunnelEvent("invite_opened", visibleRoom, session?.participantIds);
 
     return {
       title: visibleRoom.title,

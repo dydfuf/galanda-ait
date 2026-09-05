@@ -33,6 +33,7 @@ export const RecommendationReasonSchema = Schema.Literals([
 export type RecommendationReason = typeof RecommendationReasonSchema.Type;
 
 export const RecommendationSurfaceSchema = Schema.Literals([
+  "HOME",
   "FIRST_PLAN",
   "PLAN_HOME",
   "PLAN_DETAIL",

@@ -57,6 +57,7 @@ import {
   type NextTripActionRecommendation,
 } from "../../src/core/usecases/recommend-next-trip-action.ts";
 import { recordRecommendationLifecycleEvent } from "../../src/core/usecases/record-recommendation-lifecycle-event.ts";
+import { recordCompareOpened } from "../../src/core/usecases/decision-funnel.ts";
 import { IdGeneratorLive } from "../../src/infrastructure/id-generator.ts";
 import { InviteRepositoryLive } from "../../src/infrastructure/persistence/drizzle/invite-repository.ts";
 import { Database } from "../../src/infrastructure/persistence/drizzle/database.ts";
@@ -337,6 +338,17 @@ invitesRoute.post(
 );
 
 tripsRoute.get("/", (c) => runTripEffect(c, listTripOverviews()));
+
+tripsRoute.post(
+  "/:tripId/compare-opened",
+  effectValidator("param", TripParamsSchema),
+  effectValidator("json", Schema.Struct({ left: PlanIdSchema, right: PlanIdSchema }), strictInput),
+  (c) => runTripEffect(c, recordCompareOpened(
+    c.req.valid("param").tripId,
+    c.req.valid("json").left,
+    c.req.valid("json").right,
+  )),
+);
 
 tripsRoute.get(
   "/:tripId/itinerary",

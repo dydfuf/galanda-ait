@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import {
   CalendarDays,
-  Columns2,
   FileText,
   UsersRound,
 } from "lucide-react";
@@ -157,7 +156,7 @@ export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
               <span className="font-semibold text-foreground">
                 {trip.hasUnattributedOpinions
                   ? "일부 기존 의견의 참여자를 확인할 수 없어요"
-                  : `의견 참여 ${trip.opinionParticipantCount}/${trip.memberCount}명`}
+                  : `한 안 이상 의견 참여 ${trip.opinionParticipantCount}/${trip.memberCount}명`}
               </span>
               <span className="text-xs text-foreground-muted">
                 후보 여행안 {trip.candidateCount}개
@@ -226,7 +225,7 @@ export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
                 </Link>
                 <Link
                   to={`${tripRoot}/itinerary`}
-                  className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
                 >
                   <CalendarDays className="size-4" aria-hidden="true" />
                   일정 보기
@@ -235,25 +234,16 @@ export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
             ) : lifecycle === "CONFIRMED_DATE_UNKNOWN" ? (
               <Link
                 to={`${tripRoot}/itinerary`}
-                className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
               >
                 <CalendarDays className="size-4" aria-hidden="true" />
                 일정 보기
               </Link>
             ) : lifecycle === "PLANNING" ? (
               <>
-                {trip.candidateCount >= 2 && trip.eligibleActionIds.includes("COMPARE_PLANS") && (
-                  <Link
-                    to={`${tripRoot}/plans/compare`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
-                  >
-                    <Columns2 className="size-4" aria-hidden="true" />
-                    여행안 비교
-                  </Link>
-                )}
                 <Link
                   to={`${tripRoot}/plans`}
-                  className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
                 >
                   <FileText className="size-4" aria-hidden="true" />
                   계획 보기
@@ -262,7 +252,7 @@ export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
             ) : (
               <Link
                 to={`${tripRoot}/plans`}
-                className={cn(buttonVariants({ variant: "default", size: "sm" }), "no-underline!")}
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }), "no-underline!")}
               >
                 <FileText className="size-4" aria-hidden="true" />
                 {trip.eligibleActionIds.includes("EDIT_PLAN_BASIC")

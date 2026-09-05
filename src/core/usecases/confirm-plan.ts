@@ -15,6 +15,7 @@ import {
 } from "../domain/room-transitions.ts";
 import { StateConflictError, ValidationError } from "../domain/errors.ts";
 import type { TripActivityWrite } from "../domain/trip-activity.ts";
+import { logDecisionFunnelEvent } from "./decision-funnel.ts";
 
 export const confirmTripPlan = Effect.fn("confirmTripPlan")(
   function* (
@@ -102,11 +103,13 @@ export const confirmTripPlan = Effect.fn("confirmTripPlan")(
       },
     };
 
-    return yield* itineraries.confirm({
+    const confirmed = yield* itineraries.confirm({
       room: confirmPlanInRoom(room, plan),
       expectedRoomRevision: expectedRevision,
       itinerary,
       activity,
     });
+    yield* logDecisionFunnelEvent("plan_confirmed", room, session.participantIds);
+    return confirmed;
   }
 );

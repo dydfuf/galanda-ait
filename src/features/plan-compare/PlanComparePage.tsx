@@ -54,6 +54,8 @@ import {
 } from "../common/recommendation.ts";
 import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
+import { recordCompareOpened } from "../../app/api-client.ts";
+import { TripIdSchema } from "../../core/domain/ids.ts";
 
 const getPlanBadgeVariant = (
   planTag: string,
@@ -96,6 +98,7 @@ export function PlanComparePage() {
     null,
   );
   const completedRecommendationId = useRef<string>();
+  const openedComparison = useRef<string>();
   const recommendationAction = getRecommendationActionContext(location.state);
   const isComparisonReady = Boolean(
     room &&
@@ -104,6 +107,13 @@ export function PlanComparePage() {
     room.plans.some((plan) => plan.id === queryValidated.success.left) &&
     room.plans.some((plan) => plan.id === queryValidated.success.right),
   );
+
+  useEffect(() => {
+    const key = `${tripId}:${location.key}`;
+    if (!isComparisonReady || isError || !isOnline || !leftParam || !rightParam || openedComparison.current === key) return;
+    openedComparison.current = key;
+    void recordCompareOpened(TripIdSchema.make(tripId), leftParam, rightParam).catch(() => undefined);
+  }, [isComparisonReady, isError, isOnline, tripId, location.key, leftParam, rightParam]);
 
   useEffect(() => {
     if (

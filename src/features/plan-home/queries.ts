@@ -4,14 +4,14 @@ import type { TripOverviewDto } from "../../contracts/trip-overview.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 
 export const tripOverviewKeys = {
-  all: ["trip-overviews"] as const,
-  list: (): readonly ["trip-overviews", "list"] =>
+  all: ["trip-rooms", "overviews"] as const,
+  list: () =>
     [...tripOverviewKeys.all, "list"] as const,
 };
 
 export const tripRoomKeys = {
   all: ["trip-rooms"] as const,
-  list: (): readonly ["trip-overviews", "list"] => tripOverviewKeys.list(),
+  list: () => tripOverviewKeys.list(),
   detail: (id: string, viewerId?: string): readonly ["trip-rooms", "detail", string, string] =>
     [...tripRoomKeys.all, "detail", id, viewerId ?? "anonymous"] as const,
 };

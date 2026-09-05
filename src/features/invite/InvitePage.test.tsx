@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PublicInviteSummary } from "../../core/domain/invite.ts";
 import {
   RevisionSchema,
+  PlanIdSchema,
   TripIdSchema,
   UserIdSchema,
 } from "../../core/domain/ids.ts";
@@ -82,6 +83,8 @@ let sessionHandler: () => Response | Promise<Response>;
 let joinHandler: () => Response | Promise<Response>;
 let requests: Array<{ readonly path: string; readonly init?: RequestInit }>;
 
+const OpinionDestination = () => <p>의견 대상: {useLocation().pathname}</p>;
+
 const renderPage = (viewportWidth?: number) => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -99,7 +102,8 @@ const renderPage = (viewportWidth?: number) => {
         <MemoryRouter initialEntries={[`/invites/${INVITE_TOKEN}`]}>
           <Routes>
             <Route path="/invites/:inviteToken" element={<InvitePage />} />
-            <Route path="/trips/:tripId" element={<p>여행방 진입 완료</p>} />
+            <Route path="/trips/:tripId/plans" element={<p>여행방 진입 완료</p>} />
+            <Route path="/trips/:tripId/plans/:planId" element={<OpinionDestination />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>
@@ -139,6 +143,46 @@ afterEach(() => {
 });
 
 describe("InvitePage entry flow", () => {
+  it.each([
+    ["첫 미응답 후보", false, false, "second"],
+    ["모든 후보 응답", true, false, undefined],
+    ["이미 확정된 방", false, true, undefined],
+  ] as const)("실제 Guest의 과거 identity까지 반영해 %s로 이동한다", async (_label, answeredAll, confirmed, target) => {
+    const alias = UserIdSchema.make("guest-before-upgrade");
+    const actualSession = { ...guestSession, participantIds: [guestSession.participantId, alias] };
+    let signedIn = false;
+    sessionHandler = () => {
+      const response = jsonResponse(signedIn ? actualSession : null);
+      signedIn = true;
+      return response;
+    };
+    const opinion = { userId: alias, userName: "이전 이름", reaction: "LIKE" as const };
+    joinHandler = () => jsonResponse({
+      ...joinedRoom,
+      members: [{ id: guestSession.participantId, name: "입력 이름", role: "MEMBER" }],
+      plans: [
+        { id: PlanIdSchema.make("draft"), title: "초안", status: "DRAFT", voteCount: 0, places: [] },
+        { id: PlanIdSchema.make("first"), title: "응답한 안", status: "VOTING", voteCount: 1, memberOpinions: [opinion], places: [] },
+        { id: PlanIdSchema.make("second"), title: "다음 안", status: "VOTING", voteCount: answeredAll ? 1 : 0, memberOpinions: answeredAll ? [opinion] : [], places: [] },
+      ],
+      confirmedPlanId: confirmed ? "first" : undefined,
+    });
+    renderPage();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "입력 이름" } });
+    expect(screen.getByText(/계정 없이 이 여행에서 사용할 이름/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" }));
+    expect(await screen.findByText(target ? `의견 대상: /trips/trip-joined/plans/${target}` : "여행방 진입 완료")).toBeInTheDocument();
+  });
+
+  it("익명 인증 후 세션을 확인하지 못하면 join하거나 이동하지 않는다", async () => {
+    sessionHandler = () => jsonResponse(null);
+    renderPage();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "라온" } });
+    fireEvent.click(screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(requests.some(({ path }) => path.endsWith("/join"))).toBe(false);
+  });
+
   it("초대장 query pending 상태를 status text로 알린다", async () => {
     const pendingInvite = deferred<Response>();
     inviteHandler = () => pendingInvite.promise;
@@ -173,7 +217,7 @@ describe("InvitePage entry flow", () => {
       name: `${longTitle}에 초대받았어요`,
     });
     const input = screen.getByRole("textbox", { name: "어떤 이름으로 참여할까요?" });
-    const primaryAction = screen.getByRole("button", { name: "이 이름으로 참여하기" });
+    const primaryAction = screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" });
     const cancelAction = screen.getByRole("button", { name: "취소" });
 
     expect(screen.getByTestId("viewport")).toHaveStyle({ width: "320px" });
@@ -203,14 +247,14 @@ describe("InvitePage entry flow", () => {
       name: "어떤 이름으로 참여할까요?",
     });
     fireEvent.change(input, { target: { value: "  라온 여행자  " } });
-    fireEvent.click(screen.getByRole("button", { name: "이 이름으로 참여하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "참여 서버를 확인하지 못했어요.",
     );
     expect(input).toHaveValue("  라온 여행자  ");
     expect(sessionStorage.getItem(STORAGE_KEY)).toBe("  라온 여행자  ");
-    expect(screen.getByRole("button", { name: "이 이름으로 참여하기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" })).toBeEnabled();
     expect(screen.queryByText("여행방 진입 완료")).not.toBeInTheDocument();
   });
 
@@ -223,7 +267,7 @@ describe("InvitePage entry flow", () => {
       name: "어떤 이름으로 참여할까요?",
     });
     fireEvent.change(input, { target: { value: "라온" } });
-    const action = screen.getByRole("button", { name: "이 이름으로 참여하기" });
+    const action = screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" });
     fireEvent.click(action);
     fireEvent.click(action);
 
@@ -293,7 +337,7 @@ describe("InvitePage entry flow", () => {
       "인증 서비스를 확인하지 못했어요.",
     );
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "이 이름으로 참여하기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" })).toBeDisabled();
     await waitFor(() =>
       expect(screen.getByText("인증 서비스 재확인이 필요해요.")).toBeInTheDocument(),
     );

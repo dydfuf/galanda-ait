@@ -68,6 +68,13 @@ const planHomeCommand = {
 };
 
 describe("recommendNextTripAction", () => {
+  it("HOME은 동일한 RBAC와 결정 규칙으로 의견 행동을 추천한다", async () => {
+    const result = await Effect.runPromise(recommendNextTripAction({ tripId: room.id, surface: "HOME" }).pipe(
+      Effect.provide(layerFor({ ...roomWithPlan, members: [...room.members, { id: memberId, name: "Member", role: "MEMBER" }] })),
+    ));
+    expect(result.primary.actionId).toBe("PROPOSE_ALTERNATIVE");
+    expect(result.alternatives.map(({ actionId }) => actionId)).toContain("GIVE_OPINION");
+  });
   it("minimal draft fact를 deterministic RULE recommendation으로 변환한다", async () => {
     const program = recommendNextTripAction(draftCommand).pipe(
       Effect.provide(layerFor(room))

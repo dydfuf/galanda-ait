@@ -857,6 +857,29 @@ describe("Trip API vertical slice", () => {
     expect(invalid.calls).toEqual([]);
   });
 
+  it("비교 열림은 membership과 서로 다른 게시 후보를 검증하고 집계 필드만 기록한다", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const pair = { ...room, plans: [plan, { ...plan, id: PlanIdSchema.make("plan-2") }] };
+    for (const [user, body, status] of [
+      [{ id: hostId, name: "Host" }, { left: "plan-1", right: "plan-2" }, 200],
+      [{ id: "stranger", name: "Stranger" }, { left: "plan-1", right: "plan-2" }, 404],
+      [null, { left: "plan-1", right: "plan-2" }, 401],
+      [{ id: hostId, name: "Host" }, { left: "plan-1", right: "plan-1" }, 422],
+      [{ id: hostId, name: "Host" }, { left: "plan-1", right: "missing" }, 422],
+      [{ id: hostId, name: "Host" }, { left: "plan-1", right: "plan-2", nickname: "private" }, 400],
+    ] as const) {
+      const app = makeApp([[rowValues(pair)]], user);
+      const response = await app.app.fetch(request("/api/trips/trip-1/compare-opened", { method: "POST", body: JSON.stringify(body) }), env);
+      expect(response.status).toBe(status);
+    }
+    const eventLines = log.mock.calls.filter((call) => JSON.stringify(call).includes('"eventName":"compare_opened"'));
+    expect(eventLines).toHaveLength(1);
+    const logged = JSON.stringify(eventLines);
+    expect(logged).not.toContain("host-1");
+    expect(logged).not.toContain("plan-1");
+    log.mockRestore();
+  });
+
   it("NBA lifecycle 이벤트는 여행 참여자만 기록하고 입력을 strict validation한다", async () => {
     const event = {
       eventName: "nba_accept",

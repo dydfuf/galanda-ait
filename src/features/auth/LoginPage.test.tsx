@@ -55,8 +55,11 @@ describe("LoginPage entry flow", () => {
 
     renderPage();
 
-    expect(screen.getByRole("heading", { level: 1, name: "함께 갈 여행을 시작해요" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "함께 갈 여행을 결정해요" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    const steps = screen.getByRole("list", { name: "갈란다에서 여행을 결정하는 방법" });
+    expect(steps).toHaveTextContent(/비교.*의견.*확정/);
+    expect(steps.compareDocumentPosition(screen.getByRole("button", { name: label })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("sign-in pending 동안 중복 제출을 막고 resolve 전후에 허위 성공 상태를 만들지 않는다", async () => {

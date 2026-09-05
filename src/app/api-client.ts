@@ -184,6 +184,11 @@ export const getTripItinerary = (tripId: TripId, signal?: AbortSignal) =>
     signal,
   });
 
+export const recordCompareOpened = (tripId: TripId, left: string, right: string) =>
+  requestJson(`${tripPath(tripId)}/compare-opened`, Schema.Struct({ accepted: Schema.Literal(true) }), {
+    method: "POST", body: JSON.stringify({ left, right }), keepalive: true,
+  });
+
 export const getInviteSummary = (
   inviteToken: InviteToken,
   signal?: AbortSignal
