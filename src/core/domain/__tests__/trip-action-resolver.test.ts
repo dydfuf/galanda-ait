@@ -16,7 +16,7 @@ import {
   isAiRankingNeeded,
   resolveEligibleTripActions,
 } from "../trip-action-resolver.ts";
-import type { TripDecisionContext } from "../trip-decision.ts";
+import { toTripRoomDecisionContext, type TripDecisionContext } from "../trip-decision.ts";
 
 const hostId = UserIdSchema.make("host-1");
 const memberId = UserIdSchema.make("member-1");
@@ -98,6 +98,16 @@ const actionIds = (
 ) => value.map(({ actionId }) => actionId);
 
 describe("deterministic Trip action resolver", () => {
+  it("한 안에 응답했어도 다른 후보가 미응답이면 의견 행동을 유지한다", () => {
+    const opinion = { userId: memberId, userName: "멤버", reaction: "LIKE" as const };
+    const partial: TripRoom = { ...room, plans: [
+      { ...room.plans[0], memberOpinions: [opinion] },
+      { ...room.plans[0], id: PlanIdSchema.make("second") },
+    ] };
+    expect(actionIds(resolveEligibleTripActions(toTripRoomDecisionContext(partial, member), member))).toContain("GIVE_OPINION");
+    const complete = { ...partial, plans: partial.plans.map((plan) => ({ ...plan, memberOpinions: [opinion] })) };
+    expect(actionIds(resolveEligibleTripActions(toTripRoomDecisionContext(complete, member), member))).not.toContain("GIVE_OPINION");
+  });
   it.each([
     ["first plan basic incomplete", { title: "", baseHeadcount: 0 }, "EDIT_PLAN_BASIC"],
     ["basic complete and route missing", { title: "서울", baseHeadcount: 2 }, "DEFINE_ROUTE"],

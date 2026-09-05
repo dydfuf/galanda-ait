@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ApiClientError,
+  getCurrentSession,
   getInviteSummary,
   joinInvite,
   signInAnonymously,
@@ -35,6 +36,7 @@ import { useSessionQuery, sessionKeys } from "../../hooks/useSession.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
 import { tripRoomKeys } from "../plan-home/queries.ts";
+import { getRoomActor, isRoomConfirmed } from "../../core/domain/auth-guards.ts";
 import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
 
@@ -170,16 +172,28 @@ export function InvitePage(): JSX.Element {
       let session = sessionQuery.data;
       if (!session) {
         await signInAnonymously();
-        await queryClient.invalidateQueries({ queryKey: sessionKeys.all });
-        session = queryClient.getQueryData(sessionKeys.current());
+        session = await queryClient.fetchQuery({
+          queryKey: sessionKeys.current(),
+          queryFn: ({ signal }) => getCurrentSession(signal),
+          staleTime: 0,
+        });
       }
+      if (!session) throw new Error("참여할 세션을 확인하지 못했어요. 다시 시도해주세요.");
       const room = await joinInvite(
         inviteToken,
         summary.alreadyJoined ? (session?.name ?? trimmedNickname) : trimmedNickname
       );
       sessionStorage.removeItem(storageKey);
       await queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
-      navigate(`/trips/${room.id}`, { replace: true });
+      const target = !isRoomConfirmed(room) &&
+        getRoomActor(room, session.participantIds).can("opinion:submit")
+        ? room.plans.find((plan) => plan.status === "VOTING" &&
+            !plan.memberOpinions?.some((opinion) =>
+              session.participantIds.includes(opinion.userId)))
+        : undefined;
+      navigate(`/trips/${room.id}/plans${target ? `/${target.id}` : ""}`, {
+        replace: true,
+      });
     } catch (error: unknown) {
       setErrorMessage(
         toUserMessage(error, "여행에 참여하지 못했어요. 다시 시도해주세요.")
@@ -283,7 +297,8 @@ export function InvitePage(): JSX.Element {
                   <FieldError>{errorMessage}</FieldError>
                 ) : (
                   <FieldDescription>
-                    가입 폼 없이 이 여행에만 사용할 이름이에요.
+                    계정 없이 이 여행에서 사용할 이름만 입력하면 돼요.
+                    참여하면 여행안을 보고 바로 의견을 남길 수 있어요.
                   </FieldDescription>
                 )}
               </Field>
@@ -361,7 +376,7 @@ export function InvitePage(): JSX.Element {
               ? "온라인 연결 후 참여하기"
               : summary.alreadyJoined
               ? "여행방으로 돌아가기"
-              : "이 이름으로 참여하기"}
+              : "이 이름으로 참여하고 의견 남기기"}
         </Button>
         <Button
           type="button"

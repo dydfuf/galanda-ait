@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Logger, Option } from "effect";
 import { PlanIdSchema, RevisionSchema, TripIdSchema, UserIdSchema } from "../../domain/ids.ts";
 import type { TripPlan, TripRoom, UserSession } from "../../domain/room.ts";
 import type { ConfirmedItinerary } from "../../domain/confirmed-itinerary.ts";
@@ -451,6 +451,33 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
   };
 
   describe("1. createTripRoom", (): void => {
+    it("첫 의견과 확정은 commit 후에만 집계하고 재저장·CAS 실패·원문을 제외한다", async () => {
+      const events: string[] = [];
+      const publishedRoom: TripRoom = { ...sampleRoom, plans: sampleRoom.plans.map((plan) => ({
+        ...plan, status: "VOTING", revision: RevisionSchema.make(1), publishedAt: "2026-09-01T00:00:00Z",
+      })) };
+      const env = Layer.mergeAll(
+        createInMemoryRepositoryLayer([publishedRoom]),
+        createTestSessionLayer(aliceUser),
+        Logger.layer([Logger.formatJson.pipe(Logger.map((line) => { events.push(line); }))]),
+      );
+      const command = { roomId: sampleRoom.id, planId: sampleRoom.plans[0].id,
+        opinion: { reaction: "HARD" as const, reason: "private-opinion-never-log" }, expectedRevision: sampleRoom.revision };
+      await Effect.runPromise(Effect.gen(function* () {
+        yield* submitOpinion({ ...command, expectedRevision: RevisionSchema.make(999) }).pipe(Effect.exit);
+        expect(events).toHaveLength(0);
+        const first = yield* submitOpinion(command);
+        const second = yield* submitOpinion({ ...command, expectedRevision: first.revision });
+        yield* confirmTripPlan(second.id, second.plans[0].id, second.revision);
+        yield* confirmTripPlan(second.id, second.plans[0].id, second.revision).pipe(Effect.exit);
+      }).pipe(Effect.provide(env)));
+      const text = events.join("\n");
+      expect(events.map((line) => JSON.parse(line).annotations.eventName)).toEqual(["first_opinion_submitted", "plan_confirmed"]);
+      expect(text).not.toContain("private-opinion-never-log");
+      expect(text).not.toContain(aliceUser.participantId);
+      expect(text).not.toContain(aliceUser.name);
+      expect(JSON.parse(events[0]).annotations).toMatchObject({ role: "HOST", groupSize: 2, candidateCount: 1 });
+    });
     it("인증된 세션 사용자를 호스트(HOST)로 설정하여 방을 생성한다", async (): Promise<void> => {
       const testEnv = Layer.merge(
         createInMemoryRepositoryLayer(),

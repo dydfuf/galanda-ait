@@ -66,7 +66,7 @@ export const toTripRoomDecisionContext = (
     memberCount: room.members.length,
     opinionParticipantCount: opinionParticipantIds.size,
     actorHasOpinion: actor.member
-      ? opinionParticipantIds.has(actor.member.id)
+      ? room.plans.every((plan) => plan.memberOpinions?.some((opinion) => opinion.userId === actor.member?.id))
       : false,
     isConfirmed: isRoomConfirmed(room),
     confirmablePlanCount: room.plans.filter((plan) =>

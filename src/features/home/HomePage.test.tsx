@@ -13,6 +13,9 @@ vi.mock("../plan-home/queries.ts", () => ({
 vi.mock("../../hooks/useSession.ts", () => ({
   useSessionQuery: vi.fn(),
 }));
+vi.mock("../common/use-next-trip-action-recommendation.ts", () => ({
+  useNextTripActionRecommendation: vi.fn(() => ({ data: null, isPending: false })),
+}));
 
 import { useSavedListingsQuery } from "../explore/save-queries.ts";
 import { useTripRoomsQuery } from "../plan-home/queries.ts";
@@ -156,7 +159,7 @@ beforeEach(() => {
 });
 
 describe("HomePage dashboard", () => {
-  it("계획 중인 여행에서는 계획 보기 및 비교 액션을 제공한다", () => {
+  it("계획 중인 여행에서는 계획 보기를 제공하고 대상 없는 비교 shortcut은 제거한다", () => {
     mockRooms.mockReturnValue(
       roomsResult({
         data: [
@@ -181,10 +184,7 @@ describe("HomePage dashboard", () => {
       "href",
       "/trips/trip-italy/plans",
     );
-    expect(screen.getByRole("link", { name: /여행안 비교/ })).toHaveAttribute(
-      "href",
-      "/trips/trip-italy/plans/compare",
-    );
+    expect(screen.queryByRole("link", { name: /여행안 비교/ })).not.toBeInTheDocument();
   });
 
   it("저장 section이 오류여도 여행 dashboard 핵심 콘텐츠를 유지한다", () => {

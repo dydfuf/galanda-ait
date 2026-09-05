@@ -14,6 +14,7 @@ import {
   setPlanOpinionInRoom,
 } from "../domain/room-transitions.ts";
 import type { TripActivityWrite } from "../domain/trip-activity.ts";
+import { logDecisionFunnelEvent } from "./decision-funnel.ts";
 
 /**
  * 의견 제출 입력
@@ -99,10 +100,15 @@ export const submitOpinion = Effect.fn("submitOpinion")(
       },
     };
 
-    return yield* repo.saveRoomWithActivity({
+    const saved = yield* repo.saveRoomWithActivity({
       room: setPlanOpinionInRoom(room, plan, sanitizedOpinion),
       expectedRevision: input.expectedRevision,
       activity,
     });
+    if (!room.plans.some((candidate) => candidate.memberOpinions?.some((opinion) =>
+      session.participantIds.includes(opinion.userId)))) {
+      yield* logDecisionFunnelEvent("first_opinion_submitted", saved, session.participantIds);
+    }
+    return saved;
   }
 );

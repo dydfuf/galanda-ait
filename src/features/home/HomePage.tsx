@@ -15,6 +15,7 @@ import {
   selectFeaturedTrip,
 } from "./components/HomeTripDashboard.tsx";
 import { SavedIdeasSection } from "./components/SavedIdeasSection.tsx";
+import { HomeNextAction } from "./components/HomeNextAction.tsx";
 
 export function HomePage() {
   const session = useSessionQuery();
@@ -75,6 +76,7 @@ export function HomePage() {
         <p className="px-1 text-lg leading-snug font-bold [overflow-wrap:anywhere]">
           {greeting}
         </p>
+        {!rooms.isError && <HomeNextAction key={featured.id} trip={featured} />}
         <HomeTripCard trip={featured} lifecycle={lifecycle} today={today} />
       </div>
     );
@@ -126,7 +128,7 @@ export function HomePage() {
             진행 중인 여행이 없어요.
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-foreground-muted">
-            새 여행을 만들거나 다른 여행자의 일정을 둘러보세요.
+            여행방을 만들어 후보를 비교하고, 친구들의 의견으로 함께 확정해요.
           </p>
         </div>
         <div className="flex w-full min-w-0 flex-wrap gap-2">
