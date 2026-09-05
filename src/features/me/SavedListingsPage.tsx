@@ -1,6 +1,7 @@
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { useSessionQuery } from "@/hooks/useSession.ts";
@@ -67,6 +68,7 @@ export function SavedListingsPage() {
     <PageState
       status="empty"
       title="아직 저장한 여행 일정이 없어요"
+      illustration={<GalandaSpot name="empty-saved" />}
       description="탐색에서 마음에 드는 여행 일정을 저장하면 이곳에 모여요."
     />
   ) : (

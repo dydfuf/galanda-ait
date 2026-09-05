@@ -7,10 +7,27 @@ import { ItemDescription, ItemTitle } from "@/components/ui/item";
 
 import { MobileList, MobileListItem } from "./mobile-list.tsx";
 import { PageState } from "./page-state.tsx";
+import { GalandaSpot } from "./galanda-spot.tsx";
 import { PageTitle } from "./page-title.tsx";
 import { SectionHeader } from "./section-header.tsx";
 
 describe("PageState", () => {
+  it("keeps decorative art out of announcements and removes it on loading/error", () => {
+    const { container, rerender } = render(
+      <PageState status="empty" title="저장한 여행 일정이 없어요" illustration={<GalandaSpot name="empty-saved" />} />,
+    );
+    expect(container.querySelectorAll("img")).toHaveLength(2);
+    expect(container.querySelector("img")?.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("저장한 여행 일정이 없어요");
+
+    rerender(<PageState status="loading" message="불러오는 중이에요" />);
+    expect(container.querySelector("img")).toBeNull();
+    rerender(<PageState status="error" title="불러오지 못했어요" />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("불러오지 못했어요");
+  });
+
   it("announces only the loading state and keeps its text when motion is reduced", () => {
     const { container } = render(
       <PageState status="loading" message="여행 정보를 불러오는 중이에요." />,

@@ -5,6 +5,7 @@ import { CalendarDays, MapPinned, Plus, UsersRound } from "lucide-react";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -299,6 +300,7 @@ export function TripListPage() {
           <PageState
             status="empty"
             title="진행 중인 여행이 없어요"
+            illustration={!isError && trips?.length === 0 ? <GalandaSpot name="empty-trips" /> : undefined}
             description="새 여행을 시작하려면 아래 버튼을 이용해주세요."
           />
         ) : (

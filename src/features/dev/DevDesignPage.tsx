@@ -71,6 +71,7 @@ import {
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { TripCreationProgress } from "@/components/galanda/trip-creation-progress.tsx";
@@ -773,6 +774,22 @@ function FeedbackSection() {
         </div>
       </DevCard>
       <DevCard title="PageState">
+        <div className="overflow-hidden rounded-lg border border-border">
+          <PageState
+            status="empty"
+            title="진행 중인 여행이 없어요"
+            description="새 여행을 시작하려면 아래 버튼을 이용해주세요."
+            illustration={<GalandaSpot name="empty-trips" />}
+          />
+        </div>
+        <div className="overflow-hidden rounded-lg border border-border">
+          <PageState
+            status="empty"
+            title="아직 저장한 여행 일정이 없어요"
+            description="탐색에서 마음에 드는 여행 일정을 저장하면 이곳에 모여요."
+            illustration={<GalandaSpot name="empty-saved" />}
+          />
+        </div>
         <div className="overflow-hidden rounded-lg border border-border">
           <PageState status="loading" message="여행 정보를 불러오는 중이에요." />
         </div>

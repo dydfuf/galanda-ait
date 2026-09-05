@@ -96,6 +96,16 @@ beforeEach(() => {
 });
 
 describe("TripListPage", () => {
+  it("shows empty art only for a successful empty list, not a failed cached empty list", () => {
+    const view = renderPage();
+    expect(view.container.querySelector('img[src$="empty-trips-light.svg"]')).not.toBeNull();
+
+    mockUseTripRoomsQuery.mockReturnValue(roomsQueryResult([], { isError: true }));
+    view.rerender(<TestApp />);
+    expect(view.container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("이전에 불러온 정보");
+  });
+
   it("진행 중 탭은 진행 중 카드와 최근 지난 여행 2건을, 지난 여행 탭은 전체 목록을 표시한다", () => {
     const longTitle =
       "가족 모두의 취향을 반영한 아주 긴 오키나와 북부와 남부 일주 여행";
