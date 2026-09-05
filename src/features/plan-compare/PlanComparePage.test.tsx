@@ -205,7 +205,7 @@ beforeEach(() => {
 });
 
 describe("PlanComparePage responsive hierarchy and source order", () => {
-  it("query의 left/right 순서를 세로 reading order로 유지하고 긴 값과 미정 가격을 줄바꿈한다", () => {
+  it("근거를 선택보다 먼저 2열 매트릭스로 보여주고 긴 값과 미정 가격을 줄바꿈한다", () => {
     const { container } = renderPage();
 
     const content = container.querySelector<HTMLElement>(
@@ -213,7 +213,8 @@ describe("PlanComparePage responsive hierarchy and source order", () => {
     );
     expect(content?.className).toContain("max-w-(--content-max-width)");
     expect(content?.className).not.toContain("max-w-[640px]");
-    expect(container.querySelector("table")).toBeNull();
+    const matrix = screen.getByRole("table", { name: "여행안 비교 근거" });
+    expect(matrix).toHaveAttribute("aria-describedby", "plan-compare-matrix-summary");
 
     const headings = screen.getAllByRole("heading");
     expect(headings.slice(0, 3).map((heading) => heading.tagName)).toEqual([
@@ -223,12 +224,17 @@ describe("PlanComparePage responsive hierarchy and source order", () => {
     ]);
     expect(headings.slice(0, 3).map((heading) => heading.textContent)).toEqual([
       "어떤 여행안이 더 좋나요?",
+      "비교 근거",
       "여행안 선택",
-      "두 안은 이것이 달라요",
     ]);
-    expect(
-      screen.getByRole("heading", { level: 3, name: "예상 경비" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "차이만 보기" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "전체 보기" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
 
     const radios = screen.getAllByRole("radio");
     expect(radios).toEqual([
@@ -239,18 +245,17 @@ describe("PlanComparePage responsive hierarchy and source order", () => {
     ]);
     expect(radios[0]).toHaveAttribute("aria-checked", "true");
 
-    const longTitle = screen.getByText(LONG_ALTERNATIVE_TITLE);
-    expect(longTitle.className).toContain("[overflow-wrap:anywhere]");
-    expect(longTitle.closest("label")?.className).toContain("min-w-0");
+    const longTitle = screen.getAllByText(LONG_ALTERNATIVE_TITLE)[0];
+    expect(longTitle?.className).toContain("[overflow-wrap:anywhere]");
+    expect(
+      screen
+        .getByRole("radio", { name: `${LONG_ALTERNATIVE_TITLE} 선택` })
+        .closest("label")?.className,
+    ).toContain("min-w-0");
 
-    const differences = screen.getByRole("list", {
-      name: "여행안이 다른 항목",
-    });
-    const costHeading = within(differences).getByRole("heading", {
-      level: 3,
-      name: "예상 경비",
-    });
-    const costItem = costHeading.closest<HTMLElement>('[role="listitem"]');
+    const costItem = matrix.querySelector<HTMLElement>(
+      '[data-compare-kind="COST"]',
+    );
     expect(costItem).not.toBeNull();
     expect(
       within(costItem as HTMLElement).getByText("예상 경비 미정"),
@@ -263,9 +268,39 @@ describe("PlanComparePage responsive hierarchy and source order", () => {
     const leftValue = within(costItem as HTMLElement).getByText(
       "예상 경비 미정",
     );
-    const leftRow = leftValue.parentElement;
-    expect(leftRow?.className).toContain("flex-col");
     expect(leftValue.className).toContain("[overflow-wrap:anywhere]");
+
+    const rowOrder = [...matrix.querySelectorAll<HTMLElement>('[role="row"]')]
+      .map((row) => row.dataset.compareKind)
+      .filter((kind): kind is string => Boolean(kind));
+    expect(rowOrder).toEqual(["OPINIONS", "SCHEDULE", "COST", "BOOKING"]);
+  });
+
+  it("차이만 보기와 전체 보기는 같은 비교 row source를 전환한다", () => {
+    const viewModel = toPlanDetailViewModel(makeRoom(), HOST_ID);
+    const basic = viewModel.plans.find((plan) => plan.id === "plan-basic");
+    if (!basic) throw new Error("fixture에 plan-basic이 있어야 한다");
+    mockUseTripRoomDetailQuery.mockReturnValue(
+      detailQueryResult({
+        ...viewModel,
+        plans: [
+          { ...basic, id: "plan-alt", title: "같은 구성 대안", planTagLabel: "대안 1" },
+          basic,
+        ],
+      }),
+    );
+
+    renderPage();
+    const matrix = screen.getByRole("table", { name: "여행안 비교 근거" });
+    expect(matrix.querySelectorAll('[data-compare-kind]')).toHaveLength(1);
+    expect(matrix.querySelector('[data-compare-kind="OPINIONS"]')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "전체 보기" }));
+    expect(matrix.querySelectorAll('[data-compare-kind]')).toHaveLength(4);
+    expect(matrix).not.toHaveTextContent("두 안의 예약 확인 대상이 서로 달라요.");
+
+    fireEvent.click(screen.getByRole("button", { name: "차이만 보기" }));
+    expect(matrix.querySelectorAll('[data-compare-kind]')).toHaveLength(1);
   });
 });
 
@@ -341,6 +376,15 @@ describe("PlanComparePage selection and overlay behavior", () => {
       dialog.querySelector('[data-plan-summary-layout="vertical"]'),
     ).not.toBeNull();
     expect(within(dialog).getAllByText(/가격 미정 1건 별도/)).toHaveLength(2);
+    expect(
+      within(dialog).getByText("두 안을 모두 평가한 사람 0/2명"),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("비교 쌍 미응답자: 방장, 참여자"),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("어려워요 의견이 없어요."),
+    ).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
 

@@ -12,6 +12,25 @@ export interface PlanCompareDifference {
   readonly rightPlanLabel: string;
   readonly rightValue: string;
   readonly deltaText?: string;
+  readonly explanationText?: string;
+}
+
+export interface PlanCompareRow extends PlanCompareDifference {
+  readonly isChanged: boolean;
+}
+
+export interface CompareParticipant {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface CompareOpinionSummary {
+  readonly bothRespondedCount: number;
+  readonly eligibleParticipantCount: number;
+  readonly responseText: string;
+  readonly nonRespondentNames: ReadonlyArray<string>;
+  readonly nonRespondentText: string;
+  readonly limitationText?: string;
 }
 
 const areRoutesEqual = (
@@ -103,17 +122,20 @@ const formatOpinions = (plan: DetailedPlanViewModel): string => {
 };
 
 const opinionSignature = (plan: DetailedPlanViewModel): string =>
-  [plan.opinions.likeCount, plan.opinions.okayCount, plan.opinions.hardCount].join("|");
+  JSON.stringify(
+    plan.memberOpinions
+      .map(({ userId, reaction }) => [userId, reaction])
+      .sort(([leftId], [rightId]) => leftId.localeCompare(rightId)),
+  );
 
 const formatCost = (plan: DetailedPlanViewModel): string =>
   plan.costSummary.hasCost
     ? `1인 ${formatCostRangeText(plan.costSummary.minPerPerson, plan.costSummary.maxPerPerson, plan.costSummary.unpricedCount)}`
     : "예상 경비 미정";
 
-const formatSignedCost = (amount: number): string =>
-  `${amount > 0 ? "+" : amount < 0 ? "-" : ""}${formatCostText(Math.abs(amount))}`;
-
 const formatCostDelta = (
+  leftPlanLabel: string,
+  rightPlanLabel: string,
   left: DetailedPlanViewModel["costSummary"],
   right: DetailedPlanViewModel["costSummary"]
 ): string | undefined => {
@@ -125,14 +147,74 @@ const formatCostDelta = (
   const maxDelta = right.maxPerPerson - left.maxPerPerson;
   if (minDelta === 0 && maxDelta === 0) return undefined;
 
-  const delta =
-    minDelta === maxDelta
-      ? formatSignedCost(minDelta)
-      : `${formatSignedCost(minDelta)} ~ ${formatSignedCost(maxDelta)}`;
-  return `1인 기준 ${delta}`;
+  if ((minDelta < 0 && maxDelta > 0) || (minDelta > 0 && maxDelta < 0)) {
+    return "두 안의 1인 비용 범위가 겹쳐요.";
+  }
+
+  const minAmount = Math.min(Math.abs(minDelta), Math.abs(maxDelta));
+  const maxAmount = Math.max(Math.abs(minDelta), Math.abs(maxDelta));
+  const amount =
+    minAmount === maxAmount
+      ? formatCostText(minAmount)
+      : `${formatCostText(minAmount)} ~ ${formatCostText(maxAmount)}`;
+  const cheaperPlanLabel = minDelta > 0 ? leftPlanLabel : rightPlanLabel;
+  return `${cheaperPlanLabel}이 1인 기준 ${amount} 저렴해요.`;
 };
 
-const makeDifference = ({
+const formatHardOpinionText = (plan: DetailedPlanViewModel): string =>
+  plan.opinions.hardCount > 0
+    ? `${plan.planTagLabel}에는 어려워요 의견 ${plan.opinions.hardCount}개가 있어요.`
+    : `${plan.planTagLabel}에는 어려워요 의견이 없어요.`;
+
+const formatNonRespondentText = (
+  names: ReadonlyArray<string>,
+): string =>
+  names.length > 0
+    ? `비교 쌍 미응답자: ${names.join(", ")}`
+    : "비교 쌍 미응답자 없음";
+
+export const buildCompareOpinionSummary = (
+  left: DetailedPlanViewModel,
+  right: DetailedPlanViewModel,
+  participants: ReadonlyArray<CompareParticipant>,
+): CompareOpinionSummary => {
+  const eligibleIds = new Set(participants.map(({ id }) => id));
+  const leftRespondentIds = new Set(
+    left.memberOpinions
+      .map(({ userId }) => userId)
+      .filter((id) => eligibleIds.has(id)),
+  );
+  const rightRespondentIds = new Set(
+    right.memberOpinions
+      .map(({ userId }) => userId)
+      .filter((id) => eligibleIds.has(id)),
+  );
+  const bothRespondedIds = new Set(
+    [...leftRespondentIds].filter((id) => rightRespondentIds.has(id)),
+  );
+  const nonRespondentNames = participants
+    .filter(({ id }) => !bothRespondedIds.has(id))
+    .map(({ name }) => name);
+  const unattributedOpinionCount =
+    left.unattributedOpinionCount + right.unattributedOpinionCount;
+
+  return {
+    bothRespondedCount: bothRespondedIds.size,
+    eligibleParticipantCount: participants.length,
+    responseText:
+      participants.length > 0
+        ? `두 안을 모두 평가한 사람 ${bothRespondedIds.size}/${participants.length}명`
+        : "응답 가능한 회원이 없어요",
+    nonRespondentNames,
+    nonRespondentText: formatNonRespondentText(nonRespondentNames),
+    limitationText:
+      unattributedOpinionCount > 0
+        ? `회원과 연결되지 않은 과거 의견 ${unattributedOpinionCount}개는 비교 응답률에서 제외했어요.`
+        : undefined,
+  };
+};
+
+const makeRow = ({
   kind,
   label,
   left,
@@ -141,6 +223,7 @@ const makeDifference = ({
   rightValue,
   isChanged,
   deltaText,
+  explanationText,
 }: {
   readonly kind: CompareDifferenceKind;
   readonly label: string;
@@ -150,72 +233,105 @@ const makeDifference = ({
   readonly rightValue: string;
   readonly isChanged: boolean;
   readonly deltaText?: string;
-}): PlanCompareDifference | undefined =>
-  isChanged
-    ? {
-        kind,
-        label,
-        leftPlanLabel: left.planTagLabel,
-        leftValue,
-        rightPlanLabel: right.planTagLabel,
-        rightValue,
-        deltaText,
-      }
-    : undefined;
+  readonly explanationText?: string;
+}): PlanCompareRow => ({
+  kind,
+  label,
+  leftPlanLabel: left.planTagLabel,
+  leftValue,
+  rightPlanLabel: right.planTagLabel,
+  rightValue,
+  deltaText,
+  explanationText,
+  isChanged,
+});
+
+export const buildPlanCompareRows = (
+  left: DetailedPlanViewModel,
+  right: DetailedPlanViewModel,
+  participants: ReadonlyArray<CompareParticipant> = [],
+): ReadonlyArray<PlanCompareRow> => {
+  const opinionSummary = buildCompareOpinionSummary(left, right, participants);
+  const bookingChanged = bookingSignature(left) !== bookingSignature(right);
+  const bookingCountDelta = right.bookingRisks.length - left.bookingRisks.length;
+  const bookingExplanation =
+    bookingCountDelta === 0
+      ? "두 안의 예약 확인 대상이 서로 달라요."
+      : `${bookingCountDelta > 0 ? right.planTagLabel : left.planTagLabel}은 예약 ${Math.abs(bookingCountDelta)}건을 더 확인해야 해요.`;
+
+  return [
+    makeRow({
+      kind: "OPINIONS",
+      label: "그룹 의견·어려운 조건",
+      left,
+      right,
+      leftValue: formatOpinions(left),
+      rightValue: formatOpinions(right),
+      // 비교 쌍 응답률은 집계 수가 같아도 항상 확인할 근거다.
+      isChanged:
+        participants.length > 0 || opinionSignature(left) !== opinionSignature(right),
+      explanationText: [
+        `${opinionSummary.responseText}.`,
+        opinionSummary.limitationText,
+        formatHardOpinionText(left),
+        formatHardOpinionText(right),
+      ]
+        .filter((text): text is string => Boolean(text))
+        .join(" "),
+    }),
+    makeRow({
+      kind: "SCHEDULE",
+      label: "날짜·경로",
+      left,
+      right,
+      leftValue: formatSchedule(left),
+      rightValue: formatSchedule(right),
+      isChanged:
+        left.period !== right.period ||
+        left.nights !== right.nights ||
+        left.days !== right.days ||
+        !areRoutesEqual(left.route, right.route),
+    }),
+    makeRow({
+      kind: "COST",
+      label: "1인 비용",
+      left,
+      right,
+      leftValue: formatCost(left),
+      rightValue: formatCost(right),
+      isChanged:
+        left.costSummary.hasCost !== right.costSummary.hasCost ||
+        left.costSummary.unpricedCount !== right.costSummary.unpricedCount ||
+        left.costSummary.minPerPerson !== right.costSummary.minPerPerson ||
+        left.costSummary.maxPerPerson !== right.costSummary.maxPerPerson,
+      deltaText: formatCostDelta(
+        left.planTagLabel,
+        right.planTagLabel,
+        left.costSummary,
+        right.costSummary,
+      ),
+    }),
+    makeRow({
+      kind: "BOOKING",
+      label: "예약 확인",
+      left,
+      right,
+      leftValue: formatBooking(left),
+      rightValue: formatBooking(right),
+      isChanged: bookingChanged,
+      explanationText: bookingChanged ? bookingExplanation : undefined,
+    }),
+  ];
+};
 
 export const buildPlanCompareDifferences = (
   left: DetailedPlanViewModel,
-  right: DetailedPlanViewModel
+  right: DetailedPlanViewModel,
+  participants: ReadonlyArray<CompareParticipant> = [],
 ): ReadonlyArray<PlanCompareDifference> => {
-  const schedule = makeDifference({
-    kind: "SCHEDULE",
-    label: "일정 구조",
-    left,
-    right,
-    leftValue: formatSchedule(left),
-    rightValue: formatSchedule(right),
-    isChanged:
-      left.period !== right.period ||
-      left.nights !== right.nights ||
-      left.days !== right.days ||
-      !areRoutesEqual(left.route, right.route),
-  });
-  const booking = makeDifference({
-    kind: "BOOKING",
-    label: "예약 확인",
-    left,
-    right,
-    leftValue: formatBooking(left),
-    rightValue: formatBooking(right),
-    isChanged: bookingSignature(left) !== bookingSignature(right),
-  });
-  const cost = makeDifference({
-    kind: "COST",
-    label: "예상 경비",
-    left,
-    right,
-    leftValue: formatCost(left),
-    rightValue: formatCost(right),
-    isChanged:
-      left.costSummary.hasCost !== right.costSummary.hasCost ||
-      left.costSummary.unpricedCount !== right.costSummary.unpricedCount ||
-      left.costSummary.minPerPerson !== right.costSummary.minPerPerson ||
-      left.costSummary.maxPerPerson !== right.costSummary.maxPerPerson,
-    deltaText: formatCostDelta(left.costSummary, right.costSummary),
-  });
-  const opinions = makeDifference({
-    kind: "OPINIONS",
-    label: "멤버 의견",
-    left,
-    right,
-    leftValue: formatOpinions(left),
-    rightValue: formatOpinions(right),
-    isChanged: opinionSignature(left) !== opinionSignature(right),
-  });
-
-  return [schedule, booking, cost, opinions].filter(
-    (difference): difference is PlanCompareDifference => difference !== undefined
-  );
+  return buildPlanCompareRows(left, right, participants)
+    .filter(({ isChanged }) => isChanged)
+    .map(({ isChanged: _isChanged, ...difference }) => difference);
 };
 
 /**
@@ -263,11 +379,16 @@ export interface ConfirmPlanSummary {
   readonly routeText: string;
   readonly groupCostText: string;
   readonly perPersonCostText: string;
+  readonly comparisonResponseText?: string;
+  readonly comparisonNonRespondentText?: string;
+  readonly comparisonLimitationText?: string;
+  readonly hardOpinionText: string;
   readonly needCheckMessages: ReadonlyArray<string>;
 }
 
 export const buildConfirmPlanSummary = (
   plan: DetailedPlanViewModel,
+  comparison?: CompareOpinionSummary,
 ): ConfirmPlanSummary => ({
   planId: plan.id,
   title: plan.title,
@@ -288,6 +409,13 @@ export const buildConfirmPlanSummary = (
   perPersonCostText: plan.costSummary.hasCost
     ? plan.perPersonCostText
     : "1인 예상 경비 미정",
+  comparisonResponseText: comparison?.responseText,
+  comparisonNonRespondentText: comparison?.nonRespondentText,
+  comparisonLimitationText: comparison?.limitationText,
+  hardOpinionText:
+    plan.opinions.hardCount > 0
+      ? `어려워요 의견 ${plan.opinions.hardCount}개가 있어요.`
+      : "어려워요 의견이 없어요.",
   needCheckMessages: plan.bookingRisks.map((risk) => risk.message),
 });
 

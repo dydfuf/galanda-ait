@@ -42,7 +42,8 @@ import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
 import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
 import {
   buildConfirmPlanSummary,
-  buildPlanCompareDifferences,
+  buildCompareOpinionSummary,
+  buildPlanCompareRows,
   canSubmitConfirm,
   getCompareConfirmState,
 } from "./plan-compare-view-model.ts";
@@ -90,6 +91,7 @@ export function PlanComparePage() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isConfirmSheetOpen, setIsConfirmSheetOpen] = useState(false);
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+  const [showAllComparisons, setShowAllComparisons] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<"left" | "right" | null>(
     null,
   );
@@ -189,13 +191,24 @@ export function PlanComparePage() {
     : (selectedPlanId ?? leftPlan.id);
   const selectedPlan =
     currentSelectedId === rightPlan.id ? rightPlan : leftPlan;
-  const differences = buildPlanCompareDifferences(leftPlan, rightPlan);
+  const compareOpinionSummary = buildCompareOpinionSummary(
+    leftPlan,
+    rightPlan,
+    room.memberParticipants,
+  );
+  const compareRows = buildPlanCompareRows(
+    leftPlan,
+    rightPlan,
+    room.memberParticipants,
+  );
+  const changedRows = compareRows.filter((row) => row.isChanged);
+  const visibleRows = showAllComparisons
+    ? compareRows
+    : changedRows;
   const pageSubtitle =
     confirmState.kind === "LOCKED"
       ? "확정된 여행안은 잠겨 있어요. 아래에서 확정 결과를 확인하세요."
-      : differences.length > 0
-        ? `${differences.length}가지 차이를 먼저 보여드려요. 마음에 드는 안을 선택하세요.`
-        : "두 여행안의 핵심 구성이 같아요. 마음에 드는 안을 선택하세요.";
+      : "두 여행안을 같은 기준으로 확인한 뒤 마음에 드는 안을 선택하세요.";
 
   const openConfirmSheet = (): void => {
     if (!isOnline) {
@@ -311,11 +324,122 @@ export function PlanComparePage() {
       )}
 
       <SectionHeader
+        title="비교 근거"
+        description="두 여행안을 같은 기준으로 읽을 수 있어요."
+        action={
+          <div
+            role="group"
+            aria-label="비교 범위"
+            className="flex min-w-0 max-w-full rounded-lg border border-border p-0.5"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={showAllComparisons ? "ghost" : "secondary"}
+              aria-pressed={!showAllComparisons}
+              onClick={() => setShowAllComparisons(false)}
+            >
+              차이만 보기
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={showAllComparisons ? "secondary" : "ghost"}
+              aria-pressed={showAllComparisons}
+              onClick={() => setShowAllComparisons(true)}
+            >
+              전체 보기
+            </Button>
+          </div>
+        }
+      />
+
+      <p id="plan-compare-matrix-summary" className="sr-only">
+        {leftPlan.planTagLabel}과 {rightPlan.planTagLabel}을 날짜와 경로, 1인 비용,
+        예약 확인, 그룹 의견과 어려운 조건 기준으로 비교합니다. 선택은 비교 근거 아래에서
+        진행합니다.
+      </p>
+      <div
+        role="table"
+        aria-label="여행안 비교 근거"
+        aria-describedby="plan-compare-matrix-summary"
+        className="mx-(--app-inline-padding) min-w-0 overflow-hidden rounded-xl border border-border"
+      >
+        <div role="rowgroup" className="bg-muted/30">
+          <div
+            role="row"
+            className="grid min-w-0 grid-cols-2 gap-x-3 border-b border-border p-3 md:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)_minmax(0,1fr)]"
+          >
+            <div role="columnheader" className="hidden min-w-0 md:block">
+              비교 기준
+            </div>
+            {[leftPlan, rightPlan].map((plan) => (
+              <div
+                key={plan.id}
+                role="columnheader"
+                className="min-w-0 [overflow-wrap:anywhere]"
+              >
+                <span className="block text-sm leading-relaxed font-semibold text-muted-foreground">
+                  {plan.planTagLabel}
+                </span>
+                <span className="block text-base leading-snug font-bold text-foreground [overflow-wrap:anywhere]">
+                  {plan.title}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div role="rowgroup">
+          {visibleRows.map((row) => (
+            <div
+              key={row.kind}
+              role="row"
+              data-compare-kind={row.kind}
+              className="grid min-w-0 grid-cols-2 gap-x-3 border-b border-border p-3 last:border-b-0 md:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)_minmax(0,1fr)]"
+            >
+              <div
+                role="rowheader"
+                className="col-span-2 min-w-0 whitespace-nowrap text-sm leading-relaxed font-semibold text-foreground md:col-span-1"
+              >
+                {row.label}
+              </div>
+              <div
+                role="cell"
+                className="min-w-0 pt-2 text-base leading-relaxed text-secondary-foreground [overflow-wrap:anywhere] md:pt-0"
+              >
+                <span className="mb-1 block text-xs leading-relaxed font-semibold text-muted-foreground md:hidden">
+                  {row.leftPlanLabel}
+                </span>
+                {row.leftValue}
+              </div>
+              <div
+                role="cell"
+                className="min-w-0 pt-2 text-base leading-relaxed text-secondary-foreground [overflow-wrap:anywhere] md:pt-0"
+              >
+                <span className="mb-1 block text-xs leading-relaxed font-semibold text-muted-foreground md:hidden">
+                  {row.rightPlanLabel}
+                </span>
+                {row.rightValue}
+              </div>
+              {(row.deltaText || row.explanationText) && (
+                <p
+                  role="cell"
+                  className="col-span-2 min-w-0 pt-2 text-sm leading-relaxed font-semibold text-info [overflow-wrap:anywhere] md:col-span-3"
+                >
+                  {row.deltaText ?? row.explanationText}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <SectionHeader
         title="여행안 선택"
         description={
           isSelectionLocked
             ? "확정된 여행안은 다시 선택할 수 없어요."
-            : "아래 선택이 마지막 확정 버튼에 반영돼요."
+            : "비교 근거를 확인한 뒤 확정할 여행안을 선택하세요."
         }
       />
 
@@ -412,61 +536,6 @@ export function PlanComparePage() {
           );
         })}
       </RadioGroup>
-
-      <SectionHeader
-        title="두 안은 이것이 달라요"
-        description={
-          differences.length > 0
-            ? "일정 구조, 예약 현실성, 비용, 의견 순서로 정리했어요."
-            : "판단에 영향을 줄 만한 차이가 없어요."
-        }
-      />
-
-      {differences.length > 0 ? (
-        <MobileList aria-label="여행안이 다른 항목" className="mb-7">
-          {differences.map((difference) => (
-            <MobileListItem key={difference.kind}>
-              <h3 className="text-base font-semibold text-foreground">
-                {difference.label}
-              </h3>
-              <div className="flex min-w-0 flex-col gap-3 pt-1.5">
-                <div className="flex min-w-0 flex-col items-start gap-1">
-                  <span className="text-base leading-relaxed font-bold text-muted-foreground">
-                    {difference.leftPlanLabel}
-                  </span>
-                  <span className="min-w-0 text-base leading-relaxed text-secondary-foreground [overflow-wrap:anywhere]">
-                    {difference.leftValue}
-                  </span>
-                </div>
-                <div className="flex min-w-0 flex-col items-start gap-1">
-                  <span className="text-base leading-relaxed font-bold text-muted-foreground">
-                    {difference.rightPlanLabel}
-                  </span>
-                  <span className="min-w-0 text-base leading-relaxed text-secondary-foreground [overflow-wrap:anywhere]">
-                    {difference.rightValue}
-                  </span>
-                </div>
-              </div>
-              {difference.deltaText && (
-                <span className="pt-1 text-base leading-relaxed font-bold text-info">
-                  {difference.deltaText}
-                </span>
-              )}
-            </MobileListItem>
-          ))}
-        </MobileList>
-      ) : (
-        <MobileList aria-label="여행안이 같은 항목" className="mb-7">
-          <MobileListItem trailing={<Badge variant="success">차이 없음</Badge>}>
-            <h3 className="text-base font-semibold text-foreground">
-              핵심 구성은 같아요
-            </h3>
-            <ItemDescription className="text-base">
-              같은 항목은 접어두고 선택만 쉽게 했어요.
-            </ItemDescription>
-          </MobileListItem>
-        </MobileList>
-      )}
 
       {confirmState.kind === "LOCKED" && (
         <BottomAction>
@@ -611,7 +680,10 @@ export function PlanComparePage() {
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
             <ConfirmPlanSummaryView
-              summary={buildConfirmPlanSummary(selectedPlan)}
+              summary={buildConfirmPlanSummary(
+                selectedPlan,
+                compareOpinionSummary,
+              )}
             />
           </div>
           <DrawerFooter className="flex-row *:min-w-0 *:flex-1">

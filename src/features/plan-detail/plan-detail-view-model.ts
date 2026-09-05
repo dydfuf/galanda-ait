@@ -46,6 +46,8 @@ export interface DetailedPlanViewModel extends PlanSummaryData {
   readonly bookingRisks: ReadonlyArray<BookingRiskItem>;
   readonly timelineItems: ReadonlyArray<TimelineItem>;
   readonly memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel>;
+  /** memberOpinions가 없는 legacy voteCount처럼 stable participant에 귀속할 수 없는 수예요. */
+  readonly unattributedOpinionCount: number;
 }
 
 export interface PlanDetailViewModel {
@@ -55,6 +57,10 @@ export interface PlanDetailViewModel {
   readonly period: string;
   readonly memberCount: number;
   readonly memberNames: string;
+  readonly memberParticipants: ReadonlyArray<{
+    readonly id: string;
+    readonly name: string;
+  }>;
   readonly revision: number;
   /** 세션 사용자의 방 내 역할. 방장 전용 동작(확정 등) 노출 판단에 사용해요. */
   readonly viewerRole: RoomRole;
@@ -309,6 +315,8 @@ export const toPlanDetailViewModel = (
       }
 
       const privateOpinions = p.memberOpinions ?? [];
+      const unattributedOpinionCount =
+        p.memberOpinions === undefined ? p.voteCount : 0;
       const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> =
         privateOpinions.map(
           ({ userId, userName, reaction }: PublicPlanMemberOpinion) => ({
@@ -374,6 +382,7 @@ export const toPlanDetailViewModel = (
         bookingRisks,
         timelineItems,
         memberOpinions,
+        unattributedOpinionCount,
       };
     },
   );
@@ -388,6 +397,7 @@ export const toPlanDetailViewModel = (
       : "일정 미정",
     memberCount: room.members.length,
     memberNames: room.members.map((member) => member.name).join(", "),
+    memberParticipants: room.members.map(({ id, name }) => ({ id, name })),
     revision: room.revision,
     viewerRole: viewer.role,
     isViewerHost: viewer.isHost,
