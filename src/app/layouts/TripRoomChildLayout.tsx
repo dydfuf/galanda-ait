@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Outlet, useParams, useLocation } from "react-router-dom";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
@@ -11,6 +12,14 @@ export function TripRoomChildLayout() {
   const params = useParams();
   const location = useLocation();
   const { goBack, platformNavigation } = useAppNavigation();
+  const [platformTopInset, setPlatformTopInset] = useState(
+    platformNavigation?.contentTopInset ?? 0,
+  );
+
+  useEffect(
+    () => platformNavigation?.subscribeContentTopInset(setPlatformTopInset),
+    [platformNavigation],
+  );
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   if (Result.isFailure(validated)) {
@@ -33,7 +42,14 @@ export function TripRoomChildLayout() {
         />
       )}
 
-      <main className="flex flex-1 flex-col">
+      <main
+        style={
+          platformNavigation
+            ? { paddingTop: `${platformTopInset}px` }
+            : undefined
+        }
+        className="flex flex-1 flex-col"
+      >
         <Outlet context={{ tripId }} />
       </main>
     </div>

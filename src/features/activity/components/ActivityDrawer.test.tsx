@@ -54,7 +54,7 @@ describe("ActivityDrawer component", () => {
     );
 
     expect(screen.getByText("활동 알림")).toBeInTheDocument();
-    expect(screen.getByText("아직 새로운 활동이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("아직 새로운 활동이 없어요.")).toBeInTheDocument();
   });
 
   it("renders activity event items without auto-marking them read, and marks read on button click", async () => {
@@ -148,7 +148,7 @@ describe("ActivityDrawer component", () => {
       <ActivityDrawer tripId="trip-1" isOpen={true} onClose={vi.fn()} />
     );
 
-    expect(screen.getByText("활동 내역을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("활동 내역을 불러오지 못했어요.")).toBeInTheDocument();
     const retryBtn = screen.getByRole("button", { name: "다시 시도" });
     fireEvent.click(retryBtn);
     expect(refetchMock).toHaveBeenCalled();

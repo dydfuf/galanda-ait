@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 
 interface PageStateAction {
   readonly actionText?: string;
@@ -12,10 +13,12 @@ export type PageStateProps =
   | {
       readonly status: "loading";
       readonly message: string;
+      readonly className?: string;
     }
   | ({
       readonly title: string;
       readonly description?: string;
+      readonly className?: string;
     } & PageStateAction & (
       | { readonly status: "empty"; readonly illustration?: ReactNode }
       | { readonly status: "error" }
@@ -30,7 +33,10 @@ export function PageState(props: PageStateProps) {
     return (
       <div
         data-system-state="loading"
-        className="flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center"
+        className={cn(
+          "flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center",
+          props.className,
+        )}
         role="status"
         aria-live="polite"
         aria-atomic="true"
@@ -48,7 +54,10 @@ export function PageState(props: PageStateProps) {
   return (
     <div
       data-system-state={props.status}
-      className="flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center"
+      className={cn(
+        "flex min-h-[28vh] flex-col items-center justify-center gap-3 bg-surface-content px-(--app-inline-padding) py-12 text-center",
+        props.className,
+      )}
     >
       {props.status === "empty" && props.illustration}
       <div

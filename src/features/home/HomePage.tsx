@@ -3,8 +3,8 @@ import { Compass, Plus } from "lucide-react";
 
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { Button, buttonVariants } from "@/components/ui/button.tsx";
-import { Spinner } from "@/components/ui/spinner.tsx";
 import { toLocalTravelDate } from "@/core/domain/room.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 import { useTripRoomsQuery } from "@/features/plan-home/queries.ts";
@@ -33,42 +33,17 @@ export function HomePage() {
   let tripContent: React.ReactNode;
   if (rooms.isError && !featured && !hasAnyTrips) {
     tripContent = (
-      <section
-        aria-labelledby="home-trip-error-heading"
-        className="flex flex-col items-start gap-3 rounded-3xl border border-destructive-border bg-destructive-muted p-5"
-      >
-        <div>
-          <p className="text-lg leading-snug font-bold">{greeting}</p>
-          <h2 id="home-trip-error-heading" className="mt-3 text-base font-bold text-destructive-strong">
-            여행 정보를 불러오지 못했어요
-          </h2>
-          <p role="alert" className="mt-1 text-sm leading-relaxed text-destructive-strong">
-            {toUserMessage(rooms.error, "잠시 후 다시 확인해주세요.")}
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => void rooms.refetch()}>
-          다시 시도
-        </Button>
-      </section>
+      <PageState
+        status="error"
+        title="여행 정보를 불러오지 못했어요"
+        description={toUserMessage(rooms.error, "잠시 후 다시 확인해주세요.")}
+        actionText="다시 시도"
+        onAction={() => void rooms.refetch()}
+      />
     );
   } else if (rooms.isPending && !rooms.data) {
     tripContent = (
-      <section
-        aria-labelledby="home-trip-loading-heading"
-        className="rounded-3xl border border-border bg-card p-5"
-      >
-        <p className="text-lg leading-snug font-bold">{greeting}</p>
-        <h2 id="home-trip-loading-heading" className="sr-only">
-          진행 중인 여행
-        </h2>
-        <output
-          className="mt-4 flex items-center gap-2 text-sm text-foreground-muted"
-          aria-live="polite"
-        >
-          <Spinner className="size-4 text-primary" aria-hidden="true" />
-          여행 정보를 불러오는 중이에요.
-        </output>
-      </section>
+      <PageState status="loading" message="여행 정보를 불러오는 중이에요." />
     );
   } else if (featured && lifecycle) {
     tripContent = (

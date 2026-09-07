@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { BookmarkCheck, MapPinned } from "lucide-react";
 
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Spinner } from "@/components/ui/spinner.tsx";
 import { toLocalTravelDate } from "@/core/domain/room.ts";
 import { useSessionQuery } from "@/hooks/useSession.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
@@ -160,53 +160,43 @@ export function SavedIdeasSection() {
   if (isSessionError) {
     // 세션 오류도 section-local 상태로 제한하고 독립 재시도를 제공한다.
     body = (
-      <div className="flex flex-col items-start gap-2">
-        <p role="alert" className="text-sm text-destructive-strong">
-          로그인 정보를 확인할 수 없어 저장한 여행 아이디어를 불러오지 못했어요.
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => void refetchSession()}
-        >
-          로그인 정보 다시 확인
-        </Button>
-      </div>
+      <PageState
+        status="error"
+        className="min-h-0 bg-transparent px-0 py-2 text-left"
+        title="저장한 여행 아이디어를 불러오지 못했어요."
+        description="로그인 정보를 확인할 수 없어 저장 목록을 확인하지 못했어요."
+        actionText="로그인 정보 다시 확인"
+        onAction={() => void refetchSession()}
+      />
     );
   } else if (isError && !hasItems) {
     // 초기 오류(캐시된 행 없음): 재시도 액션과 함께 안내한다.
     body = (
-      <div className="flex flex-col items-start gap-2">
-        <p role="alert" className="text-sm text-destructive-strong">
-          {toUserMessage(error, "저장한 여행 아이디어를 불러오지 못했어요.")}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => void refetch()}
-        >
-          다시 시도
-        </Button>
-      </div>
+      <PageState
+        status="error"
+        className="min-h-0 bg-transparent px-0 py-2 text-left"
+        title="저장한 여행 아이디어를 불러오지 못했어요."
+        description={toUserMessage(error, "잠시 후 다시 확인해주세요.")}
+        actionText="다시 시도"
+        onAction={() => void refetch()}
+      />
     );
   } else if (isPending) {
     body = (
-      <output
-        className="flex items-center gap-2 text-sm text-foreground-muted"
-        aria-live="polite"
-      >
-        <Spinner className="size-4 text-info" aria-hidden="true" />
-        <span>저장한 여행 아이디어를 불러오는 중이에요.</span>
-      </output>
+      <PageState
+        status="loading"
+        className="min-h-0 bg-transparent px-0 py-2 text-left"
+        message="저장한 여행 아이디어를 불러오는 중이에요."
+      />
     );
   } else if (!hasItems) {
     body = (
-      <p className="text-sm text-foreground-muted">
-        아직 저장한 여행 아이디어가 없어요. 탐색에서 마음에 드는 여행 일정을
-        저장해보세요.
-      </p>
+      <PageState
+        status="empty"
+        className="min-h-0 bg-transparent px-0 py-2 text-left"
+        title="아직 저장한 여행 아이디어가 없어요."
+        description="탐색에서 마음에 드는 여행 일정을 저장해보세요."
+      />
     );
   } else {
     // 캐시된 행은 유지하되 background/refetch 오류를 함께 밝혀 stale 목록을

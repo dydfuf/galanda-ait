@@ -2,6 +2,7 @@ import { useState } from "react";
 import { css } from "@emotion/react";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -45,14 +46,6 @@ import type { TripPlan } from "../../core/domain/room.ts";
 import { calculatePlanDifference } from "../../core/calculations/plan-diff.ts";
 import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
 import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
-
-const loadingContainerStyle = css`
-  padding: 40px 0;
-  text-align: center;
-  color: var(--muted-foreground);
-  font-size: 16px;
-  line-height: 1.5;
-`;
 
 const actionErrorStyle = css`
   display: block;
@@ -113,13 +106,7 @@ export function PlanEditPage(): JSX.Element {
   }
 
   if (isRoomLoading || isSessionLoading) {
-    return (
-      <PageBody className="px-(--app-inline-padding)">
-        <div css={loadingContainerStyle} role="status" aria-live="polite">
-          여행안 정보를 불러오는 중입니다...
-        </div>
-      </PageBody>
-    );
+    return <PageState status="loading" message="여행안 정보를 불러오는 중이에요." />;
   }
 
   if (isError || !room) {

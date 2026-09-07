@@ -131,9 +131,9 @@ export function TripRoomTabLayout() {
       data-slot="trip-mode-switcher"
       style={{
         bottom:
-          "calc(var(--app-bottom-action-height, 0px) + 1.25rem + var(--app-keyboard-inset, 0px))",
+          "calc(var(--app-bottom-action-height, var(--safe-bottom)) + 1.25rem + var(--app-keyboard-inset, 0px))",
       }}
-      className="pointer-events-none fixed inset-x-0 z-30 flex justify-center px-4 pb-(--safe-bottom) transition-[bottom] duration-200 ease-out"
+      className="pointer-events-none fixed inset-x-0 z-30 flex justify-center px-4 transition-[bottom] duration-200 ease-out"
     >
       <Tabs value={selectedTab} onValueChange={handleTabChange} className="pointer-events-auto">
         <TabsList

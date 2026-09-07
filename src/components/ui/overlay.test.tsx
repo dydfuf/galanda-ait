@@ -33,6 +33,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "./drawer.tsx";
+import { Button } from "./button.tsx";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const drawerSource = readFileSync(
@@ -172,6 +173,27 @@ afterEach(async () => {
 });
 
 describe("Drawer accessibility and state contracts", () => {
+  it("forwards trigger refs through the shared Button primitive", () => {
+    const alertRef = React.createRef<HTMLElement>();
+    const drawerRef = React.createRef<HTMLElement>();
+
+    render(
+      <>
+        <AlertDialog>
+          <AlertDialogTrigger
+            render={<Button ref={alertRef}>삭제 열기</Button>}
+          />
+        </AlertDialog>
+        <Drawer>
+          <DrawerTrigger render={<Button ref={drawerRef}>열기</Button>} />
+        </Drawer>
+      </>,
+    );
+
+    expect(alertRef.current).toBeInstanceOf(HTMLButtonElement);
+    expect(drawerRef.current).toBeInstanceOf(HTMLButtonElement);
+  });
+
   it("exposes its dialog name and description, traps focus, locks scroll, and restores the opener after Escape", async () => {
     render(<DrawerFixture />);
 
