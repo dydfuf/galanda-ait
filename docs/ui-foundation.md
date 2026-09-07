@@ -74,3 +74,60 @@ npx shadcn@latest add <component>
 `components.json`이 Base UI(`base-nova` style) 기준으로 설정되어 있어 생성물은
 자동으로 Base UI 기반이 됩니다. 필요한 컴포넌트만 추가하고, 미리 전부 설치하지
 않습니다.
+
+## 화면 계약과 제품 패턴
+
+단일 질문형 wizard 화면은 `WizardStepPage`를 사용합니다. 이 제품 패턴이
+질문 본문과 하단 action 영역의 간격, progress, draft 상태, primary action과
+선택적 secondary action을 함께 소유합니다.
+
+FirstPlanWizard의 각 화면은 다음 경계를 지킵니다.
+
+- `first-plan-wizard.contract.ts`: 질문별 ViewModel과 typed event
+- `first-plan-wizard.presenter.ts`: 순수 ViewModel 계산
+- `FirstPlanWizardView.tsx`: ViewModel 렌더링과 event dispatch만 담당
+- `FirstPlanWizard.tsx`: 기존 editor/route 계약을 연결하는 controller
+
+새 질문을 추가할 때는 View에서 hook, editor, query, storage를 직접 읽지 않고,
+contract에 질문 상태와 event를 추가한 뒤 presenter와 View를 함께 갱신합니다.
+footer를 직접 조립하거나 raw color를 추가하지 않습니다.
+
+파일럿의 기본 조합은 다음과 같습니다.
+
+```tsx
+<WizardStepPage
+  title={vm.header.title}
+  description={vm.header.description}
+  progress={vm.progress}
+  draftStatus={vm.draftStatus}
+  primaryAction={vm.actions.primary}
+  secondaryAction={vm.actions.secondary}
+  onAction={onEvent}
+>
+  <QuestionContent question={vm.question} onEvent={onEvent} />
+</WizardStepPage>
+```
+
+ViewModel에는 snapshot 데이터만 둡니다. Presenter는 파생 상태를 저장하지 않고
+React hook, DOM, query, storage, network를 참조하지 않습니다. View에서 DOM focus와
+IME composition을 다루는 것은 허용하지만, 단순한 화면에 controller/presenter
+layer를 의무적으로 늘리지 않습니다. draft 저장, offline, validation, publish는
+서로 독립된 상태 축으로 유지합니다.
+
+반복되는 panel과 선택 상태는 CVA recipe와 semantic token으로 표현합니다. 제품
+패턴은 footer의 버튼 수·순서·variant·size·본문 여백을 소유하므로 feature가
+`className`, `style`, `renderFooter` escape hatch로 우회하지 않습니다. 패턴을
+확장해야 하면 새 상태/recipe를 추가하고 임의 CSS를 기본 해법으로 삼지 않습니다.
+
+새 파일럿 화면은 contract → pure presenter test/typecheck fixture → View →
+pattern/component test 순으로 추가하고,
+`src/ui-foundation-contract.test.ts`의 scoped file 목록에 등록합니다. 전역
+`--app-bottom-action-height`는 document root의 단일 footer 측정값이라는 제약이
+있으므로 component test에서는 동시에 하나의 footer만 mount하고 accessory 높이
+변화 후 본문 clearance 계약을 확인합니다.
+
+계약 guard는 다음 명령으로 실행합니다.
+
+```bash
+pnpm exec vitest run src/ui-foundation-contract.test.ts
+```

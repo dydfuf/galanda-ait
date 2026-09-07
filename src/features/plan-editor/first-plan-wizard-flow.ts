@@ -1,4 +1,4 @@
-import type { PlanEditorFormData } from "./hooks/usePlanEditorState.ts";
+import type { PlanEditorFormData } from "./plan-editor-model.ts";
 
 export const FIRST_PLAN_WIZARD_SECTIONS = [
   "basic",
@@ -622,4 +622,3 @@ export function getWizardSubStepProgress(
 
   return { current, total };
 }
-

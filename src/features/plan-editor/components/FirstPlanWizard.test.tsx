@@ -419,6 +419,27 @@ describe("FirstPlanWizard - Accommodation Questions", () => {
       expect(screen.getByRole("radio", { name: /알아보는 중/ })).toHaveAttribute("aria-checked", "true");
     });
 
+    it.each([
+      ["accommodation", /알아보는 중/],
+      ["transport", /아직 안 정함/],
+    ] as const)("keeps the choice card focus-visible when %s radio receives keyboard focus", (kind, name) => {
+      const { unmount } = renderWizard({
+        cursor: { section: kind, question: "status", index: 0 },
+      });
+      const radio = screen.getByRole("radio", { name });
+      const card = radio.closest('[data-slot="wizard-choice"]');
+
+      expect(card).not.toBeNull();
+      expect(card).toHaveClass(
+        "has-[input:focus-visible]:outline-2",
+        "has-[input:focus-visible]:outline-offset-3",
+        "has-[input:focus-visible]:outline-ring",
+      );
+      radio.focus();
+      expect(radio).toHaveFocus();
+      unmount();
+    });
+
     it("updates status to decided when '정했어요' is chosen", () => {
       const onAccommodationStatusChange = vi.fn();
       renderWizard({
@@ -695,4 +716,3 @@ describe("FirstPlanWizard - 30-character Validation", () => {
     expect(screen.getByText("31/30")).toBeInTheDocument();
   });
 });
-

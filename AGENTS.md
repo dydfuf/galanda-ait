@@ -237,6 +237,11 @@ Apps-in-Toss SDK import는 `src/platform/ait/**`에 격리한다.
 * TDS를 다시 도입하지 않는다.
 * 기존 Emotion 코드를 이유 없이 Tailwind로 전면 재작성하지 않는다.
 * semantic token을 사용하고 신규 raw color를 불필요하게 추가하지 않는다.
+* 단일 질문형 wizard는 `WizardStepPage`를 사용하고, 질문 화면은 ViewModel과
+  typed event를 통해서만 상태를 주고받는다. ViewModel presenter에는 React,
+  DOM, query, storage 의존성을 넣지 않는다.
+* UI foundation contract guard의 대상 범위와 정상/위반 fixture를 유지하고,
+  presenter/component/typecheck 테스트로 패턴 계약을 확인한다.
 
 UI는 실제 시스템 상태와 다른 성공 상태를 만들어내지 않는다.
 
