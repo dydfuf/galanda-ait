@@ -32,6 +32,14 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-artifacts
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - run: pnpm db:check
       - name: Verify Drizzle migrations are in sync (no DB required)
         run: bash scripts/check-drizzle-drift.sh
