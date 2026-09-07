@@ -5,6 +5,10 @@ import type {
   WizardStepProgress,
 } from "@/components/galanda/wizard-step-page.tsx";
 
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled FirstPlanWizard value: ${String(value)}`);
+}
+
 export type FirstPlanWizardField =
   | "title"
   | "city"

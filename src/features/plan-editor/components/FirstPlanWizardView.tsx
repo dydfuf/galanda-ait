@@ -14,11 +14,12 @@ import {
   type WizardActionState,
 } from "@/components/galanda/wizard-step-page.tsx";
 import { wizardChoiceCard, wizardQuestionPanel } from "@/components/galanda/wizard-recipes.ts";
-import type {
-  FirstPlanWizardEvent,
-  FirstPlanWizardField,
-  FirstPlanWizardQuestionViewModel,
-  FirstPlanWizardViewModel,
+import {
+  assertNever,
+  type FirstPlanWizardEvent,
+  type FirstPlanWizardField,
+  type FirstPlanWizardQuestionViewModel,
+  type FirstPlanWizardViewModel,
 } from "../first-plan-wizard.contract.ts";
 
 export interface FirstPlanWizardViewProps {
@@ -88,7 +89,7 @@ function ChoiceCard({
   readonly onChange: () => void;
 }) {
   return (
-    <label className={wizardChoiceCard({ selected: checked })}>
+    <label data-slot="wizard-choice" className={wizardChoiceCard({ selected: checked })}>
       <input
         type="radio"
         name={name}
@@ -137,7 +138,7 @@ function FirstPlanWizardQuestion({
   readonly transportStatusFieldsetRef: React.RefObject<HTMLFieldSetElement>;
   readonly transportModeInputRef: React.RefObject<HTMLInputElement>;
   readonly transportDurationInputRef: React.RefObject<HTMLInputElement>;
-}) {
+}): React.ReactNode {
   switch (question.kind) {
     case "title":
       return (
@@ -693,6 +694,9 @@ function FirstPlanWizardQuestion({
           </Field>
         </form>
       );
+
+    default:
+      return assertNever(question);
   }
 }
 

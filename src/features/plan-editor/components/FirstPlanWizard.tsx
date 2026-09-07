@@ -12,9 +12,10 @@ import {
   createFirstPlanWizardViewModel,
   type FirstPlanWizardPresenterInput,
 } from "../first-plan-wizard.presenter.ts";
-import type {
-  FirstPlanWizardEvent,
-  FirstPlanWizardField,
+import {
+  assertNever,
+  type FirstPlanWizardEvent,
+  type FirstPlanWizardField,
 } from "../first-plan-wizard.contract.ts";
 import {
   type DraftSaveStatus,
@@ -299,6 +300,8 @@ export function FirstPlanWizard({
       case "previous":
         onPrevious();
         return;
+      default:
+        return assertNever(event);
     }
   };
 

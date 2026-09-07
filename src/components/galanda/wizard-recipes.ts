@@ -5,7 +5,7 @@ export const wizardQuestionPanel = cva(
 );
 
 export const wizardChoiceCard = cva(
-  "flex cursor-pointer flex-col items-start gap-1 rounded-2xl border p-4 text-left transition-colors",
+  "flex cursor-pointer flex-col items-start gap-1 rounded-2xl border p-4 text-left transition-colors outline-none has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-3 has-[input:focus-visible]:outline-ring",
   {
     variants: {
       selected: {
