@@ -17,22 +17,15 @@
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm test:ui
 pnpm check
 ```
 
-현재 결과: `pnpm test` 146개 파일/1440개 테스트 통과, `pnpm test:ui` 8개
-테스트 통과, `pnpm check` 통과(Drizzle drift, Web build, AIT build 포함).
+현재 결과: `pnpm test` 146개 파일/1440개 테스트 통과, `pnpm check` 통과
+(Drizzle drift, Web build, AIT build 포함).
 lint에는 기존 warning만 남아 있다.
 
-## 브라우저 증거
+## 검증 범위
 
-Playwright fixture로 320/360/390/430px 및 대표 desktop 1280px 폭에서 horizontal
-overflow와 footer geometry를 확인하고, 390px long-question 화면을 snapshot으로
-고정했다. 정상/invalid-date/저장 중/저장 실패/offline/review-return 상태 fixture도
-제공한다.
-offline accessory 높이는 DOM 측정값을 CSS 변수에 반영해 검증했다. safe-area와
-keyboard inset은 Playwright에서 CSS 변수로 시뮬레이션했다.
-
-실제 Apps-in-Toss WebView와 실제 키보드/기기 safe-area 검증은 이 이슈 범위가
-아니며, native device evidence가 필요할 때 별도로 수행한다.
+이번 PR은 브라우저/E2E runner를 사용하지 않는다. Presenter, component,
+typecheck, static contract guard와 canonical `pnpm check`로 검증한다.
+실제 Web/PWA/AIT 런타임 및 기기 키보드는 이 기록에서 검증하지 않았다.

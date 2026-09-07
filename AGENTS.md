@@ -241,7 +241,7 @@ Apps-in-Toss SDK import는 `src/platform/ait/**`에 격리한다.
   typed event를 통해서만 상태를 주고받는다. ViewModel presenter에는 React,
   DOM, query, storage 의존성을 넣지 않는다.
 * UI foundation contract guard의 대상 범위와 정상/위반 fixture를 유지하고,
-  `pnpm test:ui`로 실제 브라우저의 mobile geometry를 확인한다.
+  presenter/component/typecheck 테스트로 패턴 계약을 확인한다.
 
 UI는 실제 시스템 상태와 다른 성공 상태를 만들어내지 않는다.
 

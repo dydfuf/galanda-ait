@@ -120,15 +120,14 @@ layer를 의무적으로 늘리지 않습니다. draft 저장, offline, validati
 확장해야 하면 새 상태/recipe를 추가하고 임의 CSS를 기본 해법으로 삼지 않습니다.
 
 새 파일럿 화면은 contract → pure presenter test/typecheck fixture → View →
-pattern/component test → `tests/ui` fixture/browser test 순으로 추가하고,
+pattern/component test 순으로 추가하고,
 `src/ui-foundation-contract.test.ts`의 scoped file 목록에 등록합니다. 전역
 `--app-bottom-action-height`는 document root의 단일 footer 측정값이라는 제약이
-있으므로 fixture에는 동시에 하나의 footer만 mount하고 accessory 높이 변화 후
-본문 clearance를 브라우저에서 확인합니다.
+있으므로 component test에서는 동시에 하나의 footer만 mount하고 accessory 높이
+변화 후 본문 clearance 계약을 확인합니다.
 
-계약 guard와 브라우저 검증은 다음 명령으로 실행합니다.
+계약 guard는 다음 명령으로 실행합니다.
 
 ```bash
-pnpm test:ui
 pnpm exec vitest run src/ui-foundation-contract.test.ts
 ```
