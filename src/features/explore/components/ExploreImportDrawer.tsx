@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Drawer,
@@ -10,7 +11,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
-import { Spinner } from "@/components/ui/spinner.tsx";
 import { cn } from "@/lib/utils.ts";
 import { ApiClientError } from "@/app/api-client.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
@@ -299,36 +299,30 @@ export function ExploreImportDrawer({
           {option === "EXISTING_TRIP" && (
             <div className="mt-3 min-w-0">
               {rooms.isPending ? (
-                <p className="flex items-center gap-2 text-sm text-foreground-muted">
-                  <Spinner className="size-4" aria-hidden="true" />
-                  여행 목록을 불러오는 중이에요.
-                </p>
+                <PageState
+                  status="loading"
+                  className="min-h-0 bg-transparent px-0 py-3 text-left"
+                  message="여행 목록을 불러오는 중이에요."
+                />
               ) : rooms.isError ? (
-                <div
-                  role="alert"
-                  className="flex min-w-0 flex-col gap-2 rounded-xl border border-destructive-border bg-destructive-muted p-3"
-                >
-                  <p className="min-w-0 text-sm text-destructive-strong [overflow-wrap:anywhere]">
-                    {toUserMessage(
-                      rooms.error,
-                      "여행 목록을 불러오지 못했어요."
-                    )}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="self-start"
-                    onClick={() => void rooms.refetch()}
-                  >
-                    다시 시도
-                  </Button>
-                </div>
+                <PageState
+                  status="error"
+                  className="min-h-0 bg-transparent px-0 py-3 text-left"
+                  title="여행 목록을 불러오지 못했어요."
+                  description={toUserMessage(
+                    rooms.error,
+                    "잠시 후 다시 확인해주세요.",
+                  )}
+                  actionText="다시 시도"
+                  onAction={() => void rooms.refetch()}
+                />
               ) : eligibleRooms.length === 0 ? (
-                <p className="min-w-0 text-sm text-foreground-muted [overflow-wrap:anywhere]">
-                  추가할 수 있는 여행이 없어요. 새 여행으로 가져오거나 여행에
-                  참여한 뒤 다시 시도해주세요.
-                </p>
+                <PageState
+                  status="empty"
+                  className="min-h-0 bg-transparent px-0 py-3 text-left"
+                  title="추가할 수 있는 여행이 없어요."
+                  description="새 여행으로 가져오거나 여행에 참여한 뒤 다시 시도해주세요."
+                />
               ) : (
                 <RadioGroup
                   aria-label="추가할 여행 선택"

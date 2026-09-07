@@ -489,9 +489,9 @@ describe("ExploreImportDrawer (RAON-262 DISC-8)", () => {
     mockGetTrips.mockRejectedValue(new Error("net"));
     renderDrawer();
     selectOption(/기존 여행에 추가/);
-    const alert = await screen.findByRole("alert");
+    await screen.findByRole("alert");
     expect(
-      within(alert).getByRole("button", { name: "다시 시도" })
+      screen.getByRole("button", { name: "다시 시도" })
     ).toBeVisible();
   });
 

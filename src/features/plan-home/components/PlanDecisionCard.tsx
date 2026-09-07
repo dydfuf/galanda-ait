@@ -4,11 +4,8 @@ import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 
-import type {
-  PlanBookingState,
-  PlanHomePlanSummaryData,
-} from "../plan-home-view-model.ts";
-import { Pill, PlanOpinionSummary } from "./PlanOpinionSummary.tsx";
+import type { PlanHomePlanSummaryData } from "../plan-home-view-model.ts";
+import { PlanOpinionSummary } from "./PlanOpinionSummary.tsx";
 
 interface PlanDecisionCardProps {
   readonly plan: PlanHomePlanSummaryData;
@@ -25,17 +22,16 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
   const durationLabel = hasDuration ? `${plan.nights}박 ${plan.days}일` : undefined;
   const periodText = plan.period !== "일정 미정" ? plan.period : undefined;
   const hasDifferenceSummary = Boolean(plan.differenceSummary?.trim());
-  const bookingPillClassName = (state: PlanBookingState): string => {
-    switch (state) {
-      case "UNAVAILABLE":
-        return "bg-destructive-muted font-semibold text-destructive-strong";
-      case "NEEDS_CHECK":
-      case "INCOMPLETE":
-        return "border border-warning-border bg-warning-muted font-semibold text-warning";
-      default:
-        return "font-semibold";
-    }
-  };
+  const bookingBadgeVariant =
+    plan.booking.state === "UNAVAILABLE"
+      ? "danger"
+      : plan.booking.state === "NEEDS_CHECK" || plan.booking.state === "INCOMPLETE"
+        ? "warning"
+        : plan.booking.state === "UNCHECKED"
+          ? "info"
+          : plan.booking.state === "READY"
+            ? "success"
+            : "neutral";
 
   const cardVariantClass = isConfirmed
     ? "border-success/80 bg-surface-raised hover:border-success hover:shadow-md"
@@ -47,7 +43,7 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
     <Link
       to={to}
       className={cn(
-        "group relative flex min-w-0 flex-col gap-3 rounded-2xl border p-4.5 text-left no-underline shadow-xs transition-all duration-200",
+        "group relative flex min-w-0 flex-col gap-2.5 rounded-2xl border p-4 text-left no-underline shadow-xs transition-all duration-200",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "active:translate-y-px active:scale-[0.995]",
         // Ensure long content never forces horizontal overflow on 320px
@@ -71,14 +67,14 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
         <h3 className="min-w-0 break-words text-[17px] font-bold leading-snug tracking-tight text-foreground line-clamp-2">
           {plan.title}
         </h3>
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-normal">
           {durationLabel ? (
-            <Pill className="font-semibold tabular-nums">{durationLabel}</Pill>
+            <span className="font-semibold tabular-nums text-foreground">{durationLabel}</span>
           ) : (
-            <Pill className="font-semibold">일정 미정</Pill>
+            <span className="font-medium text-foreground-muted">일정 미정</span>
           )}
           {periodText && (
-            <span className="min-w-0 break-words text-[13px] font-medium leading-normal text-foreground-muted line-clamp-1">
+            <span className="min-w-0 break-words font-medium text-foreground-muted line-clamp-1">
               {periodText}
             </span>
           )}
@@ -89,7 +85,7 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
       </div>
 
       {/* 3. 작성자 – 13px 보조 텍스트는 AA 대비를 만족하는 foreground-muted 사용 */}
-      <p className="min-w-0 break-words text-[13px] font-medium leading-normal text-foreground-muted line-clamp-1">
+      <p className="min-w-0 break-words text-sm font-medium leading-normal text-foreground-muted line-clamp-1">
         {plan.authorName} 제안
       </p>
 
@@ -97,15 +93,17 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
       <p className="min-w-0 break-words text-sm font-semibold tabular-nums leading-snug text-foreground [overflow-wrap:anywhere]">
         {plan.perPersonCostText}
       </p>
-      {/* 3.6 예약·응답 – 짧은 상태 pill만 유지해 320px에서도 잘리지 않는다 */}
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <Pill className={bookingPillClassName(plan.booking.state)}>
+      {/* 3.6 예약은 상태 badge, 응답은 일반 메타데이터로 표시해요. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <Badge variant={bookingBadgeVariant} className="font-semibold">
           {plan.booking.text}
-        </Pill>
-        <Pill className="font-semibold tabular-nums">{plan.responseText}</Pill>
+        </Badge>
+        <span className="min-w-0 break-words font-semibold tabular-nums text-foreground-muted [overflow-wrap:anywhere]">
+          {plan.responseText}
+        </span>
       </div>
       {plan.nonRespondentText ? (
-        <p className="min-w-0 break-words text-[13px] font-medium leading-normal text-foreground-muted line-clamp-1 [overflow-wrap:anywhere]">
+        <p className="min-w-0 break-words text-sm font-medium leading-normal text-foreground-muted line-clamp-1 [overflow-wrap:anywhere]">
           {plan.nonRespondentText}
         </p>
       ) : null}
@@ -113,10 +111,10 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
       {/* 4. 핵심 차이 – 입력값 또는 명시적인 미정 상태를 의견보다 먼저 표시한다. */}
       <div
         className={cn(
-          "rounded-xl border px-3.5 py-2.5 transition-colors",
+          "min-w-0 border-l-2 py-0.5 pl-3 transition-colors",
           hasDifferenceSummary
-            ? "border-primary-border-weak/80 bg-primary-muted/40 shadow-2xs"
-            : "border-border/60 bg-muted/30",
+            ? "border-primary"
+            : "border-border",
         )}
       >
         <p

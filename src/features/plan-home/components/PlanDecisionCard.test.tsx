@@ -100,7 +100,7 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(screen.getByText("확정안")).toBeInTheDocument();
   });
 
-  it("제목과 기간을 함께 표시하고 기간 pill이 보인다", () => {
+  it("제목과 기간 정보를 함께 표시한다", () => {
     renderCard();
     expect(screen.getByText("기본 여행안")).toBeInTheDocument();
     expect(screen.getByText("3박 4일")).toBeInTheDocument();
@@ -166,8 +166,8 @@ describe("PlanDecisionCard (RAON-226)", () => {
     expect(authorEl.className).not.toMatch(/text-foreground-subtle/);
 
     const durationEl = screen.getByText("3박 4일");
-    expect(durationEl.className).toMatch(/text-foreground-muted/);
-    expect(durationEl.className).not.toMatch(/text-muted-foreground/);
+    expect(durationEl.className).toMatch(/text-foreground/);
+    expect(durationEl.className).not.toMatch(/rounded-full/);
 
     const opinionEl = getReactionPill("좋아요", 2);
     expect(opinionEl.className).toMatch(/text-foreground-muted/);
@@ -178,6 +178,22 @@ describe("PlanDecisionCard (RAON-226)", () => {
     const emptyEl = screen.getByText("아직 의견이 없어요");
     expect(emptyEl.className).toMatch(/text-foreground-muted/);
     expect(emptyEl.className).not.toMatch(/text-muted-foreground/);
+  });
+
+  it("일반 메타데이터는 pill을 쓰지 않고 예약 상태만 Badge로 구분한다", () => {
+    renderCard();
+
+    expect(screen.getByText("3박 4일").className).not.toMatch(/rounded-full/);
+    expect(screen.getByText("이 여행안에 2/3명 응답").className).not.toMatch(
+      /rounded-full/,
+    );
+    expect(screen.getByText("예약 확인 완료")).toHaveAttribute(
+      "data-slot",
+      "badge",
+    );
+    expect(screen.getByText("핵심 차이 미정").parentElement?.className).not.toMatch(
+      /rounded-xl|bg-/,
+    );
   });
 
   it("긴 제목·작성자·차이는 accessible content를 보존하면서 카드 밖 overflow를 막는다", () => {

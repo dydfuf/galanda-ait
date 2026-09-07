@@ -26,6 +26,7 @@ vi.mock("../../platform/index.ts", () => ({
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TripRoomTabLayout } from "./TripRoomTabLayout.tsx";
+import { TripRoomChildLayout } from "./TripRoomChildLayout.tsx";
 
 function LocationProbe() {
   const location = useLocation();
@@ -69,6 +70,17 @@ const renderLayout = (
     </QueryClientProvider>,
   );
 };
+
+const renderChildLayout = () =>
+  render(
+    <MemoryRouter initialEntries={["/trips/trip-1/plans/new"]}>
+      <Routes>
+        <Route path="/trips/:tripId/plans/new" element={<TripRoomChildLayout />}>
+          <Route index element={<h1>여행안 작성 화면</h1>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
 
 function createNativeNavigation(
   addAccessoryButton: PlatformNavigation["addAccessoryButton"] = vi
@@ -130,6 +142,14 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     ).toBeInTheDocument();
 
     const tablist = screen.getByRole("tablist", { name: "여행방 화면" });
+    const modeSwitcher = container.querySelector<HTMLElement>(
+      '[data-slot="trip-mode-switcher"]',
+    );
+    expect(modeSwitcher).toHaveStyle({
+      bottom:
+        "calc(var(--app-bottom-action-height, var(--safe-bottom)) + 1.25rem + var(--app-keyboard-inset, 0px))",
+    });
+    expect(modeSwitcher).not.toHaveClass("pb-(--safe-bottom)");
     expect(tablist).toHaveAttribute("data-variant", "chrome");
     expect(tablist).toHaveAttribute("data-galanda-surface", "chrome");
     expect(
@@ -193,6 +213,25 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     await waitFor(() =>
       expect(navigation.removeAccessoryButton).toHaveBeenCalledTimes(1),
     );
+  });
+
+  it("AIT child routes apply the native content inset once without rendering a second header", () => {
+    const { emitInset, navigation, removeInsetListener } =
+      createNativeNavigation();
+    mocks.platform.navigation = navigation;
+
+    const { container, unmount } = renderChildLayout();
+
+    const main = container.querySelector<HTMLElement>("main");
+    expect(main).toHaveStyle({ paddingTop: "54px" });
+    expect(container.querySelectorAll('[style*="padding-top"]')).toHaveLength(1);
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+
+    act(() => emitInset(72));
+    expect(main).toHaveStyle({ paddingTop: "72px" });
+
+    unmount();
+    expect(removeInsetListener).toHaveBeenCalledTimes(1);
   });
 
   it("AIT keeps native back/title ownership but uses the reserved web share slot when accessory registration rejects", async () => {

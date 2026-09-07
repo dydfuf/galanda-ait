@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Drawer,
@@ -150,21 +151,24 @@ export function ActivityDrawer({ tripId, isOpen, onClose }: ActivityDrawerProps)
 
         <div className="flex-1 overflow-y-auto px-4 py-2">
           {isLoading ? (
-            <div className="flex h-40 items-center justify-center">
-              <Loader2 className="size-6 animate-spin text-foreground-muted" />
-            </div>
+            <PageState status="loading" message="활동 내역을 불러오는 중이에요." />
           ) : isError ? (
-            <div className="flex h-40 flex-col items-center justify-center gap-2 text-center">
-              <p className="text-sm text-foreground-muted">활동 내역을 불러오지 못했습니다.</p>
-              <Button size="sm" variant="outline" onClick={() => void refetch()}>
-                다시 시도
-              </Button>
-            </div>
+            <PageState
+              status="error"
+              title="활동 내역을 불러오지 못했어요."
+              onAction={() => void refetch()}
+            />
           ) : allEvents.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-foreground-muted">
-              <CheckCheck className="size-8 text-foreground-muted/60" />
-              <p className="text-sm">아직 새로운 활동이 없습니다.</p>
-            </div>
+            <PageState
+              status="empty"
+              title="아직 새로운 활동이 없어요."
+              illustration={
+                <CheckCheck
+                  className="size-8 text-foreground-muted/60"
+                  aria-hidden="true"
+                />
+              }
+            />
           ) : (
             <ul className="space-y-3">
               {allEvents.map((event) => {

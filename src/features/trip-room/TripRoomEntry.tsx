@@ -1,19 +1,9 @@
-import { css } from "@emotion/react";
 import { useParams, Navigate } from "react-router-dom";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { Result } from "effect";
 import { useTripRoomDetailQuery } from "../plan-detail/queries.ts";
-
-const loadingContainerStyle = css`
-  padding: 48px;
-  text-align: center;
-`;
-
-const loadingTextStyle = css`
-  color: var(--muted-foreground);
-  font-size: 15px;
-`;
 
 export function TripRoomEntry() {
   const params = useParams();
@@ -28,11 +18,7 @@ export function TripRoomEntry() {
   }
 
   if (isLoading) {
-    return (
-      <div css={loadingContainerStyle}>
-        <p css={loadingTextStyle}>여행 정보를 확인하는 중...</p>
-      </div>
-    );
+    return <PageState status="loading" message="여행 정보를 확인하는 중이에요." />;
   }
 
   if (isError || !room) {

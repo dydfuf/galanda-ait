@@ -15,6 +15,7 @@ import {
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
+import { PageState } from "@/components/galanda/page-state.tsx";
 import { TripCreationProgress } from "@/components/galanda/trip-creation-progress.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
@@ -67,13 +68,6 @@ import {
   FIRST_PLAN_SECTION_DEFAULT_QUESTIONS,
   type FirstPlanWizardCursor,
 } from "./first-plan-wizard-flow.ts";
-
-const loadingContainerStyle = css`
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--muted-foreground);
-  font-size: 15px;
-`;
 
 const errorMessageStyle = css`
   display: block;
@@ -492,9 +486,7 @@ export function PlanCreatePage(): JSX.Element {
 
   // Guard: Loading
   if (isLoading || isSessionLoading) {
-    return (
-      <div css={loadingContainerStyle}>여행방 정보를 불러오는 중입니다...</div>
-    );
+    return <PageState status="loading" message="여행방 정보를 불러오는 중이에요." />;
   }
 
   // Guard: Error
@@ -537,7 +529,7 @@ export function PlanCreatePage(): JSX.Element {
 
   // Guard: Draft Hydration for Wizard
   if (isWizardMode && !editor.isDraftHydrated) {
-    return <div css={loadingContainerStyle}>임시안을 불러오는 중입니다...</div>;
+    return <PageState status="loading" message="임시안을 불러오는 중이에요." />;
   }
 
   // Guard: Stale wizard history after plan is published with no active draft

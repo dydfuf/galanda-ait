@@ -64,7 +64,7 @@ describe("TripRoomEntry 상태 기반 진입 (Issue #96 / RAON-249)", () => {
     vi.clearAllMocks();
   });
 
-  it("로딩 중일 때 '여행 정보를 확인하는 중...'을 표시한다", () => {
+  it("로딩 중일 때 PageState로 '여행 정보를 확인하는 중이에요.'를 표시한다", () => {
     mocks.useTripRoomDetailQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -73,7 +73,7 @@ describe("TripRoomEntry 상태 기반 진입 (Issue #96 / RAON-249)", () => {
 
     renderEntry("/trips/trip-1");
 
-    expect(screen.getByText("여행 정보를 확인하는 중...")).toBeInTheDocument();
+    expect(screen.getByText("여행 정보를 확인하는 중이에요.")).toBeInTheDocument();
     expect(screen.queryByTestId("route-plans")).not.toBeInTheDocument();
     expect(screen.queryByTestId("route-itinerary")).not.toBeInTheDocument();
     expect(
