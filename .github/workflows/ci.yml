@@ -12,7 +12,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +29,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:ui
       - run: pnpm db:check
       - name: Verify Drizzle migrations are in sync (no DB required)
         run: bash scripts/check-drizzle-drift.sh

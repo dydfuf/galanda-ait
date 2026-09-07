@@ -31,5 +31,8 @@ dist-ssr
 
 *.ait
 
+/playwright-report/
+/test-results/
+
 .agents
 .cursor

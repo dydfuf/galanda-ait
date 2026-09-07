@@ -3,20 +3,17 @@ import { getPlanPublishValidationErrors, getStayNightCount, type AccommodationSn
 import { calculatePlanCost } from "../../../core/calculations/plan-cost.ts";
 import { calculatePlanDifference } from "../../../core/calculations/plan-diff.ts";
 import {
+  type DraftSaveStatus,
+  type PlanEditorFormData,
+} from "../plan-editor-model.ts";
+import {
   isFirstPlanWizardQuestion,
   isFirstPlanWizardSection,
   type FirstPlanWizardCursor,
 } from "../first-plan-wizard-flow.ts";
 
-export interface PlanEditorFormData {
-  readonly title: string;
-  readonly proposalReason: string;
-  readonly baseHeadcount: number;
-  readonly routes: ReadonlyArray<CityStay>;
-  readonly accommodations: ReadonlyArray<AccommodationSnapshot>;
-  readonly transports: ReadonlyArray<TransportSnapshot>;
-  readonly clonedFromPlanId?: string;
-}
+export type { DraftSaveStatus, PlanEditorFormData } from "../plan-editor-model.ts";
+export { getDraftSaveStatusLabel } from "../plan-editor-model.ts";
 
 const sameValue = (left: unknown, right: unknown): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
@@ -54,15 +51,6 @@ export const rebasePlanEditorData = (
   local: PlanEditorFormData,
   latest: PlanEditorFormData
 ): PlanEditorFormData => rebaseValue(base, local, latest);
-
-export type DraftSaveStatus = "IDLE" | "SAVING" | "SAVED" | "ERROR";
-
-export const getDraftSaveStatusLabel = (status: DraftSaveStatus): string => ({
-  IDLE: "아직 저장되지 않음",
-  SAVING: "자동 저장 중…",
-  SAVED: "자동 저장됨",
-  ERROR: "임시 저장하지 못했어요",
-})[status];
 
 export const syncAccommodationNights = (
   routes: ReadonlyArray<CityStay>,
