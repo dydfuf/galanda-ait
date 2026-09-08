@@ -182,3 +182,23 @@ final result: passed
   생성 행동의 단일 노출·route 이동·footer 부재를 검증하고 기존 safe-area 테스트를 갱신했다.
 - 최종 `pnpm check` exit 0: 146개 파일/1,451개 테스트, DB 정합성, Web/AIT build 통과.
 - 실제 인증·PWA 오프라인·가상 키보드·AIT 실기기 검증과 배포는 수행하지 않았다.
+
+## PR 피드백 반영: 화면 공통 영역의 경계선 제거
+
+- `PageHeader`의 자동 경계선과 `bordered` 옵션을 제거하고 모든 호출부를 정리했다.
+  전역 내비게이션·`BottomAction`·여행방 탭 영역의 전체 너비 구분선도 제거했다.
+- 선택된 탭의 밑줄, 입력창·outline 버튼 테두리, 포커스 표시는 유지한다.
+  기존 헤더 그림자 제거, 하단 단일 영역, 키보드 inset과 safe-area 계약은 유지한다.
+- 390px 라이트 여행방에서 헤더·탭 영역·하단 액션의 계산된 상하 border는 모두 0px,
+  헤더 그림자는 `none`이다. 내 여행의 내비게이션 상단 border는 0px, 높이는 64px다.
+- 320px 다크에서 내 여행·생성 화면의 가로 넘침이 없고, 생성 화면은 전역 내비게이션
+  0개·고정 액션 1개다. 입력창 1px 테두리와 뒤로 가기 버튼의 키보드 포커스 링을 확인했다.
+- PR에 표시하는 홈·내 여행·생성·계획·확정 일정, 실제 에셋 화면 5개와 라이트/다크
+  에셋 카탈로그를 다시 캡처했다. `*-single-bottom-*.png`, `plans-after-390.png`,
+  `itinerary-after-390.png`, `spot-empty-saved-390.png`, `spot-create-trip-390.png`,
+  `spot-invite-companions-390.png`, `spot-compare-plans-390.png`, `assets-*-390.png`가
+  이번 갱신 대상이다. 앞선 섹션의 border/높이 측정값은 당시 구현 기록이다.
+- 관련 5개 파일/56개 테스트 및 `pnpm check` exit 0: 146개 파일/1,451개 테스트,
+  DB 정합성, Web/AIT build 통과. 검증 후 코드 변경은 없고 문서·캡처만 갱신했다.
+- 브라우저 캡처는 실제 React와 임시 샘플 API이며 실제 인증·저장 mutation·PWA 오프라인·
+  가상 키보드·AIT 실기기 검증이나 배포를 의미하지 않는다.

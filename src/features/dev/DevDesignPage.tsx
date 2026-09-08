@@ -98,7 +98,6 @@ export function DevDesignPage() {
       <PageHeader
         title="Design Catalog"
         sticky
-        bordered
         action={
           <Button type="button" variant="ghost" size="sm" disabled>
             DEV
@@ -987,7 +986,7 @@ function ShellSection() {
           />
         </div>
         <div className="overflow-hidden rounded-lg border border-border">
-          <PageHeader title="Sticky + bordered" sticky bordered />
+          <PageHeader title="Sticky" sticky />
         </div>
       </DevCard>
       <DevCard title="TripCreationProgress">

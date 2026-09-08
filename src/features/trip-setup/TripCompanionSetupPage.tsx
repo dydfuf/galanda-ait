@@ -114,7 +114,6 @@ export function TripCompanionSetupPage() {
       {!platformNavigation && (
         <PageHeader
           sticky
-          bordered
           title="여행 만들기"
           back={{
             label: "뒤로 가기",

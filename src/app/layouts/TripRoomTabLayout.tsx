@@ -129,7 +129,7 @@ export function TripRoomTabLayout() {
   const modeSwitcher = (
     <div
       data-slot="trip-mode-switcher"
-      className="border-b border-border bg-background px-6"
+      className="bg-background px-6"
     >
       <Tabs value={selectedTab} onValueChange={handleTabChange} className="mx-auto max-w-(--content-max-width)">
         <TabsList
@@ -161,7 +161,6 @@ export function TripRoomTabLayout() {
       <div data-slot="trip-navigation" className="sticky top-0 z-20 bg-background">
         {showWebNavigation ? (
           <PageHeader
-            bordered
             safeTop
             title={getTripRoomNavigationTitle(location.pathname)}
             back={{ onClick: () => void goBack() }}
@@ -169,7 +168,6 @@ export function TripRoomTabLayout() {
           />
         ) : (
           <PageHeader
-            bordered
             safeTop={false}
             topInset={platformTopInset}
             className="z-[5]"

@@ -72,7 +72,7 @@ export function BottomAction({
         paddingBottom: "calc(12px + var(--safe-bottom))",
       }}
       className={cn(
-        "fixed inset-x-0 z-30 border-t px-5 pt-2 transition-[bottom] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] motion-reduce:transition-none",
+        "fixed inset-x-0 z-30 px-5 pt-2 transition-[bottom] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] motion-reduce:transition-none",
         className,
       )}
     >

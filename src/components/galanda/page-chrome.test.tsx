@@ -20,11 +20,10 @@ function countOccurrences(source: string, value: string): number {
 }
 
 describe("Page chrome geometry contracts", () => {
-  it("keeps a sticky header distinguishable and reserves 44px action slots around a 720px inner column", () => {
+  it("keeps a sticky header borderless and reserves 44px action slots around a 720px inner column", () => {
     const { container } = render(
       <PageHeader
         sticky
-        bordered
         title="여행방"
         back={{ onClick: () => undefined }}
         action={
@@ -39,7 +38,7 @@ describe("Page chrome geometry contracts", () => {
     expect(header).toHaveAttribute("data-galanda-surface", "chrome");
     expect(header?.className).toContain("sticky");
     expect(header?.className).toContain("top-0");
-    expect(header?.className).toContain("border-b");
+    expect(header?.className).not.toContain("border-b");
 
     const innerColumn = header?.firstElementChild as HTMLElement;
     expect(indexCss).toMatch(/--content-max-width:\s*720px;/);
@@ -152,7 +151,7 @@ describe("Page chrome geometry contracts", () => {
       paddingBottom: "calc(12px + var(--safe-bottom))",
     });
     expect(actionChrome?.className).toContain("transition-[bottom]");
-    expect(actionChrome?.className).toContain("border-t");
+    expect(actionChrome?.className).not.toContain("border-t");
 
     const innerColumn = actionChrome?.firstElementChild as HTMLElement;
     expect(innerColumn.className).toContain("mx-auto");

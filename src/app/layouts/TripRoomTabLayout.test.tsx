@@ -134,7 +134,7 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     const navigation = container.querySelector('[data-slot="trip-navigation"]');
     expect(navigation).toHaveClass("sticky", "top-0");
     expect(navigation).toContainElement(header);
-    expect(header.className).toContain("border-b");
+    expect(header.className).not.toContain("border-b");
     expect(
       within(header).getByRole("button", { name: "뒤로 가기" }),
     ).toBeInTheDocument();
