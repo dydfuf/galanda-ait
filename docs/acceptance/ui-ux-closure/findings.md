@@ -11,7 +11,7 @@
 - 기대: DEV route와 카탈로그·synthetic data가 Web/AIT production 산출물에서 제외됨.
 - 조치: #126, `src/app/router.tsx`에서 lazy 선언 자체를 `import.meta.env.DEV`로 제한. 모든 DevDesignPage 사용처 확인.
 - 재검증: 브랜치 `pnpm check` 146개 파일/1,468개 테스트 및 Web/AIT 빌드 통과. 두 빌드에서 DevDesignPage/DevWizardPreview 청크·고정 예시 문자열 없음. Web production preview `/dev`는 404 UI.
-- fix PR: 작업 브랜치 `codex/issue-126-review-pack`, PR 연결 예정.
+- fix PR: [PR #135](https://github.com/dydfuf/galanda-ait/pull/135) 머지 (`9310c9111c`), CI verify 통과. staging 재배포 전.
 
 ## UXF-002 — 도시 입력 전 진행률이 100개 질문으로 표시됨
 
@@ -20,9 +20,9 @@
 - 기준: staging `f3227555-5e25-4b8b-a028-4b29f0b7450b`, 코드 `4fa9331870`, 2026-09-08 390×844.
 - 재현: 빈 여행방 → 첫 여행안 제목 → 제안 이유 건너뛰기 → 인원. `3/100` 표시.
 - 기대: 존재하는 질문 순서의 정확한 진행 정보. 순회 보호 한도를 질문 개수로 표시하지 않음.
-- 근거: [headcount 캡처](../../assets/ui-ux-closure/wizard-headcount-390.png). routes가 빈 상태에서 sequence의 next/normalize 순회를 확인 중.
+- 근거: [headcount 캡처](../../assets/ui-ux-closure/wizard-headcount-390.png). 빈 routes에서 next/normalize가 도시 질문으로 되돌아가 100회 순회했다.
 - 구현 owner: #127, 현재 Codex 작업. `first-plan-wizard-flow.ts`의 모든 sequence/progress 호출자와 회귀 테스트 확인 후 최소 수정.
-- fix PR / 재검증: 미완료. #126의 준비 완료와 별개로 추적한다.
+- 수정: 질문 수 계산에서만 최소 첫 도시의 질문을 포함한다. 실제 draft와 navigation normalize는 변경하지 않는다. 신규 regression은 수정 전 3/100으로 실패, 수정 후 3/12 및 입력 불변성을 확인했다. 관련 331개 테스트, 전체 146개 파일/1,471개 테스트와 `pnpm check` 통과. 실제 브라우저 재검증은 수정 배포 후 진행한다.
 
 ## UXF-003 — 등록 네트워크 실패에 내부 영문 오류를 그대로 표시
 
@@ -31,8 +31,8 @@
 - 기준: UXF-002와 같은 staging. `role=alert`에 `Failed to fetch` 표시.
 - 기대: 등록이 확인되지 않았음을 한국어로 알리고 입력 보존·재시도 경로 안내.
 - 실제: 입력과 등록 버튼은 유지됨. 성공 상태로 전환하거나 초안을 삭제하지 않음.
-- owner: #127/#130 중 공통 HTTP 오류 표현의 기존 helper를 확인한 뒤 단일 수정 owner 지정. 영문 문자열 치환만으로 서버 오류 종류를 합치지 않는다.
-- fix PR / 재검증: 미완료.
+- owner: #127. 모든 읽기/변경이 거치는 기존 `requestJson`에서 fetch 실패만 `ApiClientError`의 NETWORK_ERROR로 전달한다. HTTP 응답·409·Schema 검증은 기존 경계 유지, AbortError와 signal 취소 사유도 보존한다.
+- 수정: 연결과 처리 결과를 확인한 뒤 재시도하도록 한국어로 안내한다. 실패한 회귀 테스트 재현 후 수정했으며 읽기/변경 및 요청 취소 검증, 관련 331개 테스트와 전체 `pnpm check` 통과. 실제 브라우저 재검증은 수정 배포 후 진행한다.
 
 ## 새 finding 기록 필드
 
