@@ -1,17 +1,60 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Field, FieldLabel } from "@/components/ui/field.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import { platform } from "@/platform/index.ts";
-import { safeReturnTo } from "@/platform/auth.ts";
+import { postAuthJson, safeReturnTo } from "@/platform/auth.ts";
 
 export function LoginPage() {
   const [params] = useSearchParams();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [signUp, setSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const label = platform.name === "ait" ? "토스로 계속하기" : "카카오로 계속하기";
   const needsUpgrade = params.get("reason") === "upgrade";
+
+  useEffect(() => {
+    if (platform.name !== "web") return;
+    const controller = new AbortController();
+    void fetch("/api/auth/config", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const config: unknown = await response.json();
+        if (!controller.signal.aborted) {
+          setEmailEnabled(
+            typeof config === "object" && config !== null &&
+            "emailAndPassword" in config && config.emailAndPassword === true,
+          );
+        }
+      })
+      .catch(() => { /* 설정을 확인할 수 없으면 이메일 로그인을 노출하지 않아요. */ });
+    return () => controller.abort();
+  }, []);
+
+  const submitEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError(false);
+    try {
+      await postAuthJson(`/api/auth/${signUp ? "sign-up" : "sign-in"}/email`, {
+        email: email.trim(),
+        password,
+        ...(signUp ? { name: name.trim() } : {}),
+      });
+      window.location.assign(safeReturnTo(params.get("returnTo")));
+    } catch {
+      setError(true);
+      setPending(false);
+    }
+  };
 
   const signIn = async () => {
     setPending(true);
@@ -63,6 +106,33 @@ export function LoginPage() {
           >
             {pending ? "연결 중…" : label}
           </Button>
+          {emailEnabled ? (
+            <form onSubmit={(event) => void submitEmail(event)} className="flex flex-col gap-4 rounded-2xl border border-border p-4" aria-label="Staging 이메일 로그인">
+              <p className="text-base font-semibold">Staging 테스트 계정</p>
+              <p className="text-sm text-muted-foreground">개발 테스트용 이메일과 비밀번호를 사용해 주세요. 인증 메일은 보내지 않아요.</p>
+              {signUp ? (
+                <Field>
+                  <FieldLabel htmlFor="staging-name">이름</FieldLabel>
+                  <Input id="staging-name" autoComplete="nickname" required pattern={".*\\S.*"} value={name} onChange={(event) => setName(event.target.value)} disabled={pending} />
+                </Field>
+              ) : null}
+              <Field>
+                <FieldLabel htmlFor="staging-email">이메일</FieldLabel>
+                <Input id="staging-email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={pending} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="staging-password">비밀번호</FieldLabel>
+                <Input id="staging-password" type="password" autoComplete={signUp ? "new-password" : "current-password"} required minLength={8} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} disabled={pending} aria-describedby="staging-password-hint" />
+                <p id="staging-password-hint" className="text-sm text-muted-foreground">8~128자</p>
+              </Field>
+              <Button type="submit" variant="outline" disabled={pending} aria-busy={pending}>
+                {pending ? "처리 중…" : signUp ? "계정 만들고 시작하기" : "이메일로 로그인"}
+              </Button>
+              <Button type="button" variant="ghost" disabled={pending} onClick={() => { setSignUp(!signUp); setError(false); }}>
+                {signUp ? "기존 계정으로 로그인" : "테스트 계정 만들기"}
+              </Button>
+            </form>
+          ) : null}
           {error ? (
             <p
               role="alert"

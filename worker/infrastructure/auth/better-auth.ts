@@ -8,6 +8,7 @@ import type { DatabaseEnv } from "../database/database-live.ts";
 import { tossLogin, type TossLoginFetcher } from "./toss-login.ts";
 
 export interface BetterAuthEnv extends DatabaseEnv {
+  readonly APP_ENV?: string;
   readonly BETTER_AUTH_SECRET?: string;
   readonly BETTER_AUTH_URL?: string;
   readonly KAKAO_CLIENT_ID?: string;
@@ -40,7 +41,7 @@ export const makeBetterAuth = (
           trustedOrigins: [env.BETTER_AUTH_URL],
         }
       : {}),
-    emailAndPassword: { enabled: false },
+    emailAndPassword: { enabled: env.APP_ENV === "staging" },
     ...(kakaoClientId
       ? {
           socialProviders: {

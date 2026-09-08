@@ -111,6 +111,11 @@ export function createApp(dependencies: AppDependencies = {}) {
     }
   });
 
+  app.get("/api/auth/config", (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ emailAndPassword: c.env.APP_ENV === "staging" });
+  });
+
   app.use("/api/*", databaseMiddleware);
   app.all("/api/auth/*", (c) => {
     if (!c.var.database) {

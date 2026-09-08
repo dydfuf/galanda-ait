@@ -6,6 +6,7 @@ import { requireAuthSession } from "../src/core/ports/session.ts";
 import { ParticipantIdSchema } from "../src/core/domain/ids.ts";
 import type { DatabaseHandle } from "../src/infrastructure/persistence/drizzle/database.ts";
 import { runEffect } from "./http/effect-handler.ts";
+import { makeBetterAuth, type BetterAuthEnv } from "./infrastructure/auth/better-auth.ts";
 import {
   createApp,
   type AppDependencies,
@@ -15,8 +16,15 @@ import {
 const baseURL = "https://galanda.test";
 const env = {} as AppEnv["Bindings"];
 
-const createAuthFixture = () =>
+const createAuthFixture = (authEnv: BetterAuthEnv = {}) =>
   betterAuth({
+    // Better Auth skips origin checks under NODE_ENV=test unless explicitly enabled.
+    advanced: { disableOriginCheck: false },
+    ...makeBetterAuth({} as DatabaseHandle, {
+      ...authEnv,
+      BETTER_AUTH_URL: baseURL,
+      BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+    }).options,
     database: memoryAdapter({
       user: [],
       session: [],
@@ -25,12 +33,11 @@ const createAuthFixture = () =>
     }),
     baseURL,
     secret: "test-secret-that-is-long-enough-for-better-auth",
-    emailAndPassword: { enabled: false },
     plugins: [anonymous()],
   });
 
-const createTestApp = () => {
-  const auth = createAuthFixture();
+const createTestApp = (authEnv: BetterAuthEnv = {}) => {
+  const auth = createAuthFixture(authEnv);
   let sessionLookups = 0;
   const databaseHandle = {} as DatabaseHandle;
   const authDatabaseHandles: DatabaseHandle[] = [];
@@ -85,11 +92,81 @@ const request = (
 ): Request => {
   const headers = new Headers(init?.headers);
   headers.set("content-type", "application/json");
+  if (!headers.has("origin")) headers.set("origin", baseURL);
   if (cookie) headers.set("cookie", cookie);
   return new Request(`${baseURL}${path}`, { ...init, headers });
 };
 
 describe("Better Auth Worker integration", () => {
+  it.each([undefined, "production", "development", "staging"])(
+    "exposes email login only for the staging server binding (%s), without opening a database",
+    async (APP_ENV) => {
+      const app = createApp({ withDatabase: async () => { throw new Error("must not open database"); } });
+      const response = await app.fetch(request("/api/auth/config?APP_ENV=staging"), { ...env, APP_ENV });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(await response.json()).toEqual({ emailAndPassword: APP_ENV === "staging" });
+    },
+  );
+
+  it.each([undefined, "production", "development"])("rejects direct email sign-up and sign-in outside staging (%s)", async (APP_ENV) => {
+    const { app } = createTestApp({ APP_ENV });
+    for (const action of ["sign-up", "sign-in"]) {
+      const response = await app.fetch(request(`/api/auth/${action}/email`, {
+        method: "POST",
+        body: JSON.stringify({ name: "Test Agent", email: "agent@example.test", password: "test-password-123" }),
+      }), { ...env, APP_ENV });
+      expect(response.status).toBe(400);
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+  });
+
+  it("signs up a staging account, signs out, rejects a wrong password, and signs back into a registered session", async () => {
+    const stagingEnv = { ...env, APP_ENV: "staging" };
+    const { app } = createTestApp(stagingEnv);
+    const credentials = { email: "agent@example.test", password: "test-password-123" };
+    const signUp = await app.fetch(request("/api/auth/sign-up/email", {
+      method: "POST", body: JSON.stringify({ ...credentials, name: "Test Agent" }),
+    }), stagingEnv);
+    expect(signUp.status).toBe(200);
+    const cookie = signUp.headers.get("set-cookie")?.split(";")[0];
+    expect(cookie).toBeTruthy();
+    const session = await app.fetch(request("/api/session", {}, cookie), stagingEnv);
+    const registeredSession = await session.json();
+    expect(registeredSession).toMatchObject({ isAuthenticated: true, accountType: "REGISTERED", name: "Test Agent" });
+    const protectedResponse = await app.fetch(request("/api/protected", {}, cookie), stagingEnv);
+    expect(protectedResponse.status).toBe(200);
+    const signOut = await app.fetch(request("/api/auth/sign-out", { method: "POST", body: "{}" }, cookie), stagingEnv);
+    expect(signOut.status).toBe(200);
+    expect((await app.fetch(request("/api/protected", {}, cookie), stagingEnv)).status).toBe(401);
+
+    const wrongPassword = await app.fetch(request("/api/auth/sign-in/email", {
+      method: "POST", body: JSON.stringify({ ...credentials, password: "wrong-password" }),
+    }), stagingEnv);
+    expect(wrongPassword.status).toBe(401);
+    expect(wrongPassword.headers.get("set-cookie")).toBeNull();
+    const signIn = await app.fetch(request("/api/auth/sign-in/email", {
+      method: "POST", body: JSON.stringify(credentials),
+    }), stagingEnv);
+    expect(signIn.status).toBe(200);
+    const newCookie = signIn.headers.get("set-cookie")?.split(";")[0];
+    expect(newCookie).toBeTruthy();
+    expect(await (await app.fetch(request("/api/session", {}, newCookie), stagingEnv)).json()).toEqual(registeredSession);
+  });
+
+  it("keeps staging password validation and origin protection enabled", async () => {
+    const stagingEnv = { ...env, APP_ENV: "staging" };
+    const { app } = createTestApp(stagingEnv);
+    const body = { name: "Test Agent", email: "agent@example.test", password: "short" };
+    const shortPassword = await app.fetch(request("/api/auth/sign-up/email", { method: "POST", body: JSON.stringify(body) }), stagingEnv);
+    expect(shortPassword.status).toBe(400);
+    const foreignOrigin = await app.fetch(request("/api/auth/sign-up/email", {
+      method: "POST", headers: { origin: "https://untrusted.test", "sec-fetch-site": "cross-site" }, body: JSON.stringify({ ...body, password: "test-password-123" }),
+    }), stagingEnv);
+    expect(foreignOrigin.status).toBe(403);
+    expect(foreignOrigin.headers.get("set-cookie")).toBeNull();
+  });
+
   it("creates an anonymous Guest session, preserves its cookie, and signs out", async () => {
     const { app } = createTestApp();
     const signIn = await app.fetch(
