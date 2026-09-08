@@ -106,7 +106,7 @@ export function PlanCreatePage(): JSX.Element {
     isLoading,
     isError,
     refetch,
-  } = useTripRoomRawQuery(tripId);
+  } = useTripRoomRawQuery(tripId, { editing: true });
   const {
     data: session,
     isLoading: isSessionLoading,

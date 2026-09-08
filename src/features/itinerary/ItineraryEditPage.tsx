@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Result } from "effect";
 import { useNavigate, useParams } from "react-router-dom";
+import { ApiClientError } from "../../app/api-client.ts";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
@@ -73,10 +74,12 @@ function ItineraryEditor({
   tripId,
   itinerary,
   onRefresh,
+  refreshFailed,
 }: {
   readonly tripId: string;
   readonly itinerary: ConfirmedItinerary;
   readonly onRefresh: () => Promise<ConfirmedItinerary | undefined>;
+  readonly refreshFailed: boolean;
 }) {
   const navigate = useNavigate();
   const mutation = useReviseItineraryMutation();
@@ -216,6 +219,11 @@ function ItineraryEditor({
         title="확정 일정 수정"
         description={`수정 기준 v${expectedRevision} · 저장하면 새 revision이 생성됩니다.`}
       />
+      {refreshFailed && (
+        <p role="alert" className="px-(--app-inline-padding) text-destructive-strong">
+          최신 일정을 확인하지 못했어요. 작성 중인 입력은 유지했어요. 연결을 확인한 뒤 저장해주세요.
+        </p>
+      )}
 
       <form
         id={ITINERARY_EDITOR_FORM_ID}
@@ -446,7 +454,7 @@ export function ItineraryEditPage(): JSX.Element {
   const navigate = useNavigate();
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
-  const query = useItineraryQuery(tripId);
+  const query = useItineraryQuery(tripId, { editing: true });
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -461,7 +469,9 @@ export function ItineraryEditPage(): JSX.Element {
       </PageBody>
     );
   }
-  if (query.isError || !query.data) {
+  const transientRefreshFailure = query.isError && query.error instanceof ApiClientError &&
+    (query.error.status === 0 || query.error.status >= 500);
+  if (!query.data || (query.isError && !transientRefreshFailure)) {
     return (
       <RouteErrorFallback
         message={toUserMessage(query.error, "확정 일정을 불러오지 못했습니다.")}
@@ -487,6 +497,7 @@ export function ItineraryEditPage(): JSX.Element {
     <ItineraryEditor
       tripId={tripId}
       itinerary={query.data.itinerary}
+      refreshFailed={transientRefreshFailure}
       onRefresh={async () => {
         const refreshed = await query.refetch();
         return refreshed.isError || refreshed.data?.status !== "CONFIRMED"
