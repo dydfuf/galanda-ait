@@ -110,7 +110,8 @@ describe("TripCreatePage", () => {
     expect(header).toHaveAttribute("data-galanda-surface", "chrome");
     expect(header?.className).toContain("sticky");
     expect(header?.className).toContain("top-0");
-    expect(form).toHaveClass("rounded-2xl", "border-border", "bg-card");
+    expect(form).not.toHaveClass("rounded-2xl");
+    expect(form).toHaveClass("mx-(--app-inline-padding)");
     expect(bottomAction).toHaveAttribute("data-galanda-surface", "content");
     expect(input).toHaveAttribute("aria-describedby", "trip-title-help");
     expect(submit).toBeDisabled();

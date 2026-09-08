@@ -153,8 +153,8 @@ describe("GlobalAppShell (RAON-248)", () => {
     expect(nav.className).toContain("fixed");
     expect(nav.className).toContain("inset-x-0");
     expect(nav.className).toContain("bottom-0");
-    expect(nav.className).toContain("shadow-chrome");
-    expect(nav.className).not.toContain("border-t");
+    expect(nav.className).not.toContain("shadow-chrome");
+    expect(nav.className).toContain("border-t");
     expect(nav.className).toContain("pb-[var(--safe-bottom)]");
     expect(nav.className).not.toContain("pointer-events-none");
     const navList = nav.querySelector("ul");

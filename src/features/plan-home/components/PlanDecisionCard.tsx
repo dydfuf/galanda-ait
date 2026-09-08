@@ -33,38 +33,31 @@ export function PlanDecisionCard({ plan, to }: PlanDecisionCardProps) {
             ? "success"
             : "neutral";
 
-  const cardVariantClass = isConfirmed
-    ? "border-success/80 bg-surface-raised hover:border-success hover:shadow-md"
-    : plan.planTag === "BASIC"
-      ? "border-info/70 bg-surface-raised hover:border-info hover:shadow-md"
-      : "border-border bg-surface-raised hover:border-border-strong hover:shadow-md";
-
   return (
     <Link
       to={to}
       className={cn(
-        "group relative flex min-w-0 flex-col gap-2.5 rounded-2xl border p-4 text-left no-underline shadow-xs transition-all duration-200",
+        "group relative flex min-w-0 flex-col gap-3 border-b border-border py-6 text-left no-underline transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        "active:translate-y-px active:scale-[0.995]",
         // Ensure long content never forces horizontal overflow on 320px
         "overflow-hidden",
-        cardVariantClass,
       )}
     >
       {/* 1. badge + chevron – single tap affordance, no nested control */}
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <Badge variant={badgeVariant} className="shrink-0 font-semibold shadow-2xs">
+        <Badge variant={badgeVariant} className="shrink-0 font-semibold">
           {badgeLabel}
         </Badge>
         <ChevronRight
           aria-hidden="true"
+          strokeWidth={1.8}
           className="size-4 shrink-0 text-muted-foreground/60 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground group-active:text-foreground-subtle"
         />
       </div>
 
       {/* 2. 여행안 제목 + 기간·경로 – title is primary, period/route one step below */}
       <div className="flex min-w-0 flex-col gap-1.5">
-        <h3 className="min-w-0 break-words text-[17px] font-bold leading-snug tracking-tight text-foreground line-clamp-2">
+        <h3 className="min-w-0 break-keep text-2xl font-bold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]">
           {plan.title}
         </h3>
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-normal">

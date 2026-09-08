@@ -1,5 +1,3 @@
-import { MapPin } from "lucide-react";
-
 interface TripSummarySectionProps {
   readonly title: string;
   readonly destination: string;
@@ -7,7 +5,7 @@ interface TripSummarySectionProps {
   readonly memberCount: number;
 }
 
-/** 여행 제목과 서버 aggregate의 요약 값을 불투명한 본문 카드에 표시한다. */
+/** 여행 제목과 서버 aggregate의 요약 값을 하나의 정보 그룹으로 표시한다. */
 export function TripSummarySection({
   title,
   destination,
@@ -17,16 +15,12 @@ export function TripSummarySection({
   return (
     <section
       aria-label="여행 정보"
-      className="bg-surface-raised p-4.5 transition-shadow"
+      className="min-w-0 bg-surface-content pt-5 pb-6"
     >
-      <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-foreground-muted">
-        <MapPin aria-hidden="true" className="size-3.5 text-primary shrink-0" />
-        <span>여행 정보</span>
-      </div>
-      <h1 className="mt-1.5 min-w-0 text-[22px] font-bold leading-tight tracking-tight text-foreground [overflow-wrap:anywhere]">
+      <h1 className="min-w-0 text-[32px] font-bold leading-tight tracking-tight break-keep text-foreground [overflow-wrap:anywhere]">
         {title}
       </h1>
-      <p className="mt-2 min-w-0 text-sm font-medium leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
+      <p className="mt-4 min-w-0 text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
         {destination} · {period} · 참여 {memberCount}명
       </p>
     </section>

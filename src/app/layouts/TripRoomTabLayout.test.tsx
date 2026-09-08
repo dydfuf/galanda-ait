@@ -125,13 +125,15 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     vi.clearAllMocks();
   });
 
-  it("Web/PWA owns one sticky chrome for safe-area back, title, and share, and floating Mode Tab", () => {
+  it("Web/PWA keeps header and mode tabs in one sticky navigation without a floating obstruction", () => {
     const { container } = renderLayout();
 
     const header = screen.getByRole("banner");
     expect(header.className).toContain("pt-(--safe-top)");
     expect(header).toHaveAttribute("data-galanda-surface", "chrome");
-    expect(header.className).toContain("sticky");
+    const navigation = container.querySelector('[data-slot="trip-navigation"]');
+    expect(navigation).toHaveClass("sticky", "top-0");
+    expect(navigation).toContainElement(header);
     expect(header.className).toContain("border-b");
     expect(
       within(header).getByRole("button", { name: "뒤로 가기" }),
@@ -145,23 +147,21 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     const modeSwitcher = container.querySelector<HTMLElement>(
       '[data-slot="trip-mode-switcher"]',
     );
-    expect(modeSwitcher).toHaveStyle({
-      bottom:
-        "calc(var(--app-bottom-action-height, var(--safe-bottom)) + 1.25rem + var(--app-keyboard-inset, 0px))",
-    });
+    expect(navigation).toContainElement(modeSwitcher);
+    expect(modeSwitcher).not.toHaveClass("fixed");
     expect(modeSwitcher).not.toHaveClass("pb-(--safe-bottom)");
-    expect(tablist).toHaveAttribute("data-variant", "chrome");
-    expect(tablist).toHaveAttribute("data-galanda-surface", "chrome");
+    expect(tablist).toHaveAttribute("data-variant", "line");
+    expect(tablist).not.toHaveAttribute("data-galanda-surface");
     expect(
       container.querySelectorAll('[data-galanda-surface="chrome"]'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expectPlansTabSelected();
     expect(
       screen.getByRole("heading", { level: 1, name: "계획 콘텐츠" }),
     ).toBeInTheDocument();
   });
 
-  it("AIT keeps one web chrome below native navigation and applies its inset once with floating Mode Tab", async () => {
+  it("AIT keeps mode tabs below native navigation and applies its inset once", async () => {
     const { emitInset, navigation, removeInsetListener } =
       createNativeNavigation();
     mocks.platform.navigation = navigation;
@@ -184,11 +184,11 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
       within(header).queryByRole("button", { name: "여행 초대 링크 공유" }),
     ).not.toBeInTheDocument();
     expect(header).toHaveAttribute("data-galanda-surface", "chrome");
-    expect(tablist).toHaveAttribute("data-variant", "chrome");
-    expect(tablist).toHaveAttribute("data-galanda-surface", "chrome");
+    expect(tablist).toHaveAttribute("data-variant", "line");
+    expect(tablist).not.toHaveAttribute("data-galanda-surface");
     expect(
       container.querySelectorAll('[data-galanda-surface="chrome"]'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expectPlansTabSelected();
 
     await waitFor(() =>
@@ -271,7 +271,7 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     expect(screen.getByRole("tablist", { name: "여행방 화면" })).toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-galanda-surface="chrome"]'),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expectPlansTabSelected();
   });
 

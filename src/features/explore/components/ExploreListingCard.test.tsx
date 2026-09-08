@@ -102,7 +102,7 @@ describe("ExploreListingCard (RAON-263 DISC-5 detail link)", () => {
       '[data-slot="explore-destination-visual"]',
     )!;
 
-    expect(visual).toHaveClass("bg-primary-muted", "border-primary-border-weak");
+    expect(visual).not.toHaveClass("bg-primary-muted");
     expect(visual).toHaveTextContent("오사카");
     expect(within(card).getByRole("heading", { level: 3 })).toHaveTextContent(
       "오사카 3박 4일",
@@ -161,13 +161,14 @@ describe("ExploreListingCard (RAON-263 DISC-5 detail link)", () => {
     expect(screen.getAllByText(longText).length).toBeGreaterThanOrEqual(3);
   });
 
-  it("card는 rounded semantic surface이며 fake image·ranking·search를 만들지 않는다", () => {
+  it("card는 제목 중심 목록이며 fake image·ranking·search를 만들지 않는다", () => {
     const { container } = renderCard();
     const card = container.querySelector<HTMLElement>(
       '[data-slot="explore-listing-card"]',
     )!;
 
-    expect(card).toHaveClass("rounded-2xl", "border-border", "bg-card");
+    expect(card).toHaveClass("border-b", "border-border");
+    expect(card).not.toHaveClass("bg-card");
     expect(card.querySelector("img")).toBeNull();
     expect(card.querySelector("ol")).toBeNull();
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();

@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
+import { ChevronDown, CircleAlert } from "lucide-react";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
 import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { isRevisionConflict, toUserMessage } from "../common/error-message.ts";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import {
   Drawer,
   DrawerContent,
@@ -51,6 +54,7 @@ export function ItineraryPage(): JSX.Element {
   } = useItineraryQuery(tripId);
 
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<string>();
   const [isNeedCheckSheetOpen, setIsNeedCheckSheetOpen] = useState(false);
   const [isChangeReviewOpen, setIsChangeReviewOpen] = useState(false);
   const acknowledgeMutation = useAcknowledgeItineraryMutation();
@@ -115,6 +119,7 @@ export function ItineraryPage(): JSX.Element {
         <PageState
           status="empty"
           title="아직 확정된 일정이 없어요"
+          illustration={<GalandaSpot name="compare-plans" />}
           description="팀원들과 후보 여행안을 검토하고 마음에 드는 계획을 확정해보세요."
           actionText="후보 여행안 보러가기"
           onAction={() => navigate(`/trips/${tripId}/plans`, { replace: true })}
@@ -145,6 +150,7 @@ export function ItineraryPage(): JSX.Element {
         <PageState
           status="empty"
           title="등록된 확정 일정이 없어요"
+          illustration={<GalandaSpot name="confirm-plan" />}
           description="확정된 여행안에 숙소·교통 일정이 등록되면 여기에서 확인할 수 있어요."
         />
       </PageBody>
@@ -157,16 +163,17 @@ export function ItineraryPage(): JSX.Element {
   const isAcknowledged =
     itineraryState.viewerAcknowledgedRevision ===
     itineraryState.itinerary.currentRevision;
+  const activeSectionId = viewModel.sections.find(({ id }) => id === selectedSectionId)?.id ?? viewModel.sections[0]!.id;
 
   return (
-    <PageBody data-system-state="success" className="pb-24">
+    <PageBody data-system-state="success" className="pb-24 [--app-inline-padding:24px]">
       {/* 1. 상단 확정 Summary */}
       <section
         className="flex min-w-0 flex-col gap-2 bg-surface-content pt-2 pb-1"
         aria-label="확정 일정 요약"
       >
         <div className="mt-1 px-(--app-inline-padding)">
-          <Badge variant="success" className="font-semibold shadow-2xs">
+          <Badge variant="success" className="font-semibold">
             최종 확정
           </Badge>
         </div>
@@ -179,12 +186,18 @@ export function ItineraryPage(): JSX.Element {
 
       {/* 경로 레일 (RouteRail) */}
       {viewModel.route.length > 0 && (
-        <div className="px-(--app-inline-padding) pb-3">
+        <details className="group mx-(--app-inline-padding) mb-5 border-b border-border">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+            전체 경로 보기
+            <ChevronDown className="size-4 shrink-0 group-open:rotate-180" strokeWidth={1.8} aria-hidden="true" />
+          </summary>
+          <div className="pb-4">
           <RouteRail
             route={viewModel.route}
             differenceSummary={viewModel.differenceSummary}
           />
-        </div>
+          </div>
+        </details>
       )}
 
       {(itineraryState.itinerary.currentRevision > 1 ||
@@ -193,8 +206,8 @@ export function ItineraryPage(): JSX.Element {
           className="mb-4 px-(--app-inline-padding)"
           aria-label="일정 변경 확인"
         >
-          <div className="min-w-0 rounded-2xl border border-border bg-surface-content p-4 shadow-xs [overflow-wrap:anywhere]">
-            <p className="text-base font-bold leading-snug text-foreground [overflow-wrap:anywhere]">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface-content py-3 [overflow-wrap:anywhere]">
+            <p className="text-sm font-medium leading-snug text-foreground [overflow-wrap:anywhere]">
               {itineraryState.itinerary.currentRevision > 1
                 ? `일정이 v${itineraryState.itinerary.currentRevision}로 변경됐어요`
                 : "확정 일정 v1"}
@@ -204,7 +217,7 @@ export function ItineraryPage(): JSX.Element {
                 아직 확인하지 않은 참여자 {itineraryState.unacknowledgedCount}명
               </p>
             )}
-            <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               {itineraryState.itinerary.currentRevision > 1 &&
                 !isAcknowledged && (
                   <Button
@@ -268,7 +281,7 @@ export function ItineraryPage(): JSX.Element {
         <section className="mb-4" aria-label="확인 필요 예약 요약">
           <MobileList
             aria-label="확인 필요 예약"
-            className="overflow-hidden border-y border-border bg-surface-content shadow-xs sm:mx-(--app-inline-padding) sm:rounded-2xl sm:border"
+            className="mx-(--app-inline-padding) overflow-hidden border-b border-border bg-surface-content"
             data-galanda-surface="content"
           >
             <MobileListItem
@@ -276,27 +289,14 @@ export function ItineraryPage(): JSX.Element {
               onClick={() => setIsNeedCheckSheetOpen(true)}
               aria-label={`확인이 필요한 예약 ${viewModel.needCheckCount}개`}
               leading={
-                <Badge
-                  variant={viewModel.hasNeedCheckDanger ? "danger" : "warning"}
-                  className="font-semibold shadow-2xs"
-                >
-                  확인 필요
-                </Badge>
-              }
-              trailing={
-                <Badge
-                  variant={viewModel.hasNeedCheckDanger ? "danger" : "warning"}
-                  className="font-semibold"
-                >
-                  {viewModel.needCheckCount}건
-                </Badge>
+                <CircleAlert className={`size-5 shrink-0 ${viewModel.hasNeedCheckDanger ? "text-destructive" : "text-warning"}`} strokeWidth={1.8} aria-hidden="true" />
               }
             >
-              <ItemTitle>
+              <ItemTitle className="break-keep">
                 확인이 필요한 예약 {viewModel.needCheckCount}개
               </ItemTitle>
               <ItemDescription>
-                예약 상태를 확인하고 일정을 점검해주세요.
+                예약 전 상태를 확인해주세요.
               </ItemDescription>
             </MobileListItem>
           </MobileList>
@@ -305,72 +305,84 @@ export function ItineraryPage(): JSX.Element {
 
       {/* 3. 날짜별 일정 목록 (Date-based Sections) */}
       <section aria-label="날짜별 상세 일정">
-        {viewModel.sections.map((section) => {
-          const headingId = `${section.id}-heading`;
-
-          return (
-            <section
-              key={section.id}
-              id={section.id}
-              className="mb-4 min-w-0"
-              aria-labelledby={headingId}
-            >
-              <div className="flex items-center px-(--app-inline-padding) pt-4 pb-2">
-                <h2
-                  id={headingId}
-                  className="text-base font-bold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]"
-                >
+        <Tabs value={activeSectionId} onValueChange={setSelectedSectionId}>
+          <div className="px-(--app-inline-padding)">
+            <TabsList variant="line" aria-label="일정 날짜" className="w-full justify-start overflow-x-auto pb-2">
+              {viewModel.sections.map((section) => (
+                <TabsTrigger key={section.id} value={section.id} className="shrink-0 flex-none px-4 whitespace-nowrap">
                   {section.dateHeader}
-                </h2>
-              </div>
-              <MobileList
-                aria-labelledby={headingId}
-                className="overflow-hidden border-y border-border bg-surface-content shadow-xs sm:mx-(--app-inline-padding) sm:rounded-2xl sm:border"
-                data-galanda-surface="content"
-              >
-                {section.items.map((item) => {
-                  const title =
-                    item.type === "STAY" ? item.hotelName : item.routeTitle;
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+          {viewModel.sections.map((section) => {
+            const headingId = `${section.id}-heading`;
 
-                  return (
-                    <MobileListItem
-                      key={item.id}
-                      chevron
-                      className="items-start transition-colors"
-                      onClick={() => setSelectedItem(item)}
-                      aria-label={`${title}, ${item.subText}`}
-                      leading={
-                        <Badge
-                          variant={item.type === "STAY" ? "info" : "neutral"}
-                          className="font-semibold"
-                        >
-                          {item.type === "STAY" ? "숙소" : "이동"}
-                        </Badge>
-                      }
-                      trailing={
-                        <Badge variant={item.statusTone} className="font-semibold">
-                          {item.statusLabel}
-                        </Badge>
-                      }
-                    >
-                      <ItemTitle className="items-start text-base font-semibold leading-snug">
-                        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                          {title}
-                        </span>
-                        {changedItemIds.has(item.id) && (
-                          <Badge variant="warning" className="font-semibold">변경됨</Badge>
-                        )}
-                      </ItemTitle>
-                      <ItemDescription className="text-sm leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
-                        {item.subText}
-                      </ItemDescription>
-                    </MobileListItem>
-                  );
-                })}
-              </MobileList>
-            </section>
-          );
-        })}
+            return (
+              <TabsContent
+                key={section.id}
+                value={section.id}
+                id={section.id}
+                className="mb-4 min-w-0"
+                aria-labelledby={headingId}
+              >
+                <div className="flex items-center px-(--app-inline-padding) pt-4 pb-2">
+                  <h2
+                    id={headingId}
+                    className="text-base font-bold leading-snug tracking-tight text-foreground [overflow-wrap:anywhere]"
+                  >
+                    {section.dateHeader}
+                  </h2>
+                </div>
+                <MobileList
+                  aria-labelledby={headingId}
+                  className="overflow-hidden border-y border-border bg-surface-content"
+                  data-galanda-surface="content"
+                >
+                  {section.items.map((item) => {
+                    const title =
+                      item.type === "STAY" ? item.hotelName : item.routeTitle;
+
+                    return (
+                      <MobileListItem
+                        key={item.id}
+                        chevron
+                        className="items-start transition-colors"
+                        onClick={() => setSelectedItem(item)}
+                        aria-label={`${title}, ${item.subText}`}
+                        leading={
+                          <Badge
+                            variant={item.type === "STAY" ? "info" : "neutral"}
+                            className="font-semibold"
+                          >
+                            {item.type === "STAY" ? "숙소" : "이동"}
+                          </Badge>
+                        }
+                        trailing={
+                          <Badge variant={item.statusTone} className="font-semibold">
+                            {item.statusLabel}
+                          </Badge>
+                        }
+                      >
+                        <ItemTitle className="items-start text-base font-semibold leading-snug">
+                          <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                            {title}
+                          </span>
+                          {changedItemIds.has(item.id) && (
+                            <Badge variant="warning" className="font-semibold">변경됨</Badge>
+                          )}
+                        </ItemTitle>
+                        <ItemDescription className="text-sm leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
+                          {item.subText}
+                        </ItemDescription>
+                      </MobileListItem>
+                    );
+                  })}
+                </MobileList>
+              </TabsContent>
+            );
+          })}
+        </Tabs>
       </section>
 
       {/* 4. 하단 보조 작업: 후보 여행안 목록 보기 */}

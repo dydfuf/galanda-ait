@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>일정 확정</title><g stroke-linecap="round" stroke-linejoin="round"><rect x="43" y="55" width="151" height="143" rx="18" fill="#182B47"/>
+  <rect x="36" y="48" width="151" height="143" rx="18" fill="#171D24" stroke="#3E689F" stroke-width="2.2"/>
+  <path d="M54 48h115a18 18 0 0 1 18 18v26H36V66a18 18 0 0 1 18-18Z" fill="#7AA7FF"/>
+  <path d="M72 37v23m79-23v23" stroke="#8BB4FF" stroke-width="8"/>
+  <path d="M60 114h17m22 0h17m22 0h17M60 140h17m22 0h17m-56 26h17" stroke="#3E689F" stroke-width="7"/>
+  <circle cx="177" cy="172" r="38" fill="#153524" stroke="#5DD58C" stroke-width="2.5"/>
+  <path d="m160 172 12 12 23-27" stroke="#5DD58C" stroke-width="6" fill="none"/></g></svg>

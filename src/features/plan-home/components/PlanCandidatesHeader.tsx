@@ -28,16 +28,16 @@ export function PlanCandidatesHeader({
         >
           여행안
         </h2>
-        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-foreground-muted whitespace-nowrap">
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
           후보 {candidateCount}개
         </span>
       </div>
       {showNewProposalAction && (
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="sm"
-          className="ml-auto max-w-full shrink-0 font-medium whitespace-normal shadow-2xs hover:bg-muted active:scale-[0.98] transition-transform"
+          className="ml-auto max-w-full shrink-0 font-medium whitespace-normal text-primary"
           onClick={onNewProposalAction}
         >
           <Plus aria-hidden="true" className="size-3.5 mr-1" />새 여행안 제안하기

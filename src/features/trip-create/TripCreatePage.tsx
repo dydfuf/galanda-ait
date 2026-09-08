@@ -122,7 +122,7 @@ export function TripCreatePage() {
               e.preventDefault();
               void handleSubmit();
             }}
-            className="mx-(--app-inline-padding) mt-3 flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
+            className="mx-(--app-inline-padding) mt-6 flex flex-col"
           >
             <Field
               data-invalid={Boolean(displayedError) || undefined}

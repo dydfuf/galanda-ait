@@ -72,7 +72,7 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
       <nav
         aria-label="주요 화면"
         data-galanda-surface={usesContentSurface ? "content" : "chrome"}
-        className="fixed inset-x-0 bottom-0 z-20 bg-background shadow-chrome pb-[var(--safe-bottom)]"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-background pb-[var(--safe-bottom)]"
       >
         <ul className="mx-auto flex h-16 w-full max-w-(--content-max-width) items-stretch">
           {GLOBAL_NAV_ITEMS.map((item) => {
@@ -84,7 +84,7 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
                   to={item.path}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "flex min-h-(--touch-target-min) w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-xs leading-none font-medium transition-colors",
+                    "flex min-h-(--touch-target-min) w-full min-w-0 flex-col items-center justify-center gap-1.5 rounded-md px-1 py-1.5 text-xs leading-none font-medium transition-colors",
                     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                     isActive
                       ? "text-primary"
@@ -92,9 +92,9 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
                   )}
                 >
                   <Icon
-                    className="size-5 shrink-0"
+                    className="size-6 shrink-0"
                     aria-hidden="true"
-                    strokeWidth={isActive ? 2.4 : 2}
+                    strokeWidth={1.8}
                   />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
                     {item.label}

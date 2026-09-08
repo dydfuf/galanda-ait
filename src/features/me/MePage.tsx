@@ -72,19 +72,19 @@ export function MePage() {
   const displayName = session?.name.trim() ?? "";
 
   return (
-    <PageBody safeTop>
+    <PageBody safeTop className="[--app-inline-padding:24px]">
       <PageTitle title="마이" />
 
       {displayName && (
         <section className="px-(--app-inline-padding)" aria-label="내 프로필">
-          <div className="flex min-w-0 items-center gap-4 rounded-2xl border border-primary-border bg-primary-muted p-5 shadow-sm">
+          <div className="flex min-w-0 items-center gap-4 py-8">
             <span
               aria-hidden="true"
-              className="grid size-14 shrink-0 place-items-center rounded-full border border-primary-border bg-card text-lg font-bold text-primary shadow-sm"
+              className="grid size-14 shrink-0 place-items-center rounded-full bg-muted text-lg font-bold text-foreground"
             >
               {getNameInitial(displayName)}
             </span>
-            <h2 className="min-w-0 flex-1 text-xl leading-snug font-semibold text-foreground [overflow-wrap:anywhere]">
+            <h2 className="min-w-0 flex-1 text-[32px] leading-snug font-bold tracking-tight break-keep text-foreground [overflow-wrap:anywhere]">
               {displayName}
             </h2>
           </div>
@@ -92,13 +92,13 @@ export function MePage() {
       )}
 
       <nav className="mt-5 px-(--app-inline-padding)" aria-label="마이 메뉴">
-        <MobileList className="overflow-hidden rounded-2xl border border-border bg-card">
+        <MobileList className="overflow-hidden border-y border-border">
           <MobileListItem
             to="/me/saved"
             chevron
             leading={
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">
-                <Bookmark className="size-5" aria-hidden="true" />
+              <span className="grid size-8 shrink-0 place-items-center text-muted-foreground">
+                <Bookmark className="size-5" strokeWidth={1.8} aria-hidden="true" />
               </span>
             }
           >
@@ -110,8 +110,8 @@ export function MePage() {
             chevron
             onClick={() => setIsThemeSheetOpen(true)}
             leading={
-              <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">
-                <Palette className="size-5" aria-hidden="true" />
+              <span className="grid size-8 shrink-0 place-items-center text-muted-foreground">
+                <Palette className="size-5" strokeWidth={1.8} aria-hidden="true" />
               </span>
             }
             trailing={

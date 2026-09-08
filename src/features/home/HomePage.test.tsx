@@ -137,14 +137,14 @@ const expectDashboard = () => {
   expect(
     screen.queryByRole("button", { name: "알림 기능 준비 중" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByText("Raon님, 안녕하세요 👋")).toBeInTheDocument();
+  expect(screen.queryByText("Raon님, 안녕하세요 👋")).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "이탈리아 남부 여행" })).toBeInTheDocument();
   expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: /일정 보기/ })).toHaveAttribute(
     "href",
     "/trips/trip-italy/itinerary",
   );
-  expect(screen.getByRole("link", { name: /계획 보기/ })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "여행방 열기" })).toHaveAttribute(
     "href",
     "/trips/trip-italy/plans",
   );
@@ -193,7 +193,8 @@ describe("HomePage dashboard", () => {
     );
     renderHome();
     expectDashboard();
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(mockSaved).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("저장 section이 로딩 중이어도 여행 dashboard 핵심 콘텐츠를 막지 않는다", () => {
@@ -201,11 +202,11 @@ describe("HomePage dashboard", () => {
     renderHome();
     expectDashboard();
     expect(
-      screen.getByText(/저장한 여행 아이디어를 불러오는 중이에요/),
-    ).toBeInTheDocument();
+      screen.queryByText(/저장한 여행 아이디어를 불러오는 중이에요/),
+    ).not.toBeInTheDocument();
   });
 
-  it("저장 항목이 있으면 실제 공개 필드 기반 아이디어를 함께 보여준다", () => {
+  it("저장 항목은 마이의 전용 목록에서 제공하고 홈은 여행 하나에 집중한다", () => {
     mockSaved.mockReturnValue(
       savedResult({
         data: {
@@ -217,11 +218,12 @@ describe("HomePage dashboard", () => {
     renderHome();
     expectDashboard();
     expect(
-      screen.getByRole("heading", { name: "저장한 여행 아이디어" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "저장한 여행 아이디어" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: "교토 벚꽃 여행" }),
-    ).toHaveAttribute("href", "/explore/listing-1");
+      screen.queryByRole("link", { name: "교토 벚꽃 여행" }),
+    ).not.toBeInTheDocument();
+    expect(mockSaved).not.toHaveBeenCalled();
   });
 
   it("진행 중인 여행이 없으면 가짜 카드를 만들지 않고 실제 생성/탐색 route를 안내한다", () => {
@@ -314,7 +316,7 @@ describe("HomePage dashboard", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
-  it("사용자 이름이 없으면 가짜 이름을 사용하지 않고 일반 인사말을 표시한다", () => {
+  it("사용자 이름이 없어도 가짜 이름이나 인사말 없이 여행 시작을 안내한다", () => {
     sessionOk("");
     mockRooms.mockReturnValue(roomsResult({ data: [] }));
     mockSaved.mockReturnValue(
@@ -322,7 +324,8 @@ describe("HomePage dashboard", () => {
     );
     renderHome();
 
-    expect(screen.getByText("안녕하세요 👋")).toBeInTheDocument();
+    expect(screen.queryByText("안녕하세요 👋")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "새 여행 만들기" })).toBeInTheDocument();
     expect(screen.queryByText(/여행자님/)).not.toBeInTheDocument();
   });
 });

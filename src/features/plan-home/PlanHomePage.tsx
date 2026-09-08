@@ -8,6 +8,7 @@ import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -174,11 +175,11 @@ export function PlanHomePage() {
   const actor = getRoomActor(rawRoom, session?.participantIds);
   const canCreatePlan = actor.can("plan:create");
   const cta = resolvePlanHomeCta(rawRoom, actor);
-  const recommendation = recommendationQuery.data?.recommendationId ===
+  const recommendation = !actor.isMember || plans.length === 0 || recommendationQuery.isError || recommendationQuery.data?.recommendationId ===
       dismissedRecommendationId
     ? undefined
     : recommendationQuery.data;
-  const isRecommendationPending = actor.isMember && recommendationQuery.isPending;
+  const isRecommendationPending = actor.isMember && plans.length > 0 && recommendationQuery.isPending;
   const hasRecommendationSurface = Boolean(recommendation) || isRecommendationPending;
 
   const runRecommendationAction = async (
@@ -265,17 +266,15 @@ export function PlanHomePage() {
     plans.length > 0 && cta.primaryKind !== null && !hasRecommendationSurface;
 
   return (
-    <PageBody withBottomAction={showBottomPrimary} className="pb-32">
+    <PageBody withBottomAction={showBottomPrimary || hasRecommendationSurface} className="pb-32 [--app-inline-padding:24px]">
       <div className="flex flex-col gap-3">
-        {/* 상단 통합 여행 현황 Hero 카드 */}
-        <div className="mx-(--app-inline-padding) overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-xs transition-shadow">
+        <div className="mx-(--app-inline-padding) min-w-0">
           <TripSummarySection
             title={room.title}
             destination={room.destination}
             period={room.period}
             memberCount={room.memberCount}
           />
-          <div className="border-t border-border/70" />
           <DecisionSummarySection
             badgeText={room.decisionBadgeText}
             badgeVariant={room.decisionBadgeVariant}
@@ -293,16 +292,23 @@ export function PlanHomePage() {
           />
         </div>
 
-        {recommendation && (
-          <NextActionRecommendation
-            tripId={tripId}
-            surface="PLAN_HOME"
-            recommendation={recommendation}
-            onAction={(context) => void runRecommendationAction(context)}
-            onDismiss={setDismissedRecommendationId}
-          />
+        {hasRecommendationSurface && (
+          <BottomAction>
+            <div className="min-w-0">
+              {recommendation && (
+                <NextActionRecommendation
+                  tripId={tripId}
+                  surface="PLAN_HOME"
+                  recommendation={recommendation}
+                  onAction={(context) => void runRecommendationAction(context)}
+                  onDismiss={setDismissedRecommendationId}
+                  className="mx-0 py-0"
+                />
+              )}
+              {isRecommendationPending && <NextActionRecommendationPending className="mx-0 py-0" />}
+            </div>
+          </BottomAction>
         )}
-        {isRecommendationPending && <NextActionRecommendationPending />}
       </div>
 
       <div className="mx-(--app-inline-padding) my-5 border-t border-border/70" />
@@ -320,6 +326,7 @@ export function PlanHomePage() {
         {plans.length === 0 ? (
           <PageState
             status="empty"
+            illustration={<GalandaSpot name="create-trip" />}
             title="아직 여행안이 없어요"
             description={
               canCreatePlan
@@ -354,7 +361,7 @@ export function PlanHomePage() {
 
       {showBottomPrimary && (
         <BottomAction>
-          <Button type="button" size="xl" className="font-bold shadow-md active:scale-[0.99] transition-transform" onClick={runPrimaryCta}>
+          <Button type="button" size="xl" onClick={runPrimaryCta}>
             {cta.primaryLabel}
           </Button>
         </BottomAction>

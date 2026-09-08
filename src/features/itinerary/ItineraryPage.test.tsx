@@ -290,7 +290,7 @@ describe("ItineraryPage state and responsive content contracts", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("representative width 변경에서도 720px opaque date-list hierarchy와 긴 source content를 유지한다", () => {
+  it("한 날짜의 일정만 보여주고 날짜를 바꾸어 모든 상세에 접근한다", async () => {
     const { container } = renderPage();
     const successBody = container.querySelector<HTMLElement>(
       '[data-system-state="success"]',
@@ -300,7 +300,8 @@ describe("ItineraryPage state and responsive content contracts", () => {
       name: LONG_PLAN_TITLE,
     });
     const firstDateList = screen.getByRole("list", { name: "12월 10일" });
-    const secondDateList = screen.getByRole("list", { name: "12월 12일" });
+    expect(screen.queryByRole("list", { name: "12월 12일" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("tablist", { name: "일정 날짜" })).getAllByRole("tab")).toHaveLength(2);
 
     expect(successBody).toHaveClass(
       "max-w-(--content-max-width)",
@@ -315,22 +316,17 @@ describe("ItineraryPage state and responsive content contracts", () => {
       Array.from(container.querySelectorAll("h1,h2"), (heading) =>
         heading.textContent?.trim(),
       ),
-    ).toEqual([LONG_PLAN_TITLE, "12월 10일", "12월 12일"]);
+    ).toEqual([LONG_PLAN_TITLE, "12월 10일"]);
 
-    for (const list of [firstDateList, secondDateList]) {
-      expect(list).toHaveAttribute("data-galanda-surface", "content");
-      expect(list.className).toContain("bg-surface-content");
-      expect(within(list).getAllByRole("listitem")).toHaveLength(1);
-    }
+    expect(firstDateList).toHaveAttribute("data-galanda-surface", "content");
+    expect(firstDateList.className).toContain("bg-surface-content");
+    expect(within(firstDateList).getAllByRole("listitem")).toHaveLength(1);
 
     const stayAction = within(firstDateList).getByRole("button", {
       name: `${LONG_HOTEL_NAME}, 2박 · 확인 필요`,
     });
     expect(stayAction.className).toContain("min-h-(--touch-target-min)");
     expect(stayAction).toHaveTextContent(LONG_HOTEL_NAME);
-    expect(within(secondDateList).getByRole("button")).toHaveAccessibleName(
-      "출발지 미정 → 도착지 미정, 이동 수단 미정 · 예매 가능",
-    );
 
     for (const width of [320, 390, 1440]) {
       Object.defineProperty(window, "innerWidth", {
@@ -344,6 +340,25 @@ describe("ItineraryPage state and responsive content contracts", () => {
         firstDateList,
       );
     }
+    fireEvent.click(screen.getByRole("tab", { name: "12월 12일" }));
+    const secondDateList = await screen.findByRole("list", { name: "12월 12일" });
+    expect(screen.queryByRole("list", { name: "12월 10일" })).not.toBeInTheDocument();
+    expect(within(secondDateList).getByRole("button")).toHaveAccessibleName(
+      "출발지 미정 → 도착지 미정, 이동 수단 미정 · 예매 가능",
+    );
+  });
+
+  it("갱신으로 선택한 날짜가 없어지면 남은 첫 날짜를 보여준다", async () => {
+    const view = renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: "12월 12일" }));
+    expect(await screen.findByRole("list", { name: "12월 12일" })).toBeInTheDocument();
+    mockUseItineraryQuery.mockReturnValue(queryResult(confirmedState({
+      ...itinerary,
+      snapshot: { ...itinerary.snapshot, items: [itinerary.snapshot.items[0]!] },
+    })));
+    view.rerender(<FeatureApp />);
+    expect(await screen.findByRole("list", { name: "12월 10일" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "12월 12일" })).not.toBeInTheDocument();
   });
 });
 
@@ -392,6 +407,9 @@ describe("ItineraryPage truthful detail Drawer contracts", () => {
 
   it("누락된 교통 상세는 명시적 미정으로, 입력된 0원은 unknown과 구분해 표시한다", async () => {
     renderPage();
+
+    fireEvent.click(screen.getByRole("tab", { name: "12월 12일" }));
+    await screen.findByRole("list", { name: "12월 12일" });
 
     fireEvent.click(
       screen.getByRole("button", {

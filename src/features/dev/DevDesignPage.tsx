@@ -8,6 +8,14 @@ import {
   Plus,
   Trash2,
   Users,
+  ArrowLeftRight,
+  Bookmark,
+  CalendarCheck,
+  Compass,
+  House,
+  Link2,
+  Luggage,
+  UserRound,
 } from "lucide-react";
 
 import { useTheme } from "@/app/theme-provider.tsx";
@@ -109,6 +117,7 @@ export function DevDesignPage() {
         <BadgesSection />
         <FormsSection />
         <SelectionSection />
+        <AssetsSection />
         <ListsSection />
         <FeedbackSection />
         <OverlaysSection />
@@ -132,6 +141,7 @@ const NAV_ITEMS: ReadonlyArray<{ readonly id: string; readonly label: string }> 
   { id: "badges", label: "배지" },
   { id: "forms", label: "폼" },
   { id: "selection", label: "선택" },
+  { id: "assets", label: "아이콘·에셋" },
   { id: "lists", label: "목록" },
   { id: "feedback", label: "피드백" },
   { id: "overlays", label: "오버레이" },
@@ -144,12 +154,12 @@ function DevAnchorNav() {
       aria-label="디자인 카탈로그 목차"
       className="sticky top-14 z-10 border-b border-border bg-background"
     >
-      <ul className="mx-auto flex w-full max-w-(--content-max-width) flex-wrap gap-1 overflow-x-auto px-(--app-inline-padding) py-2">
+      <ul className="mx-auto flex w-full max-w-(--content-max-width) gap-1 overflow-x-auto px-(--app-inline-padding) py-2">
         {NAV_ITEMS.map((item) => (
           <li key={item.id}>
             <a
               href={`#${item.id}`}
-              className="inline-flex min-h-(--touch-target-min) items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex min-h-(--touch-target-min) items-center rounded-lg px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               {item.label}
             </a>
@@ -758,6 +768,42 @@ function ListsSection() {
 }
 
 /* ── Feedback ───────────────────────────────────────────── */
+
+function AssetsSection() {
+  const spots = [
+    ["create-trip", "여행 시작"],
+    ["invite-companions", "동행자 초대"],
+    ["compare-plans", "여행안 비교"],
+    ["confirm-plan", "일정 확정"],
+    ["empty-trips", "여행 없음"],
+    ["empty-saved", "저장한 일정 없음"],
+  ] as const;
+  const icons = [
+    [House, "홈"], [Compass, "탐색"], [Luggage, "내 여행"], [UserRound, "마이"],
+    [CalendarDays, "날짜"], [Users, "동행자"], [Link2, "초대 링크"],
+    [ArrowLeftRight, "비교"], [CalendarCheck, "확정 일정"], [Bookmark, "저장"],
+  ] as const;
+  return (
+    <DevSection id="assets" title="여행 중심 아이콘·에셋" description="정보에는 작은 선형 아이콘, 상태 안내에는 하나의 일러스트를 사용해요. 확정 그림은 실제 일정 확정 후에만 표시해요.">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3">
+        {spots.map(([name, label]) => (
+          <figure key={name} className="flex flex-col items-center gap-3">
+            <GalandaSpot name={name} />
+            <figcaption className="text-center text-sm text-muted-foreground">{label}</figcaption>
+          </figure>
+        ))}
+      </div>
+      <div className="mt-6 grid grid-cols-3 gap-6 border-t border-border pt-6 sm:grid-cols-5">
+        {icons.map(([Icon, label]) => (
+          <div key={label} className="flex flex-col items-center gap-3 text-muted-foreground">
+            <Icon className="size-6" strokeWidth={1.8} aria-hidden="true" />
+            <span className="text-sm">{label}</span>
+          </div>
+        ))}
+      </div>
+    </DevSection>
+  );
+}
 
 function FeedbackSection() {
   return (

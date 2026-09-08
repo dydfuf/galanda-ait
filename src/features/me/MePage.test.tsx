@@ -94,7 +94,7 @@ describe("MePage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "마이" })).toBeInTheDocument();
 
     const profile = screen.getByRole("region", { name: "내 프로필" });
-    expect(profile.firstElementChild).toHaveClass("bg-primary-muted");
+    expect(profile.firstElementChild).not.toHaveClass("bg-primary-muted");
     expect(within(profile).getByRole("heading", { level: 2, name: "Raon" })).toBeInTheDocument();
     expect(within(profile).getByText("R")).toHaveAttribute("aria-hidden", "true");
 

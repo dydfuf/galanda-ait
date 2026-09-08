@@ -1,4 +1,4 @@
-export type GalandaSpotName = "empty-trips" | "empty-saved";
+export type GalandaSpotName = "empty-trips" | "empty-saved" | "create-trip" | "invite-companions" | "compare-plans" | "confirm-plan";
 
 /** Decorative: the adjacent PageState text owns the meaning. */
 export function GalandaSpot({ name }: { readonly name: GalandaSpotName }) {
