@@ -9,12 +9,7 @@ import {
 import { tripRoomKeys } from "../plan-home/queries.ts";
 
 import { useSessionQuery } from "../../hooks/useSession.ts";
-
-export const TRIP_ROOM_FRESHNESS = {
-  staleTime: 10_000,
-  refetchOnWindowFocus: true,
-  refetchOnReconnect: true,
-} as const;
+import { COLLABORATION_READ_FRESHNESS, EDITOR_BASELINE_FRESHNESS } from "../../app/query-freshness.ts";
 
 export const useTripRoomDetailQuery = (
   roomId: string
@@ -27,13 +22,14 @@ export const useTripRoomDetailQuery = (
       getTrip(TripIdSchema.make(roomId), signal),
     select: (room: TripRoom): PlanDetailViewModel =>
       toPlanDetailViewModel(room, session?.participantIds),
-    ...TRIP_ROOM_FRESHNESS,
+    ...COLLABORATION_READ_FRESHNESS,
     enabled: Boolean(roomId) && isSessionReady,
   });
 };
 
 export const useTripRoomRawQuery = (
-  roomId: string
+  roomId: string,
+  options: { readonly editing?: boolean } = {},
 ): UseQueryResult<TripRoom, Error> => {
   const { data: session, isSuccess: isSessionReady } = useSessionQuery();
 
@@ -41,7 +37,7 @@ export const useTripRoomRawQuery = (
     queryKey: tripRoomKeys.detail(roomId, session?.participantId),
     queryFn: ({ signal }): Promise<TripRoom> =>
       getTrip(TripIdSchema.make(roomId), signal),
-    ...TRIP_ROOM_FRESHNESS,
+    ...(options.editing ? EDITOR_BASELINE_FRESHNESS : COLLABORATION_READ_FRESHNESS),
     enabled: Boolean(roomId) && isSessionReady,
   });
 };

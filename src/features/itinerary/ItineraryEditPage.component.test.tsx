@@ -155,6 +155,32 @@ beforeEach(() => {
 });
 
 describe("ItineraryEditPage shared form presentation", () => {
+  it("일시적 재조회 실패와 복구 동안 작성 중 입력을 보존한다", () => {
+    const { rerender } = renderPage();
+    fireEvent.change(screen.getAllByLabelText("메모")[0]!, { target: { value: "아직 저장하지 않은 메모" } });
+    mockUseItineraryQuery.mockReturnValue({
+      ...queryResult(), isError: true,
+      error: new ApiClientError({ status: 0, code: "NETWORK_ERROR", message: "연결 실패" }),
+    } as ReturnType<typeof useItineraryQuery>);
+    rerender(<TestApp />);
+    expect(screen.getAllByLabelText("메모")[0]).toHaveValue("아직 저장하지 않은 메모");
+    expect(screen.getByRole("alert")).toHaveTextContent("최신 일정을 확인하지 못했어요");
+    mockUseItineraryQuery.mockReturnValue(queryResult());
+    rerender(<TestApp />);
+    expect(screen.getAllByLabelText("메모")[0]).toHaveValue("아직 저장하지 않은 메모");
+  });
+
+  it("권한 재검증 실패에는 캐시된 편집 화면을 표시하지 않는다", () => {
+    const { rerender } = renderPage();
+    mockUseItineraryQuery.mockReturnValue({
+      ...queryResult(), isError: true,
+      error: new ApiClientError({ status: 403, code: "FORBIDDEN", message: "접근할 수 없습니다" }),
+    } as ReturnType<typeof useItineraryQuery>);
+    rerender(<TestApp />);
+    expect(screen.queryByLabelText("숙소")).not.toBeInTheDocument();
+    expect(screen.getByText("접근할 수 없습니다")).toBeInTheDocument();
+  });
+
   it("opaque fieldset, permanent label, responsive field layout, validation accessory를 제공한다", () => {
     const { container } = renderPage();
 

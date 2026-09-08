@@ -34,6 +34,23 @@
 - owner: #127. 모든 읽기/변경이 거치는 기존 `requestJson`에서 fetch 실패만 `ApiClientError`의 NETWORK_ERROR로 전달한다. HTTP 응답·409·Schema 검증은 기존 경계 유지, AbortError와 signal 취소 사유도 보존한다.
 - 수정: 연결과 처리 결과를 확인한 뒤 재시도하도록 한국어로 안내한다. 실패한 회귀 테스트 재현 후 수정했으며 읽기/변경 및 요청 취소 검증, 관련 331개 테스트와 전체 `pnpm check` 통과. 실제 브라우저 재검증은 수정 배포 후 진행한다.
 
+## UXF-004 — 열린 협업 화면에서 다른 사용자의 변경을 계속 놓침
+
+- 분류: 재현된 결함, P2. 명시적 새로고침으로 복구되지만 변경 확인 발견성이 낮음.
+- scenario: COL-03/04, MEMBER 일정 화면을 유지하고 HOST가 숙소 메모 수정.
+- staging baseline `4fa9331870`, 2026-09-09 00:11:19~00:12:29 KST. 저장 후 70초까지 MEMBER에 변경 확인 행동이 나타나지 않았고, 새로고침 후 나타남. [수정 전](../../assets/ui-ux-closure/itinerary-stale-member-390.png).
+- owner: #128, RAON-279의 기존 initial freshness budget 재사용. Trip/Plan/Compare/Itinerary 읽기만 active 30초 재조회, focus/reconnect/mount 재확인. 편집은 진입 조회와 기존 CAS 충돌 복구만 수행한다. 전역/Explore/AI polling은 추가하지 않는다.
+- itinerary의 canEdit/viewerAcknowledgedRevision은 viewer별 query key로 격리한다. fake timer/focusManager/onlineManager와 hook 테스트로 실제 요청·값 갱신을 확인한다.
+- 수정 배포 재검증 대기. RAON-279 전체 mutation 정밀화/public query 작업의 완료로 해석하지 않는다.
+
+## UXF-005 — 일정 편집 중 재조회 실패가 저장하지 않은 입력을 삭제
+
+- 분류: 재현된 결함, P1 (저장 전 입력 유실).
+- scenario: COL-04/RES-01, HOST 일정 편집에서 첫 메모에 `UX125 아직 저장하지 않은 입력` 입력.
+- staging baseline, 320px. 브라우저의 해당 itinerary fetch만 reject하도록 주입하고 visibility 복귀 이벤트를 주입했다. 실제 OS 탭 전환의 증거와 구분한다. error fallback으로 editor unmount. 원인 해제와 재조회 후 메모가 서버의 기존 값으로 되돌아가 유실을 확인했다. [실패 화면](../../assets/ui-ux-closure/editor-refetch-failure-320.png).
+- owner: #128. 편집의 자동 focus/reconnect/polling을 비활성화하고, 기존 성공 데이터가 있는 network/5xx 재조회 실패에서는 editor와 local patches를 보존한다. 실패 안내를 표시하며 401/403 등 권한 실패에는 캐시 편집 화면을 숨기는 기존 경계를 유지한다.
+- 신규 컴포넌트 regression은 수정 전 입력 필드를 찾지 못해 실패, 수정 후 입력 보존·복구 및 403 차단 통과. 실제 수정 배포 재검증 전이므로 아직 마감하지 않는다.
+
 ## 새 finding 기록 필드
 
 `UXF ID / 분류 / 심각도·이유 / scenario·route·state·actor / 환경·SHA·배포·시각 / 재현 / 실제·기대·영향 / evidence 수준 / 구현 owner·issue / fix PR·SHA / 동일 조건 재검증 / 잔여 위험`.

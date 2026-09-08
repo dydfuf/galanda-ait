@@ -73,7 +73,7 @@ export function PlanEditPage(): JSX.Element {
     isError: isSessionError,
     error: sessionError,
   } = useSessionQuery();
-  const { data: room, isLoading: isRoomLoading, isError, refetch } = useTripRoomRawQuery(tripId);
+  const { data: room, isLoading: isRoomLoading, isError, refetch } = useTripRoomRawQuery(tripId, { editing: true });
   const updatePlanMutation = useUpdatePlanMutation();
   const deletePlanMutation = useDeletePlanMutation();
   const isOnline = useOnlineStatus();

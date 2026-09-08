@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { TRIP_ROOM_FRESHNESS } from "./queries.ts";
 import { QueryClient } from "@tanstack/react-query";
 import { tripRoomKeys, tripOverviewKeys } from "../plan-home/queries.ts";
 
@@ -11,12 +10,5 @@ describe("Trip Room freshness", () => {
     await client.invalidateQueries({ queryKey: tripRoomKeys.all });
     expect(client.getQueryState(key)?.isInvalidated).toBe(true);
     client.clear();
-  });
-  it("uses the collaboration refresh contract", () => {
-    expect(TRIP_ROOM_FRESHNESS).toEqual({
-      staleTime: 10_000,
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true,
-    });
   });
 });
