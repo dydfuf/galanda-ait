@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockPlatform } = vi.hoisted(() => ({
   mockPlatform: {
@@ -43,9 +43,60 @@ const renderPage = (initialEntry = "/login", viewportWidth?: number) =>
 beforeEach(() => {
   mockPlatform.name = "web";
   mockPlatform.signIn.mockReset();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ emailAndPassword: false })));
 });
 
+afterEach(() => vi.unstubAllGlobals());
+
 describe("LoginPage entry flow", () => {
+  it.each([false, "true", null])("does not expose email login without an explicit server capability (%s)", async (emailAndPassword) => {
+    vi.mocked(fetch).mockResolvedValue(Response.json({ emailAndPassword }));
+    renderPage();
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("form", { name: "Staging 이메일 로그인" })).not.toBeInTheDocument();
+  });
+
+  it("keeps email login hidden when config lookup fails or the platform is AIT", async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error("offline"));
+    const view = renderPage();
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    expect(screen.queryByLabelText("이메일")).not.toBeInTheDocument();
+    view.unmount();
+    vi.mocked(fetch).mockClear();
+    mockPlatform.name = "ait";
+    renderPage();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("이메일")).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("submits staging email credentials, prevents duplicates, and allows retry after failure (signUp=%s)", async (signUp) => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ emailAndPassword: true }));
+    const submission = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(submission.promise);
+    renderPage();
+    const form = await screen.findByRole("form", { name: "Staging 이메일 로그인" });
+    if (signUp) {
+      fireEvent.click(screen.getByRole("button", { name: "테스트 계정 만들기" }));
+      fireEvent.change(screen.getByLabelText("이름"), { target: { value: "Test Agent" } });
+    }
+    fireEvent.change(screen.getByLabelText("이메일"), { target: { value: "agent@example.test" } });
+    fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "test-password-123" } });
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenLastCalledWith(`/api/auth/${signUp ? "sign-up" : "sign-in"}/email`, expect.objectContaining({
+      method: "POST",
+      credentials: "same-origin",
+      body: JSON.stringify({ email: "agent@example.test", password: "test-password-123", ...(signUp ? { name: "Test Agent" } : {}) }),
+    }));
+    expect(screen.getByRole("button", { name: "처리 중…" })).toBeDisabled();
+    expect(screen.getByLabelText("비밀번호")).toBeDisabled();
+    await act(async () => submission.resolve(Response.json({}, { status: 401 })));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: signUp ? "계정 만들고 시작하기" : "이메일로 로그인" })).toBeEnabled();
+    expect(screen.getByLabelText("이메일")).toHaveValue("agent@example.test");
+  });
+
   it.each([
     ["web", "카카오로 계속하기"],
     ["ait", "토스로 계속하기"],

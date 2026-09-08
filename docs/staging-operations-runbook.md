@@ -142,7 +142,7 @@ npx wrangler secret list --env staging
 
 secret rotation은 기존 session을 무효화할 수 있으므로 배포 직후 login/session/sign-out을 다시 확인한다.
 
-Web/PWA는 Kakao Login만 사용한다. Kakao Developers에 callback URL
+Web/PWA의 기본 로그인은 Kakao Login이다. Kakao Developers에 callback URL
 `<BETTER_AUTH_URL>/api/auth/callback/kakao`를 등록하고 값을 대화형으로 넣는다.
 
 ```bash
@@ -154,6 +154,53 @@ Apps-in-Toss는 Toss Login mTLS 인증서를 Cloudflare에 업로드하고 `TOSS
 binding으로 연결한다. 인증서 ID는 환경별 값이므로 실제 ID가 발급된 뒤
 `wrangler.jsonc`의 staging `mtls_certificates`에 기록한다. 토스 access token과 사용자
 프로필은 저장하지 않고 `userKey`만 Better Auth account 식별자로 사용한다.
+
+#### Staging 이메일 테스트 계정
+
+`wrangler.jsonc`의 `env.staging.vars.APP_ENV = "staging"`일 때만 Better Auth의
+이메일·비밀번호 가입과 로그인이 활성화된다. 기본 환경과 production에서는
+`APP_ENV`를 생략하거나 해당 환경 이름으로 설정한다. 클라이언트 설정이나 URL로
+인증을 활성화할 수 없으며, staging 외 환경에서는 API를 직접 호출해도 거부된다.
+
+Web/PWA `/login`에서 `Staging 테스트 계정` → `테스트 계정 만들기`를 선택하고
+테스트용 이름, 이메일, 비밀번호(8~128자)를 입력한다. 가입하면 바로 로그인되며,
+이후에는 같은 이메일·비밀번호로 로그인할 수 있다. 로그인 후 원래 요청한
+앱 경로로 돌아가고 기존 session/Participant 권한 체계를 그대로 사용한다.
+Apps-in-Toss 로그인 화면에는 이메일 폼을 표시하지 않는다.
+
+이메일 소유 확인이나 메일 발송은 하지 않는다. 테스트 전용 주소와 비밀번호를
+사용하고 실제 서비스 계정의 비밀번호를 재사용하지 않는다. 비밀번호와 인증 쿠키를
+소스, 명령 인자, 로그, PR에 기록하지 않는다. 별도 DB migration이나 메일 서비스는 필요 없다.
+
+`GET /api/auth/config`는 DB 연결 없이 `{ "emailAndPassword": true }`를 반환하며
+`Cache-Control: no-store`를 사용한다. staging 외 환경에서는 `false`다.
+브라우저도 이 응답을 확인한 뒤 폼을 표시한다. 설정 조회 실패 시에는 숨긴다.
+
+에이전트가 재사용하는 계정은 다음과 같다.
+
+| 항목 | 값 |
+| --- | --- |
+| 이메일 | `agent-ui@staging.galanda.invalid` |
+| 표시 이름 | `Galanda 테스트 에이전트` |
+| 대상 origin | `https://galanda-staging.88dydfuf.workers.dev` |
+| 자격 증명 파일 | `~/.config/galanda/staging-test-account.json` |
+| 파일 필드 | `origin`, `email`, `name`, `password` |
+| 파일 권한 | `0600` (저장소 밖, 같은 호스트의 worktree에서 공유) |
+
+이 계정은 staging Hyperdrive를 사용하는 임시 원격 개발 세션에서 생성하고
+가입 → 로그아웃 → 저장된 비밀번호로 재로그인 → `/api/session`의 `REGISTERED`
+응답까지 확인했다. 공개 staging 로그인은 이메일 로그인 코드가 배포된 뒤 가능하다.
+
+에이전트는 파일을 프로세스 내부에서 읽고 `origin`이 위 staging 주소인지 확인한 후
+`/login`의 이메일·비밀번호 폼에 값을 전달한다. 비밀번호나 세션 응답 전체를
+출력하지 않는다. HTTP 로그인 시에는 `POST /api/auth/sign-in/email`에 JSON으로
+`email`, `password`를 전달하고 같은 origin의 `Origin` 헤더와 쿠키를 사용한다.
+로그인 검증은 `/api/session`의 `isAuthenticated: true`, `accountType: "REGISTERED"`와
+실제 로그인 후 화면으로 확인한다. 서버 API 성공만으로 브라우저 검증을 완료했다고 기록하지 않는다.
+
+파일이 없는 다른 호스트에서는 안전하게 파일을 전달받아 같은 경로에 `0600`으로
+저장한다. 공유 계정 비밀번호를 재설정하거나 이 계정을 로컬/production에 복제하지 않는다.
+다른 에이전트의 데이터와 계정 설정은 유지하고, 자신이 만든 테스트 데이터만 정리한다.
 
 ### 5. Types, deploy, remote smoke
 
@@ -173,6 +220,8 @@ pnpm deploy:staging
 - 존재하지 않는 `/api/*` → JSON `404`이며 SPA fallback이 아님
 - anonymous `GET /api/auth/get-session` → 정상적인 null session
 - anonymous Guest → Kakao 또는 Toss 계정 연결 → 동일 Participant 유지 → sign-out
+- staging 이메일 가입 → `/api/session`의 `REGISTERED` 확인 → sign-out → 재로그인
+- 잘못된 이메일 비밀번호 → 로그인 거부, staging 외 이메일 가입·로그인 → 거부
 - auth cookie → `HttpOnly`, `Secure`, `SameSite=Lax`
 - Trip create → 즉시 list/detail에서 최신 값 확인 → update
 - Plan create → update → opinion → confirm

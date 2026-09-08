@@ -325,6 +325,30 @@ required check를 통과시키기 위해:
 환경이나 권한 문제로 일부 검증을 실행할 수 없다면
 실행하지 못한 항목과 이유를 최종 결과에 명확히 기록한다.
 
+### 에이전트용 staging 테스트 계정
+
+로그인 후 Web/PWA 화면 검증에는 다음 전용 계정을 사용한다.
+
+* 로그인 주소: `https://galanda-staging.88dydfuf.workers.dev/login`
+* 이메일: `agent-ui@staging.galanda.invalid`
+* 표시 이름: `Galanda 테스트 에이전트`
+* 비밀번호: 실행 호스트의 `~/.config/galanda/staging-test-account.json`에 있는
+  `password` 필드. 저장소 밖의 파일이며 권한은 `0600`으로 유지한다.
+
+먼저 `GET /api/auth/config`의 `emailAndPassword: true`를 확인한다.
+`false` 또는 `404`이면 현재 배포에 이메일 로그인이 활성화되지 않은 상태다.
+계정은 staging DB에 생성되어 있어도 해당 코드 배포 전에는 공개 주소로 로그인할 수 없다.
+
+자격 증명 파일은 실행 프로세스 안에서 읽어 로그인 폼에 전달한다.
+파일 전체나 비밀번호를 `cat`, 로그, 도구 출력, 명령 인자, PR에 노출하지 않는다.
+파일이 없는 호스트에서는 비밀번호를 추측하거나 계정을 재생성·초기화하지 않고
+기존 파일의 안전한 전달을 요청한다. 이 계정은 staging에서만 사용한다.
+
+공유 계정의 이름·비밀번호를 변경하거나 다른 작업의 여행 데이터를 삭제하지 않는다.
+테스트 데이터는 작업별로 구분하고 자신이 만든 데이터만 정리한다.
+자세한 절차는 `docs/staging-operations-runbook.md`의
+`Staging 이메일 테스트 계정` 항목을 따른다.
+
 ## 13. Toolchain
 
 현재 repository toolchain을 따른다.
