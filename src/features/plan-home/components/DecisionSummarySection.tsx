@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge.tsx";
+import { ChevronDown } from "lucide-react";
 
 interface DecisionSummarySectionProps {
   readonly badgeText: string;
@@ -35,8 +36,6 @@ export function DecisionSummarySection({
   subText,
   candidateCount,
   totalOpinionCount,
-  participatedMemberCount,
-  memberCount,
   overallParticipationText,
   overallNonRespondentText,
   hardSummaryText,
@@ -45,15 +44,10 @@ export function DecisionSummarySection({
 }: DecisionSummarySectionProps) {
   const hasCandidates = candidateCount > 0;
 
-  const participatePercent =
-    memberCount > 0
-      ? Math.min(100, Math.round((participatedMemberCount / memberCount) * 100))
-      : 0;
-
   return (
     <section
       aria-labelledby="decision-status-heading"
-      className="bg-muted/30 p-4.5 transition-colors"
+      className="min-w-0 border-t border-border py-5"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <h2
@@ -62,7 +56,7 @@ export function DecisionSummarySection({
         >
           진행 상태
         </h2>
-        <Badge variant={badgeVariant} className="shrink-0 font-semibold shadow-2xs">
+        <Badge variant={badgeVariant} className="shrink-0 font-semibold">
           {badgeText}
         </Badge>
       </div>
@@ -74,31 +68,24 @@ export function DecisionSummarySection({
           >
             {statusText}
           </p>
-          {subText ? (
-            <p className="mt-1 min-w-0 break-words text-sm leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
-              {subText}
-            </p>
-          ) : null}
-          <div className="mt-3.5 flex min-w-0 flex-col gap-1.5 border-t border-border/60 pt-2.5">
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <p className="min-w-0 text-xs font-medium break-words text-foreground-muted [overflow-wrap:anywhere]">
+          <details className="group mt-1 min-w-0">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+              참여 현황 자세히 보기
+              <ChevronDown className="size-4 shrink-0 group-open:rotate-180" strokeWidth={1.8} aria-hidden="true" />
+            </summary>
+            <div className="flex flex-col gap-2 pb-3">
+              {subText && <p className="text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">{subText}</p>}
+              <p className="min-w-0 text-sm break-words text-foreground-muted [overflow-wrap:anywhere]">
                 {overallParticipationText} · 의견 {totalOpinionCount}개
               </p>
-              <div
-                aria-hidden="true"
-                className="h-1.5 w-16 overflow-hidden rounded-full bg-border shrink-0"
-              >
-                <div
-                  className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${participatePercent}%` }}
-                />
-              </div>
+              {overallNonRespondentText ? (
+                <p className="min-w-0 text-[13px] font-medium leading-relaxed break-words text-foreground-muted [overflow-wrap:anywhere]">
+                  {overallNonRespondentText}
+                </p>
+              ) : null}
             </div>
-            {overallNonRespondentText ? (
-              <p className="min-w-0 text-[13px] font-medium leading-relaxed break-words text-foreground-muted [overflow-wrap:anywhere]">
-                {overallNonRespondentText}
-              </p>
-            ) : null}
+          </details>
+          <div className="flex min-w-0 flex-col gap-1.5">
             {hardSummaryText ? (
               <p className="min-w-0 text-[13px] font-semibold leading-relaxed break-words text-warning [overflow-wrap:anywhere]">
                 {hardSummaryText}

@@ -188,7 +188,7 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
       '[data-slot="explore-destination-visual"]',
     )!;
 
-    expect(visual).toHaveClass("bg-primary-muted");
+    expect(visual).not.toHaveClass("bg-primary-muted");
     expect(visual).toHaveTextContent("오사카");
     expect(card).toHaveTextContent("오사카 → 교토");
     expect(card).toHaveTextContent("3박 4일");
@@ -277,6 +277,12 @@ describe("ExplorePage (RAON-260 DISC-4)", () => {
     renderPage(
       "/explore?query=%20%20%EC%98%A4%EC%82%AC%EC%B9%B4%20%20&destination=%EC%9D%BC%EB%B3%B8&themeId=food&startDate=2026-09-01"
     );
+
+    const advancedFilters = screen.getByText("상세 필터 · 3개 적용됨");
+    expect(advancedFilters.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByLabelText("목적지")).not.toBeVisible();
+    fireEvent.click(advancedFilters);
+    expect(screen.getByLabelText("목적지")).toBeVisible();
 
     expect(screen.getByRole("searchbox", { name: "일정 검색" })).toHaveValue(
       "오사카"

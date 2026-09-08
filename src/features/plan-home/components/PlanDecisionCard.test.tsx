@@ -209,8 +209,8 @@ describe("PlanDecisionCard (RAON-226)", () => {
     });
 
     const titleEl = screen.getByRole("heading", { level: 3 });
-    expect(titleEl.className).toMatch(/line-clamp-2/);
-    expect(titleEl.className).toMatch(/break-words/);
+    expect(titleEl.className).not.toMatch(/line-clamp/);
+    expect(titleEl.className).toContain("[overflow-wrap:anywhere]");
     expect(titleEl.textContent).toContain("아주 긴 제목");
 
     const authorEl = screen.getByText(`${longAuthor} 제안`);
@@ -219,7 +219,7 @@ describe("PlanDecisionCard (RAON-226)", () => {
 
     const card = screen.getByRole("link");
     expect(card.className).toMatch(/overflow-hidden/);
-    expect(card.className).toMatch(/bg-surface-raised/);
+    expect(card.className).toMatch(/border-border/);
     expect(card).toHaveAccessibleName(new RegExp(longAuthor.slice(0, 24)));
 
     const diffEl = screen.getByText(

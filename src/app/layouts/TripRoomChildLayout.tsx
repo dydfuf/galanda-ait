@@ -35,7 +35,6 @@ export function TripRoomChildLayout() {
       {!platformNavigation && (
         <PageHeader
           sticky
-          bordered
           safeTop
           title={getTripRoomNavigationTitle(location.pathname)}
           back={{ onClick: () => void goBack() }}

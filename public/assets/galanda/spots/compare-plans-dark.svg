@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>여행안 비교</title><g stroke-linecap="round" stroke-linejoin="round"><rect x="26" y="51" width="83" height="126" rx="13" fill="#182B47"/>
+  <rect x="131" y="51" width="83" height="126" rx="13" fill="#182B47"/>
+  <rect x="22" y="45" width="83" height="126" rx="13" fill="#171D24" stroke="#3E689F" stroke-width="2.2"/>
+  <rect x="135" y="45" width="83" height="126" rx="13" fill="#171D24" stroke="#3E689F" stroke-width="2.2"/>
+  <path d="M37 67h34m79 0h34" stroke="#7AA7FF" stroke-width="6"/>
+  <path d="M42 91v19c0 14 36 8 36 22v12m81-53v10c0 8 30 6 30 18s-29 9-29 22v3" stroke="#7AA7FF" stroke-width="3" fill="none"/>
+  <g fill="#171D24" stroke="#7AA7FF" stroke-width="3"><circle cx="42" cy="91" r="5"/><circle cx="78" cy="144" r="5"/><circle cx="159" cy="91" r="5"/><circle cx="160" cy="144" r="5"/></g>
+  <path d="M79 191h82m-9-9 9 9-9 9m-64-18-9 9 9 9" stroke="#7AA7FF" stroke-width="3.5" fill="none"/></g></svg>

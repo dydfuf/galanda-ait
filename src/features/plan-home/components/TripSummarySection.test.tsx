@@ -56,7 +56,7 @@ describe("TripSummarySection (RAON-225)", () => {
       `${longDestination} · 일정 미정 · 참여 12명`,
     );
 
-    expect(region.className).toMatch(/bg-surface-raised/);
+    expect(region.className).toMatch(/bg-surface-content/);
     expect(heading.className).toContain("[overflow-wrap:anywhere]");
     expect(summary.className).toContain("[overflow-wrap:anywhere]");
   });

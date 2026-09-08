@@ -12,6 +12,7 @@ import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageHeader } from "@/components/galanda/page-header.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { TripCreationProgress } from "@/components/galanda/trip-creation-progress.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
@@ -113,7 +114,6 @@ export function TripCompanionSetupPage() {
       {!platformNavigation && (
         <PageHeader
           sticky
-          bordered
           title="여행 만들기"
           back={{
             label: "뒤로 가기",
@@ -171,13 +171,17 @@ export function TripCompanionSetupPage() {
 
               <PageTitle
                 title="함께 여행할 사람을 초대할까요?"
-                description="여행방이 저장되었어요. 지금 초대하지 않아도 '내 여행'에서 언제든 다시 초대하거나 첫 여행안을 작성할 수 있어요."
+                description="여행방이 저장되었어요. 초대는 나중에 해도 괜찮아요."
                 className="pt-5 pb-2"
               />
 
+              <div className="px-(--app-inline-padding) pt-6">
+                <GalandaSpot name="invite-companions" />
+              </div>
+
               <section
                 aria-labelledby="trip-companion-share-title"
-                className="mx-(--app-inline-padding) mt-3 flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
+                className="mx-(--app-inline-padding) mt-6 flex min-w-0 flex-col gap-4"
               >
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">

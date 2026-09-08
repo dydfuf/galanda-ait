@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
 import { GlobalAppShell } from "./global-app-shell.tsx";
-import { BottomAction } from "./bottom-action.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
 const renderAt = (path: string) =>
@@ -117,13 +116,13 @@ describe("GlobalAppShell (RAON-248)", () => {
     },
   );
 
-  it("BottomAction이 있으면 nav 위로 offset하고 safe-area는 nav가 한 번만 소유한다", () => {
+  it("본문 행동과 별개로 nav 높이와 safe-area를 한 번만 확보한다", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/home"]}>
         <GlobalAppShell>
-          <BottomAction>
+          <main>
             <Button>새 여행 만들기</Button>
-          </BottomAction>
+          </main>
         </GlobalAppShell>
       </MemoryRouter>,
     );
@@ -131,29 +130,22 @@ describe("GlobalAppShell (RAON-248)", () => {
     const shell = container.querySelector<HTMLElement>(
       '[data-slot="global-app-shell"]',
     );
-    const action = container.querySelector<HTMLElement>(
-      '[data-slot="bottom-action"]',
-    );
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
 
     expect(shell).toHaveStyle({
       "--global-nav-height": "calc(64px + var(--safe-bottom))",
-      "--bottom-action-safe-bottom": "0px",
     });
     expect(shell?.firstElementChild?.className).toContain(
       "pb-[var(--global-nav-height)]",
     );
-    expect(action).toHaveStyle({
-      bottom:
-        "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
-      paddingBottom:
-        "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
-    });
+    expect(screen.getByRole("main")).toContainElement(
+      screen.getByRole("button", { name: "새 여행 만들기" }),
+    );
     expect(nav).toHaveAttribute("data-galanda-surface", "chrome");
     expect(nav.className).toContain("fixed");
     expect(nav.className).toContain("inset-x-0");
     expect(nav.className).toContain("bottom-0");
-    expect(nav.className).toContain("shadow-chrome");
+    expect(nav.className).not.toContain("shadow-chrome");
     expect(nav.className).not.toContain("border-t");
     expect(nav.className).toContain("pb-[var(--safe-bottom)]");
     expect(nav.className).not.toContain("pointer-events-none");

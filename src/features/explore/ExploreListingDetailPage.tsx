@@ -71,7 +71,6 @@ export function ExploreListingDetailPage() {
   const header = platformNavigation ? null : (
     <PageHeader
       sticky
-      bordered
       safeTop
       title="여행 일정"
       back={{ onClick: handleBack }}

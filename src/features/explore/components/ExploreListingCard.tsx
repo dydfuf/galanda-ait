@@ -76,23 +76,21 @@ export function ExploreListingCard({ item }: { item: ExploreListingItem }) {
   return (
     <article
       data-slot="explore-listing-card"
-      className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-3 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
+      className="flex min-w-0 flex-col gap-3 border-b border-border py-6 transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
     >
       <Link
         to={`/explore/${encodeURIComponent(item.listingId)}`}
         // accessible name은 제목(h3)이 제공한다. link는 제목을 참조한다.
         aria-labelledby={`explore-card-title-${item.listingId}`}
-        className="flex min-w-0 flex-col gap-4 rounded-xl hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        className="flex min-w-0 flex-col gap-4 rounded-sm hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <div
           data-slot="explore-destination-visual"
-          className="flex min-h-36 min-w-0 flex-col items-start justify-end gap-3 rounded-xl border border-primary-border-weak bg-primary-muted p-4 text-primary"
+          className="flex min-w-0 items-center gap-2 text-muted-foreground"
         >
-          <span className="grid size-10 shrink-0 place-items-center rounded-full border border-primary-border bg-card">
-            <MapPinned className="size-6" aria-hidden="true" />
-          </span>
+          <MapPinned className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
           {visualDestination ? (
-            <p className="min-w-0 text-lg leading-snug font-bold [overflow-wrap:anywhere]">
+            <p className="min-w-0 text-sm leading-snug [overflow-wrap:anywhere]">
               <span className="sr-only">목적지 </span>
               {visualDestination}
             </p>
@@ -101,10 +99,10 @@ export function ExploreListingCard({ item }: { item: ExploreListingItem }) {
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 px-1">
+        <div className="flex min-w-0 flex-col gap-3">
           <h3
             id={`explore-card-title-${item.listingId}`}
-            className="min-w-0 text-lg leading-snug font-bold text-foreground [overflow-wrap:anywhere]"
+            className="min-w-0 text-2xl leading-snug font-bold tracking-tight break-keep text-foreground [overflow-wrap:anywhere]"
           >
             {snapshot.title}
           </h3>
@@ -119,7 +117,7 @@ export function ExploreListingCard({ item }: { item: ExploreListingItem }) {
             </ul>
           )}
 
-          <dl className="flex min-w-0 flex-col gap-2 rounded-xl bg-surface-subtle p-3 text-sm text-foreground-muted">
+          <dl className="flex min-w-0 flex-col gap-2 text-sm text-foreground-muted">
             {routeText && (
               <div className="flex min-w-0 flex-col gap-0.5">
                 <dt className="font-semibold text-foreground-subtle">여행 경로</dt>
@@ -151,7 +149,7 @@ export function ExploreListingCard({ item }: { item: ExploreListingItem }) {
       </Link>
 
       {/* save toggle: link 밖의 형제. nested interactive를 만들지 않는다. */}
-      <div className="flex min-w-0 justify-end border-t border-border px-1 pt-3">
+      <div className="flex min-w-0 justify-end pt-1">
         <ExploreSaveToggle listingId={item.listingId} />
       </div>
     </article>

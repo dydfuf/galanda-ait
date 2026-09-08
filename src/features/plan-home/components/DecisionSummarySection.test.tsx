@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { DecisionSummarySection } from "./DecisionSummarySection.tsx";
 
 const baseProps = {
@@ -120,7 +120,7 @@ describe("DecisionSummarySection (RAON-225)", () => {
 });
 
 describe("DecisionSummarySection Decision Cockpit (RAON-293)", () => {
-  it("미응답자·어려움·예약 위험·레거시 설명을 상단에서 바로 확인한다", () => {
+  it("참여 상세는 펼쳐 보고 예약 위험·어려움·레거시 경고는 항상 보인다", () => {
     render(
       <DecisionSummarySection
         {...baseProps}
@@ -134,6 +134,14 @@ describe("DecisionSummarySection Decision Cockpit (RAON-293)", () => {
     );
 
     expect(screen.getByText("준호님은 아직 의견이 없어요")).toBeInTheDocument();
+    const details = screen.getByText("참여 현황 자세히 보기").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(screen.getByText("준호님은 아직 의견이 없어요")).not.toBeVisible();
+    expect(screen.getByText("예약 확인 필요 3건")).toBeVisible();
+    expect(screen.getByText("어려워요 2개 · 1개 여행안에서 확인 필요")).toBeVisible();
+    fireEvent.click(screen.getByText("참여 현황 자세히 보기"));
+    expect(details).toHaveAttribute("open");
+    expect(screen.getByText("준호님은 아직 의견이 없어요")).toBeVisible();
     expect(
       screen.getByText("어려워요 2개 · 1개 여행안에서 확인 필요"),
     ).toBeInTheDocument();
@@ -178,9 +186,7 @@ describe("DecisionSummarySection Decision Cockpit (RAON-293)", () => {
     for (const el of Array.from(
       region.querySelectorAll("p"),
     )) {
-      expect(el.className).toMatch(/break-words/);
       expect(el.className).toMatch(/\[overflow-wrap:anywhere\]/);
-      expect(el.className).toMatch(/min-w-0/);
     }
   });
 });

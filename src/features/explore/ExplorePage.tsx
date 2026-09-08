@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
+import { ChevronDown, Search } from "lucide-react";
 
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
@@ -86,6 +87,7 @@ export function ExplorePage() {
     useState<ExploreListingsFilters>(filters);
   const [filterError, setFilterError] = useState<string | null>(null);
   const hasFilters = Object.values(filters).some(Boolean);
+  const advancedFilterCount = Object.entries(filters).filter(([key, value]) => key !== "query" && Boolean(value)).length;
   const hasDraftFilters = Object.values(
     normalizeExploreListingsFilters(draftFilters)
   ).some(Boolean);
@@ -279,7 +281,7 @@ export function ExplorePage() {
   );
 
   return (
-    <PageBody safeTop>
+    <PageBody safeTop className="[--app-inline-padding:24px]">
       <PageTitle
         title="탐색"
         description="다른 사람들이 공개한 여행 일정을 둘러보세요."
@@ -289,7 +291,7 @@ export function ExplorePage() {
         <form
           aria-label="공개 여행 일정 검색"
           onSubmit={handleFilterSubmit}
-          className="mx-(--app-inline-padding) mb-6 flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-4"
+          className="mx-(--app-inline-padding) mt-4 mb-8 flex min-w-0 flex-col gap-4"
         >
           <Field>
             <FieldLabel htmlFor="explore-query">일정 검색</FieldLabel>
@@ -304,94 +306,102 @@ export function ExplorePage() {
             />
           </Field>
 
-          <fieldset className="flex min-w-0 flex-col gap-2">
-            <legend className="text-sm leading-none font-medium text-foreground">
-              여행 테마
-            </legend>
-            <div className="flex min-w-0 flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={draftFilters.themeId === undefined ? "default" : "outline"}
-                aria-pressed={draftFilters.themeId === undefined}
-                onClick={() => updateDraftFilter("themeId", undefined)}
-              >
-                전체
-              </Button>
-              {EXPLORE_SELECTABLE_THEMES.map((theme) => (
-                <Button
-                  key={theme.id}
-                  type="button"
-                  size="sm"
-                  variant={draftFilters.themeId === theme.id ? "default" : "outline"}
-                  aria-pressed={draftFilters.themeId === theme.id}
-                  onClick={() => updateDraftFilter("themeId", theme.id)}
-                >
-                  {theme.label}
-                </Button>
-              ))}
-            </div>
-          </fieldset>
+          <details className="group min-w-0 border-b border-border pb-2">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+              <span>상세 필터{advancedFilterCount > 0 ? ` · ${advancedFilterCount}개 적용됨` : " · 테마, 도시, 날짜"}</span>
+              <ChevronDown className="size-4 shrink-0 group-open:rotate-180" strokeWidth={1.8} aria-hidden="true" />
+            </summary>
+            <div className="flex min-w-0 flex-col gap-5 py-4">
+              <fieldset className="flex min-w-0 flex-col gap-2">
+                <legend className="text-sm leading-none font-medium text-foreground">
+                  여행 테마
+                </legend>
+                <div className="flex min-w-0 flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={draftFilters.themeId === undefined ? "default" : "outline"}
+                    aria-pressed={draftFilters.themeId === undefined}
+                    onClick={() => updateDraftFilter("themeId", undefined)}
+                  >
+                    전체
+                  </Button>
+                  {EXPLORE_SELECTABLE_THEMES.map((theme) => (
+                    <Button
+                      key={theme.id}
+                      type="button"
+                      size="sm"
+                      variant={draftFilters.themeId === theme.id ? "default" : "outline"}
+                      aria-pressed={draftFilters.themeId === theme.id}
+                      onClick={() => updateDraftFilter("themeId", theme.id)}
+                    >
+                      {theme.label}
+                    </Button>
+                  ))}
+                </div>
+              </fieldset>
 
-          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="explore-destination">목적지</FieldLabel>
-              <Input
-                id="explore-destination"
-                name="destination"
-                maxLength={100}
-                value={draftFilters.destination ?? ""}
-                onChange={(event) =>
-                  updateDraftFilter("destination", event.target.value)
-                }
-                placeholder="예: 오사카"
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="explore-route-city">경유 도시</FieldLabel>
-              <Input
-                id="explore-route-city"
-                name="routeCity"
-                maxLength={100}
-                value={draftFilters.routeCity ?? ""}
-                onChange={(event) =>
-                  updateDraftFilter("routeCity", event.target.value)
-                }
-                placeholder="예: 교토"
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="explore-start-date">
-                겹치는 기간 시작일
-              </FieldLabel>
-              <Input
-                id="explore-start-date"
-                name="startDate"
-                type="date"
-                value={draftFilters.startDate ?? ""}
-                onChange={(event) =>
-                  updateDraftFilter("startDate", event.target.value)
-                }
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="explore-end-date">
-                겹치는 기간 종료일
-              </FieldLabel>
-              <Input
-                id="explore-end-date"
-                name="endDate"
-                type="date"
-                value={draftFilters.endDate ?? ""}
-                onChange={(event) =>
-                  updateDraftFilter("endDate", event.target.value)
-                }
-              />
-            </Field>
-          </div>
-          <p className="text-base text-foreground-muted">
-            선택한 기간과 하루라도 겹치는 공개 일정을 찾아요.
-          </p>
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="explore-destination">목적지</FieldLabel>
+                  <Input
+                    id="explore-destination"
+                    name="destination"
+                    maxLength={100}
+                    value={draftFilters.destination ?? ""}
+                    onChange={(event) =>
+                      updateDraftFilter("destination", event.target.value)
+                    }
+                    placeholder="예: 오사카"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="explore-route-city">경유 도시</FieldLabel>
+                  <Input
+                    id="explore-route-city"
+                    name="routeCity"
+                    maxLength={100}
+                    value={draftFilters.routeCity ?? ""}
+                    onChange={(event) =>
+                      updateDraftFilter("routeCity", event.target.value)
+                    }
+                    placeholder="예: 교토"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="explore-start-date">
+                    겹치는 기간 시작일
+                  </FieldLabel>
+                  <Input
+                    id="explore-start-date"
+                    name="startDate"
+                    type="date"
+                    value={draftFilters.startDate ?? ""}
+                    onChange={(event) =>
+                      updateDraftFilter("startDate", event.target.value)
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="explore-end-date">
+                    겹치는 기간 종료일
+                  </FieldLabel>
+                  <Input
+                    id="explore-end-date"
+                    name="endDate"
+                    type="date"
+                    value={draftFilters.endDate ?? ""}
+                    onChange={(event) =>
+                      updateDraftFilter("endDate", event.target.value)
+                    }
+                  />
+                </Field>
+              </div>
+              <p className="text-base text-foreground-muted">
+                선택한 기간과 하루라도 겹치는 공개 일정을 찾아요.
+              </p>
+            </div>
+          </details>
 
           {filterError && (
             <p role="alert" className="text-base text-destructive-strong">
@@ -408,7 +418,7 @@ export function ExplorePage() {
             >
               초기화
             </Button>
-            <Button type="submit">검색하기</Button>
+            <Button type="submit"><Search className="size-4" strokeWidth={1.8} aria-hidden="true" />검색하기</Button>
           </div>
         </form>
       </search>
@@ -423,7 +433,7 @@ export function ExplorePage() {
             description="전체 공개 일정에서 많이 등장한 도시예요."
             className="px-0 pt-0"
           />
-          <div className="flex min-w-0 flex-wrap gap-2">
+          <div className="flex min-w-0 gap-2 overflow-x-auto pb-2 *:shrink-0">
             {popularCities.map(({ cityId, listingCount }) => {
               const label = getExploreCityLabel(cityId);
               return (

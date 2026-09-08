@@ -103,7 +103,7 @@ export function TripRoomTabLayout() {
         className="relative text-foreground-muted hover:text-foreground transition-colors"
         onClick={() => setIsActivityOpen(true)}
       >
-        <Bell className="size-5" />
+        <Bell className="size-5" strokeWidth={1.8} aria-hidden="true" />
         {unreadCount > 0 && (
           <span className="absolute top-2 right-2 flex size-2">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
@@ -120,7 +120,7 @@ export function TripRoomTabLayout() {
           className="text-foreground-muted hover:text-foreground transition-colors"
           onClick={() => void shareTripInvite(tripId)}
         >
-          <Share2 className="size-5" />
+          <Share2 className="size-5" strokeWidth={1.8} aria-hidden="true" />
         </Button>
       )}
     </div>
@@ -129,28 +129,24 @@ export function TripRoomTabLayout() {
   const modeSwitcher = (
     <div
       data-slot="trip-mode-switcher"
-      style={{
-        bottom:
-          "calc(var(--app-bottom-action-height, var(--safe-bottom)) + 1.25rem + var(--app-keyboard-inset, 0px))",
-      }}
-      className="pointer-events-none fixed inset-x-0 z-30 flex justify-center px-4 transition-[bottom] duration-200 ease-out"
+      className="bg-background px-6"
     >
-      <Tabs value={selectedTab} onValueChange={handleTabChange} className="pointer-events-auto">
+      <Tabs value={selectedTab} onValueChange={handleTabChange} className="mx-auto max-w-(--content-max-width)">
         <TabsList
-          variant="chrome"
-          surface="chrome"
+          variant="line"
+          surface="none"
           aria-label="여행방 화면"
-          className="h-11 w-48 rounded-full border border-border/80 p-1 shadow-lg"
+          className="w-full pb-2"
         >
           <TabsTrigger
             value="plans"
-            className="rounded-full text-sm font-semibold text-foreground-muted transition-all duration-200 hover:text-foreground data-active:bg-primary data-active:text-primary-foreground data-active:shadow-xs data-active:font-bold dark:data-active:bg-primary dark:data-active:text-primary-foreground"
+            className="text-sm font-semibold"
           >
             계획
           </TabsTrigger>
           <TabsTrigger
             value="itinerary"
-            className="rounded-full text-sm font-semibold text-foreground-muted transition-all duration-200 hover:text-foreground data-active:bg-primary data-active:text-primary-foreground data-active:shadow-xs data-active:font-bold dark:data-active:bg-primary dark:data-active:text-primary-foreground"
+            className="text-sm font-semibold"
           >
             일정
           </TabsTrigger>
@@ -162,32 +158,29 @@ export function TripRoomTabLayout() {
   return (
     <div data-galanda-surface="content" className="flex min-h-dvh flex-1 flex-col">
       <OfflineStatusBanner />
-      {showWebNavigation ? (
-        <PageHeader
-          sticky
-          bordered
-          safeTop
-          title={getTripRoomNavigationTitle(location.pathname)}
-          back={{ onClick: () => void goBack() }}
-          action={headerActions}
-        />
-      ) : (
-        <PageHeader
-          sticky
-          bordered
-          safeTop={false}
-          topInset={platformTopInset}
-          className="z-[5]"
-          action={headerActions}
-        />
-      )}
+      <div data-slot="trip-navigation" className="sticky top-0 z-20 bg-background">
+        {showWebNavigation ? (
+          <PageHeader
+            safeTop
+            title={getTripRoomNavigationTitle(location.pathname)}
+            back={{ onClick: () => void goBack() }}
+            action={headerActions}
+          />
+        ) : (
+          <PageHeader
+            safeTop={false}
+            topInset={platformTopInset}
+            className="z-[5]"
+            action={headerActions}
+          />
+        )}
+        {modeSwitcher}
+      </div>
 
       {/* 탭 내부 페이지 렌더링 */}
       <main className="flex flex-1 flex-col">
         <Outlet context={{ tripId }} />
       </main>
-
-      {modeSwitcher}
 
       <ActivityDrawer
         tripId={tripId}

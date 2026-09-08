@@ -286,10 +286,17 @@ describe("PlanHomePage 상태별 CTA 렌더링 (RAON-228)", () => {
   it("후보 0개 + plan:create 가능자는 '첫 여행안 만들기' 버튼을 정확히 하나만 렌더한다 (empty state 전용)", () => {
     mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
     mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(roomWithPlans(0)));
+    mockUseRecommendation.mockReturnValue(toQueryResult({
+      recommendationId: RecommendationIdSchema.make("cached-recommendation"),
+      primary: { actionId: "GIVE_OPINION", reasonCode: "SHARE_PLAN_OPINION" },
+      alternatives: [], source: "RULE", policyVersion: "nba-rule-v1",
+      tripRevision: RevisionSchema.make(1), contextFingerprint: "fingerprint",
+    }));
 
     const { container } = renderPage();
 
     expect(screen.getAllByRole("button", { name: "첫 여행안 만들기" })).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "다음으로 하면 좋은 일" })).not.toBeInTheDocument();
     // empty state에서 sticky BottomAction이 경쟁하면 안 된다
     expect(hasStickyCtaSpace(container)).toBe(false);
   });
@@ -412,7 +419,7 @@ describe("PlanHomePage regression contract (RAON-229)", () => {
     expect(screen.queryByRole("button", { name: "새 여행안 제안하기" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: "제안된 여행안" })).toBeInTheDocument();
-    expect(hasStickyCtaSpace(container)).toBe(false);
+    expect(hasStickyCtaSpace(container)).toBe(true);
   });
 
   it("추천은 진행 상태 뒤에 compact하게 노출되고 건너뛰면 기존 primary로 복귀한다", () => {
@@ -449,7 +456,7 @@ describe("PlanHomePage regression contract (RAON-229)", () => {
     expect(screen.getByRole("button", { name: "여행안에 의견 남기기" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "대신 여행안 비교하기" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "여행안 비교하기" })).not.toBeInTheDocument();
-    expect(hasStickyCtaSpace(container)).toBe(false);
+    expect(hasStickyCtaSpace(container)).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: "지금은 건너뛰기" }));
 

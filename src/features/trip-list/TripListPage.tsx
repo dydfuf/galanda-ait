@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { CalendarDays, MapPinned, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronRight, MapPinned, Plus, UsersRound } from "lucide-react";
 
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { toLocalTravelDate } from "@/core/domain/room.ts";
-import { cn } from "@/lib/utils.ts";
 import { toUserMessage } from "../common/error-message.ts";
 import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
 import {
@@ -24,7 +23,6 @@ import { useSessionQuery } from "../../hooks/useSession.ts";
 type TripListTab = "ONGOING" | "PAST";
 
 const DAY_MS = 86_400_000;
-const PAST_PREVIEW_LIMIT = 2;
 
 const getTripEntryPath = (trip: TripOverviewDto): string =>
   `/trips/${encodeURIComponent(trip.id)}`;
@@ -82,12 +80,6 @@ const getTripDayLabel = (
   return { label: "날짜 미정", variant: "neutral" };
 };
 
-const getMemberNames = (trip: TripOverviewDto): ReadonlyArray<string> =>
-  trip.memberNames.map((name) => name.trim()).filter(Boolean);
-
-const getInitial = (name: string): string =>
-  Array.from(name.trim())[0]?.toUpperCase() ?? "?";
-
 const sortPastTripsByMostRecent = (
   trips: ReadonlyArray<TripOverviewDto>,
 ): ReadonlyArray<TripOverviewDto> =>
@@ -96,48 +88,6 @@ const sortPastTripsByMostRecent = (
     const leftDate = left.confirmedPeriod?.endDate ?? left.updatedAt;
     return rightDate.localeCompare(leftDate);
   });
-
-function TripParticipantStack({ trip }: { readonly trip: TripOverviewDto }) {
-  const memberNames = getMemberNames(trip);
-  const shownMembers = memberNames.slice(0, 4);
-  const remainingMembers = Math.max(0, trip.memberCount - shownMembers.length);
-
-  if (shownMembers.length === 0) {
-    return (
-      <span className="flex items-center gap-1.5 text-sm text-foreground-muted">
-        <UsersRound className="size-4" aria-hidden="true" />
-        {trip.memberCount}명
-      </span>
-    );
-  }
-
-  return (
-    <ul
-      className="flex min-w-0 items-center"
-      aria-label={`여행 참여자 ${trip.memberCount}명`}
-    >
-      {shownMembers.map((name, index) => (
-        <li
-          key={`${name}-${index}`}
-          title={name}
-          className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-full border-2 border-card bg-primary-muted text-xs font-bold text-primary",
-            index > 0 && "-ml-2",
-          )}
-        >
-          <span aria-hidden="true">{getInitial(name)}</span>
-          <span className="sr-only">{name}</span>
-        </li>
-      ))}
-      {remainingMembers > 0 && (
-        <li className="-ml-2 grid size-8 shrink-0 place-items-center rounded-full border-2 border-card bg-muted text-xs font-bold text-foreground-muted">
-          <span aria-hidden="true">+{remainingMembers}</span>
-          <span className="sr-only">추가 참여자 {remainingMembers}명</span>
-        </li>
-      )}
-    </ul>
-  );
-}
 
 function OngoingTripCard({
   trip,
@@ -153,43 +103,23 @@ function OngoingTripCard({
     <Link
       to={getTripEntryPath(trip)}
       aria-label={`${trip.title} 여행 열기`}
-      className="group grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] gap-3 rounded-2xl border border-border bg-card p-3 text-foreground! no-underline! shadow-sm transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary-border hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="flex min-w-0 items-center gap-4 border-b border-border py-7 text-foreground! no-underline! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
-      <div className="flex min-h-32 min-w-0 flex-col items-center justify-center rounded-xl bg-primary-muted px-2 text-center text-primary">
-        <MapPinned className="size-7" aria-hidden="true" />
-        <span className="mt-2 line-clamp-2 text-xs font-semibold [overflow-wrap:anywhere]">
-          {trip.destination || "여행"}
-        </span>
-      </div>
-
-      <div className="flex min-w-0 flex-col">
-        <div className="flex min-w-0 items-start justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <h2 className="min-w-0 text-base leading-snug font-bold [overflow-wrap:anywhere]">
-              {trip.title}
-            </h2>
-            {trip.activitySummary && trip.activitySummary.unreadCount > 0 && (
-              <Badge
-                variant="default"
-                className="h-5 shrink-0 px-1.5 text-[10px] font-bold"
-                aria-label={`새 활동 ${trip.activitySummary.unreadCount}개`}
-              >
-                +{trip.activitySummary.unreadCount}
-              </Badge>
-            )}
-          </div>
-          <Badge
-            variant={badgeVariant}
-            className="h-6 shrink-0 px-2.5 text-xs"
-          >
-            {dayLabel}
-          </Badge>
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Badge variant={badgeVariant}>{dayLabel}</Badge>
+          {trip.activitySummary && trip.activitySummary.unreadCount > 0 && (
+            <span className="text-xs font-medium text-primary">새 활동 {trip.activitySummary.unreadCount}개</span>
+          )}
         </div>
-        <p className="mt-1 text-sm text-foreground-muted [overflow-wrap:anywhere]">
-          {getTripPeriodText(trip)}
-        </p>
-
-        <div className="mt-2 flex flex-col gap-1 text-xs text-foreground-muted">
+        <h2 className="min-w-0 text-2xl leading-snug font-bold tracking-tight break-keep [overflow-wrap:anywhere]">
+              {trip.title}
+        </h2>
+        <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2"><CalendarDays className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />{getTripPeriodText(trip)}</p>
+          <p className="flex items-center gap-2"><UsersRound className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />참여 {trip.memberCount}명</p>
+        </div>
+        <div className="text-sm leading-relaxed text-muted-foreground">
           {lifecycle === "PLANNING" ? (
             <span>
               {trip.hasUnattributedOpinions
@@ -206,10 +136,8 @@ function OngoingTripCard({
           )}
         </div>
 
-        <div className="mt-auto pt-3">
-          <TripParticipantStack trip={trip} />
-        </div>
       </div>
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
     </Link>
   );
 }
@@ -224,7 +152,7 @@ function PastTripList({
   return (
     <MobileList
       aria-label={label}
-      className="overflow-hidden rounded-2xl border border-border bg-card"
+      className="overflow-hidden"
     >
       {trips.map((trip) => (
         <MobileListItem
@@ -232,12 +160,12 @@ function PastTripList({
           to={getTripEntryPath(trip)}
           aria-label={`${trip.title} 지난 여행 열기`}
           leading={
-            <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-primary-muted text-primary">
-              <MapPinned className="size-5" aria-hidden="true" />
+            <span className="grid size-10 shrink-0 place-items-center text-muted-foreground">
+              <MapPinned className="size-5" strokeWidth={1.8} aria-hidden="true" />
             </span>
           }
           trailing={<Badge variant="neutral">완료</Badge>}
-          className="px-3 py-3"
+          className="px-0 py-5"
         >
           <div className="flex min-w-0 items-center gap-1.5">
             <ItemTitle className="text-base font-semibold [overflow-wrap:anywhere]">
@@ -285,7 +213,9 @@ export function TripListPage() {
   const pastTrips = sortPastTripsByMostRecent(
     trips?.filter((t) => classifyTrip(t, today) === "PAST") ?? []
   );
-  const pastPreviewTrips = pastTrips.slice(0, PAST_PREVIEW_LIMIT);
+  const showEmptyCreateAction = activeTab === "ONGOING" &&
+    ongoingTrips.length === 0 && trips !== undefined &&
+    !isLoading && !isError && !isSessionError;
 
   const ongoingContent = (
     <div className="flex flex-col gap-8 pb-12">
@@ -301,10 +231,12 @@ export function TripListPage() {
             status="empty"
             title="진행 중인 여행이 없어요"
             illustration={!isError && trips?.length === 0 ? <GalandaSpot name="empty-trips" /> : undefined}
-            description="새 여행을 시작하려면 아래 버튼을 이용해주세요."
+            description="새 여행을 만들어 함께 계획해보세요."
+            actionText="새 여행 만들기"
+            onAction={showEmptyCreateAction ? () => navigate("/trips/new") : undefined}
           />
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col">
             {ongoingTrips.map((trip) => (
               <OngoingTripCard key={trip.id} trip={trip} today={today} />
             ))}
@@ -312,20 +244,6 @@ export function TripListPage() {
         )}
       </section>
 
-      {pastTrips.length > 0 && (
-        <section
-          aria-labelledby="past-preview-heading"
-          className="px-(--app-inline-padding)"
-        >
-          <h2
-            id="past-preview-heading"
-            className="mb-3 text-lg leading-snug font-bold text-foreground"
-          >
-            지난 여행 ({pastTrips.length})
-          </h2>
-          <PastTripList trips={pastPreviewTrips} label="지난 여행 미리보기" />
-        </section>
-      )}
     </div>
   );
 
@@ -397,8 +315,23 @@ export function TripListPage() {
     );
 
   return (
-    <PageBody safeTop withBottomAction data-slot="trip-list-page">
-      <PageTitle title="내 여행" />
+    <PageBody safeTop data-slot="trip-list-page" className="[--app-inline-padding:24px]">
+      <PageTitle
+        title="내 여행"
+        className="items-center [&>div:first-child]:basis-0"
+        action={showEmptyCreateAction ? undefined : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            aria-label="새 여행 만들기"
+            onClick={() => navigate("/trips/new")}
+          >
+            <Plus className="size-5" strokeWidth={1.8} aria-hidden="true" />
+            새 여행
+          </Button>
+        )}
+      />
 
       <div className="mt-4 mb-4 px-(--app-inline-padding)">
         <Tabs
@@ -408,7 +341,7 @@ export function TripListPage() {
           }
         >
           <TabsList
-            variant="default"
+            variant="line"
             aria-label="여행 목록 필터"
             className="w-full"
           >
@@ -421,24 +354,6 @@ export function TripListPage() {
       </div>
 
       {content}
-
-      <div
-        className="pointer-events-none fixed inset-x-0 z-30 px-(--app-inline-padding)"
-        style={{ bottom: "calc(var(--global-nav-height, 0px) + 1rem)" }}
-      >
-        <div className="mx-auto flex w-full max-w-(--content-max-width) justify-end min-[960px]:max-w-[calc(var(--content-max-width)+20rem)]">
-          <Button
-            type="button"
-            size="lg"
-            aria-label="새 여행 만들기"
-            onClick={() => navigate("/trips/new")}
-            className="pointer-events-auto rounded-full px-5 shadow-lg"
-          >
-            <Plus className="size-5" aria-hidden="true" />
-            새 여행
-          </Button>
-        </div>
-      </div>
     </PageBody>
   );
 }

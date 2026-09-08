@@ -16,7 +16,6 @@ interface PageHeaderProps {
   readonly action?: ReactNode;
   /** 스크롤 시 상단에 고정할지 여부. 내부 고정값이 아니라 화면이 명시적으로 선택해요. */
   readonly sticky?: boolean;
-  readonly bordered?: boolean;
   readonly safeTop?: boolean;
   readonly topInset?: number;
   /** 상위 shell이 chrome을 소유할 때 `none`으로 중복 surface를 막아요. */
@@ -34,7 +33,6 @@ export function PageHeader({
   back,
   action,
   sticky = false,
-  bordered = false,
   safeTop = true,
   topInset,
   surface = "chrome",
@@ -49,7 +47,6 @@ export function PageHeader({
         // 명시적인 native inset이 있으면 Web safe-area를 더하지 않아요.
         safeTop && topInset === undefined && "pt-(--safe-top)",
         sticky && "sticky top-0 z-20",
-        (bordered || sticky) && "border-b",
         className,
       )}
     >

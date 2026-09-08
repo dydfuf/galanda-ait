@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
 import type { RecommendNextActionResponse } from "../../contracts/recommendation.ts";
 import type {
   RecommendationSurface,
@@ -17,7 +16,7 @@ import {
 } from "./recommendation.ts";
 
 const recommendationCardClassName =
-  "mx-(--app-inline-padding) min-w-0 rounded-2xl border border-primary-border/60 bg-surface-raised p-4.5 shadow-xs transition-all";
+  "mx-(--app-inline-padding) min-w-0 py-3";
 
 export function NextActionRecommendationPending({
   className,
@@ -32,7 +31,6 @@ export function NextActionRecommendationPending({
       className={cn(recommendationCardClassName, className)}
     >
       <div className="flex items-center gap-1.5 text-primary">
-        <Sparkles aria-hidden="true" className="size-4 shrink-0 text-primary" />
         <h2 className="text-xs font-bold tracking-wide">다음으로 하면 좋은 일</h2>
       </div>
       <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">
@@ -91,7 +89,6 @@ export function NextActionRecommendation({
       className={cn(recommendationCardClassName, className)}
     >
       <div className="flex items-center gap-1.5 text-primary">
-        <Sparkles aria-hidden="true" className="size-4 shrink-0 text-primary" />
         <h2 id={titleId} className="text-xs font-bold tracking-wide">
           다음으로 하면 좋은 일
         </h2>
@@ -101,8 +98,8 @@ export function NextActionRecommendation({
       </p>
       <Button
         type="button"
-        size="lg"
-        className="mt-3.5 w-full font-semibold shadow-2xs active:scale-[0.99] transition-transform"
+        size="xl"
+        className="mt-4 w-full"
         onClick={() => selectAction(recommendation.primary.actionId, false)}
       >
         {tripActionPresentation[recommendation.primary.actionId].label}

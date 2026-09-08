@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 
 import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
+import { GlobalAppShell } from "@/components/galanda/global-app-shell.tsx";
 
 vi.mock("../plan-home/queries.ts", () => ({
   useTripRoomsQuery: vi.fn(),
@@ -79,7 +80,7 @@ function TestApp() {
     <MemoryRouter initialEntries={["/trips"]}>
       <LocationProbe />
       <Routes>
-        <Route path="/trips" element={<TripListPage />} />
+        <Route path="/trips" element={<GlobalAppShell><TripListPage /></GlobalAppShell>} />
         <Route path="*" element={<div>이동 완료</div>} />
       </Routes>
     </MemoryRouter>
@@ -106,7 +107,7 @@ describe("TripListPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("이전에 불러온 정보");
   });
 
-  it("진행 중 탭은 진행 중 카드와 최근 지난 여행 2건을, 지난 여행 탭은 전체 목록을 표시한다", () => {
+  it("진행 중과 지난 여행을 섞지 않고 각 탭에서 전체 목록을 표시한다", () => {
     const longTitle =
       "가족 모두의 취향을 반영한 아주 긴 오키나와 북부와 남부 일주 여행";
     const ongoingTrip = tripFixture({
@@ -146,7 +147,7 @@ describe("TripListPage", () => {
     renderPage();
 
     const filter = screen.getByRole("tablist", { name: "여행 목록 필터" });
-    expect(filter).toHaveAttribute("data-variant", "default");
+    expect(filter).toHaveAttribute("data-variant", "line");
     expect(filter).not.toHaveAttribute("data-galanda-surface");
     expect(screen.getByRole("tab", { name: "진행 중 (1)" })).toHaveAttribute(
       "aria-selected",
@@ -158,15 +159,10 @@ describe("TripListPage", () => {
     expect(screen.getByText(longTitle).className).toContain(
       "[overflow-wrap:anywhere]",
     );
-    expect(
-      screen.getByRole("list", { name: "여행 참여자 4명" }),
-    ).toBeInTheDocument();
-
-    const preview = screen.getByRole("list", { name: "지난 여행 미리보기" });
-    expect(within(preview).getAllByRole("listitem")).toHaveLength(2);
-    expect(within(preview).getByText("최근 제주 여행")).toBeInTheDocument();
-    expect(within(preview).getByText("지난 강릉 여행")).toBeInTheDocument();
-    expect(within(preview).queryByText("오래된 부산 여행")).not.toBeInTheDocument();
+    expect(screen.getByText("참여 4명")).toBeVisible();
+    expect(screen.queryByText("최근 제주 여행")).not.toBeInTheDocument();
+    expect(screen.queryByText("지난 강릉 여행")).not.toBeInTheDocument();
+    expect(screen.queryByText("오래된 부산 여행")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "지난 여행" }));
 
@@ -179,10 +175,12 @@ describe("TripListPage", () => {
     ).not.toBeInTheDocument();
     const fullPastList = screen.getByRole("list", { name: "지난 여행 전체" });
     expect(within(fullPastList).getAllByRole("listitem")).toHaveLength(3);
-    expect(within(fullPastList).getByText("오래된 부산 여행")).toBeInTheDocument();
+    expect(within(fullPastList).getAllByRole("link").map((link) => link.getAttribute("aria-label"))).toEqual([
+      "최근 제주 여행 지난 여행 열기", "지난 강릉 여행 지난 여행 열기", "오래된 부산 여행 지난 여행 열기",
+    ]);
   });
 
-  it("여행안·의견 집계 상태와 구조화된 참가자 이름을 사실대로 표시한다", () => {
+  it("여행안·의견 집계와 참여 인원을 사실대로 표시한다", () => {
     mockUseTripRoomsQuery.mockReturnValue(
       roomsQueryResult([
         tripFixture({
@@ -215,11 +213,7 @@ describe("TripListPage", () => {
       name: "여행안 없는 여행 여행 열기",
     });
     expect(within(noPlanCard).getByText("여행안 0개 · 첫 여행안을 작성해주세요")).toBeVisible();
-    const participantList = within(noPlanCard).getByRole("list", {
-      name: "여행 참여자 1명",
-    });
-    expect(within(participantList).getAllByRole("listitem")).toHaveLength(1);
-    expect(within(participantList).getByTitle("김, 라온")).toBeVisible();
+    expect(within(noPlanCard).getByText("참여 1명")).toBeVisible();
 
     const planningCard = screen.getByRole("link", {
       name: "계획 중인 여행 여행 열기",
@@ -236,7 +230,7 @@ describe("TripListPage", () => {
     ).toBeVisible();
   });
 
-  it("여행 카드와 유일한 Primary Action이 실제 route로 이동한다", () => {
+  it("여행 카드와 빈 상태의 유일한 생성 행동이 실제 route로 이동하고 하단은 nav만 소유한다", () => {
     mockUseTripRoomsQuery.mockReturnValue(
       roomsQueryResult([tripFixture({ id: "trip-route" })]),
     );
@@ -257,29 +251,35 @@ describe("TripListPage", () => {
     const pageBody = secondView.container.querySelector<HTMLElement>(
       '[data-slot="trip-list-page"]',
     );
-    expect(pageBody?.className).toContain(
-      "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]",
-    );
-    expect(pageBody?.className).not.toContain("pb-(--app-page-padding-bottom)");
+    expect(pageBody?.className).toContain("pb-(--app-page-padding-bottom)");
 
     const primaryActions = screen.getAllByRole("button", {
       name: "새 여행 만들기",
     });
     expect(primaryActions).toHaveLength(1);
-    expect(document.querySelector('[data-slot="bottom-action"]')).toBeNull();
-    const floatingLayer = primaryActions[0].closest("div.fixed");
-    expect(floatingLayer).not.toBeNull();
-    expect(floatingLayer).toHaveStyle({
-      bottom: "calc(var(--global-nav-height, 0px) + 1rem)",
-    });
-    const fabContainer = primaryActions[0].parentElement;
-    expect(fabContainer?.className).toContain(
-      "min-[960px]:max-w-[calc(var(--content-max-width)+20rem)]",
-    );
+    const footer = document.querySelector('[data-slot="bottom-action"]');
+    expect(footer).toBeNull();
+    expect(screen.getByRole("navigation", { name: "주요 화면" })).toBeVisible();
+    expect(secondView.container.querySelector('[data-system-state="empty"]')).toContainElement(primaryActions[0]);
     fireEvent.click(primaryActions[0]);
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       "/trips/new",
     );
+  });
+
+  it("목록이 있거나 지난 여행 탭이면 제목 옆 생성 행동을 유지한다", () => {
+    mockUseTripRoomsQuery.mockReturnValue(roomsQueryResult([tripFixture()]));
+    const view = renderPage();
+    const title = screen.getByRole("heading", { name: "내 여행" }).parentElement?.parentElement;
+    expect(title).toContainElement(screen.getByRole("button", { name: "새 여행 만들기" }));
+    expect(view.container.querySelector('[data-slot="bottom-action"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "지난 여행" }));
+    expect(screen.getByText("지난 여행이 없어요")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "새 여행 만들기" })).toHaveLength(1);
+    expect(title).toContainElement(screen.getByRole("button", { name: "새 여행 만들기" }));
+    fireEvent.click(screen.getByRole("button", { name: "새 여행 만들기" }));
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/trips/new");
   });
 
   it("로딩과 성공한 0건 empty state를 동시에 표시하지 않는다", () => {

@@ -56,6 +56,22 @@ describe("HOME next action", () => {
   it("overview와 일치하지 않는 권한 action은 표시하지 않는다", () => {
     renderAction({ ...trip, eligibleActionIds: [] });
     expect(screen.queryByRole("button", { name: "여행안에 의견 남기기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "계획 보기" })).toHaveAttribute("href", "/trips/trip/plans");
+  });
+  it("추천 로딩이나 실패 중에도 여행방을 열 수 있다", () => {
+    vi.mocked(useNextTripActionRecommendation).mockReturnValue({ data: undefined, isPending: true } as ReturnType<typeof useNextTripActionRecommendation>);
+    const view = renderAction();
+    expect(screen.getByRole("link", { name: "계획 보기" })).toHaveAttribute("href", "/trips/trip/plans");
+    view.unmount();
+    vi.mocked(useNextTripActionRecommendation).mockReturnValue({ data: undefined, isError: true } as ReturnType<typeof useNextTripActionRecommendation>);
+    renderAction();
+    expect(screen.getByRole("link", { name: "계획 보기" })).toHaveAttribute("href", "/trips/trip/plans");
+  });
+  it("오래된 overview에서는 캐시된 추천을 실행하지 않는다", () => {
+    render(<MemoryRouter><HomeNextAction trip={trip} stale /></MemoryRouter>);
+    expect(useNextTripActionRecommendation).toHaveBeenCalledWith("trip", { surface: "HOME" }, 2, false);
+    expect(screen.queryByRole("button", { name: "여행안에 의견 남기기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "계획 보기" })).toBeInTheDocument();
   });
   it("클릭 전에 방이 확정되면 오래된 의견 action을 실행하지 않는다", async () => {
     vi.mocked(api.getTrip).mockResolvedValue({ ...room, confirmedPlanId: room.plans[0].id });

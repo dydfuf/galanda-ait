@@ -8,27 +8,21 @@ import { Button, buttonVariants } from "@/components/ui/button.tsx";
 import { toLocalTravelDate } from "@/core/domain/room.ts";
 import { toUserMessage } from "@/features/common/error-message.ts";
 import { useTripRoomsQuery } from "@/features/plan-home/queries.ts";
-import { useSessionQuery } from "@/hooks/useSession.ts";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { cn } from "@/lib/utils.ts";
 import {
   HomeTripCard,
   selectFeaturedTrip,
 } from "./components/HomeTripDashboard.tsx";
-import { SavedIdeasSection } from "./components/SavedIdeasSection.tsx";
 import { HomeNextAction } from "./components/HomeNextAction.tsx";
 
 export function HomePage() {
-  const session = useSessionQuery();
   const rooms = useTripRoomsQuery();
   const today = toLocalTravelDate(new Date());
   const { featured, lifecycle, hasAnyTrips, hasOnlyPastTrips } = selectFeaturedTrip(
     rooms.data ?? [],
     today
   );
-
-  const greeting = session.data?.name?.trim()
-    ? `${session.data.name.trim()}님, 안녕하세요 👋`
-    : "안녕하세요 👋";
 
   let tripContent: React.ReactNode;
   if (rooms.isError && !featured && !hasAnyTrips) {
@@ -47,44 +41,39 @@ export function HomePage() {
     );
   } else if (featured && lifecycle) {
     tripContent = (
-      <div className="flex flex-col gap-2">
-        <p className="px-1 text-lg leading-snug font-bold [overflow-wrap:anywhere]">
-          {greeting}
-        </p>
-        {!rooms.isError && <HomeNextAction key={featured.id} trip={featured} />}
+      <div className="flex flex-col gap-7">
         <HomeTripCard trip={featured} lifecycle={lifecycle} today={today} />
+        <HomeNextAction key={featured.id} trip={featured} stale={rooms.isError} />
       </div>
     );
   } else if (hasOnlyPastTrips) {
     tripContent = (
       <section
         aria-labelledby="home-trip-past-heading"
-        className="flex min-w-0 flex-col items-start gap-4 rounded-3xl border border-border bg-card p-5 shadow-sm"
+        className="flex min-w-0 flex-col items-start gap-6 pt-12"
       >
         <div className="min-w-0">
-          <p className="text-lg leading-snug font-bold [overflow-wrap:anywhere]">
-            {greeting}
-          </p>
-          <h2 id="home-trip-past-heading" className="mt-3 text-base font-bold">
+          <GalandaSpot name="create-trip" />
+          <h2 id="home-trip-past-heading" className="mt-6 text-3xl font-bold leading-snug tracking-tight break-keep">
             다음 여행을 준비해 보세요
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-foreground-muted">
             지난 여행 기록을 확인하거나 새로운 여행을 계획해보세요.
           </p>
         </div>
-        <div className="flex w-full min-w-0 flex-wrap gap-2">
-          <Link
-            to="/trips"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1 no-underline!")}
-          >
-            내 여행 보기
-          </Link>
+        <div className="flex w-full min-w-0 flex-col gap-2">
           <Link
             to="/trips/new"
-            className={cn(buttonVariants({ size: "sm" }), "flex-1 no-underline!")}
+            className={cn(buttonVariants({ size: "xl" }), "min-h-14 no-underline!")}
           >
             <Plus aria-hidden="true" />
             새 여행 만들기
+          </Link>
+          <Link
+            to="/trips"
+            className={cn(buttonVariants({ variant: "ghost", size: "xl" }), "no-underline!")}
+          >
+            내 여행 보기
           </Link>
         </div>
       </section>
@@ -93,23 +82,21 @@ export function HomePage() {
     tripContent = (
       <section
         aria-labelledby="home-trip-empty-heading"
-        className="flex min-w-0 flex-col items-start gap-4 rounded-3xl border border-border bg-card p-5 shadow-sm"
+        className="flex min-w-0 flex-col items-start gap-6 pt-12"
       >
         <div className="min-w-0">
-          <p className="text-lg leading-snug font-bold [overflow-wrap:anywhere]">
-            {greeting}
-          </p>
-          <h2 id="home-trip-empty-heading" className="mt-3 text-base font-bold">
+          <GalandaSpot name="empty-trips" />
+          <h2 id="home-trip-empty-heading" className="mt-6 text-3xl font-bold leading-snug tracking-tight break-keep">
             진행 중인 여행이 없어요.
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-foreground-muted">
             여행방을 만들어 후보를 비교하고, 친구들의 의견으로 함께 확정해요.
           </p>
         </div>
-        <div className="flex w-full min-w-0 flex-wrap gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-2">
           <Link
             to="/trips/new"
-            className={cn(buttonVariants({ size: "sm" }), "flex-1 no-underline!")}
+            className={cn(buttonVariants({ size: "xl" }), "min-h-14 no-underline!")}
           >
             <Plus aria-hidden="true" />
             새 여행 만들기
@@ -117,8 +104,8 @@ export function HomePage() {
           <Link
             to="/explore"
             className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "flex-1 no-underline!"
+              buttonVariants({ variant: "ghost", size: "xl" }),
+              "no-underline!"
             )}
           >
             <Compass aria-hidden="true" />
@@ -130,11 +117,10 @@ export function HomePage() {
   }
 
   return (
-    <PageBody safeTop>
+    <PageBody safeTop className="flex flex-col [--app-inline-padding:24px] [--app-page-padding-bottom:40px]">
       <PageTitle title="홈" />
 
-      <div className="flex flex-col gap-6 px-(--app-inline-padding) pt-2">
-        {tripContent}
+      <div className="flex flex-1 flex-col gap-6 px-(--app-inline-padding) pt-2">
         {hasAnyTrips && rooms.isError && (
           <div className="flex flex-col items-start gap-2 rounded-2xl bg-warning-muted p-3">
             <p role="alert" className="text-sm leading-relaxed text-warning">
@@ -150,7 +136,7 @@ export function HomePage() {
             </Button>
           </div>
         )}
-        <SavedIdeasSection />
+        {tripContent}
       </div>
     </PageBody>
   );
