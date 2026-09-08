@@ -233,6 +233,10 @@ body {
   backdrop-filter: var(--chrome-backdrop-filter);
 }
 
+header[data-galanda-surface="chrome"] {
+  box-shadow: none;
+}
+
 [data-galanda-surface="overlay"] {
   background-color: var(--surface-overlay);
   border-color: var(--border-overlay);

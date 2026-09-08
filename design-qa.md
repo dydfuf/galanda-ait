@@ -128,3 +128,22 @@ final result: passed
 - 최종 `pnpm check` exit 0: 146개 파일, 1,450개 테스트, DB 정합성, Web/AIT build 통과.
   별도의 Playwright/E2E runner는 추가하지 않았다.
 - 실제 인증 smoke, PWA 오프라인 전환, AIT 실기기 확인과 배포는 여전히 미수행이다.
+
+## PR 피드백 반영: 헤더 그림자와 에셋 캡처
+
+- 공통 chrome 스타일 중 `header`의 `box-shadow`만 제거했다. 라이트에서 계산된 그림자는
+  `rgba(25, 31, 40, 0.12) 0px 8px 24px 0px` → `none`, 헤더 높이 57px와 경계선 1px는
+  동일하다. 하단 행동 영역의 그림자와 overlay 스타일은 변경하지 않았다.
+- 다크 카탈로그의 chrome 헤더 4개도 계산값 `none`을 확인했다.
+- `plans-after-390.png`, `itinerary-after-390.png`, `assets-light-390.png`,
+  `assets-dark-390.png`를 최신 헤더로 갱신했다. 이외 기존 캡처는 앞선 구현 시점 기록이다.
+- 실제 앱에서 에셋이 표시되는 390 × 844px 샘플 화면 5개를 추가했다:
+  `spot-empty-trips-390.png`(홈), `spot-empty-saved-390.png`(저장 목록),
+  `spot-create-trip-390.png`(첫 여행안), `spot-invite-companions-390.png`(동행자 초대),
+  `spot-compare-plans-390.png`(미확정 일정). 실제 공유·저장은 실행하지 않았다.
+- `confirm-plan`은 라이트/다크 에셋 카탈로그에서만 시각 확인했다. 현재
+  `ConfirmedItinerarySnapshotSchema`가 routes/items를 비어 있지 않은 배열로 제한하여,
+  항목 없는 확정 일정 샘플은 클라이언트 검증에서 거부된다. 따라서 해당 방어용 빈 상태를
+  정상 API로 재현했다고 주장하지 않는다. 이 도달성 차이는 별도 검토 대상으로 남기고,
+  캡처를 위해 API 검증이나 실제 제품 상태를 변경하지 않았다.
+- 수정 후 `pnpm check` exit 0: 146개 파일 / 1,450개 테스트 및 Web/AIT build 통과.
