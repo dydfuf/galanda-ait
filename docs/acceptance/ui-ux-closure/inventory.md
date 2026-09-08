@@ -21,7 +21,7 @@
 | EXPLORE | `/explore` | loading/empty/error, 검색·필터·복귀 | GlobalShell | 공개 QA listing 또는 공개 목록 | #129 |
 | LISTING | `/explore/:listingId` | 상세·저장·가져오기, 공개 해제/원본 변경, 권한 | ExploreListingDetailPage | HOST가 공개한 QA 후보 | #129 |
 | SAVED | `/me/saved` | empty, saved, 해제·실패, stale listing | GlobalShell | MEMBER가 저장한 QA listing | #129 |
-| ME | `/me` | light/dark/system, logout, 계정 전환 | GlobalShell | HOST/MEMBER | #129/#130 |
+| ME | `/me` | light/dark/system; logout UI 없음, 계정 경계 별도 | GlobalShell | HOST/MEMBER | #129/#130 |
 | NOTFOUND | `*` | 존재하지 않는 route, 정상 복귀 | NotFoundPage | `/not-a-ux125-route`, production `/dev` | #129 |
 | DEV | `/dev?preview=wizard` | normal, invalid-date, long-copy, offline, review-return, choice × draft 상태 | DevWizardPreview + 실제 WizardStepPage | URL 고정 fixture, API 없음 | #126/#130/#131 |
 

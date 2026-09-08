@@ -181,7 +181,10 @@ pattern/component test 순으로 추가하고,
 `src/ui-foundation-contract.test.ts`의 scoped file 목록에 등록합니다. 전역
 `--app-bottom-action-height`는 document root의 단일 footer 측정값이라는 제약이
 있으므로 component test에서는 동시에 하나의 footer만 mount하고 accessory 높이
-변화 후 본문 clearance 계약을 확인합니다.
+변화 후 본문 clearance 계약을 확인합니다. `BottomAction`은 padding/safe-area 변화도
+측정하도록 border-box를 관찰합니다. `PageBody withBottomAction`의 실제 스크롤
+여백에는 footer 높이와 keyboard inset을 포함하며, scroller의 scroll-padding만으로
+본문 끝의 스크롤 공간을 대신하지 않습니다.
 
 계약 guard는 다음 명령으로 실행합니다.
 

@@ -48,3 +48,13 @@ reset: 반복 실행은 `UX-125 <여정> <실행번호>` 이름의 새 방으로
 | MOB-01~02, A11Y-01~02, RES-01, PWA-01 | 키보드·날짜/footer/focus/의미/복구/설치형 실행 | [#130](https://github.com/dydfuf/galanda-ait/issues/130) |
 
 오류 주입: DEV 고정 상태와 실제 HTTP 브라우저의 요청 차단을 구분한다. 특정 QA mutation URL만 차단하고 관찰 후 해제한다. 권한/409는 실제 actor/revision 및 해당 서버 계층 테스트로 확인한다. 생산 인증 우회나 fake 성공 응답을 추가하지 않는다.
+
+## 실제 생성한 추가 데이터와 재현 경계 (2026-09-09)
+
+- HOST `UX-125 생성 복구 재검증`: 방 `75c93c89-06bf-4dbe-b96f-1d8f2227f0e2`, 부산(10/09~11)→제주(10/11~13), 첫 숙소 결정/둘째 미정, 교통 3구간 미정. 첫 여행안 제목 `UX125 부산 제주 복구 오프라인`, 이중 click 후 서버 후보 1개/revision 2.
+- 기존 협업 방 `ecff0d8a-0570-4eee-929f-18a1d8510627`: 확정 일정 v5, MEMBER 확인 v5. 두 HOST 탭은 같은 계정/서로 다른 QueryClient이며 MEMBER는 독립 프로필이다.
+- 공개 listing `f2e0b6aa-148c-403f-ba1d-7a0a66d9e0a6`: 기존 HOST 첫 후보를 기존 `POST /api/trips/:tripId/plans/:planId/explore-listing` + `{}`로 seed. 현재 게시 UI가 없어 API로 준비한 데이터이며 UI 게시 성공으로 주장하지 않는다. MEMBER 저장→새 여행 import→기존 여행 import를 실제 UI로 수행했다.
+- import 대상 MEMBER 방 `be9eed8d-12f5-40f9-bf60-13a23870e753`, 후보 `d95a5570-f747-4fb5-917e-742a77eb2df6`, `42524248-cead-46a9-8f98-b2d6450432e5`.
+- 공개 해제는 자기 listing만 기존 DELETE와 expectedRevision 1로 수행했다. unavailable UI와 실제 import 410 확인 후 기존 relist API와 expectedRevision 2로 복구, 현재 LISTED revision 3.
+- 비로그인 `ux125-c`: private GET 401, login return 경로, 무효 초대와 404 확인. HOST가 MEMBER의 private 방을 GET하면 정보 없이 404. MEMBER가 HOST 확정 일정에 유효한 수정 payload를 보내면 403.
+- actor credential, 원래 초대 capability는 기존 호스트 외부 파일만 사용한다. 본문에 넣지 않는다. 새로 재현할 때 공유 계정의 다른 데이터나 전체 storage를 지우지 않는다.

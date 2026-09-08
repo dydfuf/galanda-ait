@@ -53,7 +53,7 @@ export function BottomAction({
         const borderBoxHeight = entry?.borderBoxSize?.[0]?.blockSize;
         updateHeight(borderBoxHeight ?? action.getBoundingClientRect().height);
       });
-      observer.observe(action);
+      observer.observe(action, { box: "border-box" });
     }
 
     return () => {
