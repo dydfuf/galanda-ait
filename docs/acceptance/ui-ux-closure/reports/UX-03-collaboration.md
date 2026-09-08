@@ -36,3 +36,16 @@
 - 수정 전 입력 유실 regression 실패, 수정 후 권한 실패 차단과 입력 보존 통과.
 - freshness hook과 itinerary focused 검사: 6개 파일/26개 테스트 통과. 기존 상수 모양 검사 1개를 실제 timer/focus/reconnect 동작 검사로 대체했다.
 - 첫 `pnpm check`는 동시 실행 중 카탈로그 1개 테스트가 5초 timeout(나머지 1,476개 통과). 제한 시간·테스트·CI를 바꾸지 않고 `VITEST_MAX_WORKERS=2 pnpm check` 재실행: **147개 파일/1,477개 테스트**, lint/DB drift/typecheck/Web/AIT build exit 0.
+
+## PR #137 배포 후 재검증
+
+main `832cc8d574`, staging `142a5975-228f-4834-bbd2-8cdc6beec5ef`. 두 프로필에서 PWA 업데이트 버튼으로 새 코드를 적용했다.
+
+- MEMBER는 열린 일정 화면을 유지. HOST 00:34:25 KST 저장으로 v3→v4, MEMBER의 polling 응답 완료 00:34:29.912 KST에 v4 확인, 변경 내용 확인 action 표시. 30초 budget 내 관찰이다. fetch wrapper는 시각과 revision만 기록했고 응답/정책을 바꾸지 않았다.
+- HOST 두 탭에서 같은 v3로 수정. 첫 탭의 숙소 메모 저장→v4. 두 번째 탭은 교통 메모를 편집한 상태에서 save 409, 최신 GET만 실패 주입. [입력 보존](../../../assets/ui-ux-closure/editor-refetch-preserved-320.png). 첫 메모와 기존 기준이 남고 최신 조회 실패가 명시됨.
+- 실패 해제 후 다시 저장→v3→v4 conflict/rebase 안내, 다른 탭의 숙소 메모와 내 교통 메모 둘 다 보존→사용자가 재저장→서버 v5에서 두 값 확인. UXF-005 재검증 완료.
+- MEMBER가 v4 변경 drawer를 열고 있는 동안 HOST가 v5 저장. 확인하기가 최신 변경을 확인한 것으로 처리되지 않고 v5 내용을 재확인하도록 안내. [충돌](../../../assets/ui-ux-closure/acknowledgement-conflict-390.png).
+- 확인 요청도 network abort를 주입해 실패 안내/열린 drawer 유지, 해제 후 재시도→서버 acknowledgedRevision 5 확인.
+- 비로그인 private GET 401 UNAUTHORIZED, HOST가 비참여 MEMBER 소유 방 조회는 404 NOT_FOUND, MEMBER의 유효한 itinerary PATCH는 403 FORBIDDEN. 최초 불완전 PATCH의 400은 권한 증거에서 제외했다.
+
+추가 matrix 실행은 사용자 요청으로 중단. 남은 세부 범위: 이미 참여/만료 초대 각각의 실제 흐름, 의견·확정 5xx, 모든 back/forward 조합과 서로 다른 의견/가격·인원 비교 데이터. 기존 서버/단위/컴포넌트 검사는 이를 실제 브라우저 통과로 대신하지 않는다.

@@ -96,7 +96,7 @@ describe("Page chrome geometry contracts", () => {
 
   it("centers PageBody and reserves the larger of its fallback or measured CTA clearance", () => {
     const dynamicClearance =
-      "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]";
+      "pb-[calc(max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))+var(--app-keyboard-inset,0px))]";
     const { rerender } = render(
       <PageBody data-testid="page-body" withBottomAction>
         <button type="button">마지막 본문 행동</button>
@@ -221,6 +221,7 @@ describe("Page chrome geometry contracts", () => {
     );
     let resizeCallback: ResizeObserverCallback | undefined;
     let observedElement: Element | undefined;
+    let observedBox: ResizeObserverBoxOptions | undefined;
     let disconnected = false;
 
     class ResizeObserverMock implements ResizeObserver {
@@ -228,8 +229,9 @@ describe("Page chrome geometry contracts", () => {
         resizeCallback = callback;
       }
 
-      observe(target: Element) {
+      observe(target: Element, options?: ResizeObserverOptions) {
         observedElement = target;
+        observedBox = options?.box;
       }
 
       unobserve() {}
@@ -263,6 +265,7 @@ describe("Page chrome geometry contracts", () => {
       );
 
       expect(observedElement).toBe(actionChrome);
+      expect(observedBox).toBe("border-box");
       Object.defineProperty(actionChrome, "getBoundingClientRect", {
         configurable: true,
         value: () => ({ height: 152 }) as DOMRect,

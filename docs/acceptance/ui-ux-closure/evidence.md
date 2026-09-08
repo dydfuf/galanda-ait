@@ -34,3 +34,13 @@
 ## 아직 완료 증거가 없는 항목
 
 실기기 키보드·OS date picker·safe-area, 설치형 PWA, screen reader, 사람 참여 관찰, WIZ/COL/NAV 전체 매트릭스는 후속 보고서에서 각각 판정한다. 이 파일의 fixture 캡처나 전체 gate를 해당 항목의 통과로 사용하지 않는다.
+
+## 2026-09-09 추가 증거와 현재 판정
+
+- [UX-02 생성](reports/UX-02-creation.md): 3/12, 복수 도시·재개·검토 수정·저장 실패·offline·이중 등록 방지·한국어 오류 후 복구.
+- [UX-03 협업](reports/UX-03-collaboration.md): 실제 403/404/401 경계, active polling, 입력 유실 수정, 재조회 장애/충돌 및 acknowledgement race 복구.
+- [UX-04 전역](reports/UX-04-global.md): dark theme, save/import, 공개 중단 410, 초기 조회 실패/재시도.
+- [UX-05 품질](reports/UX-05-quality.md): simulated keyboard의 입력/CTA 전후 측정, 현재 공통 여백 수정·검사.
+- [UX-06 Foundation](reports/UX-06-foundation.md): 책임 계층·기존 계약·#123 충족/미검증/범위 제외 대응표.
+
+실기기 QA와 나머지 매트릭스는 사용자 결정으로 각각 보류/중단이다. 이 기록을 전체 이슈 완료로 해석하지 않는다.

@@ -51,6 +51,22 @@
 - owner: #128. 편집의 자동 focus/reconnect/polling을 비활성화하고, 기존 성공 데이터가 있는 network/5xx 재조회 실패에서는 editor와 local patches를 보존한다. 실패 안내를 표시하며 401/403 등 권한 실패에는 캐시 편집 화면을 숨기는 기존 경계를 유지한다.
 - 신규 컴포넌트 regression은 수정 전 입력 필드를 찾지 못해 실패, 수정 후 입력 보존·복구 및 403 차단 통과. 실제 수정 배포 재검증 전이므로 아직 마감하지 않는다.
 
+## UXF-006 — 키보드 inset에서 마지막 입력과 footer 겹침
+
+- 분류: 재현된 결함, P2. simulated inset에서 마지막 입력 하단 22px 가림. 실제 기기 영향의 심각도는 보류.
+- owner: #130, 공통 PageBody/BottomAction. 본문 keyboard 여백과 border-box 관찰로 수정. 다른 header/scroll-margin에 obstruction을 중복 가산하지 않는다.
+- 환경/전후 수치/캡처/검사: [UX-05](reports/UX-05-quality.md). 로컬 같은 360px 조건에서 입력과 footer 사이 16px 확보, 측정값도 148px로 일치.
+- 실기기 QA 보류, 전체 #130 종료와 구분.
+
 ## 새 finding 기록 필드
 
 `UXF ID / 분류 / 심각도·이유 / scenario·route·state·actor / 환경·SHA·배포·시각 / 재현 / 실제·기대·영향 / evidence 수준 / 구현 owner·issue / fix PR·SHA / 동일 조건 재검증 / 잔여 위험`.
+
+## 2026-09-09 수정 완료 판정
+
+- UXF-001: PR #135 머지·production 제외 확인.
+- UXF-002/003: PR #136 머지 및 staging `637c7290-b701-47f1-a340-b2fb5cdae920`에서 실제 3/12·한국어 등록 실패/재시도 확인.
+- UXF-004/005: PR #137 머지 및 staging `142a5975-228f-4834-bbd2-8cdc6beec5ef`에서 원격 변경 자동 갱신, 재조회 실패 중 입력 보존, v3→v4 충돌 복구 후 v5 저장 확인. P1 입력 유실은 동일 계약 재검증 완료.
+- UXF-006: 현재 여백 수정 로컬 재검증 완료, PR/CI 결과는 최종 진행 보고에 연결한다.
+
+과거 단계의 ‘재검증 대기’ 기록은 이 완료 판정과 연결한다. 미실행 시나리오를 새 결함 또는 통과로 추정하지 않는다.

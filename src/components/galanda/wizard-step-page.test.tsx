@@ -29,7 +29,7 @@ describe("WizardStepPage", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
     expect(screen.getByText("질문 내용")).toBeInTheDocument();
     expect(screen.getByTestId("wizard-step-page-body")).toHaveClass(
-      "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]",
+      "pb-[calc(max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))+var(--app-keyboard-inset,0px))]",
     );
   });
 

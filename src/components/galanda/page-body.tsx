@@ -33,7 +33,7 @@ export function PageBody({
           ? "pt-[calc(var(--app-page-padding-top)+var(--safe-top))]"
           : "pt-(--app-page-padding-top)",
         withBottomAction
-          ? "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]"
+          ? "pb-[calc(max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))+var(--app-keyboard-inset,0px))]"
           : "pb-(--app-page-padding-bottom)",
       )}
     />
