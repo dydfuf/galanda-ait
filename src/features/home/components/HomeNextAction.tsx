@@ -69,7 +69,7 @@ export function HomeNextAction({ trip, stale = false }: { readonly trip: TripOve
   };
 
   return (
-    <section aria-label="여행의 다음 행동" className="flex min-w-0 flex-1 flex-col">
+    <section aria-label="여행의 다음 행동" className="flex min-w-0 flex-col">
       <Link
         to={`${tripRoot}/${trip.isConfirmed ? "itinerary" : "plans"}`}
         className="flex min-h-16 items-center gap-4 border-t border-border py-5 text-base leading-relaxed text-foreground no-underline! focus-visible:outline-2 focus-visible:outline-ring"
@@ -88,7 +88,7 @@ export function HomeNextAction({ trip, stale = false }: { readonly trip: TripOve
         </span>
         <ChevronRight className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.8} aria-hidden="true" />
       </Link>
-      <div className="mt-auto flex flex-col gap-2 pt-16 [&_a]:scroll-mb-[calc(var(--global-nav-height,0px)+16px)] [&_button]:scroll-mb-[calc(var(--global-nav-height,0px)+16px)]">
+      <div className="flex flex-col gap-2 pt-5 [&_a]:scroll-mb-[calc(var(--global-nav-height,0px)+16px)] [&_button]:scroll-mb-[calc(var(--global-nav-height,0px)+16px)]">
         {error && <p role="alert" className="text-sm leading-relaxed text-destructive">{error}</p>}
         {recommendation ? (
           <Button

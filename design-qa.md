@@ -63,7 +63,7 @@ final result: passed
 
 ## 검증과 잔여 범위
 
-- 최종 `pnpm check`: lint, 146개 파일/1,450개 테스트, Drizzle 정합성,
+- 최종 `pnpm check`: lint, 146개 파일/1,451개 테스트, Drizzle 정합성,
   Web typecheck/build 및 Apps-in-Toss build 통과. 기존 lint 경고는 유지했다.
 - `git diff --check` 통과.
 - 일러스트 12개 총 11,716 bytes, 이번 추가분 8개 8,088 bytes.
@@ -147,3 +147,38 @@ final result: passed
   정상 API로 재현했다고 주장하지 않는다. 이 도달성 차이는 별도 검토 대상으로 남기고,
   캡처를 위해 API 검증이나 실제 제품 상태를 변경하지 않았다.
 - 수정 후 `pnpm check` exit 0: 146개 파일 / 1,450개 테스트 및 Web/AIT build 통과.
+
+## PR 피드백 반영: 하단 고정 영역 한 종류
+
+- Figma 없이 기존 UI를 수정했다. 전역 탐색 화면은 내비게이션만 고정하고,
+  기존 생성·편집·확정 route는 전역 shell 밖에서 하단 액션만 소유한다.
+- 내 여행의 생성 행동을 제목 옆으로 이동했다. 진행 중인 여행이 없는 정상 빈 상태는
+  본문 안에 주요 생성 행동을 표시하고 제목 옆 행동은 생략한다. 지난 여행·조회 오류에서는
+  제목 옆 행동을 유지한다. 고정 footer와 이를 위한 본문 여백은 제거했다.
+- 홈의 정상/빈 상태/지난 여행 행동을 관련 본문 바로 뒤에 배치했다. 하단으로 밀어내던
+  flex 여백을 없애고, 기존 추천 권한 확인·오류·진입 경로는 유지했다.
+- 두 고정 영역의 동시 사용을 위한 nav offset/safe-area override를 제거했다.
+  집중 작업의 키보드 inset과 safe-bottom, 액션 높이 측정/본문 여백 계약은 유지한다.
+
+### 최신 캡처와 확인
+
+모든 화면은 실제 React 컴포넌트와 로컬 샘플 API다. 이전 섹션의 홈/내 여행 캡처는
+해당 구현 시점 기록이며, 아래가 단일 하단 영역을 적용한 최신 화면이다.
+
+- `home-single-bottom-390.png`: 여행 정보에 이어 추천 행동을 배치.
+  320px 다크에서도 버튼 하단 473.64px, 내비게이션 시작 675px이며 가로 넘침 없음.
+- `home-empty-single-bottom-390.png`: 일러스트·설명 바로 뒤의 생성 행동.
+  320px에서도 본문 너비 320px, 생성 버튼 하단 493.5px로 확인.
+- `trips-single-bottom-390.png`, `trips-single-bottom-dark-390.png`,
+  `trips-single-bottom-320.png`: 하단 액션 0개, 전역 내비게이션 1개. 제목 옆 생성 버튼의
+  높이 44px 유지. 320px에서 제목/버튼이 같은 행에 있고 가로 넘침 없음.
+- `trips-empty-single-bottom-390.png`: 본문 생성 버튼 1개, 고정 액션 0개.
+- `create-single-bottom-320.png`: 내 여행의 생성 버튼으로 `/trips/new` 진입.
+  전역 내비게이션 0개, 하단 액션 1개, 액션 하단 740px. 입력/생성 mutation은 실행하지 않았다.
+
+### 검증
+
+- 관련 6개 파일/79개 테스트 통과. 실제 `TripListPage`와 `GlobalAppShell` 조합에서
+  생성 행동의 단일 노출·route 이동·footer 부재를 검증하고 기존 safe-area 테스트를 갱신했다.
+- 최종 `pnpm check` exit 0: 146개 파일/1,451개 테스트, DB 정합성, Web/AIT build 통과.
+- 실제 인증·PWA 오프라인·가상 키보드·AIT 실기기 검증과 배포는 수행하지 않았다.

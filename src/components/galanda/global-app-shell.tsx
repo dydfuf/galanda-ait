@@ -28,10 +28,8 @@ import {
  * 여백 소유권: Global nav가 viewport bottom과 safe-bottom의 owner다.
  * 본문 wrapper가 bar 높이(`--global-nav-height`)만큼 padding-bottom을 확보해
  * 콘텐츠가 가려지지 않게 한다.
- * Global route가 contextual fixed action(예: `/trips`의 새 여행 CTA)을 함께 가질 수 있으며,
- * 그런 action은 `--global-nav-height`만큼 nav 위로 offset한다.
- * `BottomAction`이 shell 안에 위치할 때 safe-bottom을 중복 소유하지 않도록
- * `--bottom-action-safe-bottom: 0px`를 사용한다.
+ * Global route의 행동은 본문 안에 둔다. 하단 고정 영역은 navigation만 소유한다.
+ * BottomAction을 쓰는 집중 작업 route는 이 shell 밖에 둔다.
  */
 
 const NAV_ICONS: Record<GlobalNavKey, typeof House> = {
@@ -51,8 +49,6 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
   const usesContentSurface = /^\/trips\/?$/.test(location.pathname);
   const shellStyle = {
     "--global-nav-height": "calc(64px + var(--safe-bottom))",
-    // BottomAction이 nav 위에 놓일 때 safe-area는 nav만 소유한다.
-    "--bottom-action-safe-bottom": "0px",
   } as CSSProperties;
 
   return (

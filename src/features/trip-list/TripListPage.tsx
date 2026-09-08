@@ -7,7 +7,6 @@ import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
-import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
@@ -214,6 +213,9 @@ export function TripListPage() {
   const pastTrips = sortPastTripsByMostRecent(
     trips?.filter((t) => classifyTrip(t, today) === "PAST") ?? []
   );
+  const showEmptyCreateAction = activeTab === "ONGOING" &&
+    ongoingTrips.length === 0 && trips !== undefined &&
+    !isLoading && !isError && !isSessionError;
 
   const ongoingContent = (
     <div className="flex flex-col gap-8 pb-12">
@@ -229,7 +231,9 @@ export function TripListPage() {
             status="empty"
             title="진행 중인 여행이 없어요"
             illustration={!isError && trips?.length === 0 ? <GalandaSpot name="empty-trips" /> : undefined}
-            description="새 여행을 시작하려면 아래 버튼을 이용해주세요."
+            description="새 여행을 만들어 함께 계획해보세요."
+            actionText="새 여행 만들기"
+            onAction={showEmptyCreateAction ? () => navigate("/trips/new") : undefined}
           />
         ) : (
           <div className="flex flex-col">
@@ -311,8 +315,23 @@ export function TripListPage() {
     );
 
   return (
-    <PageBody safeTop withBottomAction data-slot="trip-list-page" className="[--app-inline-padding:24px]">
-      <PageTitle title="내 여행" />
+    <PageBody safeTop data-slot="trip-list-page" className="[--app-inline-padding:24px]">
+      <PageTitle
+        title="내 여행"
+        className="items-center [&>div:first-child]:basis-0"
+        action={showEmptyCreateAction ? undefined : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            aria-label="새 여행 만들기"
+            onClick={() => navigate("/trips/new")}
+          >
+            <Plus className="size-5" strokeWidth={1.8} aria-hidden="true" />
+            새 여행
+          </Button>
+        )}
+      />
 
       <div className="mt-4 mb-4 px-(--app-inline-padding)">
         <Tabs
@@ -335,18 +354,6 @@ export function TripListPage() {
       </div>
 
       {content}
-
-      <BottomAction>
-          <Button
-            type="button"
-            size="xl"
-            aria-label="새 여행 만들기"
-            onClick={() => navigate("/trips/new")}
-          >
-            <Plus className="size-5" strokeWidth={1.8} aria-hidden="true" />
-            새 여행 만들기
-          </Button>
-      </BottomAction>
     </PageBody>
   );
 }

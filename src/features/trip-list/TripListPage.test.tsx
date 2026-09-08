@@ -9,6 +9,7 @@ import {
 } from "react-router-dom";
 
 import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
+import { GlobalAppShell } from "@/components/galanda/global-app-shell.tsx";
 
 vi.mock("../plan-home/queries.ts", () => ({
   useTripRoomsQuery: vi.fn(),
@@ -79,7 +80,7 @@ function TestApp() {
     <MemoryRouter initialEntries={["/trips"]}>
       <LocationProbe />
       <Routes>
-        <Route path="/trips" element={<TripListPage />} />
+        <Route path="/trips" element={<GlobalAppShell><TripListPage /></GlobalAppShell>} />
         <Route path="*" element={<div>이동 완료</div>} />
       </Routes>
     </MemoryRouter>
@@ -229,7 +230,7 @@ describe("TripListPage", () => {
     ).toBeVisible();
   });
 
-  it("여행 카드와 유일한 Primary Action이 실제 route로 이동한다", () => {
+  it("여행 카드와 빈 상태의 유일한 생성 행동이 실제 route로 이동하고 하단은 nav만 소유한다", () => {
     mockUseTripRoomsQuery.mockReturnValue(
       roomsQueryResult([tripFixture({ id: "trip-route" })]),
     );
@@ -250,22 +251,35 @@ describe("TripListPage", () => {
     const pageBody = secondView.container.querySelector<HTMLElement>(
       '[data-slot="trip-list-page"]',
     );
-    expect(pageBody?.className).toContain(
-      "pb-[max(var(--app-cta-space),calc(var(--app-bottom-action-height,0px)+16px))]",
-    );
-    expect(pageBody?.className).not.toContain("pb-(--app-page-padding-bottom)");
+    expect(pageBody?.className).toContain("pb-(--app-page-padding-bottom)");
 
     const primaryActions = screen.getAllByRole("button", {
       name: "새 여행 만들기",
     });
     expect(primaryActions).toHaveLength(1);
     const footer = document.querySelector('[data-slot="bottom-action"]');
-    expect(footer).toContainElement(primaryActions[0]);
-    expect(footer).toHaveStyle({ bottom: "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))" });
+    expect(footer).toBeNull();
+    expect(screen.getByRole("navigation", { name: "주요 화면" })).toBeVisible();
+    expect(secondView.container.querySelector('[data-system-state="empty"]')).toContainElement(primaryActions[0]);
     fireEvent.click(primaryActions[0]);
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       "/trips/new",
     );
+  });
+
+  it("목록이 있거나 지난 여행 탭이면 제목 옆 생성 행동을 유지한다", () => {
+    mockUseTripRoomsQuery.mockReturnValue(roomsQueryResult([tripFixture()]));
+    const view = renderPage();
+    const title = screen.getByRole("heading", { name: "내 여행" }).parentElement?.parentElement;
+    expect(title).toContainElement(screen.getByRole("button", { name: "새 여행 만들기" }));
+    expect(view.container.querySelector('[data-slot="bottom-action"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "지난 여행" }));
+    expect(screen.getByText("지난 여행이 없어요")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "새 여행 만들기" })).toHaveLength(1);
+    expect(title).toContainElement(screen.getByRole("button", { name: "새 여행 만들기" }));
+    fireEvent.click(screen.getByRole("button", { name: "새 여행 만들기" }));
+    expect(screen.getByTestId("location-path")).toHaveTextContent("/trips/new");
   });
 
   it("로딩과 성공한 0건 empty state를 동시에 표시하지 않는다", () => {

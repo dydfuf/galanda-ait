@@ -148,10 +148,8 @@ describe("Page chrome geometry contracts", () => {
     expect(actionChrome?.className).toContain("fixed");
     expect(actionChrome?.className).toContain("inset-x-0");
     expect(actionChrome).toHaveStyle({
-      bottom:
-        "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
-      paddingBottom:
-        "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
+      bottom: "var(--app-keyboard-inset, 0px)",
+      paddingBottom: "calc(12px + var(--safe-bottom))",
     });
     expect(actionChrome?.className).toContain("transition-[bottom]");
     expect(actionChrome?.className).toContain("border-t");

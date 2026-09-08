@@ -41,7 +41,7 @@ export function HomePage() {
     );
   } else if (featured && lifecycle) {
     tripContent = (
-      <div className="flex flex-1 flex-col gap-7">
+      <div className="flex flex-col gap-7">
         <HomeTripCard trip={featured} lifecycle={lifecycle} today={today} />
         <HomeNextAction key={featured.id} trip={featured} stale={rooms.isError} />
       </div>
@@ -50,7 +50,7 @@ export function HomePage() {
     tripContent = (
       <section
         aria-labelledby="home-trip-past-heading"
-        className="flex min-w-0 flex-1 flex-col items-start gap-6 pt-12"
+        className="flex min-w-0 flex-col items-start gap-6 pt-12"
       >
         <div className="min-w-0">
           <GalandaSpot name="create-trip" />
@@ -61,19 +61,19 @@ export function HomePage() {
             지난 여행 기록을 확인하거나 새로운 여행을 계획해보세요.
           </p>
         </div>
-        <div className="mt-auto flex w-full min-w-0 flex-col-reverse gap-2 pt-12">
-          <Link
-            to="/trips"
-            className={cn(buttonVariants({ variant: "ghost", size: "xl" }), "no-underline!")}
-          >
-            내 여행 보기
-          </Link>
+        <div className="flex w-full min-w-0 flex-col gap-2">
           <Link
             to="/trips/new"
             className={cn(buttonVariants({ size: "xl" }), "min-h-14 no-underline!")}
           >
             <Plus aria-hidden="true" />
             새 여행 만들기
+          </Link>
+          <Link
+            to="/trips"
+            className={cn(buttonVariants({ variant: "ghost", size: "xl" }), "no-underline!")}
+          >
+            내 여행 보기
           </Link>
         </div>
       </section>
@@ -82,7 +82,7 @@ export function HomePage() {
     tripContent = (
       <section
         aria-labelledby="home-trip-empty-heading"
-        className="flex min-w-0 flex-1 flex-col items-start gap-6 pt-12"
+        className="flex min-w-0 flex-col items-start gap-6 pt-12"
       >
         <div className="min-w-0">
           <GalandaSpot name="empty-trips" />
@@ -93,7 +93,7 @@ export function HomePage() {
             여행방을 만들어 후보를 비교하고, 친구들의 의견으로 함께 확정해요.
           </p>
         </div>
-        <div className="mt-auto flex w-full min-w-0 flex-col gap-2 pt-12">
+        <div className="flex w-full min-w-0 flex-col gap-2">
           <Link
             to="/trips/new"
             className={cn(buttonVariants({ size: "xl" }), "min-h-14 no-underline!")}

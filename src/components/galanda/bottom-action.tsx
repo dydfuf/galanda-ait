@@ -68,9 +68,8 @@ export function BottomAction({
       data-slot="bottom-action"
       data-galanda-surface={surface}
       style={{
-        bottom: "calc(var(--global-nav-height, 0px) + var(--app-keyboard-inset, 0px))",
-        paddingBottom:
-          "calc(12px + var(--bottom-action-safe-bottom, var(--safe-bottom)))",
+        bottom: "var(--app-keyboard-inset, 0px)",
+        paddingBottom: "calc(12px + var(--safe-bottom))",
       }}
       className={cn(
         "fixed inset-x-0 z-30 border-t px-5 pt-2 transition-[bottom] duration-[var(--motion-duration-standard)] ease-[var(--motion-ease-standard)] motion-reduce:transition-none",
