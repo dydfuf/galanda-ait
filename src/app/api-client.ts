@@ -98,6 +98,15 @@ const requestJson = async <S extends Schema.Decoder<any, never>>(
     ...init,
     credentials: "same-origin",
     headers: init.body ? { "content-type": "application/json" } : init.headers,
+  }).catch((cause: unknown) => {
+    if (init.signal?.aborted || (cause instanceof Error && cause.name === "AbortError")) {
+      throw cause;
+    }
+    throw new ApiClientError({
+      status: 0,
+      code: "NETWORK_ERROR",
+      message: "서버에 연결하지 못했어요. 연결과 처리 결과를 확인한 뒤 다시 시도해주세요.",
+    });
   });
   const payload: unknown = await response.json().catch(() => undefined);
 

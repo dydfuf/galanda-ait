@@ -813,6 +813,18 @@ describe("End-to-End State Machine Scenarios", () => {
   });
 
   describe("getWizardSubStepProgress", () => {
+    it("도시 입력 전에도 최소 한 도시의 질문을 세며 초안에 빈 도시를 저장하지 않는다", () => {
+      const emptyForm = createMockFormData({ routes: [], accommodations: [], transports: [] });
+      const before = structuredClone(emptyForm);
+      expect(getWizardSubStepProgress({ section: "basic", question: "headcount" }, emptyForm))
+        .toEqual({ current: 3, total: 12 });
+      expect(getWizardQuestionSequence(emptyForm)).toEqual(getWizardQuestionSequence({
+        ...emptyForm, routes: [{ city: "", arrivalDate: "", departureDate: "" }],
+      }));
+      expect(emptyForm).toEqual(before);
+      expect(normalizeWizardCursor({ section: "accommodation", question: "status" }, emptyForm))
+        .toEqual({ section: "route", question: "city", index: 0 });
+    });
     it("기본 1개 도시(숙소 탐색 기본값) 기준 12개 질문에서 순서에 맞는 current/total을 반환한다", () => {
       const initialForm: PlanEditorFormData = {
         title: "",

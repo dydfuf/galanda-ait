@@ -44,6 +44,25 @@ const jsonResponse = (body: unknown, status = 200) =>
   });
 
 describe("API client", () => {
+  it("읽기와 등록의 네트워크 실패를 같은 한국어 오류로 전달한다", async () => {
+    globalThis.fetch = async () => { throw new TypeError("Failed to fetch"); };
+    for (const request of [() => getCurrentSession(), () => createTrip({ title: "네트워크 확인" })]) {
+      await expect(request()).rejects.toMatchObject({
+        name: "ApiClientError", status: 0, code: "NETWORK_ERROR",
+        message: "서버에 연결하지 못했어요. 연결과 처리 결과를 확인한 뒤 다시 시도해주세요.",
+      });
+    }
+  });
+
+  it("요청 취소는 네트워크 장애로 바꾸지 않는다", async () => {
+    const controller = new AbortController();
+    const abort = new DOMException("Aborted", "AbortError");
+    globalThis.fetch = async () => { throw abort; };
+    await expect(getCurrentSession(controller.signal)).rejects.toBe(abort);
+    controller.abort(new Error("route changed"));
+    globalThis.fetch = async () => { throw controller.signal.reason; };
+    await expect(getCurrentSession(controller.signal)).rejects.toBe(controller.signal.reason);
+  });
   it("추천 조회와 lifecycle 이벤트를 같은 recommendationId로 전송한다", async () => {
     const tripId = TripIdSchema.make("trip-1");
     const recommendationId = RecommendationIdSchema.make("recommendation-1");

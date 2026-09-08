@@ -536,6 +536,11 @@ export function mapValidationErrorToCursor(
 export function getWizardQuestionSequence(
   formData: PlanEditorFormData
 ): ReadonlyArray<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> {
+  // 첫 도시를 입력하기 전에도 해당 도시의 질문은 진행률에 포함한다.
+  const sequenceFormData = formData.routes.length > 0 ? formData : {
+    ...formData,
+    routes: [{ city: "", arrivalDate: "", departureDate: "" }],
+  };
   const list: Array<{ section: FirstPlanWizardSection; question: FirstPlanWizardQuestion; index?: number }> = [];
   let current: FirstPlanWizardCursor = { section: "basic", question: "title" };
 
@@ -548,7 +553,7 @@ export function getWizardQuestionSequence(
       question: current.question,
       ...(current.index !== undefined ? { index: current.index } : {}),
     });
-    const next = getNextWizardCursor(current, formData);
+    const next = getNextWizardCursor(current, sequenceFormData);
     if (
       next.section === current.section &&
       next.question === current.question &&
