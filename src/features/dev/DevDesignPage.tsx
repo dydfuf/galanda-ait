@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { DevWizardPreview } from "./DevWizardPreview.tsx";
 import { toast } from "sonner";
 import {
   CalendarDays,
@@ -93,6 +95,8 @@ import { cn } from "@/lib/utils.ts";
  *   한 페이지에서 눈으로 확인할 때만 써요.
  */
 export function DevDesignPage() {
+  const [params] = useSearchParams();
+  if (params.get("preview") === "wizard") return <DevWizardPreview />;
   return (
     <div data-slot="dev-design-page" className="min-h-dvh bg-background">
       <PageHeader
@@ -110,6 +114,9 @@ export function DevDesignPage() {
           title="Galanda UI 카탈로그"
           description="shadcn primitive, Galanda shell, semantic token을 한눈에 확인하는 개발 전용 페이지예요. 프로덕션 빌드에는 포함되지 않아요."
         />
+        <Link to="/dev?preview=wizard" className="mx-(--app-inline-padding) inline-flex min-h-(--touch-target-min) items-center text-primary underline">
+          위자드 단독 미리보기
+        </Link>
         <TokenSection />
         <TypographySection />
         <ButtonsSection />

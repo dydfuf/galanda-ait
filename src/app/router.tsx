@@ -71,11 +71,11 @@ const NotFoundPage = lazy(() =>
 const LoginPage = lazy(() =>
   import("../features/auth/LoginPage.tsx").then((m) => ({ default: m.LoginPage })),
 );
-const DevDesignPage = lazy(() =>
+const DevDesignPage = import.meta.env.DEV ? lazy(() =>
   import("../features/dev/DevDesignPage.tsx").then((m) => ({
     default: m.DevDesignPage,
   })),
-);
+) : undefined;
 
 function RouteFallback() {
   return <PageState status="loading" message="화면을 불러오는 중이에요." />;
@@ -105,7 +105,7 @@ export function AppRouter() {
           개발 전용 디자인 카탈로그. DEV 빌드에서만 등록돼요.
           프로덕션에서는 이 route가 없어 `/dev`가 404가 돼요.
         */}
-        {import.meta.env.DEV && (
+        {DevDesignPage && (
           <Route path="/dev" element={withSuspense(<DevDesignPage />)} />
         )}
 
