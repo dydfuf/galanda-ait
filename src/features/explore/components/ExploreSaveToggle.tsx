@@ -1,4 +1,4 @@
-import { Bookmark, BookmarkCheck } from "lucide-react";
+import { DecisionIcon } from "@/components/galanda/decision-icon.tsx";
 
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
@@ -73,10 +73,8 @@ export function ExploreSaveToggle({
       >
         {isBusy ? (
           <Spinner className="size-5" aria-hidden="true" />
-        ) : saved ? (
-          <BookmarkCheck className="size-5" aria-hidden="true" />
         ) : (
-          <Bookmark className="size-5" aria-hidden="true" />
+          <DecisionIcon name="bookmark" variant={saved ? "filled" : "outline"} size={20} />
         )}
         <span>{label}</span>
       </Button>

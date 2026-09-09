@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
-import { Bell, Share2 } from "lucide-react";
+import { Bell } from "lucide-react";
+import { DecisionIcon } from "@/components/galanda/decision-icon.tsx";
 import { decodeRouteParams, TripParamsSchema } from "../routes/route-params.ts";
 import { RouteErrorFallback } from "../../features/common/RouteErrorFallback.tsx";
 import { Result } from "effect";
@@ -120,7 +121,7 @@ export function TripRoomTabLayout() {
           className="text-foreground-muted hover:text-foreground transition-colors"
           onClick={() => void shareTripInvite(tripId)}
         >
-          <Share2 className="size-5" strokeWidth={1.8} aria-hidden="true" />
+          <DecisionIcon name="share" size={20} />
         </Button>
       )}
     </div>

@@ -78,7 +78,7 @@ fallback하며 header owner를 바꾸지 않습니다.
 
 - 일반 조작·메타데이터 아이콘은 기존 Lucide를 사용합니다. 홈에서는
   16/20/24px, 1.8px 선으로 맞추며 터치 영역은 Button/Link가 44px 이상 확보합니다.
-  아래 여행 준비 및 시작·협업·완료 아이콘 적용 지점은 전용 24×24 / 2px SVG 계약을 따릅니다.
+  아래 전용 아이콘 적용 지점은 각 절에 명시한 24×24 / 2px SVG 계약을 따릅니다.
 - 글로벌 내비게이션은 아래의 전용 SVG 계약을 따릅니다. 일러스트나 Lucide 아이콘을
   하단 탭 아이콘과 혼용하지 않습니다.
 - 일러스트는 `GalandaSpot`으로 렌더링합니다. 텍스트가 의미를 소유하고 그림은
@@ -154,6 +154,31 @@ fallback하며 header owner를 바꾸지 않습니다.
   예약 완료가 아닙니다. `IDLE`/`SAVING`/`ERROR`에는 완료 체크를 표시하지 않습니다.
 - 보이는 한글 텍스트가 의미를 소유합니다. SVG는 `aria-hidden="true"`, `focusable="false"`이며,
   아이콘 크기를 링크·버튼의 터치 영역으로 취급하지 않습니다. 기존 일러스트는 유지합니다.
+
+### 비교·보관·가져오기·공유 아이콘
+
+`DecisionIcon`은 `compare`, `bookmark`, `import-plan`, `share`를 제공합니다.
+원본 5개는 `public/assets/galanda/decision/`에 보관하며 인라인 JSX로 렌더링합니다.
+
+- `bookmark`만 `variant="outline" | "filled"`를 지원합니다. 같은 경로에 채움만
+  전환하며 나머지 아이콘은 outline 전용입니다. `decision-icon.test.tsx`가 원본과
+  실제 React 렌더러의 형상·색상 계약을 비교합니다.
+- 24×24 viewBox, 2px 선, 둥근 끝·모서리, `currentColor`, 투명 배경을 유지합니다.
+  기본 24px, 행동 버튼 20px, 작은 추천 보조 버튼 16px이며 부모의 semantic color를
+  상속합니다. 라이트·다크 전용 파일, 고정 색상, SVG 로더를 추가하지 않습니다.
+- `PlanHomePage`의 비교 CTA·비교 대상 선택 Drawer와 `NextActionRecommendation`의
+  `COMPARE_PLANS` 행동에 `compare`를 표시합니다. 확정·의견·생성 행동에는 붙이지
+  않으며 기존 후보 수·권한·선택 개수·추천 노출 조건과 이동 동작을 유지합니다.
+- `ExploreSaveToggle`은 기존 `saved` 값으로 북마크 채움을 결정합니다. 보관 여부이지
+  임시 저장·예약 완료가 아닙니다. mutation 중에는 기존 Spinner를 표시하고 실패 시
+  기존 query rollback에 따라 형상도 복구합니다. `aria-pressed`, 저장/저장됨 라벨,
+  세션·초기 로딩·오프라인·disabled 조건을 변경하지 않습니다.
+- `ExploreImportAction`의 가져오기 버튼과 `TripRoomTabLayout`의 웹 공유 버튼에
+  적용합니다. 가져오기 Drawer, 공유 처리, 네이티브 accessory와 웹 fallback 조건은
+  그대로 유지합니다. 네이티브 `icon-share-mono`는 이 웹 SVG로 대체하지 않습니다.
+- 기존 버튼/링크가 접근 가능한 이름과 터치 영역을 소유합니다. SVG는
+  `aria-hidden="true"`, `focusable="false"`이며 별도 포커스 대상을 만들지 않습니다.
+- 이전 내비게이션·여행 준비·시작/협업 아이콘과 일러스트·PWA 로고는 변경하지 않습니다.
 
 ### 여행 중심 주요 화면
 

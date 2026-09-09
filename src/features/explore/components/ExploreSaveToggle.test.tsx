@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../app/api-client.ts", () => ({
@@ -75,6 +75,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장" });
     expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button.querySelector('[data-slot="decision-icon"]')).toHaveAttribute("fill", "none");
   });
 
   it("저장 상태에서는 aria-pressed=true, 저장됨 label을 노출한다", async () => {
@@ -83,6 +84,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
     renderToggle();
     const button = await screen.findByRole("button", { name: "저장됨" });
     expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(button.querySelector('[data-slot="decision-icon"]')).toHaveAttribute("fill", "currentColor");
   });
 
   it("toggle 클릭 시 save를 호출하고 성공하면 저장됨으로 확정한다", async () => {
@@ -99,6 +101,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
     fireEvent.click(button);
     await waitFor(() => expect(mockSave).toHaveBeenCalledWith(listingId));
     await screen.findByRole("button", { name: "저장됨" });
+    await waitFor(() => expect(button.querySelector('[data-slot="decision-icon"]')).toHaveAttribute("fill", "currentColor"));
   });
 
   it("save 실패 시 저장됨으로 표시하지 않고 rollback + 오류 안내한다", async () => {
@@ -115,6 +118,7 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
       "aria-pressed",
       "false"
     );
+    expect(button.querySelector('[data-slot="decision-icon"]')).toHaveAttribute("fill", "none");
     // 실패를 "저장됨"으로 표시하지 않는다.
     expect(
       screen.queryByRole("button", { name: "저장됨" })
@@ -130,5 +134,35 @@ describe("ExploreSaveToggle (RAON-254 DISC-6)", () => {
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
     await waitFor(() => expect(mockUnsave).toHaveBeenCalledWith(listingId));
+  });
+
+  it("저장 해제 중에는 스피너를 표시하고 실패하면 채운 북마크로 복구한다", async () => {
+    mockUseSession.mockReturnValue(readySession());
+    mockState.mockResolvedValue({ saved: true, saveCount: 0 });
+    let rejectUnsave!: (error: Error) => void;
+    mockUnsave.mockImplementation(() => new Promise((_, reject) => {
+      rejectUnsave = reject;
+    }));
+    renderToggle();
+    const button = await screen.findByRole("button", { name: "저장됨" });
+    await waitFor(() => expect(button).toBeEnabled());
+
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(mockUnsave).toHaveBeenCalledWith(listingId);
+      expect(button).toBeDisabled();
+      expect(button.querySelector('[data-slot="spinner"]')).not.toBeNull();
+      expect(button.querySelector('[data-slot="decision-icon"]')).toBeNull();
+    });
+    await act(async () => rejectUnsave(new Error("unsave failed")));
+
+    await screen.findByRole("alert");
+    await waitFor(() => {
+      expect(button).toBeEnabled();
+      expect(button).toHaveAttribute("aria-pressed", "true");
+      expect(button).toHaveAccessibleName("저장됨");
+      expect(button.querySelector('[data-slot="decision-icon"]')).toHaveAttribute("fill", "currentColor");
+      expect(button.querySelector('[data-slot="spinner"]')).toBeNull();
+    });
   });
 });
