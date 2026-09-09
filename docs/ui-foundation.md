@@ -76,8 +76,10 @@ fallback하며 header owner를 바꾸지 않습니다.
 하단 단일 영역 피드백 이후에는 시안의 버튼 위치 대신 여행 정보 바로 뒤에 행동을
 배치하며, 화면 하단으로 밀어내는 빈 공간을 만들지 않습니다.
 
-- 조작·메타데이터 아이콘은 기존 Lucide를 사용합니다. 새 홈과 글로벌 내비게이션은
+- 일반 조작·메타데이터 아이콘은 기존 Lucide를 사용합니다. 홈에서는
   16/20/24px, 1.8px 선으로 맞추며 터치 영역은 Button/Link가 44px 이상 확보합니다.
+- 글로벌 내비게이션은 아래의 전용 SVG 계약을 따릅니다. 일러스트나 Lucide 아이콘을
+  하단 탭 아이콘과 혼용하지 않습니다.
 - 일러스트는 `GalandaSpot`으로 렌더링합니다. 텍스트가 의미를 소유하고 그림은
   `aria-hidden` 및 빈 alt를 사용합니다. 실제 크기는 128px입니다.
 - `create-trip`: 첫 여행안 시작 안내. `invite-companions`: 동행자 초대 안내.
@@ -90,6 +92,25 @@ fallback하며 header owner를 바꾸지 않습니다.
 
 로고·앱 아이콘·공유 이미지는 이 에셋 세트와 별개입니다. 서비스 코드에 일러스트
 패키지 전체나 새 아이콘 의존성을 추가하지 않습니다.
+
+### 글로벌 내비게이션 아이콘
+
+`GlobalAppShell`은 `GlobalNavIcon`으로 홈·탐색·내 여행·마이 아이콘을 렌더링합니다.
+기존 `resolveGlobalNavKey`의 같은 선택 상태로 `aria-current`와 아이콘 채움을
+결정합니다. 선택된 항목은 filled, 나머지는 outline이며 `/me/saved`는 마이를 선택합니다.
+
+- 승인된 SVG 원본 8개는 `public/assets/galanda/navigation/`에 보관합니다.
+  `home`, `explore`, `trips`, `my` 각각 `-outline.svg`와 `-filled.svg` 쌍입니다.
+- 렌더러는 원본과 같은 경로를 인라인 SVG로 사용합니다. 형상을 바꿀 때에는 원본과
+  `src/components/galanda/global-nav-icon.tsx`를 함께 갱신합니다.
+- `viewBox="0 0 24 24"`, 표시 크기 24px, 선 두께 2px, 둥근 끝·모서리를 유지합니다.
+  선택 전환 시 외곽 크기를 바꾸지 않으며 그림자·그라데이션·원근감을 추가하지 않습니다.
+- `currentColor`가 링크의 `text-primary` / `text-foreground-muted`를 상속합니다.
+  흰색 도형으로 구멍을 덮지 않고 투명 영역과 `evenodd`로 테마 독립성을 유지합니다.
+- 인라인 SVG이므로 탭 렌더링에 별도 이미지 요청이나 SVG 로더 패키지가 필요하지 않습니다.
+  원본을 `<img>`로 교체하면 부모의 `color`를 상속하지 않으므로 사용하지 않습니다.
+- 보이는 한글 링크 라벨이 접근 가능한 이름을 소유합니다. SVG는 `aria-hidden="true"`,
+  `focusable="false"`로 두며 44px 이상 터치 영역, focus-visible, safe-area는 shell이 유지합니다.
 
 ### 여행 중심 주요 화면
 

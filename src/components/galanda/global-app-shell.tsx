@@ -1,13 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Compass, House, Luggage, UserRound } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { GlobalNavIcon } from "@/components/galanda/global-nav-icon.tsx";
 import { OfflineStatusBanner } from "@/components/galanda/OfflineStatusBanner.tsx";
 import {
   GLOBAL_NAV_ITEMS,
   resolveGlobalNavKey,
-  type GlobalNavKey,
 } from "@/app/routes/global-nav.ts";
 
 /**
@@ -31,13 +30,6 @@ import {
  * Global route의 행동은 본문 안에 둔다. 하단 고정 영역은 navigation만 소유한다.
  * BottomAction을 쓰는 집중 작업 route는 이 shell 밖에 둔다.
  */
-
-const NAV_ICONS: Record<GlobalNavKey, typeof House> = {
-  HOME: House,
-  EXPLORE: Compass,
-  TRIPS: Luggage,
-  ME: UserRound,
-};
 
 export interface GlobalAppShellProps {
   readonly children: ReactNode;
@@ -72,7 +64,6 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
       >
         <ul className="mx-auto flex h-16 w-full max-w-(--content-max-width) items-stretch">
           {GLOBAL_NAV_ITEMS.map((item) => {
-            const Icon = NAV_ICONS[item.key];
             const isActive = item.key === activeKey;
             return (
               <li key={item.key} className="flex min-w-0 flex-1">
@@ -87,11 +78,7 @@ export function GlobalAppShell({ children }: GlobalAppShellProps) {
                       : "text-foreground-muted hover:text-foreground",
                   )}
                 >
-                  <Icon
-                    className="size-6 shrink-0"
-                    aria-hidden="true"
-                    strokeWidth={1.8}
-                  />
+                  <GlobalNavIcon navKey={item.key} active={isActive} />
                   <span className="min-w-0 [overflow-wrap:anywhere]">
                     {item.label}
                   </span>
