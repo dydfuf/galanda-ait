@@ -1,10 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>여행방 만들기</title><g stroke-linecap="round" stroke-linejoin="round"><path d="m33 76 55-20 64 20 55-20v132l-55 20-64-20-55 20Z" fill="#E0EDFF" stroke="#82B6FF" stroke-width="2.2"/>
-  <path d="m88 56 64 20v132l-64-20Z" fill="#FFFFFF"/>
-  <path d="M88 57v131m64-111v130" fill="none" stroke="#82B6FF" stroke-width="2.2"/>
-  <path d="M52 165c9-19 24-12 38-27s11-22 27-29" fill="none" stroke="#3182F6" stroke-width="4" stroke-dasharray="3 9"/>
-  <circle cx="52" cy="165" r="7" fill="#FFFFFF" stroke="#3182F6" stroke-width="3"/>
-  <path d="M151 44c-18 0-32 13-32 31 0 25 32 46 32 46s32-21 32-46c0-18-14-31-32-31Z" fill="#3182F6"/>
-  <circle cx="151" cy="75" r="11" fill="#FFFFFF"/>
-  <circle cx="191" cy="171" r="28" fill="#FFFFFF" stroke="#3182F6" stroke-width="3"/>
-  <path d="M181 171h20m-10-10v20" stroke="#3182F6" stroke-width="4"/>
-  <path d="m47 92 22-8m98 50 23-8" stroke="#82B6FF" stroke-width="3"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <title>새 경로를 시작하는 지도</title>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#78B9FF"/>
+      <stop offset=".52" stop-color="#3182F6"/>
+      <stop offset="1" stop-color="#1B64DA"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#EAF3FF"/>
+      <stop offset=".7" stop-color="#DCEBFF"/>
+      <stop offset="1" stop-color="#AACCF6"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="m31 85 55-16 65 17 52-17v112l-52 17-65-17-55 16Z" fill="#C9DDF7"/>
+    <path d="m27 77 55-16 65 17 52-17v112l-52 17-65-17-55 16Z" fill="url(#paper)"/>
+    <path d="m82 61 65 17v112l-65-17Z" fill="#C8DFFF"/>
+    <path d="M82 67v99m65-81v98" stroke="#AED3FF" stroke-width="2" stroke-opacity=".65"/>
+    <path d="m36 84 37-11m84 10 33-10" stroke="#FFFFFF" stroke-width="3" stroke-opacity=".35"/>
+    <path d="M48 148c22 0 18-27 39-27s23 15 43-10" fill="none" stroke="#5796E7" stroke-width="5" stroke-dasharray="3 10"/>
+    <circle cx="48" cy="148" r="7" fill="#EAF3FF" stroke="#5796E7" stroke-width="3"/>
+    <path d="M151 28c-18 0-30 13-30 29 0 23 30 47 30 47s30-24 30-47c0-16-12-29-30-29Z" fill="#1B64DA"/>
+    <path d="M146 23c-18 0-30 13-30 29 0 23 30 47 30 47s30-24 30-47c0-16-12-29-30-29Z" fill="url(#blue)"/>
+    <circle cx="146" cy="52" r="11" fill="#EAF3FF"/>
+    <path d="M126 43a22 22 0 0 1 20-13" fill="none" stroke="#AED3FF" stroke-width="3" stroke-opacity=".65"/>
+    <circle cx="188" cy="179" r="28" fill="#1B64DA"/>
+    <circle cx="184" cy="173" r="28" fill="url(#blue)"/>
+    <path d="M173 173h22m-11-11v22" stroke="#FFFFFF" stroke-width="6"/>
+  </g>
+</svg>
