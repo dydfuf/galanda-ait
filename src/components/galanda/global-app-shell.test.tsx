@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
@@ -51,6 +51,47 @@ describe("GlobalAppShell (RAON-248)", () => {
     expect(current[0]!.getAttribute("href")).toBe("/me");
   });
 
+  it.each([
+    ["/home", "홈"],
+    ["/explore", "탐색"],
+    ["/trips", "내 여행"],
+    ["/me", "마이"],
+    ["/me/saved", "마이"],
+  ])("%s에서는 %s 아이콘만 채우고 나머지는 라인으로 표시한다", (path, label) => {
+    renderAt(path);
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+    const selected = within(nav).getByRole("link", { name: label });
+
+    expect(selected).toHaveAttribute("aria-current", "page");
+    for (const link of within(nav).getAllByRole("link")) {
+      expect(link.querySelector("svg")).toHaveAttribute(
+        "fill",
+        link === selected ? "currentColor" : "none",
+      );
+    }
+  });
+
+  it("탭 이동 시 이전 아이콘은 라인으로 돌아가고 새 목적지만 채운다", () => {
+    renderAt("/home");
+    const nav = screen.getByRole("navigation", { name: "주요 화면" });
+
+    for (const label of ["탐색", "내 여행", "마이", "홈"]) {
+      const selected = within(nav).getByRole("link", { name: label });
+      fireEvent.click(selected);
+
+      expect(selected).toHaveAttribute("aria-current", "page");
+      for (const link of within(nav).getAllByRole("link")) {
+        expect(link.querySelector("svg")).toHaveAttribute(
+          "fill",
+          link === selected ? "currentColor" : "none",
+        );
+        if (link !== selected) {
+          expect(link).not.toHaveAttribute("aria-current");
+        }
+      }
+    }
+  });
+
   it("nav는 정확히 하나의 landmark label을 가지고 icon은 aria-hidden이며 link accessible name이 노출된다", () => {
     renderAt("/home");
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
@@ -58,6 +99,8 @@ describe("GlobalAppShell (RAON-248)", () => {
     expect(icons).toHaveLength(4);
     for (const icon of icons) {
       expect(icon).toHaveAttribute("aria-hidden", "true");
+      expect(icon).toHaveAttribute("focusable", "false");
+      expect(icon).toHaveAttribute("viewBox", "0 0 24 24");
     }
     expect(within(nav).getByRole("link", { name: "홈" })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "탐색" })).toBeInTheDocument();
@@ -81,6 +124,9 @@ describe("GlobalAppShell (RAON-248)", () => {
       .getAllByRole("link")
       .filter((a) => a.getAttribute("aria-current") === "page");
     expect(current).toHaveLength(0);
+    for (const icon of nav.querySelectorAll("svg")) {
+      expect(icon).toHaveAttribute("fill", "none");
+    }
   });
 
   it.each(["/trips", "/trips/"])(
