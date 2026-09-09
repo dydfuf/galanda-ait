@@ -68,8 +68,18 @@ export function generateIcons(check = false) {
     if (JSON.stringify(definition.attrs) === JSON.stringify({ ...rootAttrs, fill: 'currentColor' })) return `filled(${JSON.stringify(definition.nodes)})`;
     return JSON.stringify(definition);
   };
-  const nodesText = nodeHeader + `export const ICON_NODES = {\n${Object.entries(sorted(definitions)).map(([name, variants]) => `  ${JSON.stringify(name)}: {${Object.entries(variants).map(([variant, definition]) => `${JSON.stringify(variant)}: ${serialize(definition)}`).join(', ')}},`).join('\n')}\n} as const;\n`;
-  const catalogueText = `${GENERATED_HEADER}export const ICON_CATALOG = {\n${Object.entries(sorted(catalogue)).map(([name, value]) => `  ${JSON.stringify(name)}: ${JSON.stringify(value)},`).join('\n')}\n} as const;\n`;
+  const indent = String.fromCharCode(32, 32);
+  const nodeLines = Object.entries(sorted(definitions)).map(([name, variants]) => {
+    const entries = Object.entries(variants).map(([variant, definition]) =>
+      JSON.stringify(variant) + ': ' + serialize(definition),
+    );
+    return indent + JSON.stringify(name) + ': {' + entries.join(', ') + '},';
+  });
+  const catalogueLines = Object.entries(sorted(catalogue)).map(([name, value]) =>
+    indent + JSON.stringify(name) + ': ' + JSON.stringify(value) + ',',
+  );
+  const nodesText = nodeHeader + ['export const ICON_NODES = {', ...nodeLines, '} as const;', ''].join('\n');
+  const catalogueText = GENERATED_HEADER + ['export const ICON_CATALOG = {', ...catalogueLines, '} as const;', ''].join('\n');
   for (const [file, text] of [['icon-nodes.ts', nodesText], ['catalog.ts', catalogueText]]) {
     const path = join(OUTPUT, file);
     if (check) {
