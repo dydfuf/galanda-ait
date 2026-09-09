@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark, Monitor, Moon, Palette, Sun } from "lucide-react";
+import { GalandaIcon } from "@/components/galanda/galanda-icon.tsx";
 
 import { useTheme } from "@/app/theme-provider.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
@@ -25,9 +25,9 @@ const THEME_LABELS = {
 } as const;
 
 const THEME_OPTIONS = [
-  { value: "system", label: "시스템", Icon: Monitor },
-  { value: "light", label: "라이트", Icon: Sun },
-  { value: "dark", label: "다크", Icon: Moon },
+  { value: "system", label: "시스템", icon: "monitor" },
+  { value: "light", label: "라이트", icon: "sun" },
+  { value: "dark", label: "다크", icon: "moon" },
 ] as const;
 
 const getNameInitial = (name: string): string => {
@@ -98,7 +98,7 @@ export function MePage() {
             chevron
             leading={
               <span className="grid size-8 shrink-0 place-items-center text-muted-foreground">
-                <Bookmark className="size-5" strokeWidth={1.8} aria-hidden="true" />
+                <GalandaIcon name="bookmark" size={20} />
               </span>
             }
           >
@@ -111,7 +111,7 @@ export function MePage() {
             onClick={() => setIsThemeSheetOpen(true)}
             leading={
               <span className="grid size-8 shrink-0 place-items-center text-muted-foreground">
-                <Palette className="size-5" strokeWidth={1.8} aria-hidden="true" />
+                <GalandaIcon name="palette" size={20} />
               </span>
             }
             trailing={
@@ -150,13 +150,13 @@ export function MePage() {
             aria-label="색상 선택"
             className="gap-0 px-4 pt-3 pb-[calc(1rem+var(--safe-bottom,0px))]"
           >
-            {THEME_OPTIONS.map(({ value, label, Icon }) => (
+            {THEME_OPTIONS.map(({ value, label, icon }) => (
               <label
                 key={value}
                 className="flex min-h-(--touch-target-min) cursor-pointer items-center gap-3 border-b border-border py-3.5 last:border-b-0"
               >
                 <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">
-                  <Icon className="size-5" aria-hidden="true" />
+                  <GalandaIcon name={icon} size={20} />
                 </span>
                 <span className="min-w-0 flex-1 text-base font-medium text-foreground">
                   {label}

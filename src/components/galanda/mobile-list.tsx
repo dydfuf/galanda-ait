@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { GalandaIcon } from "./galanda-icon.tsx";
 
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia } from "@/components/ui/item";
 import { cn } from "@/lib/utils";
@@ -89,9 +89,10 @@ export function MobileListItem({
           <ItemActions className="min-w-0 max-w-[45%] shrink-0 flex-wrap justify-end text-right [overflow-wrap:anywhere] [&>*]:min-w-0 [&>*]:max-w-full [&>*]:whitespace-normal [&>*]:[overflow-wrap:anywhere]">
             {trailing}
             {chevron && (
-              <ChevronRight
-                aria-hidden="true"
-                className="size-4 shrink-0 text-muted-foreground/60"
+              <GalandaIcon
+                name="chevron-right"
+                size={16}
+                className="text-muted-foreground/60"
               />
             )}
           </ItemActions>

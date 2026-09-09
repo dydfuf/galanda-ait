@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronLeft } from "lucide-react";
+import { GalandaIcon } from "./galanda-icon.tsx";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,7 @@ export function PageHeader({
               aria-label={back.label ?? "뒤로 가기"}
               onClick={back.onClick}
             >
-              <ChevronLeft className="size-6" />
+              <GalandaIcon name="chevron-left" />
             </Button>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { useOnlineStatus } from "../../hooks/useOnlineStatus.ts";
-import { WifiOff } from "lucide-react";
+import { GalandaIcon } from "./galanda-icon.tsx";
 
 interface OfflineStatusBannerProps {
   readonly lastSyncedAt?: string;
@@ -20,7 +20,7 @@ export function OfflineStatusBanner({
       aria-live="polite"
       className={`flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-2 text-xs font-medium text-amber-900 dark:text-amber-200 border-b border-amber-500/30 ${className}`}
     >
-      <WifiOff className="size-4 shrink-0" aria-hidden="true" />
+      <GalandaIcon name="wifi-off" size={16} />
       <span>
         오프라인 상태입니다.
         {lastSyncedAt
