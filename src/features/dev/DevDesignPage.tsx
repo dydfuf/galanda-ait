@@ -783,6 +783,8 @@ function AssetsSection() {
     ["confirm-plan", "일정 확정"],
     ["empty-trips", "여행 없음"],
     ["empty-saved", "저장한 일정 없음"],
+    ["empty-explore", "공개된 일정 없음"],
+    ["empty-search", "검색 결과 없음"],
   ] as const;
   const icons = [
     [House, "홈"], [Compass, "탐색"], [Luggage, "내 여행"], [UserRound, "마이"],
