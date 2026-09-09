@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Compass } from "lucide-react";
+import { GalandaIcon } from "@/components/galanda/galanda-icon.tsx";
 
 import { ActionIcon } from "@/components/galanda/action-icon.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
@@ -109,7 +109,7 @@ export function HomePage() {
               "no-underline!"
             )}
           >
-            <Compass aria-hidden="true" />
+            <GalandaIcon name="explore" size={20} />
             여행 탐색
           </Link>
         </div>
