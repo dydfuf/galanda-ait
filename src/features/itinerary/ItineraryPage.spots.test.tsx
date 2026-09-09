@@ -7,10 +7,14 @@ import type { ItineraryStateResponse } from "@/contracts/itinerary.ts";
 import {
   ItineraryIdSchema, ParticipantIdSchema, PlanIdSchema, RevisionSchema, TripIdSchema,
 } from "@/core/domain/ids.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
 import { useItineraryQuery } from "./queries.ts";
 import { useAcknowledgeItineraryMutation } from "./mutations.ts";
 import { ItineraryPage } from "./ItineraryPage.tsx";
 
+vi.mock("../../hooks/useSession.ts", () => ({
+  useSessionQuery: vi.fn<typeof useSessionQuery>(),
+}));
 vi.mock("./queries.ts", () => ({ useItineraryQuery: vi.fn<typeof useItineraryQuery>() }));
 vi.mock("./mutations.ts", () => ({
   useAcknowledgeItineraryMutation: vi.fn<typeof useAcknowledgeItineraryMutation>(),
@@ -59,6 +63,18 @@ const spot = (container: HTMLElement) => container.querySelector('[data-slot="ga
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Keep session I/O outside these state-rendering tests, just like itinerary I/O.
+  vi.mocked(useSessionQuery).mockReturnValue({
+    data: {
+      participantId: "host-spot-test",
+      participantIds: ["host-spot-test"],
+      accountType: "REGISTERED",
+      name: "테스트 여행자",
+      isAuthenticated: true,
+    },
+    isSuccess: true, isPending: false, isLoading: false, isError: false, error: null,
+    refetch: vi.fn<ReturnType<typeof useSessionQuery>["refetch"]>(),
+  } as ReturnType<typeof useSessionQuery>);
   setQuery({ status: "UNCONFIRMED" });
   vi.mocked(useAcknowledgeItineraryMutation).mockReturnValue({
     isPending: false, isError: false, error: null,
