@@ -6,9 +6,10 @@ import { cleanup, render } from "@testing-library/react";
 
 import { GalandaSpot, type GalandaSpotName } from "./galanda-spot.tsx";
 
-const refreshed = ["empty-trips", "create-trip", "empty-saved"] as const;
-const legacy = ["invite-companions", "compare-plans", "confirm-plan"] as const;
-const names: readonly GalandaSpotName[] = [...refreshed, ...legacy];
+const names: readonly GalandaSpotName[] = [
+  "empty-trips", "create-trip", "empty-saved",
+  "invite-companions", "compare-plans", "confirm-plan",
+];
 const themes = ["light", "dark"] as const;
 const readSvg = (name: GalandaSpotName, theme: (typeof themes)[number]) =>
   readFileSync(join(process.cwd(), `public/assets/galanda/spots/${name}-${theme}.svg`), "utf8");
@@ -51,14 +52,9 @@ describe("GalandaSpot display contract", () => {
     expect(queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it.each(refreshed)("uses %s's own dark palette without an extra brightness filter", (name) => {
+  it.each(names)("uses %s's own dark palette without an extra brightness filter", (name) => {
     const { container } = render(<GalandaSpot name={name} />);
     expect(container.querySelector('img[src$="-dark.svg"]')).not.toHaveClass("brightness-125");
-  });
-
-  it.each(legacy)("preserves the existing contrast treatment of %s", (name) => {
-    const { container } = render(<GalandaSpot name={name} />);
-    expect(container.querySelector('img[src$="-dark.svg"]')).toHaveClass("brightness-125");
   });
 
   it("preserves Vite's non-root asset base", () => {
@@ -68,15 +64,15 @@ describe("GalandaSpot display contract", () => {
   });
 });
 
-describe("Home spot SVG sources", () => {
-  it.each(refreshed)("keeps %s geometry identical across palettes", (name) => {
+describe("Galanda spot SVG sources", () => {
+  it.each(names)("keeps %s geometry identical across palettes", (name) => {
     const light = readSvg(name, "light");
     const dark = readSvg(name, "dark");
     expect(light).not.toBe(dark);
     expect(geometry(light)).toEqual(geometry(dark));
   });
 
-  it.each(refreshed.flatMap((name) => themes.map((theme) => ({ name, theme }))))(
+  it.each(names.flatMap((name) => themes.map((theme) => ({ name, theme }))))(
     "keeps $name/$theme self-contained, static, and within the source size budget",
     ({ name, theme }) => {
       const source = readSvg(name, theme);
