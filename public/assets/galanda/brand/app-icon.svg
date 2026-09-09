@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 512 512" fill="none">
-  <title>갈라고</title>
-  <rect width="512" height="512" rx="112" fill="#3182F6"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>갈라고 앱 아이콘</title>
+  <rect width="512" height="512" fill="#3182F6"/>
   <path d="M379.6 321.7A140 140 0 1 1 379.6 190.3" stroke="white" stroke-width="48" stroke-linecap="round"/>
   <path d="M252 256H382" stroke="white" stroke-width="48" stroke-linecap="round"/>
   <circle cx="382" cy="256" r="10" fill="#3182F6"/>
