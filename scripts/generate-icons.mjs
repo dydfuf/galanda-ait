@@ -62,7 +62,15 @@ export function generateIcons(check = false) {
   for (const name of Object.keys(labels)) if (!definitions[name]) throw new Error(`Orphan label: ${name}`);
   const sorted = (object) => Object.fromEntries(Object.entries(object).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
   const rootAttrs = parseSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/></svg>').attrs;
-  const nodeHeader = `${GENERATED_HEADER}type Node = { readonly tag: string; readonly attrs: Readonly<Record<string, string>> };\nconst ROOT = ${JSON.stringify(rootAttrs)};\nconst outline = (nodes: readonly Node[]) => ({ attrs: ROOT, nodes });\nconst filled = (nodes: readonly Node[]) => ({ attrs: { ...ROOT, fill: "currentColor" }, nodes });\n`;
+  const nodeHeader = [
+    GENERATED_HEADER.trimEnd(),
+    'type Node = { readonly tag: string; readonly attrs: Readonly<Record<string, string>> };',
+    'const ROOT = ' + JSON.stringify(rootAttrs) + ';',
+    'const outline = (nodes: readonly Node[]) => ({ attrs: ROOT, nodes });',
+    'const filled = (nodes: readonly Node[]) => ({ attrs: { ...ROOT, fill: "currentColor" }, nodes });',
+    '',
+    '',
+  ].join('\n');
   const serialize = (definition) => {
     if (JSON.stringify(definition.attrs) === JSON.stringify(rootAttrs)) return `outline(${JSON.stringify(definition.nodes)})`;
     if (JSON.stringify(definition.attrs) === JSON.stringify({ ...rootAttrs, fill: 'currentColor' })) return `filled(${JSON.stringify(definition.nodes)})`;
