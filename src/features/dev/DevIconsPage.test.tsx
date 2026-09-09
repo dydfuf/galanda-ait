@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ICON_CATALOG } from "@/components/galanda/icons/catalog.ts";
-const setPreference = vi.fn();
+const setPreference = vi.fn<(preference: "system" | "light" | "dark") => void>();
 vi.mock("@/app/theme-provider.tsx", () => ({ useTheme: () => ({ preference: "system", setPreference }) }));
 import { DevIconsPage } from "./DevIconsPage.tsx";
 
