@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
-import {
-  CalendarDays,
-  UsersRound,
-} from "lucide-react";
+import { UsersRound } from "lucide-react";
 
+import { PlanningIcon } from "@/components/galanda/planning-icon.tsx";
 import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
 import {
   classifyTrip,
@@ -122,7 +120,7 @@ export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
       </h2>
       <div className="mt-6 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-base leading-relaxed text-muted-foreground">
         <p className="flex min-w-0 items-start gap-2">
-          <CalendarDays className="mt-0.5 size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+          <PlanningIcon name="calendar" size={16} className="mt-0.5" />
           <span className="min-w-0 [overflow-wrap:anywhere]">
             {formatHomeTripPeriod(trip.confirmedPeriod?.startDate, trip.confirmedPeriod?.endDate)}
           </span>

@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { ItemDescription, ItemTitle } from "@/components/ui/item.tsx";
 import { MobileList, MobileListItem } from "@/components/galanda/mobile-list.tsx";
 import { ExternalLink } from "@/components/galanda/external-link.tsx";
+import { PlanningIcon } from "@/components/galanda/planning-icon.tsx";
 
 export interface StaySection {
   readonly id: string;
@@ -79,7 +80,12 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
           return (
             <MobileListItem
               key={stay.id}
-              leading={<Badge variant="info">숙소</Badge>}
+              leading={
+                <div className="flex flex-col items-center gap-1 text-primary">
+                  <PlanningIcon name="stay" size={20} />
+                  <Badge variant="info">숙소</Badge>
+                </div>
+              }
               trailing={<Badge variant={status.variant}>{status.label}</Badge>}
             >
               <ItemTitle>
@@ -98,9 +104,10 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
               {stay.bookingUrl && (
                 <ExternalLink
                   href={stay.bookingUrl}
-                  className="mt-1 [overflow-wrap:anywhere]"
+                  className="mt-1 inline-flex max-w-full items-start gap-1.5 [overflow-wrap:anywhere]"
                 >
-                  예약 정보 보기
+                  <PlanningIcon name="ticket" size={20} />
+                  <span className="min-w-0">예약 정보 보기</span>
                 </ExternalLink>
               )}
             </MobileListItem>
@@ -114,7 +121,12 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
           return (
             <MobileListItem
               key={transport.id}
-              leading={<Badge variant="neutral">이동</Badge>}
+              leading={
+                <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                  <PlanningIcon name="route" size={20} />
+                  <Badge variant="neutral">이동</Badge>
+                </div>
+              }
               trailing={<Badge variant={status.variant}>{status.label}</Badge>}
             >
               <ItemTitle>
@@ -134,9 +146,10 @@ export function DetailTimeline({ items }: DetailTimelineProps) {
               {transport.bookingUrl && (
                 <ExternalLink
                   href={transport.bookingUrl}
-                  className="mt-1 [overflow-wrap:anywhere]"
+                  className="mt-1 inline-flex max-w-full items-start gap-1.5 [overflow-wrap:anywhere]"
                 >
-                  교통 정보 보기
+                  <PlanningIcon name="ticket" size={20} />
+                  <span className="min-w-0">교통 정보 보기</span>
                 </ExternalLink>
               )}
             </MobileListItem>

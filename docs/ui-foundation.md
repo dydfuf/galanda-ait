@@ -78,6 +78,7 @@ fallback하며 header owner를 바꾸지 않습니다.
 
 - 일반 조작·메타데이터 아이콘은 기존 Lucide를 사용합니다. 홈에서는
   16/20/24px, 1.8px 선으로 맞추며 터치 영역은 Button/Link가 44px 이상 확보합니다.
+  아래 여행 준비 아이콘 적용 지점은 전용 24×24 / 2px SVG 계약을 따릅니다.
 - 글로벌 내비게이션은 아래의 전용 SVG 계약을 따릅니다. 일러스트나 Lucide 아이콘을
   하단 탭 아이콘과 혼용하지 않습니다.
 - 일러스트는 `GalandaSpot`으로 렌더링합니다. 텍스트가 의미를 소유하고 그림은
@@ -111,6 +112,26 @@ fallback하며 header owner를 바꾸지 않습니다.
   원본을 `<img>`로 교체하면 부모의 `color`를 상속하지 않으므로 사용하지 않습니다.
 - 보이는 한글 링크 라벨이 접근 가능한 이름을 소유합니다. SVG는 `aria-hidden="true"`,
   `focusable="false"`로 두며 44px 이상 터치 영역, focus-visible, safe-area는 shell이 유지합니다.
+
+### 여행 준비 아이콘
+
+`PlanningIcon`은 일정·경로·숙소·예약 항목을 나타내는 outline 전용 아이콘입니다.
+하단 탭의 선택 상태나 예약 완료 배지를 대신하지 않습니다.
+
+- 원본은 `public/assets/galanda/planning/`의 `calendar`, `route`, `stay`, `ticket`
+  각각 `-outline.svg`입니다. 원본 4개를 보존하고 인라인 JSX로 렌더링합니다.
+- `src/components/galanda/planning-icon.tsx`와 원본을 함께 갱신합니다.
+  `planning-icon.test.tsx`는 원본 파일과 실제 렌더러의 형상·색상 속성 일치를 검사합니다.
+- 24×24 viewBox, 2px 선, 둥근 끝·모서리, `fill="none"`, `stroke="currentColor"`를
+  유지합니다. 기본 24px, 목록 20px, 기존 홈 메타데이터 정렬에는 16px를 사용합니다.
+- 색상을 하드코딩하거나 흰색으로 빈 부분을 덮지 않습니다. 기존 semantic token을
+  상속하므로 라이트·다크 파일 교체, 이미지 요청, 별도 SVG 로더가 필요하지 않습니다.
+- 의미는 기존 한글 텍스트가 소유하며 SVG는 `aria-hidden="true"`, `focusable="false"`입니다.
+  크기 속성은 그림의 크기이며 링크·버튼의 터치 영역을 대신하지 않습니다.
+- 홈의 여행 날짜에 `calendar`, 숙소·교통 상세 타임라인의 항목 표시에 `stay`/`route`,
+  예약·교통 정보 링크에 `ticket`을 적용합니다. 숙소/이동 라벨과 예약 가능·만실·확인 필요·
+  아직 확인 전 배지, 링크가 없는 상태와 외부 URL 열기 동작은 유지합니다.
+- 전역 내비게이션, 일반 조작용 Lucide, 일러스트, PWA 로고는 이 세트와 분리합니다.
 
 ### 여행 중심 주요 화면
 
