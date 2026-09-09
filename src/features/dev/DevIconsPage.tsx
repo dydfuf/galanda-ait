@@ -30,13 +30,13 @@ export function DevIconsPage() {
         <p className="text-sm text-muted-foreground">24×24 · 2px · currentColor · 기능 의미는 텍스트가 소유합니다.</p>
       </header>
       <div className="flex min-w-0 flex-wrap gap-4">
-        <label className="min-w-0 flex-1 space-y-1">
+        <label htmlFor="icon-search" className="min-w-0 flex-1 space-y-1">
           <span>아이콘 검색</span>
-          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 기능: search, 숙소…" />
+          <Input id="icon-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 기능: search, 숙소…" />
         </label>
-        <label className="flex min-w-0 flex-col gap-1">
+        <label htmlFor="icon-category" className="flex min-w-0 flex-col gap-1">
           <span>분류</span>
-          <select value={category} onChange={(event) => setCategory(event.target.value)} className="min-h-11 max-w-full rounded-lg border border-input bg-background px-3 text-foreground">
+          <select id="icon-category" value={category} onChange={(event) => setCategory(event.target.value)} className="min-h-11 max-w-full rounded-lg border border-input bg-background px-3 text-foreground">
             <option value="all">전체</option>
             {Object.entries(categories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
