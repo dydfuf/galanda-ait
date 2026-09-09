@@ -78,7 +78,7 @@ fallback하며 header owner를 바꾸지 않습니다.
 
 - 일반 조작·메타데이터 아이콘은 기존 Lucide를 사용합니다. 홈에서는
   16/20/24px, 1.8px 선으로 맞추며 터치 영역은 Button/Link가 44px 이상 확보합니다.
-  아래 여행 준비 아이콘 적용 지점은 전용 24×24 / 2px SVG 계약을 따릅니다.
+  아래 여행 준비 및 시작·협업·완료 아이콘 적용 지점은 전용 24×24 / 2px SVG 계약을 따릅니다.
 - 글로벌 내비게이션은 아래의 전용 SVG 계약을 따릅니다. 일러스트나 Lucide 아이콘을
   하단 탭 아이콘과 혼용하지 않습니다.
 - 일러스트는 `GalandaSpot`으로 렌더링합니다. 텍스트가 의미를 소유하고 그림은
@@ -132,6 +132,28 @@ fallback하며 header owner를 바꾸지 않습니다.
   예약·교통 정보 링크에 `ticket`을 적용합니다. 숙소/이동 라벨과 예약 가능·만실·확인 필요·
   아직 확인 전 배지, 링크가 없는 상태와 외부 URL 열기 동작은 유지합니다.
 - 전역 내비게이션, 일반 조작용 Lucide, 일러스트, PWA 로고는 이 세트와 분리합니다.
+
+### 시작·협업·완료 아이콘
+
+`ActionIcon`은 `create-trip`, `companions`, `invite`, `complete`를 제공합니다.
+기존 `PlanningIcon`과 같은 outline 규격이며 전역 탭 선택 상태와는 별개입니다.
+
+- 원본은 `public/assets/galanda/actions/*-outline.svg`에 보관합니다.
+  `src/components/galanda/action-icon.tsx`와 함께 갱신하며 `action-icon.test.tsx`가
+  원본과 실제 렌더러의 형상·색상 속성 차이를 검사합니다.
+- 24×24 viewBox, 2px 선, 둥근 끝·모서리, `fill="none"`, `stroke="currentColor"`를
+  유지합니다. 기본 24px, 행동/상태 20px, 홈 참여 인원에는 16px를 사용합니다.
+- 색상은 기존 semantic token을 상속합니다. 생성 버튼에서는 버튼 글자색을 따르고,
+  동행은 `text-muted-foreground`, 초대는 `text-primary`, 완료는 `text-success`입니다.
+  라이트·다크 파일 교체, 흰색 배경 도형, 별도 이미지 요청이나 로더는 사용하지 않습니다.
+- 홈의 빈 상태·지난 여행 상태에서 새 여행 만들기 링크에 `create-trip`, 홈 여행 카드의
+  실제 참여 인원에 `companions`, 동행자 설정의 초대 링크 공유 영역에 `invite`를 사용합니다.
+  기존 링크 목적지와 초대 권한·공유/복사/취소/실패·pending 동작은 변경하지 않습니다.
+- `PlanEditorHeader`는 `draftSaveStatus === "SAVED"`일 때만 `complete`를 표시합니다.
+  기존 `자동 저장됨` 텍스트를 유지하며, 이는 로컬 임시 저장 성공이지 서버 공개·여행 확정·
+  예약 완료가 아닙니다. `IDLE`/`SAVING`/`ERROR`에는 완료 체크를 표시하지 않습니다.
+- 보이는 한글 텍스트가 의미를 소유합니다. SVG는 `aria-hidden="true"`, `focusable="false"`이며,
+  아이콘 크기를 링크·버튼의 터치 영역으로 취급하지 않습니다. 기존 일러스트는 유지합니다.
 
 ### 여행 중심 주요 화면
 

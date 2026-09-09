@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { Compass, Plus } from "lucide-react";
+import { Compass } from "lucide-react";
 
+import { ActionIcon } from "@/components/galanda/action-icon.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
@@ -66,7 +67,7 @@ export function HomePage() {
             to="/trips/new"
             className={cn(buttonVariants({ size: "xl" }), "min-h-14 no-underline!")}
           >
-            <Plus aria-hidden="true" />
+            <ActionIcon name="create-trip" size={20} />
             새 여행 만들기
           </Link>
           <Link
@@ -98,7 +99,7 @@ export function HomePage() {
             to="/trips/new"
             className={cn(buttonVariants({ size: "xl" }), "min-h-14 no-underline!")}
           >
-            <Plus aria-hidden="true" />
+            <ActionIcon name="create-trip" size={20} />
             새 여행 만들기
           </Link>
           <Link

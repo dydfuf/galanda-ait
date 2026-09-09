@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { UsersRound } from "lucide-react";
 
+import { ActionIcon } from "@/components/galanda/action-icon.tsx";
 import { PlanningIcon } from "@/components/galanda/planning-icon.tsx";
 import type { TripOverviewDto } from "@/contracts/trip-overview.ts";
 import {
@@ -126,7 +126,7 @@ export function HomeTripCard({ trip, lifecycle, today }: HomeTripCardProps) {
           </span>
         </p>
         <p className="flex items-center gap-2">
-          <UsersRound className="size-4 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+          <ActionIcon name="companions" size={16} />
           <span>참여 {trip.memberCount}명</span>
         </p>
       </div>
