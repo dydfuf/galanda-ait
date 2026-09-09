@@ -20,21 +20,32 @@
 
 초대 화면의 로딩·오류·권한 부족·설정 종료 분기와 공유/복사/취소/실패 문구는 유지합니다. 확정 그림을 미확정 상태나 확정 버튼의 안내 그림으로 재사용하지 않습니다. `MISSING`은 복구가 필요한 오류이며 빈 일정이나 성공 그림으로 덮지 않습니다. 캐시된 `CONFIRMED` 데이터가 있어도 기존 화면의 loading/error 분기를 우회하지 않습니다.
 
-여섯 그림은 같은 좌상단 광원, 둥근 모서리, 절제된 면 명암으로 입체감을 표현합니다. 바닥 그림자·후광·배경 판·필터·래스터 이미지는 없습니다. 제목이나 행동 버튼을 그림 안에 넣지 않습니다. 그림의 더하기/북마크/화살표는 별도 컨트롤이나 저장·확정 성공 상태가 아닙니다.
+## 탐색·검색 묶음
+
+| 이름 | 현재 적용 위치 | 표현과 의미 |
+| --- | --- | --- |
+| `empty-explore` | `ExplorePage`에서 적용된 필터 없이 조회한 빈 결과 | 펼친 지도와 작은 나침반. 아직 공개된 일정이 없는 안내 |
+| `empty-search` | `ExplorePage`에서 적용된 필터로 조회한 빈 결과 | 일정 카드와 돋보기. 오류가 아니라 조건에 맞는 결과가 없는 안내 |
+
+그림은 정규화된 URL의 실제 적용 조건인 `filters`와 기존 `hasFilters`를 따릅니다. 입력 중이거나 지운 `draftFilters`만으로 바꾸지 않습니다. 기존 문구·필터 초기화·검색 URL·인기 도시·목록과 페이지네이션을 유지합니다. 세션/조회 오류와 로딩에 빈 결과 그림을 표시하지 않고, 캐시된 목록을 빈 그림으로 대체하지 않습니다. 경고색·완료 체크나 새로운 CTA를 추가하지 않습니다.
+
+여덟 그림은 같은 좌상단 광원, 둥근 모서리, 절제된 면 명암으로 입체감을 표현합니다. 바닥 그림자·후광·배경 판·필터·래스터 이미지는 없습니다. 제목이나 행동 버튼을 그림 안에 넣지 않습니다. 그림의 더하기/북마크/화살표/나침반/돋보기는 별도 컨트롤이나 저장·확정 성공 상태가 아닙니다.
 
 ## 규격·테마
 
 원본은 240×240 좌표계이며 화면 표시는 기존 128×128입니다. `GalandaSpot`은 이미지 속성과 컨테이너 크기를 미리 확보하고, 이미지가 없어도 텍스트와 행동은 그대로 남깁니다. Vite `BASE_URL`과 `.dark` 테마 전환을 유지합니다.
 
-라이트·다크 파일은 **동일한 도형과 그라데이션 좌표**에 서로 다른 팔레트만 사용합니다. 6종 모두 원본에서 다크 대비를 조정했으므로 CSS `brightness-125` 보정을 적용하지 않습니다. 테마별 예외 분기를 새로 추가하지 않습니다. SVG의 `url(#...)`는 같은 파일 안 그라데이션만 참조합니다. 인라인으로 붙이지 않고 기존 외부 이미지로 사용합니다.
+라이트·다크 파일은 **동일한 도형과 그라데이션 좌표**에 서로 다른 팔레트만 사용합니다. 8종 모두 원본에서 다크 대비를 조정했으므로 CSS `brightness-125` 보정을 적용하지 않습니다. 테마별 예외 분기를 새로 추가하지 않습니다. SVG의 `url(#...)`는 같은 파일 안 그라데이션만 참조합니다. 인라인으로 붙이지 않고 기존 외부 이미지로 사용합니다.
 
 ## 적용·검증
 
-새 상태나 CTA를 만들지 않고 기존 이름의 SVG 쌍을 교체합니다. 이동 경로·조회 조건·캐시 유지·재시도·페이지네이션·초대 권한·확정/예약 의미는 바꾸지 않습니다. `PageState`의 로딩/오류 분기에 그림을 추가하지 않습니다. 128px 일러스트를 작은 버튼이나 하단 내비게이션 아이콘 대신 사용하지 않습니다.
+새 상태나 CTA를 만들지 않고 기존 상태에 맞는 SVG 쌍을 연결합니다. 이동 경로·조회 조건·캐시 유지·재시도·페이지네이션·초대 권한·확정/예약 의미는 바꾸지 않습니다. `PageState`의 로딩/오류 분기에 그림을 추가하지 않습니다. 128px 일러스트를 작은 버튼이나 하단 내비게이션 아이콘 대신 사용하지 않습니다.
+
+새 이름을 추가할 때는 `GalandaSpotName`, `/dev#assets`, 공통 SVG 검사 목록과 사용처의 상태 회귀 검사를 함께 갱신합니다. 기존 그림의 이름이나 상태 의미를 다른 용도로 바꾸지 않습니다.
 
 ```bash
-pnpm exec vitest run src/components/galanda/galanda-spot.test.tsx src/features/home/home-empty-state-spots.test.tsx src/features/home/HomePage.test.tsx src/features/me/SavedListingsPage.test.tsx src/features/trip-setup/TripCompanionSetupPage.test.tsx src/features/itinerary/ItineraryPage.test.tsx src/features/itinerary/ItineraryPage.spots.test.tsx
+pnpm exec vitest run src/components/galanda/galanda-spot.test.tsx src/features/home/home-empty-state-spots.test.tsx src/features/home/HomePage.test.tsx src/features/me/SavedListingsPage.test.tsx src/features/trip-setup/TripCompanionSetupPage.test.tsx src/features/itinerary/ItineraryPage.test.tsx src/features/itinerary/ItineraryPage.spots.test.tsx src/features/explore/ExplorePage.test.tsx src/features/explore/ExplorePage.spots.test.tsx
 pnpm check
 ```
 
-추가 검사: 6종/12개 SVG의 테마별 도형 일치, 외부 참조/동작/필터 없는 정적 SVG, 파일당 4KB 미만, 128px 자리 확보, 장식 접근성, 비루트 asset base, 홈/저장 목록/일정의 상태 분리. 기존 `/dev#assets`에서 6종을 검토할 수 있습니다. 실제 확인한 브라우저·뷰포트·테마·검증 제한은 PR에 따로 기록합니다. SVG 렌더링과 DOM 테스트를 실제 인증 앱·설치형 PWA·AIT 실기기 검증으로 취급하지 않습니다.
+추가 검사: 8종/16개 SVG의 테마별 도형 일치, 외부 참조/동작/필터 없는 정적 SVG, 파일당 4KB 미만, 128px 자리 확보, 장식 접근성, 비루트 asset base, 홈/저장 목록/일정/탐색의 상태 분리. 기존 `/dev#assets`에서 8종을 검토할 수 있습니다. 실제 확인한 브라우저·뷰포트·테마·검증 제한은 PR에 따로 기록합니다. SVG 렌더링과 DOM 테스트를 실제 인증 앱·설치형 PWA·AIT 실기기 검증으로 취급하지 않습니다.
