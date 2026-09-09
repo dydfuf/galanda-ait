@@ -31,7 +31,13 @@ const confirmed: ItineraryStateResponse = {
     currentRevision: RevisionSchema.make(1),
     createdBy: ParticipantIdSchema.make("host-spot-test"),
     createdAt: "2026-09-01T00:00:00.000Z",
-    snapshot: { planTitle: "확정된 여행안", destination: "서울", routes: [], items: [] },
+    snapshot: {
+      planTitle: "확정된 여행안",
+      destination: "서울",
+      routes: [{ city: "서울", arrivalDate: "2026-09-10", departureDate: "2026-09-12" }],
+      // Exercise the defensive empty-items UI while preserving required route dates.
+      items: [],
+    },
   },
   canEdit: false,
   acknowledgements: [],
@@ -72,23 +78,23 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   // Keep session I/O outside these state-rendering tests, just like itinerary I/O.
-  vi.mocked(useSessionQuery).mockReturnValue({
+  vi.mocked(useSessionQuery, { partial: true }).mockReturnValue({
     data: {
-      participantId: "host-spot-test",
-      participantIds: ["host-spot-test"],
+      participantId: ParticipantIdSchema.make("host-spot-test"),
+      participantIds: [ParticipantIdSchema.make("host-spot-test")],
       accountType: "REGISTERED",
       name: "테스트 여행자",
       isAuthenticated: true,
     },
     isSuccess: true, isPending: false, isLoading: false, isError: false, error: null,
     refetch: vi.fn<ReturnType<typeof useSessionQuery>["refetch"]>(),
-  } as ReturnType<typeof useSessionQuery>);
+  });
   setQuery({ status: "UNCONFIRMED" });
-  vi.mocked(useAcknowledgeItineraryMutation).mockReturnValue({
+  vi.mocked(useAcknowledgeItineraryMutation, { partial: true }).mockReturnValue({
     isPending: false, isError: false, error: null,
     reset: vi.fn<() => void>(),
     mutateAsync: vi.fn<ReturnType<typeof useAcknowledgeItineraryMutation>["mutateAsync"]>(),
-  } as ReturnType<typeof useAcknowledgeItineraryMutation>);
+  });
 });
 afterEach(() => {
   cleanup();
