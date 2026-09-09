@@ -1,9 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>아직 여행이 없어요</title><g stroke-linecap="round" stroke-linejoin="round"><path d="M86 71v-9a12 12 0 0 1 12-12h44a12 12 0 0 1 12 12v9" stroke="#1B64DA" stroke-width="6" fill="none"/>
-  <rect x="40" y="72" width="160" height="113" rx="18" fill="#E0EDFF" stroke="#82B6FF" stroke-width="2.2"/>
-  <path d="m70 83 29-9 44 12 27-9v73l-27 9-44-12-29 9Z" fill="#FFFFFF" stroke="#82B6FF" stroke-width="2.2"/>
-  <path d="M99 76v70m44-59v71" stroke="#82B6FF" stroke-width="2"/>
-  <path d="M84 127c10-14 18-6 31-15" stroke="#82B6FF" stroke-width="3" stroke-dasharray="3 8" fill="none"/>
-  <path d="M35 128h170v57a16 16 0 0 1-16 16H51a16 16 0 0 1-16-16Z" fill="#3182F6"/>
-  <path d="M58 129v70m124-70v70" stroke="#1B64DA" stroke-width="3"/>
-  <rect x="103" y="120" width="34" height="18" rx="6" fill="#FFFFFF" stroke="#82B6FF" stroke-width="2"/>
-  <path d="M58 204v6m124-6v6" stroke="#1B64DA" stroke-width="7"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <title>첫 여행을 기다리는 가방</title>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#78B9FF"/>
+      <stop offset=".52" stop-color="#3182F6"/>
+      <stop offset="1" stop-color="#1B64DA"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#EAF3FF"/>
+      <stop offset=".7" stop-color="#DCEBFF"/>
+      <stop offset="1" stop-color="#AACCF6"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="m127 41 31-10 28 10 24-8v80l-24 8-28-10-31 10Z" fill="url(#paper)"/>
+    <path d="m158 31 28 10v80l-28-10Z" fill="#C8DFFF"/>
+    <path d="M158 37v66m28-55v65" stroke="#AED3FF" stroke-width="2" stroke-opacity=".6"/>
+    <path d="M166 79c0-18 27-6 27-25" fill="none" stroke="#5796E7" stroke-width="4"/>
+    <circle cx="195" cy="54" r="5" fill="#3182F6"/>
+    <rect x="66" y="193" width="15" height="20" rx="7" fill="#315C92"/>
+    <rect x="158" y="193" width="15" height="20" rx="7" fill="#315C92"/>
+    <path d="M86 81V66a12 12 0 0 1 12-12h31a12 12 0 0 1 12 12v15" fill="none" stroke="#315C92" stroke-width="12"/>
+    <path d="M86 70v-4a12 12 0 0 1 12-12h31" fill="none" stroke="#AED3FF" stroke-width="3"/>
+    <rect x="48" y="84" width="146" height="120" rx="25" fill="#1B64DA"/>
+    <rect x="40" y="77" width="146" height="120" rx="25" fill="url(#blue)"/>
+    <path d="M52 100a16 16 0 0 1 16-15h88" fill="none" stroke="#AED3FF" stroke-width="3" stroke-opacity=".65"/>
+    <path d="M76 105v63m75-63v63" fill="none" stroke="#1B64DA" stroke-width="10" stroke-opacity=".4"/>
+    <path d="M74 105v63m75-63v63" fill="none" stroke="#AED3FF" stroke-width="3" stroke-opacity=".4"/>
+    <rect x="94" y="111" width="38" height="26" rx="8" fill="url(#paper)"/>
+    <path d="M104 123h18" stroke="#5796E7" stroke-width="3"/>
+  </g>
+</svg>

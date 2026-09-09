@@ -1,6 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>저장한 여행안이 없어요</title><g stroke-linecap="round" stroke-linejoin="round"><rect x="62" y="46" width="126" height="159" rx="16" fill="#182B47"/>
-  <rect x="53" y="39" width="126" height="159" rx="16" fill="#171D24" stroke="#3E689F" stroke-width="2.2"/>
-  <path d="M80 72h22m-22 19h64" stroke="#303842" stroke-width="7"/>
-  <path d="M80 143h65m-56-28h47a9 9 0 0 1 9 9v37a9 9 0 0 1-9 9H89a9 9 0 0 1-9-9v-37a9 9 0 0 1 9-9Z" stroke="#3E689F" stroke-width="2.2" stroke-dasharray="4 7" fill="none"/>
-  <path d="M138 34h39a7 7 0 0 1 7 7v74l-26.5-16-26.5 16V41a7 7 0 0 1 7-7Z" fill="#182B47" stroke="#7AA7FF" stroke-width="3"/>
-  <path d="M146 53h23" stroke="#7AA7FF" stroke-width="3"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <title>후보를 기다리는 보관 카드</title>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#A3CBFF"/>
+      <stop offset=".52" stop-color="#7AA7FF"/>
+      <stop offset="1" stop-color="#477FD6"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#42628C"/>
+      <stop offset=".7" stop-color="#2B4568"/>
+      <stop offset="1" stop-color="#203653"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="71" y="39" width="112" height="161" rx="21" transform="rotate(8 127 119)" fill="#263F61"/>
+    <rect x="51" y="48" width="132" height="156" rx="22" fill="#203653"/>
+    <rect x="45" y="42" width="132" height="156" rx="22" fill="url(#paper)"/>
+    <path d="M55 63a13 13 0 0 1 13-13h55" fill="none" stroke="#E9F3FF" stroke-width="3" stroke-opacity=".45"/>
+    <path d="M68 82h27m-27 18h48" stroke="#6E91BE" stroke-width="6"/>
+    <rect x="67" y="123" width="71" height="48" rx="10" stroke="#6E91BE" stroke-width="3" stroke-dasharray="4 8" fill="none"/>
+    <path d="M150 38h29a9 9 0 0 1 9 9v72l-23-14-24 14V47a9 9 0 0 1 9-9Z" fill="#345F9A"/>
+    <path d="M145 32h29a9 9 0 0 1 9 9v72l-23-14-24 14V41a9 9 0 0 1 9-9Z" fill="url(#blue)"/>
+    <path d="M147 53v34l13-8 12 8V53Z" stroke="#E9F3FF" stroke-width="3" fill="none"/>
+  </g>
+</svg>
