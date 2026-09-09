@@ -72,7 +72,14 @@ export function generateIcons(check = false) {
   for (const [file, text] of [['icon-nodes.ts', nodesText], ['catalog.ts', catalogueText]]) {
     const path = join(OUTPUT, file);
     if (check) {
-      if (readFileSync(path, 'utf8') !== text) throw new Error(`${file} is stale. Run node scripts/generate-icons.mjs`);
+      const actual = readFileSync(path, 'utf8');
+      if (actual !== text) {
+        let offset = 0;
+        while (offset < actual.length && offset < text.length && actual[offset] === text[offset]) offset += 1;
+        const line = text.slice(0, offset).split('\n').length;
+        const contextStart = Math.max(0, offset - 40);
+        throw new Error(`${file} is stale at line ${line}, offset ${offset}. Run node scripts/generate-icons.mjs\nExpected: ${JSON.stringify(text.slice(contextStart, offset + 100))}\nActual: ${JSON.stringify(actual.slice(contextStart, offset + 100))}`);
+      }
     } else {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, text);
