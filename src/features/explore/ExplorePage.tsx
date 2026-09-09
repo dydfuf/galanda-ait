@@ -5,6 +5,7 @@ import { ChevronDown, Search } from "lucide-react";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageTitle } from "@/components/galanda/page-title.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
+import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
 import { SectionHeader } from "@/components/galanda/section-header.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Field, FieldLabel } from "@/components/ui/field.tsx";
@@ -209,6 +210,7 @@ export function ExplorePage() {
   ) : items.length === 0 ? (
     <PageState
       status="empty"
+      illustration={<GalandaSpot name={hasFilters ? "empty-search" : "empty-explore"} />}
       title={
         hasFilters
           ? "조건에 맞는 여행 일정이 없어요"

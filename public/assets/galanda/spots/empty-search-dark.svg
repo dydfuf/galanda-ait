@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <title>조건에 맞는 일정을 찾는 돋보기</title>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#A3CBFF"/>
+      <stop offset=".52" stop-color="#7AA7FF"/>
+      <stop offset="1" stop-color="#477FD6"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#42628C"/>
+      <stop offset=".7" stop-color="#2B4568"/>
+      <stop offset="1" stop-color="#203653"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="48" y="47" width="125" height="151" rx="22" fill="#203653"/>
+    <rect x="42" y="41" width="125" height="151" rx="22" fill="url(#paper)"/>
+    <path d="M52 62a13 13 0 0 1 13-13h56" stroke="#E9F3FF" stroke-width="3" stroke-opacity=".45"/>
+    <path d="M66 81h50m-50 20h30" stroke="#6E91BE" stroke-width="6"/>
+    <path d="M66 131h18m-18 18h13" stroke="#6E91BE" stroke-width="6"/>
+    <path d="m180 170 26 26" stroke="#345F9A" stroke-width="20"/>
+    <path d="m175 165 26 26" stroke="url(#blue)" stroke-width="20"/>
+    <circle cx="155" cy="145" r="40" fill="#345F9A"/>
+    <circle cx="150" cy="140" r="40" fill="url(#blue)"/>
+    <circle cx="150" cy="140" r="28" fill="url(#paper)"/>
+    <path d="M139 133h22m-22 14h13" stroke="#6E91BE" stroke-width="5"/>
+    <path d="M124 122a32 32 0 0 1 27-14" stroke="#E9F3FF" stroke-width="3" stroke-opacity=".45"/>
+  </g>
+</svg>

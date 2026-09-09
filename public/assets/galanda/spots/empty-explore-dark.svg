@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <title>여행 일정을 둘러볼 지도와 나침반</title>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#A3CBFF"/>
+      <stop offset=".52" stop-color="#7AA7FF"/>
+      <stop offset="1" stop-color="#477FD6"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#42628C"/>
+      <stop offset=".7" stop-color="#2B4568"/>
+      <stop offset="1" stop-color="#203653"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="m43 74 44-19 47 17 44-18a8 8 0 0 1 11 8v120l-48 19-48-17-44 18a8 8 0 0 1-11-8V82a8 8 0 0 1 5-8Z" fill="#203653"/>
+    <path d="m37 68 44-19 47 17 44-18a8 8 0 0 1 11 8v120l-48 19-48-17-44 18a8 8 0 0 1-11-8V76a8 8 0 0 1 5-8Z" fill="url(#paper)"/>
+    <path d="M81 49v122l47 17V66Z" fill="#263F61"/>
+    <path d="m43 78 27-12m-21 97 16-6m32-58 15 5" stroke="#E9F3FF" stroke-width="3" stroke-opacity=".45"/>
+    <path d="m53 128 16-8 27 10 18-7" stroke="#6E91BE" stroke-width="6"/>
+    <circle cx="165" cy="153" r="40" fill="#345F9A"/>
+    <circle cx="160" cy="148" r="40" fill="url(#blue)"/>
+    <circle cx="160" cy="148" r="29" fill="url(#paper)"/>
+    <path d="m176 128-10 28-22 12 10-28Z" fill="#6E91BE"/>
+    <path d="m176 128-10 28-12-16Z" fill="url(#blue)"/>
+    <path d="M134 130a32 32 0 0 1 27-14" stroke="#E9F3FF" stroke-width="3" stroke-opacity=".45"/>
+  </g>
+</svg>

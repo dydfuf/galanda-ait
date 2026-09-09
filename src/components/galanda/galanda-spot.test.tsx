@@ -9,6 +9,7 @@ import { GalandaSpot, type GalandaSpotName } from "./galanda-spot.tsx";
 const names: readonly GalandaSpotName[] = [
   "empty-trips", "create-trip", "empty-saved",
   "invite-companions", "compare-plans", "confirm-plan",
+  "empty-explore", "empty-search",
 ];
 const themes = ["light", "dark"] as const;
 const readSvg = (name: GalandaSpotName, theme: (typeof themes)[number]) =>
@@ -57,10 +58,10 @@ describe("GalandaSpot display contract", () => {
     expect(container.querySelector('img[src$="-dark.svg"]')).not.toHaveClass("brightness-125");
   });
 
-  it("preserves Vite's non-root asset base", () => {
+  it.each(["empty-trips", "empty-explore", "empty-search"] as const)("preserves Vite's non-root asset base for %s", (name) => {
     vi.stubEnv("BASE_URL", "/preview/");
-    const { container } = render(<GalandaSpot name="empty-trips" />);
-    expect(container.querySelector("img")).toHaveAttribute("src", "/preview/assets/galanda/spots/empty-trips-light.svg");
+    const { container } = render(<GalandaSpot name={name} />);
+    expect(container.querySelector("img")).toHaveAttribute("src", `/preview/assets/galanda/spots/${name}-light.svg`);
   });
 });
 
