@@ -102,7 +102,11 @@ SVG 원본과 `icons/labels.json`이 source of truth입니다. 변경 후
 - `confirm-plan`: 서버에서 확정된 일정에만 사용하며 예약 완료를 뜻하지 않습니다.
 - `empty-trips`, `empty-saved`: 해당 조회가 성공한 빈 상태에만 사용합니다.
 - 모든 그림은 `public/assets/galanda/spots/`의 라이트·다크 SVG 쌍입니다.
-  총 12개, 11,716 bytes이며 기존 PWA SVG precache 규칙으로 포함됩니다.
+  총 12개이며 기존 PWA SVG precache 규칙으로 포함됩니다.
+  홈·빈 상태 3종은 원본에서 다크 팔레트를 조정한 입체형 SVG입니다. 이 3종에는
+  추가 밝기 필터를 적용하지 않으며, 나머지 3종의 기존 대비 처리는 유지합니다.
+  원본 240×240, 표시 128×128, 테마별 도형 일치 및 파일당 4KB 미만 기준은
+  [일러스트 가이드](../public/assets/galanda/spots/README.md)를 따릅니다.
 - `/dev#assets`에서 여섯 일러스트와 공통 아이콘을 검토할 수 있습니다.
 
 로고·앱 아이콘·공유 이미지는 이 에셋 세트와 별개입니다. 서비스 코드에 일러스트
@@ -118,7 +122,7 @@ SVG 원본과 `icons/labels.json`이 source of truth입니다. 변경 후
   `home`, `explore`, `trips`, `my` 각각 `-outline.svg`와 `-filled.svg` 쌍입니다.
 - 렌더러는 원본과 같은 경로를 인라인 SVG로 사용합니다. 형상을 바꿀 때에는 원본과
   `src/components/galanda/global-nav-icon.tsx`를 함께 갱신하고 공통 생성기도 실행합니다.
-- `viewBox="0 0 24 24"`, 표시 크기 24px, 선 두께 2px, 둥근 끝·모서리를 유지합니다.
+- `viewBox="0 0 24 24"`, 표시 크기 24px, 선 두께 2px, 둥근 끝·모서리 유지합니다.
   선택 전환 시 외곽 크기를 바꾸지 않으며 그림자·그라데이션·원근감을 추가하지 않습니다.
 - `currentColor`가 링크의 `text-primary` / `text-foreground-muted`를 상속합니다.
   흰색 도형으로 구멍을 덮지 않고 투명 영역과 `evenodd`로 테마 독립성을 유지합니다.
