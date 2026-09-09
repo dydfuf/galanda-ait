@@ -9,10 +9,45 @@
 
 특정 기능의 요구사항과 완료 조건은 해당 task/goal 및 Linear issue를 따른다.
 
+## 0. 요청 해석과 작업 진행
+
+플랫폼·시스템 지침 안에서 현재 사용자의 요청과 대화 중 수정 사항을 우선한다.
+스킬, 계획서, 과거 검증 기록을 근거로 이미 승인된 작업을 다시 승인받거나
+사용자가 요청하지 않은 작업으로 범위를 넓히지 않는다.
+문서의 역할과 적용 범위는 [문서 안내](docs/README.md)를 참고한다.
+
+"해줄 수 있나요", "수정하고 싶어요" 같은 실행 요청은 실제 작업으로 처리한다.
+현재 맥락으로 의도와 범위를 판단하고, 조사·계획에서 멈추지 않고 구현과 필요한
+검증까지 진행한다. 통상적인 구현 선택은 기존 코드와 계약을 근거로 결정한다.
+
+답에 따라 제품 의미나 결과가 달라지고 현재 근거로 판단할 수 없을 때만
+필요한 질문을 모아 묻는다. 답을 기다리는 동안에도 독립적으로 가능한 작업은
+계속한다. 사용자의 중간 질문·진행 확인에는 답하고 원래 작업을 이어간다.
+사용자가 취소하거나 목표를 바꾼 경우에는 그 변경을 따른다.
+
+### 스킬과 병렬 작업
+
+- 스킬은 작업에 필요한 것만 읽고 적용한다. 명시된 사용자 요청이 스킬 지침보다 우선한다.
+- 스킬이나 문서 때문에 승인 요청·중단·범위 변경이 필요하면 정확한 파일과
+  해당 문구를 인용하고, 명시적 요구인지 에이전트의 해석인지 설명한다.
+- 실제 도구와 상위 지침이 허용하고 시간이나 품질에 이득이 있을 때 독립적인
+  조사·검증을 subagent에 나눈다. 범위·산출물·수정 파일을 정하고 결과를 통합한다.
+  같은 파일의 동시 수정, 의존 작업의 병렬 실행, 관련 없는 역할의 일괄 호출은 피한다.
+- 위임이 불가능하거나 작은 작업이면 직접 수행한다. 도구 이름과 인자를
+  과거 문서에서 추측하지 않고 현재 제공된 도구 계약을 따른다.
+
+### 진행 상황과 결과 전달
+
+한국어로 결과나 다음 행동을 먼저 말하고, 짧은 문단과 쉬운 표현을 사용한다.
+목록·표는 절차나 비교에 도움이 될 때 사용한다. 상투적인 요약, 과장, 불필요한
+전문 용어와 매 단계의 작업 일지는 피한다.
+진행 중에는 확인된 사실·중요한 가정·남은 불확실성을 알리고, 최종 보고에는
+변경 이유, 실제 검증 결과, 미검증 범위와 필요한 다음 행동을 기록한다.
+
 
 ## 1. 작업을 시작하기 전에
 
-코드를 수정하기 전에 다음 순서로 현재 상태를 확인한다.
+코드나 문서를 수정하기 전에 다음 중 작업 범위에 해당하는 현재 상태를 확인한다.
 
 1. 현재 파일에 적용되는 `AGENTS.md` / `AGENTS.override.md`를 읽는다.
 2. 작업이 Linear issue를 참조한다면 child issue와 parent goal의 최신 내용을 읽는다.
@@ -27,8 +62,9 @@
 - 현재 코드와 테스트는 실제 현재 동작을 설명한다.
 - config/schema/scripts는 실행 가능한 계약을 설명한다.
 
-충돌을 발견하면 한쪽을 추측으로 선택하지 않는다.
-현재 의도를 확인한 뒤 구현과 문서/issue의 정합성을 함께 복구한다.
+충돌은 현재 요청·코드·테스트·실행 설정으로 먼저 해소한다. 근거가 명확한
+오래된 설명은 갱신하고, 제품 의미가 달라지는데 판단 근거가 부족할 때만 묻는다.
+과거 계획의 미완료 체크박스나 당시 검증 기록만으로 작업을 다시 시작하지 않는다.
 
 
 ## 2. Repository map
@@ -134,7 +170,7 @@ core domain / ports
 infrastructure adapters
         ↓
 Better Auth / Drizzle / external systems
-````
+```
 
 * Hono owns transport: routing, HTTP validation과 status/DTO mapping을 담당한다.
 * Effect owns application execution: use case orchestration과 typed expected failure를 담당한다.
@@ -290,7 +326,8 @@ Effect를 upgrade할 때는 다음 정합성을 함께 유지한다.
 
 변경하기 전에 관련 테스트가 어디에 있는지 먼저 찾는다.
 
-변경 후에는 가장 좁은 검증부터 실행한다.
+변경 후에는 영향을 받는 계약의 가장 좁은 검증부터 실행한다.
+아래 순서는 필요한 검증을 고르는 기준이며, 모든 작업에 모든 단계를 적용하지 않는다.
 
 ```text
 focused unit/domain test
@@ -301,12 +338,14 @@ focused unit/domain test
 
 bug fix는 가능하면 실패를 재현하는 regression test를 추가한다.
 
-Do not write tests for reversible, low-impact changes that mirror the implementation. If you do choose to verify your work with tests, make sure that the tests are meaningful and necessary to verify implementation.
+되돌릴 수 있는 저영향 변경에 구현을 그대로 반복하는 테스트를 추가하지 않는다.
+새 테스트는 실제 실패나 중요한 계약의 회귀를 잡을 수 있어야 한다.
 
 authorization, persistence, concurrency 같은 중요한 계약을
 UI test만으로 검증하지 않는다.
 
-코드 변경을 완료하기 전에 현재 repository의 canonical gate를 실행한다.
+애플리케이션 코드·의존성·실행 설정을 변경하면 완료 전에 현재 repository의
+canonical gate를 실행한다.
 
 ```bash
 pnpm check
@@ -314,7 +353,14 @@ pnpm check
 
 현재 command 이름과 세부 단계는 항상 `package.json`을 source of truth로 사용한다.
 
-Run tests appropriate to the change and complete required checks. Once those pass, broaden or repeat testing only when new changes, failures, or unresolved concerns justify it; otherwise, continue toward completing the task.
+문서만 변경했다면 `git diff --check`, 변경한 링크·경로·명령의 실제 설정 대조로
+검증한다. 문서 변경만을 위해 전체 빌드, DB 연결, 배포 또는 브라우저 QA를 실행하지 않는다.
+CI와 해당 작업의 필수 검증은 유지하며, 필요한 검증이 통과한 뒤에는 새 변경·실패·
+미해결 우려가 있을 때만 범위를 넓히거나 반복한다.
+
+Playwright/E2E runner, fixture, screenshot baseline, browser CI를 추가하거나
+복원하지 않는다. 화면 확인이 필요한 작업은 직접 브라우저 조작으로 검증하고,
+로컬 테스트·실제 인증 브라우저·설치형 PWA·AIT 실기기 증거를 구분한다.
 
 required check를 통과시키기 위해:
 
@@ -440,7 +486,12 @@ Goal의 성공 여부는 변경한 파일 수나 Done issue 수가 아니라
 일반적인 구현 선택은 현재 코드, architecture, acceptance criteria를 근거로
 자율적으로 결정한다.
 
-다음 경우에는 사람의 판단 또는 승인이 필요하다.
+읽기, 검토, 되돌릴 수 있는 수정, 대화에서 이미 승인된 작업은 재승인받지 않는다.
+추가 판단이 필요해도 승인된 조사·수정·검증을 먼저 끝내고 구체적인 변경안과
+영향을 제시한다. 가정한 위험만으로 승인 절차나 체크리스트를 추가하지 않는다.
+
+다음 사항이 현재 요청과 기존 승인으로 해결되지 않으면 사람의 판단 또는
+필요한 접근 권한을 요청한다.
 
 * acceptance criteria의 제품 의미를 변경해야 하는 경우
 * destructive production migration

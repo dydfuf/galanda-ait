@@ -8,6 +8,10 @@ source: ./2026-08-16-galanda-technical-stack.md
 
 # 갈란다 Effect-first 아키텍처 결정
 
+> [ADR-001](../adr/ADR-001-galanda-effect-v4-architecture.md)로 대체된 과거 구조다.
+> 아래 browser ManagedRuntime·LocalStorage/Supabase Layer·RLS 실행 지시는
+> 신규 작업에 적용하지 않는다. 현재 서버의 Hono → Effect → adapter 경계를 따른다.
+
 ## 1. 문서 목적
 
 이 문서는 갈란다 MVP의 애플리케이션 구조와 의존성 방향을 정의한다. 기술 선택과 버전은 [갈란다 기술 스택 결정](./2026-08-16-galanda-technical-stack.md), URL과 화면 이동은 [라우팅 아키텍처 결정](./2026-08-16-galanda-routing-architecture-brainstorm.md)을 따른다.

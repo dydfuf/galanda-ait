@@ -1,5 +1,9 @@
 # Galanda TDS UI foundation
 
+> 과거 UI 구현 기록이다. 현재 구현은 [UI foundation](ui-foundation.md)의
+> shadcn + Base UI + Tailwind를 따른다. 아래 TDS 컴포넌트·provider 지시는
+> 신규 작업에 적용하지 않으며, 정보 구조와 UX 배경만 참고한다.
+
 Apps in Toss 화면은 웹 컨테이너가 아니라 흰색 surface 위의 TDS 화면으로 구성한다.
 
 ## 화면 문법

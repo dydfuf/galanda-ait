@@ -5,11 +5,13 @@
 ## 적용
 
 1. Supabase Data API가 disabled인지 Dashboard에서 확인한다.
-2. 관리자 전용 `DATABASE_URL`로 `pnpm db:migrate`를 실행한다.
-3. 같은 관리자 연결로 권한 검증을 실행한다.
+2. 관리자 전용 `MIGRATION_DATABASE_URL`로 `pnpm db:migrate`를 실행한다.
+   현재 [drizzle.config.ts](../drizzle.config.ts)는 이 변수만 읽는다.
+   Worker runtime의 `DATABASE_URL`과 분리한다.
+3. 안전하게 연결한 관리자 대화형 `psql` 세션에서 저장소 루트를 기준으로 권한 검증을 실행한다.
 
-   ```bash
-   psql "$DATABASE_URL" -f scripts/verify-database-privileges.sql
+   ```sql
+   \i scripts/verify-database-privileges.sql
    ```
 
 4. 대화형 `psql`에서 runtime password를 설정하고 로그인을 활성화한다. `\password`는 password를 화면이나 shell history에 남기지 않는다.

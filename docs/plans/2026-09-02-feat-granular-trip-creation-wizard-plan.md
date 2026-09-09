@@ -2,9 +2,15 @@
 title: "feat: 여행 만들기 위자드 질문 단위 세분화"
 type: feat
 date: 2026-09-02
+status: archived
 ---
 
 # 여행 만들기 위자드 질문 단위 세분화 구현 계획
+
+> 구현 이력으로 보관한 계획이다. 전달 결과는 [PROJECT.md](../../PROJECT.md),
+> 현재 제품 계약은 [ADR-002](../adr/ADR-002-trip-creation-wizard-product-contract.md)를 따른다.
+> 아래 체크박스는 계획 당시 상태이며 자동 재실행할 작업 목록이 아니다.
+> 브라우저·실기기 수용 여부는 해당 검증 기록으로 별도 확인한다.
 
 ## 1. 목표
 
