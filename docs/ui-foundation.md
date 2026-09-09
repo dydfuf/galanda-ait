@@ -67,6 +67,20 @@ fallback하며 header owner를 바꾸지 않습니다.
 
 ## 컴포넌트 추가 방법
 
+### 공통 아이콘 카탈로그와 생성
+
+제품 UI에서는 `GalandaIcon`과 개발 전용 `/dev/icons` 카탈로그를 우선 사용합니다.
+기본 세트는 80종 / SVG 85개이며 검색·편집·상태·교통·지출·협업·설정을 포함합니다.
+사용 예제, 상태 의미, 추가 절차는 [아이콘 시스템](icon-system.md)에 정리합니다.
+
+SVG 원본과 `icons/labels.json`이 source of truth입니다. 변경 후
+`node scripts/generate-icons.mjs`로 `icons/icon-nodes.ts`와 `icons/catalog.ts`를
+생성하고 함께 커밋합니다. `node scripts/generate-icons.mjs --check`와 기존 Vitest
+검사가 원본/생성물 차이를 잡습니다. 생성 파일을 수작업으로 수정하지 않습니다.
+`PlanningIcon`, `ActionIcon`, `DecisionIcon`은 기존 API/data-slot을 유지하는
+`GalandaIcon` wrapper이며, 기능 상태나 이벤트 처리를 옮기지 않습니다.
+`GlobalNavIcon`은 기존 선택 계약을 유지합니다. 카탈로그는 production route에 등록하지 않습니다.
+
 ### 여행 중심 홈과 에셋
 
 홈의 시각 기준은 `docs/assets/trip-led/home-reference.png`입니다. 여행 하나의 제목,
@@ -76,9 +90,9 @@ fallback하며 header owner를 바꾸지 않습니다.
 하단 단일 영역 피드백 이후에는 시안의 버튼 위치 대신 여행 정보 바로 뒤에 행동을
 배치하며, 화면 하단으로 밀어내는 빈 공간을 만들지 않습니다.
 
-- 일반 조작·메타데이터 아이콘은 기존 Lucide를 사용합니다. 홈에서는
-  16/20/24px, 1.8px 선으로 맞추며 터치 영역은 Button/Link가 44px 이상 확보합니다.
-  아래 전용 아이콘 적용 지점은 각 절에 명시한 24×24 / 2px SVG 계약을 따릅니다.
+- 신규 제품 아이콘은 `GalandaIcon`의 16/20/24px, 2px 선 규격을 따릅니다.
+  터치 영역은 Button/Link가 44px 이상 확보합니다. 기존 미전환 Lucide와 shadcn
+  primitive 내부 아이콘은 유지하며, 라이브러리 제거를 위한 전면 재작성은 하지 않습니다.
 - 글로벌 내비게이션은 아래의 전용 SVG 계약을 따릅니다. 일러스트나 Lucide 아이콘을
   하단 탭 아이콘과 혼용하지 않습니다.
 - 일러스트는 `GalandaSpot`으로 렌더링합니다. 텍스트가 의미를 소유하고 그림은
@@ -103,7 +117,7 @@ fallback하며 header owner를 바꾸지 않습니다.
 - 승인된 SVG 원본 8개는 `public/assets/galanda/navigation/`에 보관합니다.
   `home`, `explore`, `trips`, `my` 각각 `-outline.svg`와 `-filled.svg` 쌍입니다.
 - 렌더러는 원본과 같은 경로를 인라인 SVG로 사용합니다. 형상을 바꿀 때에는 원본과
-  `src/components/galanda/global-nav-icon.tsx`를 함께 갱신합니다.
+  `src/components/galanda/global-nav-icon.tsx`를 함께 갱신하고 공통 생성기도 실행합니다.
 - `viewBox="0 0 24 24"`, 표시 크기 24px, 선 두께 2px, 둥근 끝·모서리를 유지합니다.
   선택 전환 시 외곽 크기를 바꾸지 않으며 그림자·그라데이션·원근감을 추가하지 않습니다.
 - `currentColor`가 링크의 `text-primary` / `text-foreground-muted`를 상속합니다.
@@ -119,8 +133,8 @@ fallback하며 header owner를 바꾸지 않습니다.
 하단 탭의 선택 상태나 예약 완료 배지를 대신하지 않습니다.
 
 - 원본은 `public/assets/galanda/planning/`의 `calendar`, `route`, `stay`, `ticket`
-  각각 `-outline.svg`입니다. 원본 4개를 보존하고 인라인 JSX로 렌더링합니다.
-- `src/components/galanda/planning-icon.tsx`와 원본을 함께 갱신합니다.
+  각각 `-outline.svg`입니다. 원본 4개를 보존하고 생성된 노드로 인라인 렌더링합니다.
+- 원본 변경 후 공통 생성기를 실행합니다. `planning-icon.tsx`에 형상을 복사하지 않습니다.
   `planning-icon.test.tsx`는 원본 파일과 실제 렌더러의 형상·색상 속성 일치를 검사합니다.
 - 24×24 viewBox, 2px 선, 둥근 끝·모서리, `fill="none"`, `stroke="currentColor"`를
   유지합니다. 기본 24px, 목록 20px, 기존 홈 메타데이터 정렬에는 16px를 사용합니다.
@@ -139,7 +153,7 @@ fallback하며 header owner를 바꾸지 않습니다.
 기존 `PlanningIcon`과 같은 outline 규격이며 전역 탭 선택 상태와는 별개입니다.
 
 - 원본은 `public/assets/galanda/actions/*-outline.svg`에 보관합니다.
-  `src/components/galanda/action-icon.tsx`와 함께 갱신하며 `action-icon.test.tsx`가
+  변경 후 공통 생성기를 실행하며 `action-icon.test.tsx`가
   원본과 실제 렌더러의 형상·색상 속성 차이를 검사합니다.
 - 24×24 viewBox, 2px 선, 둥근 끝·모서리, `fill="none"`, `stroke="currentColor"`를
   유지합니다. 기본 24px, 행동/상태 20px, 홈 참여 인원에는 16px를 사용합니다.
@@ -158,7 +172,7 @@ fallback하며 header owner를 바꾸지 않습니다.
 ### 비교·보관·가져오기·공유 아이콘
 
 `DecisionIcon`은 `compare`, `bookmark`, `import-plan`, `share`를 제공합니다.
-원본 5개는 `public/assets/galanda/decision/`에 보관하며 인라인 JSX로 렌더링합니다.
+원본 5개는 `public/assets/galanda/decision/`에 보관하며 생성된 노드로 인라인 렌더링합니다.
 
 - `bookmark`만 `variant="outline" | "filled"`를 지원합니다. 같은 경로에 채움만
   전환하며 나머지 아이콘은 outline 전용입니다. `decision-icon.test.tsx`가 원본과

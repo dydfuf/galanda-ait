@@ -76,6 +76,11 @@ const DevDesignPage = import.meta.env.DEV ? lazy(() =>
     default: m.DevDesignPage,
   })),
 ) : undefined;
+const DevIconsPage = import.meta.env.DEV ? lazy(() =>
+  import("../features/dev/DevIconsPage.tsx").then((m) => ({
+    default: m.DevIconsPage,
+  })),
+) : undefined;
 
 function RouteFallback() {
   return <PageState status="loading" message="화면을 불러오는 중이에요." />;
@@ -107,6 +112,9 @@ export function AppRouter() {
         */}
         {DevDesignPage && (
           <Route path="/dev" element={withSuspense(<DevDesignPage />)} />
+        )}
+        {DevIconsPage && (
+          <Route path="/dev/icons" element={withSuspense(<DevIconsPage />)} />
         )}
 
         <Route element={<SessionRoute />}>
