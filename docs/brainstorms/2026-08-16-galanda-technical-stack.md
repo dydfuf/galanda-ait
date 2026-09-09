@@ -1,11 +1,16 @@
 ---
 date: 2026-08-16
 topic: galanda-technical-stack
-status: confirmed
+status: superseded
+superseded_by: ../adr/ADR-001-galanda-effect-v4-architecture.md
 source: ./2026-08-14-galanda-group-trip-product-brainstorm.md
 ---
 
 # 갈란다 기술 스택 결정
+
+> 2026-08-16의 기술 선택 기록이다. 현재 구조는 [ADR-001](../adr/ADR-001-galanda-effect-v4-architecture.md),
+> UI는 [UI foundation](../ui-foundation.md), 버전은 [package.json](../../package.json)을 따른다.
+> 아래 TDS·Supabase client/RLS·browser Effect 실행 및 미적용 항목은 현재 구현 지시가 아니다.
 
 ## 1. 문서 목적
 

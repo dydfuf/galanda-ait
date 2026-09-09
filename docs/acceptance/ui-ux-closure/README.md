@@ -1,5 +1,9 @@
 # UI/UX Closure Review Pack
 
+> 이 문서는 해당 UI/UX 점검의 날짜별 실행 기록이다. 아래 "현재 작업", 상태표와
+> 보류·중단은 그 작업 범위에 적용한다. 새 요청의 작업 목록이나 전체 저장소의
+> 중단 조건으로 해석하지 않는다. 관련 점검을 재개할 때 최신 요청과 증거를 확인한다.
+
 상위 [#125](https://github.com/dydfuf/galanda-ait/issues/125), 준비 작업 [#126](https://github.com/dydfuf/galanda-ait/issues/126).
 
 ## 환경과 실행

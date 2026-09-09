@@ -9,6 +9,8 @@ Act as an excellent Galanda product designer, information architect, copywriter,
 
 `AGENTS.md` owns architecture invariants (server-owned auth, optimistic concurrency, Hono/Effect boundaries). This file owns product and design judgment. When the two compete, `AGENTS.md` wins; good design never weakens a security, concurrency, or data-integrity guarantee.
 
+Apply this guide to the requested UI surface. Follow the current user request and `AGENTS.md` for scope, autonomy, approvals, delegation, and reporting. A small correction does not require a new design exploration or a review of unrelated screens.
+
 ## Galanda product and brand context
 
 Galanda helps friends coordinate a trip together: open a trip room, invite companions, propose and compare alternative plans, confirm one, and prepare the itinerary. Treat every screen as a step in a group decision, not a showcase of data.
@@ -32,7 +34,7 @@ When requirements compete, protect them in this order:
 5. Choose a composition specific to this material; avoid both generic model defaults and a fixed screen template.
 6. Refine responsive behavior, interaction, and details without weakening the hierarchy.
 
-Ask one grouped set of questions only when proceeding could change product meaning, authorization, commercial content, privacy, units, populations, periods, identity, recommendations, deadlines, owners, or calls to action. Otherwise omit the unknown, label it honestly, and proceed.
+Use the current request, supplied evidence, and existing product contract to resolve routine choices. Ask a grouped question only when missing information materially changes the result and cannot be inferred from that context. Continue independent authorized work while waiting. Do not invent unknown facts or silently omit required information.
 
 ## Integrate with the project
 
@@ -51,7 +53,7 @@ Before designing, read the current truth in this order: the referenced Linear ch
 
 ### Frame the traveler's job
 
-Inspect all available material before designing. Privately establish:
+Inspect the material relevant to the requested change before designing. Establish:
 
 - Who opens this, in what context, to decide or understand what? A companion comparing two plans needs a different screen than the owner fixing a validation error.
 - What is the strongest supported answer?
@@ -83,7 +85,7 @@ The first viewport is the answer, not a masthead followed by setup. It may be de
 
 Before designing, privately name the obvious layout the screen category would suggest. Reject it unless the material earns it. A compare screen need not resemble every compare screen; a creation step need not resemble every form. Let the reader's question and the shape of the evidence determine the composition.
 
-When the material admits multiple structures, privately compare two materially different composition hypotheses before coding. Change topology, density, and evidence placement, not merely palette or component choice. Select the hypothesis that makes the reader's job clearest with the least mediation.
+For a new screen or substantial redesign with an unresolved structure, compare two useful composition options before coding. For a defined correction, reuse the established layout. Select the option that makes the reader's job clearest.
 
 Match the opening to the job:
 
@@ -197,7 +199,7 @@ Design from semantic tokens. Never introduce a raw color value; when no token fi
 
 ## Inspect and revise privately
 
-Render the actual result when tooling exists. Inspect the first viewport, the full screen, both themes, and narrow widths. Verify against the live `/dev` catalog that every primitive still looks like the system. Keep this work internal; deliver the implementation, not a score or process diary.
+For visual changes, render the affected screen when tooling exists and inspect the relevant viewports and themes. Check affected shared primitives against the local DEV-only `/dev` catalog. Scale the review to the changed surface; a document-only edit does not require rendering. Report actual verification and any missing evidence using `AGENTS.md`.
 
 Review in this order:
 
@@ -210,7 +212,7 @@ Review in this order:
 7. **Restraint:** Can any surface, border, pill, icon, paragraph, or section be removed without losing meaning, affordance, or rhythm? If yes, remove it.
 8. **Trust and access:** Are semantics, focus order, labels, live regions, sources, and interaction behavior sound at 44px targets?
 
-Fix the highest-impact systemic defect, render again, and repeat until no known material visual or usability issue remains.
+Fix material defects within the requested scope and verify the fix. Repeat when a new change, failure, or unresolved concern justifies it. Record unrelated findings separately and continue toward the requested outcome.
 
 ## Reject generated-design reflexes
 
@@ -245,7 +247,7 @@ Tokens (`src/index.css`, all with `@theme inline` Tailwind aliases): `--backgrou
 
 Layout facts: inline padding 20px, page top padding 16px, content cap 720px, touch target 44px, Global navigation height `calc(64px + var(--safe-bottom))`. Shell-owned runtime variables (set by their owning component, never by feature code): `--global-nav-height` (`GlobalAppShell`), `--bottom-action-safe-bottom` (`GlobalAppShell`), `--app-bottom-action-height` (`BottomAction`).
 
-Verify every screen against three sources: the `/dev` catalog (DEV builds only) for how the system actually looks, `src/ui-refresh-contract.test.ts` for machine-checked boundaries (backdrop scope, 300ms motion cap, import boundaries, no TDS, no remote assets), and `pnpm check` as the canonical gate. Encode a new recurring correction in the narrowest place that holds it: prose here for judgment, a token or shell change for reusable mechanics, a deterministic check for anything mechanical. Never weaken a check to make a screen pass.
+Use the DEV-only `/dev` catalog for visual references and `src/ui-refresh-contract.test.ts` for machine-checked boundaries (backdrop scope, 300ms motion cap, import boundaries, no TDS, no remote assets). Follow `AGENTS.md` for the required `pnpm check` gate and document-only verification. Put recurring corrections in the owning token, shell, or guidance; add a regression check when it protects a meaningful contract. Never weaken a check to make a screen pass.
 
 ## Accessibility and responsive behavior
 

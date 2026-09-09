@@ -1,5 +1,11 @@
 # Project: Granular Trip Creation Wizard (First Plan Single-Question Flow)
 
+This is the delivery record for the granular creation wizard, not a repository-wide
+work queue. Its milestones and constraints describe that implementation. Follow
+[AGENTS.md](AGENTS.md) for agent behavior and the current user request for new work.
+Use ADR-002 and current source for subsequent changes; historical test counts do not
+establish current browser or device acceptance.
+
 ## Product Contract Status
 
 - **Implementation delivery:** COMPLETE
@@ -80,63 +86,10 @@ If telemetry is required, extend the existing RAON-222 product-event infrastruct
 
 ## Interface Contracts
 
-### `FirstPlanWizardCursor`
-```typescript
-export type FirstPlanWizardSection = "basic" | "route" | "accommodation" | "transport" | "review";
-
-export type FirstPlanWizardQuestion =
-  | "title"
-  | "proposal-reason"
-  | "headcount"
-  | "city"
-  | "arrival-date"
-  | "departure-date"
-  | "add-city"
-  | "status"
-  | "hotel-name"
-  | "endpoints"
-  | "mode"
-  | "duration";
-
-export interface FirstPlanWizardCursor {
-  readonly section: FirstPlanWizardSection;
-  readonly question: FirstPlanWizardQuestion;
-  readonly index?: number;
-  readonly returnToReview?: boolean;
-}
-```
-
-### `first-plan-wizard-flow.ts` Contract
-```typescript
-export function parseWizardCursor(searchParams: URLSearchParams, pathname: string): FirstPlanWizardCursor;
-export function serializeWizardCursor(cursor: FirstPlanWizardCursor, tripId: string): { pathname: string; search: string };
-export function normalizeWizardCursor(cursor: Partial<FirstPlanWizardCursor>, formData: PlanEditorFormData): FirstPlanWizardCursor;
-export function getNextWizardCursor(currentCursor: FirstPlanWizardCursor, formData: PlanEditorFormData): FirstPlanWizardCursor;
-export function getPreviousWizardCursor(currentCursor: FirstPlanWizardCursor, formData: PlanEditorFormData): FirstPlanWizardCursor;
-export function mapValidationErrorToCursor(validationError: string, formData: PlanEditorFormData): FirstPlanWizardCursor;
-```
-
-### `TripCreationProgress` Contract
-```typescript
-export type TripCreationStep =
-  | "trip-info"
-  | "companions"
-  | "plan-basic"
-  | "plan-route"
-  | "plan-accommodation"
-  | "plan-transport"
-  | "plan-review";
-
-export interface TripCreationProgressProps {
-  readonly currentStep: TripCreationStep;
-  readonly subStepLabel?: string;
-  readonly subStepProgress?: {
-    readonly current: number;
-    readonly total: number;
-  };
-  readonly className?: string;
-}
-```
+Read the exported types and functions in
+[`first-plan-wizard-flow.ts`](src/features/plan-editor/first-plan-wizard-flow.ts) and
+[`trip-creation-progress.tsx`](src/components/galanda/trip-creation-progress.tsx).
+Keep executable signatures in their source files instead of duplicating them here.
 
 ## Code Layout
 - `src/features/plan-editor/first-plan-wizard-flow.ts` — Pure flow state machine and cursor resolver
@@ -149,4 +102,4 @@ export interface TripCreationProgressProps {
 - `src/components/galanda/trip-creation-progress.tsx` — 4-stage main progress bar with optional question-level progress
 - `src/components/galanda/trip-creation-progress.test.tsx` — Progress bar accessibility & state tests
 - `src/features/plan-home/PlanHomePage.tsx` — Plan home with draft resume CTA
-- `src/app/trip-creation-navigation.test.tsx` — End-to-end trip creation navigation integration tests
+- `src/app/trip-creation-navigation.test.tsx` — Vitest/jsdom trip creation navigation integration tests

@@ -7,6 +7,11 @@ source: ./2026-08-14-galanda-screen-flow-brainstorm.md
 
 # 갈란다 라우팅 아키텍처 결정
 
+> 초기 라우팅 결정 기록이다. 현재 경로는 [router.tsx](../../src/app/router.tsx),
+> 생성 흐름은 [ADR-002](../adr/ADR-002-trip-creation-wizard-product-contract.md)를 확인한다.
+> 아래 샘플 화면 교체 지시는 당시 작업이며, browser ManagedRuntime 데이터 경로는
+> [ADR-001](../adr/ADR-001-galanda-effect-v4-architecture.md)의 HTTP/서버 구조로 대체됐다.
+
 ## 1. 문서 목적
 
 이 문서는 갈란다 WebView 미니앱의 URL 구조, 화면 전환, 딥링크와 뒤로가기 원칙을 정의한다. 화면의 역할과 사용자 흐름은 [화면 흐름 및 화면 명세](./2026-08-14-galanda-screen-flow-brainstorm.md), 애플리케이션 계층은 [Effect-first 아키텍처 결정](./2026-08-16-galanda-effect-first-architecture-brainstorm.md)을 따른다.
