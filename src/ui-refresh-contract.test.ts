@@ -13,6 +13,8 @@ const packageJsonPath = path.join(projectRoot, "package.json");
 
 const sourceExtensions = new Set([".css", ".ts", ".tsx"]);
 const testFilePattern = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+// Match whole time tokens, not SVG coordinates such as `1s.4`.
+const timeValuePattern = /(?<![\w.])(\d*\.?\d+)(ms|s)(?![\w.])/g;
 
 interface SourceFile {
   readonly absolutePath: string;
@@ -338,13 +340,28 @@ describe("UI refresh foundation source contract", () => {
     );
   });
 
+  it("recognizes time tokens without treating SVG curves as seconds", () => {
+    const source = `
+      <path d="m3 10 7 2 6-8c1-1.4 3-2 4-1s.4 3-1 4" />
+      const asset1s = "icon";
+      transition: opacity 1s, transform .5s;
+      animation-duration: 0.3s;
+      style={{ transitionDuration: "400ms" }}
+      className="duration-[1.5s] duration-[350ms]"
+    `;
+
+    expect([...source.matchAll(timeValuePattern)].map(([value]) => value)).toEqual([
+      "1s", ".5s", "0.3s", "400ms", "1.5s", "350ms",
+    ]);
+  });
+
   it("caps every source-owned UI duration at 300ms", () => {
     const violations: string[] = [];
 
     for (const file of productionSourceFiles) {
       const source = stripComments(file.source);
 
-      for (const match of source.matchAll(/(\d*\.?\d+)(ms|s)\b/g)) {
+      for (const match of source.matchAll(timeValuePattern)) {
         const milliseconds = Number(match[1]) * (match[2] === "s" ? 1_000 : 1);
         if (milliseconds > 300) {
           violations.push(
