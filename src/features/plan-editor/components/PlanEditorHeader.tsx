@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ActionIcon } from "@/components/galanda/action-icon.tsx";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,13 +54,16 @@ export function PlanEditorHeader({
 
       <div className="flex min-w-0 shrink-0 flex-col items-end gap-2">
         <output
-          className={`flex min-h-(--touch-target-min) max-w-full min-w-0 items-center rounded-lg px-3 py-2 text-base leading-snug font-medium [overflow-wrap:anywhere] ${
+          className={`flex min-h-(--touch-target-min) max-w-full min-w-0 items-center gap-1.5 rounded-lg px-3 py-2 text-base leading-snug font-medium [overflow-wrap:anywhere] ${
             draftSaveStatus === "ERROR"
               ? "bg-destructive-muted text-destructive-strong"
               : "bg-muted text-muted-foreground"
           }`}
         >
-          {getDraftSaveStatusLabel(draftSaveStatus)}
+          {draftSaveStatus === "SAVED" && (
+            <ActionIcon name="complete" size={20} className="text-success" />
+          )}
+          <span className="min-w-0">{getDraftSaveStatusLabel(draftSaveStatus)}</span>
         </output>
         {onClearDraft && (
           <button

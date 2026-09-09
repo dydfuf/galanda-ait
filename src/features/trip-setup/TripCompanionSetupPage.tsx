@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Share2 } from "lucide-react";
 import { Result } from "effect";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -7,6 +6,7 @@ import {
   decodeRouteParams,
   TripParamsSchema,
 } from "@/app/routes/route-params.ts";
+import { ActionIcon } from "@/components/galanda/action-icon.tsx";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { PageHeader } from "@/components/galanda/page-header.tsx";
@@ -185,7 +185,7 @@ export function TripCompanionSetupPage() {
               >
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary-muted text-primary">
-                    <Share2 className="size-5" aria-hidden="true" />
+                    <ActionIcon name="invite" size={20} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <h2
