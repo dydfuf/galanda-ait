@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -37,6 +38,8 @@ const confirmed: ItineraryStateResponse = {
   unacknowledgedCount: 0,
 };
 
+let queryClient: QueryClient;
+
 function setQuery(
   data: ItineraryStateResponse | undefined,
   overrides: Partial<ReturnType<typeof useItineraryQuery>> = {},
@@ -50,12 +53,14 @@ function setQuery(
 
 function Page() {
   return (
-    <MemoryRouter initialEntries={["/trips/trip-spot-test/itinerary"]}>
-      <Routes>
-        <Route path="/trips/:tripId/itinerary" element={<ItineraryPage />} />
-        <Route path="/trips/:tripId/plans" element={<h1>후보 여행안 목록</h1>} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/trips/trip-spot-test/itinerary"]}>
+        <Routes>
+          <Route path="/trips/:tripId/itinerary" element={<ItineraryPage />} />
+          <Route path="/trips/:tripId/plans" element={<h1>후보 여행안 목록</h1>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
@@ -63,6 +68,9 @@ const spot = (container: HTMLElement) => container.querySelector('[data-slot="ga
 
 beforeEach(() => {
   vi.clearAllMocks();
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   // Keep session I/O outside these state-rendering tests, just like itinerary I/O.
   vi.mocked(useSessionQuery).mockReturnValue({
     data: {
@@ -82,7 +90,10 @@ beforeEach(() => {
     mutateAsync: vi.fn<ReturnType<typeof useAcknowledgeItineraryMutation>["mutateAsync"]>(),
   } as ReturnType<typeof useAcknowledgeItineraryMutation>);
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  queryClient.clear();
+});
 
 describe("Itinerary illustration state boundaries", () => {
   it("shows comparison rather than a success check before confirmation and preserves navigation", () => {
