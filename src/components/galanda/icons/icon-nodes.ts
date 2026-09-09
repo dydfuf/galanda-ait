@@ -3,6 +3,7 @@ type Node = { readonly tag: string; readonly attrs: Readonly<Record<string, stri
 const ROOT = {"xmlns":"http://www.w3.org/2000/svg","width":"24","height":"24","viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeWidth":"2","strokeLinecap":"round","strokeLinejoin":"round"};
 const outline = (nodes: readonly Node[]) => ({ attrs: ROOT, nodes });
 const filled = (nodes: readonly Node[]) => ({ attrs: { ...ROOT, fill: "currentColor" }, nodes });
+
 export const ICON_NODES = {
   "add": {"outline": outline([{"tag":"path","attrs":{"d":"M12 4v16M4 12h16"}}])},
   "arrow-down": {"outline": outline([{"tag":"path","attrs":{"d":"M12 4v16m-7-7 7 7 7-7"}}])},
