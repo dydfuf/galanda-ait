@@ -103,8 +103,8 @@ SVG 원본과 `icons/labels.json`이 source of truth입니다. 변경 후
 - `empty-trips`, `empty-saved`: 해당 조회가 성공한 빈 상태에만 사용합니다.
 - 모든 그림은 `public/assets/galanda/spots/`의 라이트·다크 SVG 쌍입니다.
   총 12개이며 기존 PWA SVG precache 규칙으로 포함됩니다.
-  홈·빈 상태 3종은 원본에서 다크 팔레트를 조정한 입체형 SVG입니다. 이 3종에는
-  추가 밝기 필터를 적용하지 않으며, 나머지 3종의 기존 대비 처리는 유지합니다.
+  홈·빈 상태와 협업·확정의 6종 모두 원본에서 다크 팔레트를 조정한 입체형 SVG입니다.
+  추가 밝기 필터나 이름별 대비 보정 예외를 적용하지 않습니다.
   원본 240×240, 표시 128×128, 테마별 도형 일치 및 파일당 4KB 미만 기준은
   [일러스트 가이드](../public/assets/galanda/spots/README.md)를 따릅니다.
 - `/dev#assets`에서 여섯 일러스트와 공통 아이콘을 검토할 수 있습니다.
