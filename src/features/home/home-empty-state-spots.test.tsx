@@ -2,13 +2,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import type * as HomeTripDashboardModule from "./components/HomeTripDashboard.tsx";
 
 vi.mock("../plan-home/queries.ts", () => ({ useTripRoomsQuery: vi.fn() }));
 vi.mock("../explore/save-queries.ts", () => ({ useSavedListingsQuery: vi.fn(), SAVED_FEED_PAGE_SIZE: 20 }));
 vi.mock("../../hooks/useSession.ts", () => ({ useSessionQuery: vi.fn() }));
 vi.mock("./components/HomeNextAction.tsx", () => ({ HomeNextAction: () => null }));
 vi.mock("./components/HomeTripDashboard.tsx", async (importOriginal) => ({
-  ...await importOriginal<typeof import("./components/HomeTripDashboard.tsx")>(),
+  ...await importOriginal<typeof HomeTripDashboardModule>(),
   HomeTripCard: () => <p>현재 여행 카드</p>,
 }));
 vi.mock("../explore/components/ExploreListingCard.tsx", () => ({
@@ -75,7 +76,8 @@ describe("Home and saved empty-state illustration integration", () => {
     mockRooms({ data: undefined, isPending: true });
     const { container } = renderHome();
     expect(spot(container)).toBeNull();
-    expect(screen.getByRole("status")).toHaveTextContent("여행 정보를 불러오는 중이에요.");
+    expect(container.querySelector('[data-system-state="loading"]')).toHaveAttribute("role", "status");
+    expect(screen.getByText("여행 정보를 불러오는 중이에요.")).toBeInTheDocument();
   });
 
   it("keeps home errors and retries separate from empty trips", () => {
@@ -107,7 +109,8 @@ describe("Home and saved empty-state illustration integration", () => {
     mockSaved({ data: undefined, isPending: true });
     const { container } = renderSaved();
     expect(spot(container)).toBeNull();
-    expect(screen.getByRole("status")).toHaveTextContent("저장한 여행 일정을 불러오는 중이에요.");
+    expect(container.querySelector('[data-system-state="loading"]')).toHaveAttribute("role", "status");
+    expect(screen.getByText("저장한 여행 일정을 불러오는 중이에요.")).toBeInTheDocument();
   });
 
   it("keeps saved-list errors and retries separate from an empty collection", () => {
