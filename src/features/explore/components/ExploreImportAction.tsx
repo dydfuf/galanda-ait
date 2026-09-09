@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { DecisionIcon } from "@/components/galanda/decision-icon.tsx";
 
 import { Button } from "@/components/ui/button.tsx";
 import { useSessionQuery } from "@/hooks/useSession.ts";
@@ -38,7 +38,7 @@ export function ExploreImportAction({
         onClick={() => setIsOpen(true)}
         data-slot="explore-import-action"
       >
-        <Download className="size-5" aria-hidden="true" />
+        <DecisionIcon name="import-plan" size={20} />
         <span>내 여행으로 가져오기</span>
       </Button>
 

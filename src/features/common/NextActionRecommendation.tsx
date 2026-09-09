@@ -4,6 +4,7 @@ import type {
   RecommendationSurface,
   TripActionId,
 } from "../../core/domain/trip-action.ts";
+import { DecisionIcon } from "@/components/galanda/decision-icon.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
 import {
@@ -102,6 +103,9 @@ export function NextActionRecommendation({
         className="mt-4 w-full"
         onClick={() => selectAction(recommendation.primary.actionId, false)}
       >
+        {recommendation.primary.actionId === "COMPARE_PLANS" && (
+          <DecisionIcon name="compare" size={20} />
+        )}
         {tripActionPresentation[recommendation.primary.actionId].label}
       </Button>
       <div className="mt-1.5 flex min-w-0 flex-wrap items-center justify-center gap-x-2">
@@ -113,6 +117,7 @@ export function NextActionRecommendation({
             className="min-w-0 whitespace-normal text-xs font-semibold text-primary hover:text-primary hover:bg-primary-muted/60"
             onClick={() => selectAction(alternative, true)}
           >
+            {alternative === "COMPARE_PLANS" && <DecisionIcon name="compare" size={16} />}
             대신 {tripActionPresentation[alternative].label}
           </Button>
         )}

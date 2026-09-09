@@ -6,6 +6,7 @@ import { RouteErrorFallback } from "../common/RouteErrorFallback.tsx";
 import { toUserMessage } from "../common/error-message.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { Result } from "effect";
+import { DecisionIcon } from "@/components/galanda/decision-icon.tsx";
 import { PageState } from "@/components/galanda/page-state.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
 import { GalandaSpot } from "@/components/galanda/galanda-spot.tsx";
@@ -362,6 +363,7 @@ export function PlanHomePage() {
       {showBottomPrimary && (
         <BottomAction>
           <Button type="button" size="xl" onClick={runPrimaryCta}>
+            {cta.primaryKind === "compare" && <DecisionIcon name="compare" size={20} />}
             {cta.primaryLabel}
           </Button>
         </BottomAction>
@@ -448,6 +450,7 @@ export function PlanHomePage() {
               disabled={selectedCompareIds.length !== 2}
               onClick={handleCompareConfirm}
             >
+              <DecisionIcon name="compare" size={20} />
               선택한 2개 비교하기
             </Button>
           </DrawerFooter>
