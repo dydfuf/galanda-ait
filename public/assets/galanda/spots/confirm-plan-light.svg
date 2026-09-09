@@ -1,7 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><title>일정 확정</title><g stroke-linecap="round" stroke-linejoin="round"><rect x="43" y="55" width="151" height="143" rx="18" fill="#E0EDFF"/>
-  <rect x="36" y="48" width="151" height="143" rx="18" fill="#FFFFFF" stroke="#82B6FF" stroke-width="2.2"/>
-  <path d="M54 48h115a18 18 0 0 1 18 18v26H36V66a18 18 0 0 1 18-18Z" fill="#3182F6"/>
-  <path d="M72 37v23m79-23v23" stroke="#1B64DA" stroke-width="8"/>
-  <path d="M60 114h17m22 0h17m22 0h17M60 140h17m22 0h17m-56 26h17" stroke="#82B6FF" stroke-width="7"/>
-  <circle cx="177" cy="172" r="38" fill="#F0FBF4" stroke="#15803D" stroke-width="2.5"/>
-  <path d="m160 172 12 12 23-27" stroke="#15803D" stroke-width="6" fill="none"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <title>확정된 여행 일정</title>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#82B6FF"/>
+      <stop offset=".52" stop-color="#3182F6"/>
+      <stop offset="1" stop-color="#1B64DA"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F1F7FF"/>
+      <stop offset=".7" stop-color="#E0EDFF"/>
+      <stop offset="1" stop-color="#BCD8FA"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="39" y="52" width="147" height="151" rx="22" fill="#A6C9F2"/>
+    <rect x="33" y="46" width="147" height="151" rx="22" fill="url(#paper)"/>
+    <path d="M55 46h103a22 22 0 0 1 22 22v29H33V68a22 22 0 0 1 22-22Z" fill="url(#blue)"/>
+    <path d="M44 69a13 13 0 0 1 13-13h96" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="3"/>
+    <path d="M68 36v29m77-29v29" stroke="#315E98" stroke-width="11"/>
+    <path d="M65 36v23m77-23v23" stroke="#FFFFFF" stroke-opacity=".7" stroke-width="3"/>
+    <path d="M57 120h18m20 0h18m20 0h18M57 142h18m20 0h18M57 164h18" stroke="#96BCEC" stroke-width="7"/>
+    <circle cx="176" cy="173" r="37" fill="#1554BE"/>
+    <circle cx="171" cy="168" r="37" fill="url(#blue)"/>
+    <path d="M146 160a27 27 0 0 1 25-19" stroke="#FFFFFF" stroke-opacity=".45" stroke-width="3"/>
+    <path d="m155 169 10 10 23-24" stroke="#FFFFFF" stroke-width="7"/>
+  </g>
+</svg>
