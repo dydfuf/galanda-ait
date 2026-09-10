@@ -1,9 +1,12 @@
-# Galanda — 친구들과 함께하는 여행 일정 조율
+# 갈라고 — 친구들과 함께하는 여행 일정 조율
 
 React + TanStack Query 기반 Web/PWA가 기본 타깃이며, Apps in Toss는 선택적 플랫폼 타깃으로 동작해요. 서버는 Hono transport + Effect application + Drizzle/PostgreSQL 경계 위에 구성되어 있어요.
 
+사용자에게 보이는 서비스 브랜드는 **갈라고**입니다. 저장소·package·Apps in Toss `appName`·기존 storage key의 `galanda`는 배포 호환성을 위한 내부 식별자로 유지합니다.
+
 - **Repository guide**: [`AGENTS.md`](./AGENTS.md) — 저장소 경계·아키텍처 invariant·검증 규칙
 - **문서 안내**: [`docs/README.md`](./docs/README.md) — 현재 구현 기준과 과거 계획·검증 기록의 적용 범위
+- **Brand identity**: [`docs/brand-identity.md`](./docs/brand-identity.md) — 표시명·마크·favicon/PWA 아이콘·내부 식별자 경계
 - **로컬 개발**: [`docs/local-development.md`](./docs/local-development.md) — 로컬 PostgreSQL·Worker API·Vite proxy 세팅과 로그인 확인
 - **Architecture**: [`docs/adr/ADR-001-galanda-effect-v4-architecture.md`](./docs/adr/ADR-001-galanda-effect-v4-architecture.md) — Hono/Effect/Domain/Ports ownership, error algebra, persistence/concurrency
 - **UI**: [`docs/ui-foundation.md`](./docs/ui-foundation.md) — shadcn + Base UI + Tailwind 기준 (과거 TDS는 참고만)

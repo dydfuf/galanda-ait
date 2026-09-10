@@ -6,6 +6,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 import aitDevtools from "@apps-in-toss/devtools/unplugin";
 
+const BRAND_DISPLAY_NAME = '갈라고'
+const BRAND_DESCRIPTION = '갈라고 - 친구들과 함께하는 여행 일정 조율'
+const BRAND_PRIMARY_COLOR = '#3182F6'
+
 /*
  * Vite dev server는 SPA만 서빙해요. `/api/*`는 Worker(Hono)가 소유하므로
  * dev에서도 로컬 `wrangler dev`로 그대로 넘겨요.
@@ -43,14 +47,14 @@ export default defineConfig(({ mode }) => {
               strategies: 'generateSW',
               includeAssets: ['favicon.svg'],
               manifest: {
-                name: '갈란다 - 친구들과 함께하는 여행 일정 조율',
-                short_name: '갈란다',
-                description: '갈란다 - 친구들과 함께하는 여행 일정 조율',
+                name: BRAND_DESCRIPTION,
+                short_name: BRAND_DISPLAY_NAME,
+                description: BRAND_DESCRIPTION,
                 start_url: '/',
                 scope: '/',
                 display: 'standalone',
-                theme_color: '#3182f6',
-                background_color: '#ffffff',
+                theme_color: BRAND_PRIMARY_COLOR,
+                background_color: '#FFFFFF',
                 lang: 'ko',
                 icons: [
                   {

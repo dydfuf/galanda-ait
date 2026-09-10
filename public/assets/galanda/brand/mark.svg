@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>갈라고 G 경로 마크</title>
+  <defs>
+    <mask id="route-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="white"/>
+      <circle cx="382" cy="256" r="10" fill="black"/>
+    </mask>
+  </defs>
+  <g mask="url(#route-cutout)" stroke="#3182F6" stroke-width="48" stroke-linecap="round">
+    <path d="M379.6 321.7A140 140 0 1 1 379.6 190.3"/>
+    <path d="M252 256H382"/>
+  </g>
+</svg>
