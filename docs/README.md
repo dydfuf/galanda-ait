@@ -17,6 +17,7 @@
 | Effect 버전 | [버전 결정](effect-version-decision.md) | `package.json`과 `repos/effect/packages/effect/package.json` |
 | 탐색 분류 | [도시](explore-city-taxonomy.md), [테마](explore-theme-taxonomy.md) | `src/core/domain/`, 공개 listing 구현 |
 | AI 추천 운영 | [AI Gateway](raon-238-ai-gateway-runbook.md), [Shadow eval 결정](raon-239-shadow-eval-decision.md) | Worker vars, ranking adapter, eval script |
+| 공동 여행 자료함 | [자료함 계약·운영](trip-resources.md) | `src/features/resources/`, `worker/routes/trip-resources.ts` |
 
 문서의 역할과 실제 코드가 다르면 현재 요청과 실행 가능한 근거를 대조한다.
 설명이 오래된 것이 명확하면 갱신한다. 제품 의미나 승인 범위가 불명확한 경우에만

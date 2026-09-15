@@ -151,6 +151,9 @@ export function TripRoomTabLayout() {
           >
             일정
           </TabsTrigger>
+          <TabsTrigger value="resources" className="text-sm font-semibold">
+            자료함
+          </TabsTrigger>
         </TabsList>
       </Tabs>
     </div>

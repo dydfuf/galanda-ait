@@ -41,6 +41,9 @@ importers:
       effect:
         specifier: 4.0.0-rc.109
         version: 4.0.0-rc.109
+      entities:
+        specifier: 8.0.0
+        version: 8.0.0
       hono:
         specifier: 4.13.3
         version: 4.13.3

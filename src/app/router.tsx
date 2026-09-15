@@ -62,6 +62,9 @@ const PlanComparePage = lazy(() =>
 const ItineraryPage = lazy(() =>
   import("../features/itinerary/ItineraryPage.tsx").then((m) => ({ default: m.ItineraryPage })),
 );
+const TripResourcesPage = lazy(() =>
+  import("../features/resources/TripResourcesPage.tsx").then((m) => ({ default: m.TripResourcesPage })),
+);
 const ItineraryEditPage = lazy(() =>
   import("../features/itinerary/ItineraryEditPage.tsx").then((m) => ({ default: m.ItineraryEditPage })),
 );
@@ -137,6 +140,7 @@ export function AppRouter() {
           />
           <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
             <Route path="plans" element={withSuspense(<PlanHomePage />)} />
+            <Route path="resources" element={withSuspense(<TripResourcesPage />)} />
             <Route
               path="itinerary"
               element={withSuspense(<ItineraryPage />)}

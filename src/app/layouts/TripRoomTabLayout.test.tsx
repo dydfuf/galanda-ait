@@ -64,6 +64,7 @@ const renderLayout = (
           <Route path="/trips/:tripId" element={<TripRoomTabLayout />}>
             <Route path="plans" element={<h1>계획 콘텐츠</h1>} />
             <Route path="itinerary" element={<h1>일정 콘텐츠</h1>} />
+            <Route path="resources" element={<h1>자료함 콘텐츠</h1>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -354,6 +355,17 @@ describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "일정 콘텐츠" }),
     ).toBeInTheDocument();
+  });
+
+  it("자료함 탭 전환과 직접 진입이 여행방 shell을 유지한다", () => {
+    const { unmount } = renderLayout("/trips/trip-1/plans");
+    fireEvent.click(screen.getByRole("tab", { name: "자료함" }));
+    expect(screen.getByTestId("location-pathname")).toHaveTextContent("/trips/trip-1/resources");
+    expect(screen.getByRole("heading", { name: "자료함 콘텐츠" })).toBeInTheDocument();
+    unmount();
+    renderLayout("/trips/trip-1/resources/");
+    expect(screen.getByRole("tab", { name: "자료함" })).toHaveAttribute("aria-selected", "true");
+    expect(within(screen.getByRole("banner")).getByText("여행방")).toBeInTheDocument();
   });
 
   it("일정 → 계획 탭 전환 시 URL이 바뀌고 계획 콘텐츠가 렌더링된다", () => {

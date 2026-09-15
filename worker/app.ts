@@ -19,6 +19,7 @@ import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
 import { invitesRoute, tripsRoute } from "./routes/trips.ts";
 import { exploreRoute, explorePlanListingRoute, meRoute } from "./routes/explore.ts";
+import { tripResourcesRoute } from "./routes/trip-resources.ts";
 
 export interface AppVariables {
   requestId: string;
@@ -29,6 +30,7 @@ export interface AppVariables {
 }
 
 export interface AiRecommendationBindings {
+  readonly AI_RESOURCE_MODEL?: string;
   readonly AI_RECOMMENDATION_MODE?: string;
   readonly AI_RECOMMENDATION_MODEL?: string;
   readonly AI_RECOMMENDATION_POLICY_VERSION?: string;
@@ -144,6 +146,7 @@ export function createApp(dependencies: AppDependencies = {}) {
       : c.json(c.var.authSession ?? null)
   );
   app.route("/api/trips", tripsRoute);
+  app.route("/api/trips", tripResourcesRoute);
   app.route("/api/trips", explorePlanListingRoute);
   app.route("/api/explore", exploreRoute);
   app.route("/api/me", meRoute);

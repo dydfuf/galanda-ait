@@ -83,6 +83,8 @@ describe("Trip Room mode navigation", () => {
     expect(getTripRoomSection("/trips/trip-1/itinerary/")).toBe("itinerary");
     expect(getTripRoomSection("/trips/trip-1/itinerary///")).toBe("itinerary");
     expect(getTripRoomSection("/trips/trip-1/ITINERARY")).toBe("itinerary");
+    expect(getTripRoomSection("/trips/trip-1/RESOURCES/")).toBe("resources");
+    expect(getTripRoomSectionPath("trip-1", "resources")).toBe("/trips/trip-1/resources");
     expect(getTripRoomSectionPath("trip-1", "itinerary")).toBe(
       "/trips/trip-1/itinerary",
     );
@@ -98,6 +100,7 @@ describe("Trip Room mode navigation", () => {
     ["/trips/trip-1/itinerary", "여행방"],
     ["/trips/trip-1/itinerary/", "여행방"],
     ["/trips/trip-1/ITINERARY", "여행방"],
+    ["/trips/trip-1/resources/", "여행방"],
     ["/trips/trip-1/itinerary/edit", "일정 수정"],
     ["/trips/trip-1/itinerary/edit/", "일정 수정"],
     ["/trips/trip-1/ITINERARY/EDIT", "일정 수정"],
