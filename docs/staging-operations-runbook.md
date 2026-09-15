@@ -34,9 +34,9 @@ production application path는 Supabase Auth, `supabase-js`, PostgREST를 사용
 | `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | Cloudflare Worker staging secret |
 | `TOSS_MTLS` certificate와 private key | Cloudflare mTLS certificate binding |
 | PostgreSQL password와 전체 origin connection URL | Cloudflare Hyperdrive / secret manager |
-| 관리자용 `DATABASE_URL` | migration 실행 환경에만 일시 주입 |
+| 관리자용 `MIGRATION_DATABASE_URL` | migration 실행 환경에만 일시 주입 |
 
-`DATABASE_URL`은 local runtime fallback과 migration용이다. staging Worker runtime은 `HYPERDRIVE.connectionString`을 사용한다. `VITE_*` database credential은 만들지 않는다.
+`DATABASE_URL`은 local runtime fallback이며 migration은 `MIGRATION_DATABASE_URL`을 사용한다. staging Worker runtime은 `HYPERDRIVE.connectionString`을 사용한다. `VITE_*` database credential은 만들지 않는다.
 
 ## Runtime invariants
 
@@ -101,18 +101,18 @@ pnpm check
 4. migration과 최소 권한 검증을 실행한다.
 
 ```bash
-printf 'DATABASE_URL: ' >&2
-IFS= read -r -s DATABASE_URL
+printf 'MIGRATION_DATABASE_URL: ' >&2
+IFS= read -r -s MIGRATION_DATABASE_URL
 printf '\n' >&2
-export DATABASE_URL
+export MIGRATION_DATABASE_URL
 (
   pnpm db:migrate &&
-    psql "$DATABASE_URL" -f scripts/verify-database-privileges.sql
+    psql "$MIGRATION_DATABASE_URL" -f scripts/verify-database-privileges.sql
 )
-unset DATABASE_URL
+unset MIGRATION_DATABASE_URL
 ```
 
-Direct endpoint는 기본적으로 IPv6다. 실행 환경이 IPv4-only이고 Supabase IPv4 add-on이 없다면 migration용 `DATABASE_URL`에만 Session Pooler port `5432`를 사용할 수 있다. Worker Hyperdrive origin은 Direct endpoint를 유지한다.
+Direct endpoint는 기본적으로 IPv6다. 실행 환경이 IPv4-only이고 Supabase IPv4 add-on이 없다면 migration용 `MIGRATION_DATABASE_URL`에만 Session Pooler port `5432`를 사용할 수 있다. Worker Hyperdrive origin은 Direct endpoint를 유지한다.
 
 runtime role의 생성·권한·credential 적용은 [RAON-204 database role rollout](./raon-204-database-role-runbook.md)을 따른다.
 

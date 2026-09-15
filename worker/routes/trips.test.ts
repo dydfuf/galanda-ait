@@ -18,14 +18,14 @@ import {
 
 const baseUrl = "https://galanda.test";
 const env = {} as AppEnv["Bindings"];
+const providerRun = vi.fn<AiGateway["run"]>();
 const shadowEnv = {
+  AI: { gateway: () => ({ run: providerRun }) } as unknown as Ai,
   AI_RECOMMENDATION_MODE: "shadow",
   AI_RECOMMENDATION_MODEL: "test-model",
   AI_RECOMMENDATION_POLICY_VERSION: "nba-ai-test-v1",
   AI_RECOMMENDATION_TIMEOUT_MS: "100",
-  AI_GATEWAY_ACCOUNT_ID: "account-id",
   AI_GATEWAY_ID: "gateway-id",
-  AI_GATEWAY_TOKEN: "gateway-token",
 } as AppEnv["Bindings"];
 const activeEnv = {
   ...shadowEnv,
@@ -239,7 +239,7 @@ const makeExecutionContext = () => {
   return { executionCtx, promises };
 };
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); providerRun.mockReset(); });
 
 describe("Trip API vertical slice", () => {
   it("list/detail/create/update를 Hono → Effect → Drizzle 경계로 실행한다", async () => {
@@ -957,12 +957,10 @@ describe("Trip API vertical slice", () => {
   });
 
   it("active mode는 ambiguous Trip Room action에만 AI ranking을 적용한다", async () => {
-    const providerFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    const providerFetch = providerRun.mockResolvedValue(
       Response.json({
-        output: [{
-          content: [{
-            type: "output_text",
-            text: JSON.stringify({
+        choices: [{ finish_reason: "stop", message: {
+            content: JSON.stringify({
               primaryActionId: "INVITE_MEMBER",
               alternativeActionIds: [
                 "PROPOSE_ALTERNATIVE",
@@ -970,9 +968,8 @@ describe("Trip API vertical slice", () => {
               ],
               reasonCode: "INVITE_TRAVEL_COMPANION",
             }),
-          }],
-        }],
-        usage: { input_tokens: 12, output_tokens: 8, total_tokens: 20 },
+        } }],
+        usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
       })
     );
     const { app } = makeApp([[rowValues(roomWithPlan)]]);
@@ -993,14 +990,14 @@ describe("Trip API vertical slice", () => {
         { actionId: "GIVE_OPINION" },
       ],
       source: "AI",
-      policyVersion: "nba-ai-test-v1",
+      policyVersion: "nba-ai-test-v1:openrouter-v2:test-model",
       tripRevision: 3,
     });
     expect(providerFetch).toHaveBeenCalledOnce();
   });
 
   it("active rollout 승인 없이는 AI를 호출하지 않고 RULE을 반환한다", async () => {
-    const providerFetch = vi.spyOn(globalThis, "fetch");
+    const providerFetch = providerRun;
     const { app } = makeApp([[rowValues(roomWithPlan)]]);
 
     const response = await app.fetch(
@@ -1020,7 +1017,7 @@ describe("Trip API vertical slice", () => {
   });
 
   it("active mode에서도 deterministic first-plan은 provider 없이 RULE을 반환한다", async () => {
-    const providerFetch = vi.spyOn(globalThis, "fetch");
+    const providerFetch = providerRun;
     const { app } = makeApp([[rowValues(room)]]);
 
     const response = await app.fetch(
@@ -1050,7 +1047,7 @@ describe("Trip API vertical slice", () => {
   it("shadow ranking은 RULE 응답 뒤 waitUntil에서만 실행한다", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     let resolveProvider: ((response: Response) => void) | undefined;
-    const providerFetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+    const providerFetch = providerRun.mockImplementation(
       () => new Promise<Response>((resolve) => {
         resolveProvider = resolve;
       })
@@ -1085,17 +1082,14 @@ describe("Trip API vertical slice", () => {
     expect(promises).toHaveLength(1);
     await vi.waitFor(() => expect(providerFetch).toHaveBeenCalledOnce());
     resolveProvider?.(Response.json({
-      output: [{
-        content: [{
-          type: "output_text",
-          text: JSON.stringify({
+      choices: [{ finish_reason: "stop", message: {
+          content: JSON.stringify({
             primaryActionId: "INVITE_MEMBER",
             alternativeActionIds: ["DEFINE_ROUTE"],
             reasonCode: "INVITE_TRAVEL_COMPANION",
           }),
-        }],
-      }],
-      usage: { input_tokens: 12, output_tokens: 8, total_tokens: 20 },
+      } }],
+      usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
     }));
     await Promise.all(promises);
 
@@ -1111,9 +1105,30 @@ describe("Trip API vertical slice", () => {
     log.mockRestore();
   });
 
+  it.each(["AI", "AI_RECOMMENDATION_MODEL"] as const)("shadow 설정 %s 누락에도 RULE 응답을 보존한다", async (key) => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { app } = makeApp([[rowValues(room)]]);
+    const { executionCtx, promises } = makeExecutionContext();
+    const response = await app.fetch(
+      request("/api/trips/trip-1/recommendations/next", {
+        method: "POST",
+        body: JSON.stringify({
+          surface: "FIRST_PLAN",
+          draft: { basic: true, route: false, accommodation: false, transport: false },
+        }),
+      }),
+      { ...shadowEnv, [key]: undefined },
+      executionCtx
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ source: "RULE" });
+    expect(providerRun).not.toHaveBeenCalled();
+    expect(promises).toHaveLength(0);
+  });
+
   it("shadow provider 실패가 recommendation 성공을 바꾸지 않는다", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const providerFetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    const providerFetch = providerRun.mockResolvedValue(
       new Response(null, { status: 503 })
     );
     const { app } = makeApp([[rowValues(room)]]);

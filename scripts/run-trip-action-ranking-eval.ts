@@ -1,12 +1,8 @@
-import { Effect, Logger } from "effect";
-import {
-  makeCloudflareAiGatewayTripActionRanker,
-  type CloudflareAiGatewayRankerTelemetry,
-} from "../worker/infrastructure/ai/cloudflare-ai-gateway-trip-action-ranker.ts";
-import {
-  runTripActionRankingEval,
-  type TripActionRankingEvalOutcome,
-} from "../worker/infrastructure/ai/trip-action-ranking-eval.ts";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { unstable_dev } from "wrangler";
 
 interface ModelPrice {
   readonly inputUsdPerMillionTokens: number;
@@ -71,60 +67,47 @@ const main = async () => {
     throw new Error("AI_EVAL_MODELS must contain at least two unique models");
   }
   const prices = pricesFor(models);
-  const accountId = required("AI_GATEWAY_ACCOUNT_ID");
   const gatewayId = required("AI_GATEWAY_ID");
-  const gatewayToken = required("AI_GATEWAY_TOKEN");
   const policyVersion = required("AI_RECOMMENDATION_POLICY_VERSION");
   const timeoutMs = positiveInteger("AI_RECOMMENDATION_TIMEOUT_MS");
-
-  const candidates = models.map((model) => {
-    let telemetry: CloudflareAiGatewayRankerTelemetry | undefined;
-    const ranker = makeCloudflareAiGatewayTripActionRanker({
-      accountId,
-      gatewayId,
-      gatewayToken,
-      model,
-      policyVersion,
-      timeoutMs,
-      openAiApiKey: process.env.OPENAI_API_KEY,
-      onTelemetry: (event) => {
-        telemetry = event;
+  const directory = await mkdtemp(join(tmpdir(), "galanda-ranking-eval-"));
+  let worker: Awaited<ReturnType<typeof unstable_dev>> | undefined;
+  try {
+    const config = join(directory, "wrangler.json");
+    await writeFile(config, JSON.stringify({
+      name: "galanda-ranking-eval",
+      compatibility_date: "2026-09-15",
+      ai: { binding: "AI" },
+      observability: { enabled: false },
+      vars: {
+        AI_GATEWAY_ID: gatewayId,
+        AI_RECOMMENDATION_POLICY_VERSION: policyVersion,
+        AI_RECOMMENDATION_TIMEOUT_MS: timeoutMs,
+        AI_EVAL_MODELS: models,
+        AI_EVAL_PRICING: prices,
       },
+    }));
+    worker = await unstable_dev(fileURLToPath(new URL(
+      "../worker/infrastructure/ai/trip-action-ranking-eval-worker.ts",
+      import.meta.url,
+    )), {
+      config,
+      local: false,
+      port: 0,
+      logLevel: "error",
+      experimental: { disableExperimentalWarning: true, watch: false },
     });
-    return {
-      id: model,
-      rank: async (input) => {
-        let failure: TripActionRankingEvalOutcome["failure"];
-        const ranking = await Effect.runPromise(
-          ranker.rank(input).pipe(
-            Effect.catch((error) => {
-              failure = error.reason;
-              return Effect.succeed(undefined);
-            }),
-            Effect.provide(Logger.layer([]))
-          )
-        );
-        if (!telemetry) throw new Error(`Missing telemetry for ${model}`);
-        const price = prices[model]!;
-        return {
-          ranking,
-          failure,
-          firstResponseLatencyMs: telemetry.firstResponseLatencyMs,
-          totalLatencyMs: telemetry.totalLatencyMs,
-          inputTokens: telemetry.inputTokens,
-          outputTokens: telemetry.outputTokens,
-          totalTokens: telemetry.totalTokens,
-          estimatedCostUsd:
-            (telemetry.inputTokens * price.inputUsdPerMillionTokens +
-              telemetry.outputTokens * price.outputUsdPerMillionTokens) /
-            1_000_000,
-        };
-      },
-    };
-  });
-
-  const report = await runTripActionRankingEval(candidates);
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    const response = await worker.fetch();
+    if (!response.ok) throw new Error(`Ranking evaluation failed: HTTP ${response.status}`);
+    const report: unknown = await response.json();
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  } finally {
+    try {
+      await worker?.stop();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
 };
 
 main().catch((error) => {

@@ -1,13 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Effect } from "effect";
-import { makeTripResourceExtractor, readableResourceUrl, readBoundedText, readResourcePage } from "./trip-resource-extractor.ts";
+import { makeTripResourceExtractor, readableResourceUrl, readResourcePage } from "./trip-resource-extractor.ts";
+import { readBoundedText } from "./openrouter.ts";
 
-const config = { accountId: "test-account", gatewayId: "test-gateway", gatewayToken: "test-token", model: "test-model" };
+const run = vi.fn<AiGateway["run"]>();
+const config = { gateway: { run }, model: "test-model" };
 const note = "성산일출봉은 제주 서귀포시에 있다. 일출을 보고 싶다.";
 const place = { name: "성산일출봉", category: "SIGHT", location: "제주 서귀포시", summary: "일출을 보고 싶다는 멤버 의견", evidence: { source: "NOTE", text: "성산일출봉은 제주 서귀포시에 있다." } };
 const response = (places: unknown[] = [place], status = "completed", linkUsable = false) => Response.json({
-  status, output: [{ content: [{ type: "output_text", text: JSON.stringify({ linkUsable, places }) }] }],
+  choices: [{ finish_reason: status === "completed" ? "stop" : "length", message: { content: JSON.stringify({ linkUsable, places }) } }],
 });
+beforeEach(() => run.mockReset());
 
 describe("resource source reader", () => {
   it("allows provider-owned travel/blog hosts and rejects arbitrary hosts, credentials and ports", () => {
@@ -42,19 +45,19 @@ describe("resource source reader", () => {
 });
 
 describe("resource place extraction", () => {
-  it("uses supplied note text, validates evidence and disables provider payload storage", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response());
-    const result = await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "", note }));
+  it("uses supplied note text, validates evidence and preserves default reasoning", async () => {
+    run.mockResolvedValue(response());
+    const result = await Effect.runPromise(makeTripResourceExtractor(config).extract({ url: "", note }));
     expect(result).toEqual({ places: [place], linkStatus: "NOT_READ" });
-    const request = fetcher.mock.calls[0][1]!;
-    expect(request.headers).toMatchObject({ "cf-aig-collect-log-payload": "false", "cf-aig-max-attempts": "1" });
-    expect(typeof request.body).toBe("string");
-    const body = JSON.parse(request.body as string);
-    expect(body.store).toBe(false);
-    expect(JSON.parse(body.input)).toEqual({ LINK: "", NOTE: note });
+    const request = run.mock.calls[0]![0] as AIGatewayUniversalRequest;
+    expect(request.headers).toEqual({ "cf-aig-collect-log-payload": "true" });
+    expect(request.provider).toBe("openrouter");
+    expect(request.query).not.toHaveProperty("reasoning");
+    const body = request.query as { messages: Array<{ content: string }>; tools?: unknown; response_format: { json_schema: { schema: { required: string[] } } } };
+    expect(JSON.parse(body.messages[1]!.content)).toEqual({ LINK: "", NOTE: note });
     expect(body.tools).toBeUndefined();
-    expect(body.text.format.schema.required).toContain("linkUsable");
-    expect(body.instructions).toContain("When linkUsable is false, ignore LINK completely and extract only from NOTE.");
+    expect(body.response_format.json_schema.schema.required).toContain("linkUsable");
+    expect(body.messages[0]!.content).toContain("When linkUsable is false, ignore LINK completely and extract only from NOTE.");
   });
   it("does not call an unconfigured provider", async () => {
     const fetcher = vi.fn<typeof fetch>();
@@ -62,56 +65,61 @@ describe("resource place extraction", () => {
     expect(extractor.available).toBe(false);
     expect(await Effect.runPromise(extractor.extract({ url: "", note }).pipe(Effect.flip))).toMatchObject({ reason: "UNAVAILABLE" });
     expect(fetcher).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
   });
   it("does not infer places from a URL that could not be read", async () => {
     const fetcher = vi.fn<typeof fetch>();
     expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://unknown.example/hotel", note: "" }).pipe(Effect.flip))).toMatchObject({ reason: "SOURCE_UNREADABLE" });
     expect(fetcher).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
   });
   it("explicitly reports an unread link when using only the note", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response());
-    const result = await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://unknown.example/hotel", note }));
+    run.mockResolvedValue(response());
+    const result = await Effect.runPromise(makeTripResourceExtractor(config).extract({ url: "https://unknown.example/hotel", note }));
     expect(result.linkStatus).toBe("UNAVAILABLE");
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledTimes(1);
   });
   it("extracts a place from link text with LINK provenance", async () => {
     const fromLink = { ...place, evidence: { ...place.evidence, source: "LINK" } };
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(note, { headers: { "content-type": "text/plain" } })).mockResolvedValueOnce(response([fromLink], "completed", true));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(note, { headers: { "content-type": "text/plain" } }));
+    run.mockResolvedValue(response([fromLink], "completed", true));
     const result = await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://travel.tistory.com/1", note: "" }));
     expect(result).toMatchObject({ linkStatus: "READ", places: [fromLink] });
   });
   it.each(["로그인이 필요합니다", "Verify you are human to continue", "홈 · 숙소 검색 · 예약 관리"])("does not complete an HTTP 200 unreadable page as no places: %s", async (page) => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(page, { headers: { "content-type": "text/plain" } })).mockResolvedValueOnce(response([]));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(page, { headers: { "content-type": "text/plain" } }));
+    run.mockResolvedValue(response([]));
     const result = await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://www.booking.com/hotel", note: "" }).pipe(Effect.flip));
     expect(result).toMatchObject({ reason: "SOURCE_UNREADABLE" });
   });
   it("uses only note evidence when the model identifies an unreadable link", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response("로그인이 필요합니다", { headers: { "content-type": "text/plain" } })).mockResolvedValueOnce(response());
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response("로그인이 필요합니다", { headers: { "content-type": "text/plain" } }));
+    run.mockResolvedValue(response());
     expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://www.booking.com/hotel", note })))
       .toEqual({ places: [place], linkStatus: "UNAVAILABLE" });
   });
   it("rejects LINK evidence from content classified as unreadable", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(`${note} 로그인 필요`, { headers: { "content-type": "text/plain" } }))
-      .mockResolvedValueOnce(response([{ ...place, evidence: { ...place.evidence, source: "LINK" } }]));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(`${note} 로그인 필요`, { headers: { "content-type": "text/plain" } }));
+    run.mockResolvedValue(response([{ ...place, evidence: { ...place.evidence, source: "LINK" } }]));
     expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://www.booking.com/hotel", note }).pipe(Effect.flip)))
       .toMatchObject({ reason: "INVALID_OUTPUT" });
   });
   it("keeps readable content without named places distinct from unreadable content", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response("여행할 때는 편한 신발과 가벼운 짐을 준비하세요.", { headers: { "content-type": "text/plain" } }))
-      .mockResolvedValueOnce(response([], "completed", true));
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response("여행할 때는 편한 신발과 가벼운 짐을 준비하세요.", { headers: { "content-type": "text/plain" } }));
+    run.mockResolvedValue(response([], "completed", true));
     expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "https://travel.tistory.com/1", note: "" })))
       .toEqual({ places: [], linkStatus: "READ" });
   });
   it("does not accept a usable LINK flag when no LINK was supplied", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response([place], "completed", true));
-    expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "", note }).pipe(Effect.flip)))
+    run.mockResolvedValue(response([place], "completed", true));
+    expect(await Effect.runPromise(makeTripResourceExtractor(config).extract({ url: "", note }).pipe(Effect.flip)))
       .toMatchObject({ reason: "INVALID_OUTPUT" });
   });
   it("requires an explicit link usability decision in the model output", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({
-      status: "completed", output: [{ content: [{ type: "output_text", text: JSON.stringify({ places: [] }) }] }],
+    run.mockResolvedValue(Response.json({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ places: [] }) } }],
     }));
-    expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "", note }).pipe(Effect.flip)))
+    expect(await Effect.runPromise(makeTripResourceExtractor(config).extract({ url: "", note }).pipe(Effect.flip)))
       .toMatchObject({ reason: "INVALID_OUTPUT" });
   });
   it.each([
@@ -122,18 +130,18 @@ describe("resource place extraction", () => {
     { ...place, category: "INVENTED" },
     { ...place, summary: "a".repeat(701) },
   ])("rejects ungrounded or invalid model output %#", async (invalid) => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response([invalid]));
-    expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({ url: "", note }).pipe(Effect.flip))).toMatchObject({ reason: "INVALID_OUTPUT" });
+    run.mockResolvedValue(response([invalid]));
+    expect(await Effect.runPromise(makeTripResourceExtractor(config).extract({ url: "", note }).pipe(Effect.flip))).toMatchObject({ reason: "INVALID_OUTPUT" });
   });
   it("distinguishes no named places from an incomplete provider response", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(response([])).mockResolvedValueOnce(response([place], "incomplete"));
-    const extractor = makeTripResourceExtractor(config, fetcher);
+    run.mockResolvedValueOnce(response([])).mockResolvedValueOnce(response([place], "incomplete"));
+    const extractor = makeTripResourceExtractor(config);
     expect(await Effect.runPromise(extractor.extract({ url: "", note }))).toMatchObject({ places: [] });
     expect(await Effect.runPromise(extractor.extract({ url: "", note }).pipe(Effect.flip))).toMatchObject({ reason: "INVALID_OUTPUT" });
   });
   it("rejects a card that combines one place name with another place's evidence", async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response([{ ...place, name: "경복궁" }]));
-    expect(await Effect.runPromise(makeTripResourceExtractor(config, fetcher).extract({
+    run.mockResolvedValue(response([{ ...place, name: "경복궁" }]));
+    expect(await Effect.runPromise(makeTripResourceExtractor(config).extract({
       url: "", note: `경복궁은 서울 종로구에 있다. ${note}`,
     }).pipe(Effect.flip))).toMatchObject({ reason: "INVALID_OUTPUT" });
   });

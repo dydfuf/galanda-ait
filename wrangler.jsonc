@@ -37,8 +37,15 @@
       },
       "vars": {
         "APP_ENV": "staging",
-        "BETTER_AUTH_URL": "https://galanda-staging.88dydfuf.workers.dev"
+        "BETTER_AUTH_URL": "https://galanda-staging.88dydfuf.workers.dev",
+        "AI_GATEWAY_ID": "galanda-staging-ai",
+        "AI_RESOURCE_MODEL": "deepseek/deepseek-v4.1-flash",
+        "AI_RECOMMENDATION_MODEL": "deepseek/deepseek-v4.1-flash",
+        "AI_RECOMMENDATION_MODE": "shadow",
+        "AI_RECOMMENDATION_POLICY_VERSION": "v1",
+        "AI_RECOMMENDATION_TIMEOUT_MS": "5000"
       },
+      "ai": { "binding": "AI", "remote": true },
       "hyperdrive": [
         {
           "binding": "HYPERDRIVE",

@@ -140,13 +140,10 @@ const makeConfiguredTripActionRanker = (
   c: HonoContext<AppEnv>
 ): TripActionRankerService =>
   makeCloudflareAiGatewayTripActionRanker({
-    accountId: c.env.AI_GATEWAY_ACCOUNT_ID ?? "",
-    gatewayId: c.env.AI_GATEWAY_ID ?? "",
-    gatewayToken: c.env.AI_GATEWAY_TOKEN ?? "",
+    gateway: c.env.AI_GATEWAY_ID?.trim() ? c.env.AI?.gateway(c.env.AI_GATEWAY_ID.trim()) : undefined,
     model: c.env.AI_RECOMMENDATION_MODEL ?? "",
     policyVersion: c.env.AI_RECOMMENDATION_POLICY_VERSION ?? "",
     timeoutMs: Number(c.env.AI_RECOMMENDATION_TIMEOUT_MS),
-    openAiApiKey: c.env.OPENAI_API_KEY,
   });
 
 const makeActiveTripActionRanker = (
