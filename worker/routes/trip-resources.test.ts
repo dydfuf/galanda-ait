@@ -5,10 +5,10 @@ import * as schema from "../../src/infrastructure/persistence/drizzle/schema/ind
 import { createApp, type AppDependencies, type AppEnv } from "../app.ts";
 
 const env = {} as AppEnv["Bindings"];
+const providerRun = vi.fn<AiGateway["run"]>();
 const configuredEnv = {
-  AI_GATEWAY_ACCOUNT_ID: "test-account",
+  AI: { gateway: () => ({ run: providerRun }) } as unknown as Ai,
   AI_GATEWAY_ID: "test-gateway",
-  AI_GATEWAY_TOKEN: "test-token",
   AI_RESOURCE_MODEL: "test-model",
 } as AppEnv["Bindings"];
 const collection = "/api/trips/trip-1/resources";
@@ -62,6 +62,7 @@ const request = (path: string, method = "GET", body?: unknown) => new Request(`h
 });
 
 afterEach(() => {
+  providerRun.mockReset();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -79,6 +80,7 @@ describe("Trip resources HTTP boundary", () => {
     });
     expect(calls[1].params).toEqual(["trip-1", 200]);
     expect(fetcher).not.toHaveBeenCalled();
+    expect(providerRun).not.toHaveBeenCalled();
   });
 
   it("생성 작성자는 인증 provider ID가 아닌 서버 participant와 세션 이름을 사용한다", async () => {
@@ -146,10 +148,9 @@ describe("Trip resources HTTP boundary", () => {
 
   it("정리는 출처가 검증된 장소 카드를 원문 보존과 revision CAS를 거쳐 반환한다", async () => {
     const place = { name: "경복궁", category: "SIGHT", location: "", summary: "멤버가 방문을 제안했어요.", evidence: { source: "NOTE", text: "경복궁에 가자" } };
-    const fetcher = vi.fn<typeof fetch>(async () => Response.json({
-      status: "completed", output: [{ content: [{ type: "output_text", text: JSON.stringify({ linkUsable: false, places: [place] }) }] }],
+    providerRun.mockResolvedValue(Response.json({
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ linkUsable: false, places: [place] }) } }],
     }));
-    vi.stubGlobal("fetch", fetcher);
     const updated = resourceRow();
     updated[6] = 2;
     updated[9] = [{ ...place, edited: false }];
@@ -160,7 +161,7 @@ describe("Trip resources HTTP boundary", () => {
     expect(await response.json()).toMatchObject({
       id: resourceId, revision: 2, note: "경복궁에 가자", places: [{ ...place, edited: false }],
     });
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(providerRun).toHaveBeenCalledOnce();
     const update = calls.find((call) => call.text.startsWith("update"));
     expect(update?.params.slice(-3)).toEqual(["trip-1", resourceId, 1]);
     expect(update?.text).not.toContain('"note" =');
@@ -174,8 +175,8 @@ describe("Trip resources HTTP boundary", () => {
     const url = "https://www.booking.com/hotel";
     const places = note ? [{ name: "경복궁", category: "SIGHT", location: "", summary: "멤버가 방문을 제안했어요.", evidence: { source: "NOTE", text: note } }] : [];
     const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response("로그인이 필요합니다", { headers: { "content-type": "text/plain" } }))
-      .mockResolvedValueOnce(Response.json({ status: "completed", output: [{ content: [{ type: "output_text", text: JSON.stringify({ linkUsable: false, places }) }] }] }));
+      .mockResolvedValueOnce(new Response("로그인이 필요합니다", { headers: { "content-type": "text/plain" } }));
+    providerRun.mockResolvedValue(Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ linkUsable: false, places }) } }] }));
     vi.stubGlobal("fetch", fetcher);
     const updated = resourceRow(url, note);
     updated[6] = 2;
@@ -184,7 +185,8 @@ describe("Trip resources HTTP boundary", () => {
     updated[11] = "UNAVAILABLE";
     const { app, calls } = makeApp([[roomRow()], [resourceRow(url, note)], [roomRow()], [updated]]);
     const response = await app.fetch(request(`${resourcePath}/organize`, "POST", { expectedRevision: 1 }), configuredEnv);
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(providerRun).toHaveBeenCalledOnce();
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject(body);
     // Without a note, no write may turn places:null into a completed empty result.
@@ -198,13 +200,12 @@ describe("Trip resources HTTP boundary", () => {
     { reason: "SOURCE_UNREADABLE", status: 422, bindings: configuredEnv, url: "https://example.invalid/article", note: "", fetchCalls: 0 },
     { reason: "INVALID_OUTPUT", status: 502, bindings: configuredEnv, url: "", note: "경복궁에 가자", fetchCalls: 1 },
   ])("정리 $reason 오류는 $status이고 원본을 변경하지 않는다", async ({ status, bindings, url, note, fetchCalls }) => {
-    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ status: "completed", output: [{ content: [{ type: "output_text", text: "invalid JSON" }] }] }));
-    vi.stubGlobal("fetch", fetcher);
+    providerRun.mockResolvedValue(Response.json({ choices: [{ finish_reason: "stop", message: { content: "invalid JSON" } }] }));
     const { app, calls } = makeApp([[roomRow()], [resourceRow(url, note)]]);
     const response = await app.fetch(request(`${resourcePath}/organize`, "POST", { expectedRevision: 1 }), bindings);
     expect(response.status).toBe(status);
     expect(await response.json()).toMatchObject({ error: { code: "RESOURCE_EXTRACTION_FAILED" } });
-    expect(fetcher).toHaveBeenCalledTimes(fetchCalls);
+    expect(providerRun).toHaveBeenCalledTimes(fetchCalls);
     expect(calls.some((call) => /^(insert|update|delete)/.test(call.text))).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { Effect, Exit } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TripActionRankingInput } from "../../../src/core/ports/trip-action-ranker.ts";
 import {
   makeCachedTripActionRanker,
@@ -9,9 +9,6 @@ import {
 } from "./cloudflare-ai-gateway-trip-action-ranker.ts";
 
 const config: CloudflareAiGatewayRankerConfig = {
-  accountId: "account-id",
-  gatewayId: "gateway-id",
-  gatewayToken: "gateway-token",
   model: "test-model",
   policyVersion: "nba-ai-v1",
   timeoutMs: 100,
@@ -40,61 +37,44 @@ const input: TripActionRankingInput = {
 
 const responseWithOutput = (output: unknown): Response =>
   Response.json({
-    output: [{
-      content: [{ type: "output_text", text: JSON.stringify(output) }],
-    }],
-    usage: { input_tokens: 12, output_tokens: 8, total_tokens: 20 },
+    choices: [{ finish_reason: "stop", message: { content: JSON.stringify(output) } }],
+    usage: { prompt_tokens: 12, completion_tokens: 8, total_tokens: 20 },
   });
 
 describe("CloudflareAiGatewayTripActionRanker", () => {
-  it("Responses API structured output을 ranking으로 변환한다", async () => {
-    let requestedUrl = "";
-    let requestedInit: RequestInit | undefined;
+  it("OpenRouter BYOK binding의 structured output을 ranking으로 변환한다", async () => {
     const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
-    const ranker = makeCloudflareAiGatewayTripActionRanker(
-      { ...config, onTelemetry: (event) => telemetry.push(event) },
-      async (url, init) => {
-        requestedUrl = url instanceof Request
-          ? url.url
-          : url instanceof URL
-            ? url.href
-            : url;
-        requestedInit = init;
-        return responseWithOutput({
+    const run = vi.fn<AiGateway["run"]>(async () => responseWithOutput({
           primaryActionId: "INVITE_MEMBER",
           alternativeActionIds: ["DEFINE_ROUTE"],
           reasonCode: "INVITE_TRAVEL_COMPANION",
-        });
-      }
-    );
+    }));
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, gateway: { run }, onTelemetry: (event) => telemetry.push(event),
+    });
 
     await expect(Effect.runPromise(ranker.rank(input))).resolves.toEqual({
       primaryActionId: "INVITE_MEMBER",
       alternativeActionIds: ["DEFINE_ROUTE"],
       reasonCode: "INVITE_TRAVEL_COMPANION",
     });
-    expect(requestedUrl).toBe(
-      "https://gateway.ai.cloudflare.com/v1/account-id/gateway-id/openai/responses"
-    );
-    const headers = new Headers(requestedInit?.headers);
-    expect(headers.get("cf-aig-authorization")).toBe("Bearer gateway-token");
-    expect(headers.get("cf-aig-collect-log-payload")).toBe("false");
-    expect(headers.get("cf-aig-max-attempts")).toBe("1");
-
-    const requestBodyText = requestedInit?.body;
-    if (typeof requestBodyText !== "string") {
-      throw new Error("Expected a JSON string request body");
-    }
-    const requestBody = JSON.parse(requestBodyText);
-    expect(requestBody).toMatchObject({
-      model: "test-model",
-      store: false,
-      text: { format: { type: "json_schema", strict: true } },
-    });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "openrouter", endpoint: "https://openrouter.ai/api/v1/chat/completions",
+      headers: { "cf-aig-collect-log-payload": "true" },
+      query: expect.objectContaining({
+        model: "test-model",
+        reasoning: { effort: "low" },
+        response_format: { type: "json_schema", json_schema: expect.objectContaining({ strict: true }) },
+        provider: { require_parameters: true, data_collection: "deny" },
+      }),
+    }), expect.objectContaining({ extraHeaders: {
+      "cf-aig-skip-cache": "true", "cf-aig-request-timeout": "100",
+      "cf-aig-max-attempts": "1", "cf-aig-collect-log-payload": "true",
+    } }));
     expect(telemetry).toEqual([
       expect.objectContaining({
         status: "COMPLETED",
-        provider: "openai",
+        provider: "openrouter",
         model: "test-model",
         configuredTimeoutMs: 100,
         statusCode: 200,
@@ -130,7 +110,7 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
       "PROVIDER_ERROR",
     ],
   ])("%s를 typed failure로 반환한다", async (_name, fetcher, reason) => {
-    const ranker = makeCloudflareAiGatewayTripActionRanker(config, fetcher);
+    const ranker = makeCloudflareAiGatewayTripActionRanker({ ...config, gateway: { run: fetcher } });
     const exit = await Effect.runPromiseExit(ranker.rank(input));
 
     expect(Exit.isFailure(exit)).toBe(true);
@@ -139,10 +119,10 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
 
   it("ranking validation failure에도 provider telemetry를 보존한다", async () => {
     const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
-    const ranker = makeCloudflareAiGatewayTripActionRanker(
-      { ...config, onTelemetry: (event) => telemetry.push(event) },
-      async () => responseWithOutput({ primaryActionId: "DEFINE_ROUTE" })
-    );
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, onTelemetry: (event) => telemetry.push(event),
+      gateway: { run: async () => responseWithOutput({ primaryActionId: "DEFINE_ROUTE" }) },
+    });
     const exit = await Effect.runPromiseExit(ranker.rank(input));
 
     expect(Exit.isFailure(exit)).toBe(true);
@@ -163,18 +143,28 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
   });
 
   it("설정된 latency budget이 지나면 TIMEOUT을 반환한다", async () => {
-    const ranker = makeCloudflareAiGatewayTripActionRanker(
-      { ...config, timeoutMs: 5 },
-      (_url, init) => new Promise<Response>((_resolve, reject) => {
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, timeoutMs: 5,
+      gateway: { run: (_request, init) => new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener(
           "abort",
           () => reject(init.signal?.reason),
           { once: true }
         );
-      })
-    );
+      }) },
+    });
     const exit = await Effect.runPromiseExit(ranker.rank(input));
 
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(JSON.stringify(exit)).toContain("TIMEOUT");
+  });
+
+  it("headers 이후 본문이 멈춰도 TIMEOUT을 반환한다", async () => {
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, timeoutMs: 5,
+      gateway: { run: async () => new Response(new ReadableStream()) },
+    });
+    const exit = await Effect.runPromiseExit(ranker.rank(input));
     expect(Exit.isFailure(exit)).toBe(true);
     expect(JSON.stringify(exit)).toContain("TIMEOUT");
   });
@@ -190,17 +180,16 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
         entries.set(new Request(request).url, response.clone());
       },
     } satisfies Pick<Cache, "match" | "put">;
-    const provider = makeCloudflareAiGatewayTripActionRanker(
-      config,
-      async () => {
+    const provider = makeCloudflareAiGatewayTripActionRanker({
+      ...config, gateway: { run: async () => {
         providerCalls += 1;
         return responseWithOutput({
           primaryActionId: "INVITE_MEMBER",
           alternativeActionIds: ["DEFINE_ROUTE"],
           reasonCode: "INVITE_TRAVEL_COMPANION",
         });
-      }
-    );
+      } },
+    });
     const ranker = makeCachedTripActionRanker(
       provider,
       cache,
@@ -216,5 +205,23 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
     }));
 
     expect(providerCalls).toBe(2);
+
+    const anotherModel = makeCachedTripActionRanker(
+      makeCloudflareAiGatewayTripActionRanker({
+        ...config, model: "another-model", gateway: { run: async () => {
+          providerCalls += 1;
+          return responseWithOutput({
+            primaryActionId: "INVITE_MEMBER",
+            alternativeActionIds: ["DEFINE_ROUTE"],
+            reasonCode: "INVITE_TRAVEL_COMPANION",
+          });
+        } },
+      }),
+      cache,
+      (promise) => pendingWrites.push(promise)
+    );
+    await Effect.runPromise(anotherModel.rank(input));
+    await Promise.all(pendingWrites);
+    expect(providerCalls).toBe(3);
   });
 });

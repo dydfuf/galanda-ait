@@ -36,14 +36,11 @@ export interface AiRecommendationBindings {
   readonly AI_RECOMMENDATION_POLICY_VERSION?: string;
   readonly AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION?: string;
   readonly AI_RECOMMENDATION_TIMEOUT_MS?: string;
-  readonly AI_GATEWAY_ACCOUNT_ID?: string;
   readonly AI_GATEWAY_ID?: string;
-  readonly AI_GATEWAY_TOKEN?: string;
-  readonly OPENAI_API_KEY?: string;
 }
 
 export interface AppEnv {
-  Bindings: Cloudflare.Env & BetterAuthEnv & AiRecommendationBindings;
+  Bindings: Omit<Cloudflare.Env, keyof AiRecommendationBindings> & BetterAuthEnv & AiRecommendationBindings;
   Variables: AppVariables;
 }
 

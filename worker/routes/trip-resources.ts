@@ -28,11 +28,8 @@ const runResourceEffect = <A, E>(c: Context<AppEnv>, program: Effect.Effect<A, E
     TripRoomRepositoryLive.pipe(Layer.provide(Layer.succeed(Database, { db }))),
     DrizzleTripResourceRepositoryLive(db),
     Layer.succeed(TripResourceExtractor, makeTripResourceExtractor({
-      accountId: c.env.AI_GATEWAY_ACCOUNT_ID,
-      gatewayId: c.env.AI_GATEWAY_ID,
-      gatewayToken: c.env.AI_GATEWAY_TOKEN,
+      gateway: c.env.AI_GATEWAY_ID?.trim() ? c.env.AI?.gateway(c.env.AI_GATEWAY_ID.trim()) : undefined,
       model: c.env.AI_RESOURCE_MODEL,
-      openAiApiKey: c.env.OPENAI_API_KEY,
     })),
   );
   return runEffect(c, program.pipe(Effect.provide(services)), { status });

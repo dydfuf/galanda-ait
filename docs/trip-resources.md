@@ -64,27 +64,32 @@ provider 응답 150KB로 제한한다. 큰 본문은 실패 처리하며 원본�
 
 ## AI 활성화와 배포
 
-기존 Cloudflare AI Gateway + OpenAI Responses 경계를 재사용한다.
-새 서비스나 Vector DB, background job은 없다.
+Worker `AI` 바인딩 → Cloudflare AI Gateway → OpenRouter BYOK 경로를 사용한다.
+OpenRouter 키는 Gateway의 Provider Keys에서 관리한다.
 
-환경별 필요한 설정:
+staging 설정은 `wrangler.jsonc`에 선언한다.
 
-```text
-AI_RESOURCE_MODEL=<사용할 OpenAI 모델 ID>
-AI_GATEWAY_ACCOUNT_ID=<계정 ID>
-AI_GATEWAY_ID=<Gateway ID>
-AI_GATEWAY_TOKEN=<Worker secret>
+```json
+{
+  "ai": { "binding": "AI", "remote": true },
+  "vars": {
+    "AI_GATEWAY_ID": "galanda-staging-ai",
+    "AI_RESOURCE_MODEL": "deepseek/deepseek-v4.1-flash"
+  }
+}
 ```
 
-BYOK를 쓰는 환경만 `OPENAI_API_KEY` secret도 필요하다. Gateway 저장 키 또는
-Unified Billing을 사용하는 환경은 기존 Gateway 설정을 유지한다. 이 기능은
-`AI_RECOMMENDATION_MODE`와 독립적이다. 설정이 없으면 API가
-`extractionAvailable: false`를 반환하며 원본 저장은 계속 가능하다.
+호출은 `env.AI.gateway(env.AI_GATEWAY_ID).run()`이며 provider는 `openrouter`다.
+Worker에 provider 키나 Gateway token을 추가하지 않는다. 이 기능은
+`AI_RECOMMENDATION_MODE`와 독립적이다. 바인딩·Gateway ID·모델 설정이 없으면
+API가 `extractionAvailable: false`를 반환하며 원본 저장은 계속 가능하다.
 
 모델로 전달하는 내용은 사용자가 선택한 자료 하나의 읽은 본문과 메모다.
 원본 페이지 내용은 명령으로 취급하지 않으며 외부 도구 호출을 허용하지 않는다.
-`store: false`, `cf-aig-collect-log-payload: false`, provider 재시도 1회로
-본문·응답 보관과 자동 재시도를 끈다. 활성화 환경에는 Gateway 요청·비용 제한을
+사용자 요청으로 `cf-aig-collect-log-payload: true`를 설정해 Gateway에 요청·응답
+본문을 저장한다.
+OpenRouter `provider.data_collection: deny`로 데이터 수집 허용 provider를 제외한다.
+`cf-aig-max-attempts: 1`로 Gateway 추가 재시도를 막고 캐시는 사용하지 않는다. 활성화 환경에는 Gateway 요청·비용 제한을
 설정한다. 동시에 같은 자료를 정리하면 provider 요청이 중복될 수 있지만
 CAS를 통과한 결과 하나만 저장된다.
 
@@ -99,3 +104,29 @@ CAS를 통과한 결과 하나만 저장된다.
 
 관련 테스트는 `trip-resources.test.ts`, `trip-resource-repository.test.ts`,
 `trip-resource-extractor.test.ts`, `TripResourcesPage.test.tsx`, `queries.test.tsx`에 있다.
+
+### 2026-09-16 staging 연결 검증
+
+- 기존 `0013_trip_resources`를 staging DB에 적용하고
+  `scripts/verify-database-privileges.sql`을 통과했다.
+- Worker version `caed2ecd-32d7-4de5-a0f7-9d6a4f468ea7`로 배포했다.
+- 비공개 Worker preview에서 실제 `gpt-4.1-mini`로 메모 장소 추출과
+  지원하지 않는 링크의 메모 처리(`linkStatus: UNAVAILABLE`)를 확인했다.
+- staging 테스트 계정으로 새 검증 여행을 만들고 자료함에서 메모 저장 →
+  `정보 정리` → 경복궁 카드 생성 → 새로고침 후 저장 유지까지 브라우저로 확인했다.
+- `pnpm check`: 166개 테스트 파일 / 1797개 테스트, schema drift, typecheck,
+  Web·AIT 빌드 통과. 설치형 PWA·AIT 실기기 및 두 멤버의 동시 편집은 이번 연결
+  검증에서 실행하지 않았다. 배포 전부터 열어 둔 검증 브라우저의 이전 서비스워커
+  캐시는 새 번들을 불러오도록 초기화한 뒤 확인했다.
+
+### DeepSeek 모델 변경 검증 (2026-09-16 KST)
+
+- 사용자 요청으로 자료함·추천 모델을 `deepseek/deepseek-v4.1-flash`로 변경했다.
+  Gateway, structured output, 서버 검증, timeout 및 기본 추론 설정은 유지했다.
+- `pnpm check` 재통과: 166개 파일 / 1797개 테스트, schema drift, Web·AIT 빌드.
+- staging version `5408b632-d986-4841-8630-fea2aa2671f9` 배포 완료.
+- 기존 검증 여행에서 새 창덕궁 메모를 저장하고 정보 정리를 실행해 장소명·위치·
+  메모 근거를 갖춘 실제 DeepSeek 카드를 확인했다. 새로고침 후에도 유지됐다.
+- 자료함의 실제 호출이 성공해 별도 테스트 페이지는 추가하지 않았다. 사용자는
+  staging 로그인 → 본인 여행 → 자료함 → 새 메모 저장 → 정보 정리로 확인할 수 있다.
+- 별도의 5초 추천 평가에서는 timeout이 8건 중 5건이었다. 추천은 shadow를 유지한다.
