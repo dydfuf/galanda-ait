@@ -188,6 +188,19 @@ export function mapDomainError(
             requestId,
           }),
         };
+      case "ResourceExtractionError":
+        return {
+          status: tagged.reason === "SOURCE_UNREADABLE" ? 422 : tagged.reason === "INVALID_OUTPUT" ? 502 : 503,
+          body: formatApiError({
+            code: "RESOURCE_EXTRACTION_FAILED",
+            message: tagged.reason === "SOURCE_UNREADABLE"
+              ? "링크 내용을 읽지 못했어요. 본문을 메모로 저장하면 정리할 수 있어요."
+              : tagged.reason === "INVALID_OUTPUT"
+                ? "출처에서 확인할 수 있는 정보로 정리하지 못했어요. 원본 자료는 그대로 있어요."
+                : "정보 정리를 잠시 사용할 수 없어요. 원본 자료는 그대로 있어요.",
+            requestId,
+          }),
+        };
     }
   }
 

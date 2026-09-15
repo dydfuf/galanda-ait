@@ -1,5 +1,11 @@
 import { Schema } from "effect";
 import { assertOnlineForRequest } from "./offline-mutation.ts";
+import {
+  TripResourceResponseSchema,
+  TripResourcesResponseSchema,
+  type CreateResourceRequest,
+  type EditResourcePlaceRequest,
+} from "../contracts/trip-resource.ts";
 import type {
   ExploreListingId,
   InviteToken,
@@ -191,6 +197,29 @@ export const recordRecommendationLifecycleEvent = (
 export const getTripItinerary = (tripId: TripId, signal?: AbortSignal) =>
   requestJson(`${tripPath(tripId)}/itinerary`, ItineraryStateResponseSchema, {
     signal,
+  });
+
+export const getTripResources = (tripId: TripId, signal?: AbortSignal) =>
+  requestJson(`${tripPath(tripId)}/resources`, TripResourcesResponseSchema, { signal });
+
+export const createTripResource = (tripId: TripId, input: CreateResourceRequest) =>
+  requestJson(`${tripPath(tripId)}/resources`, TripResourceResponseSchema, {
+    method: "POST", body: JSON.stringify(input),
+  });
+
+export const organizeTripResource = (tripId: TripId, resourceId: string, expectedRevision: Revision) =>
+  requestJson(`${tripPath(tripId)}/resources/${encodeURIComponent(resourceId)}/organize`, TripResourceResponseSchema, {
+    method: "POST", body: JSON.stringify({ expectedRevision }),
+  });
+
+export const editTripResourcePlace = (tripId: TripId, resourceId: string, input: EditResourcePlaceRequest) =>
+  requestJson(`${tripPath(tripId)}/resources/${encodeURIComponent(resourceId)}/places`, TripResourceResponseSchema, {
+    method: "PATCH", body: JSON.stringify(input),
+  });
+
+export const deleteTripResource = (tripId: TripId, resourceId: string, expectedRevision: Revision) =>
+  requestJson(`${tripPath(tripId)}/resources/${encodeURIComponent(resourceId)}`, Schema.Struct({ deleted: Schema.Literal(true) }), {
+    method: "DELETE", body: JSON.stringify({ expectedRevision }),
   });
 
 export const recordCompareOpened = (tripId: TripId, left: string, right: string) =>

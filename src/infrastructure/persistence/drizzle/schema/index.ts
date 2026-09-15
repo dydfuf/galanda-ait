@@ -7,3 +7,4 @@ export * from "./explore-plan.ts";
 export * from "./explore-listing-city.ts";
 export * from "./explore-save.ts";
 export * from "./trip-activity.ts";
+export * from "./trip-resource.ts";

@@ -1,4 +1,4 @@
-export const TRIP_ROOM_SECTIONS = ["plans", "itinerary"] as const;
+export const TRIP_ROOM_SECTIONS = ["plans", "itinerary", "resources"] as const;
 
 export type TripRoomSection = (typeof TRIP_ROOM_SECTIONS)[number];
 
@@ -13,7 +13,7 @@ function normalizePathname(pathname: string): string {
 
 export function getTripRoomSection(pathname: string): TripRoomSection {
   const normalized = normalizePathname(pathname);
-  return normalized.endsWith("/itinerary") ? "itinerary" : "plans";
+  return TRIP_ROOM_SECTIONS.find((section) => normalized.endsWith(`/${section}`)) ?? "plans";
 }
 
 export function getTripRoomSectionPath(tripId: string, value: unknown): string {
@@ -37,7 +37,7 @@ export function getTripRoomNavigationTitle(pathname: string): string {
   if (normalized.includes("/edit")) {
     return "여행안 수정";
   }
-  if (normalized.endsWith("/plans") || normalized.endsWith("/itinerary")) {
+  if (TRIP_ROOM_SECTIONS.some((section) => normalized.endsWith(`/${section}`))) {
     return "여행방";
   }
   return "여행안 상세";
