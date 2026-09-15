@@ -101,6 +101,7 @@ interface ResourceExtractorConfig {
 }
 
 const OutputSchema = Schema.Struct({
+  linkUsable: Schema.Boolean,
   places: Schema.Array(ExtractedPlaceSchema).check(Schema.isMaxLength(RESOURCE_PLACE_LIMIT)),
 });
 const ResponseSchema = Schema.Struct({
@@ -127,7 +128,6 @@ export const makeTripResourceExtractor = (
           // Reading failures never erase the saved source or masquerade as a successful link read.
           linkText = await readResourcePage(source.url, AbortSignal.any([signal, AbortSignal.timeout(8_000)]), fetcher).catch(() => "");
         }
-        const linkStatus = !source.url ? "NOT_READ" as const : linkText ? "READ" as const : "UNAVAILABLE" as const;
         if (!linkText && !source.note.trim()) throw new ResourceExtractionError({ reason: "SOURCE_UNREADABLE" });
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -151,14 +151,15 @@ export const makeTripResourceExtractor = (
                 "Copy location exactly from the source, or leave it empty when absent. summary must distinguish personal NOTE opinions from LINK claims.",
                 "Preserve quoted price currency, unit, date and conditions; never represent historical prices or availability as current verified facts.",
                 "For each card copy one short verbatim evidence passage containing its exact name and location, and label its source LINK or NOTE. Base the card only on that passage. Leave location empty if no single passage supports both name and location.",
-                "Return an empty places array for text without specific named travel places, a login page, anti-bot page, or navigation-only page.",
+                "Set linkUsable to true only when LINK contains readable source content, even if it contains no named places. Set it to false for missing LINK, login pages, anti-bot/challenge pages, or navigation-only shells.",
+                "When linkUsable is false, ignore LINK completely and extract only from NOTE. If NOTE is also missing, return an empty places array. Otherwise return an empty array only when the usable content has no specific named travel places.",
               ].join(" "),
               input: JSON.stringify({ LINK: linkText, NOTE: source.note }),
               text: { format: {
                 type: "json_schema", name: "travel_places", strict: true,
                 schema: {
-                  type: "object", additionalProperties: false, required: ["places"],
-                  properties: { places: { type: "array", maxItems: RESOURCE_PLACE_LIMIT, items: {
+                  type: "object", additionalProperties: false, required: ["linkUsable", "places"],
+                  properties: { linkUsable: { type: "boolean" }, places: { type: "array", maxItems: RESOURCE_PLACE_LIMIT, items: {
                     type: "object", additionalProperties: false,
                     required: ["name", "category", "location", "summary", "evidence"],
                     properties: {
@@ -185,17 +186,20 @@ export const makeTripResourceExtractor = (
           if (payload.status !== "completed") throw new Error("Incomplete response");
           const output = payload.output.flatMap((item) => item.content ?? [])
             .filter((part) => part.type === "output_text").map((part) => part.text ?? "").join("");
-          const { places } = Schema.decodeUnknownSync(OutputSchema, { onExcessProperty: "error" })(JSON.parse(output));
+          const { places, linkUsable } = Schema.decodeUnknownSync(OutputSchema, { onExcessProperty: "error" })(JSON.parse(output));
+          if (linkUsable && !linkText) throw new Error("Missing link content");
+          if (!linkUsable && !source.note.trim()) throw new ResourceExtractionError({ reason: "SOURCE_UNREADABLE" });
+          const linkStatus = !source.url ? "NOT_READ" as const : linkUsable ? "READ" as const : "UNAVAILABLE" as const;
           for (const place of places) {
-            const evidenceSource = normalize(place.evidence.source === "LINK" ? linkText : source.note);
+            const evidenceSource = normalize(place.evidence.source === "LINK" ? (linkUsable ? linkText : "") : source.note);
             const evidence = normalize(place.evidence.text);
             if (!evidenceSource || !evidence || !evidenceSource.includes(evidence) || !evidence.includes(normalize(place.name)) || (place.location && !evidence.includes(normalize(place.location)))) {
               throw new Error("Ungrounded place");
             }
           }
           return { places, linkStatus };
-        } catch {
-          throw new ResourceExtractionError({ reason: "INVALID_OUTPUT" });
+        } catch (cause) {
+          throw cause instanceof ResourceExtractionError ? cause : new ResourceExtractionError({ reason: "INVALID_OUTPUT" });
         }
       },
       catch: (cause) => cause instanceof ResourceExtractionError ? cause : new ResourceExtractionError({ reason: "UNAVAILABLE" }),

@@ -164,6 +164,60 @@ describe("공동 여행 자료함", () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ type: "delete", resourceId: resource.id, expectedRevision: 1 }));
   });
 
+  it("삭제 충돌 뒤 최신 내용을 확인하기 전에는 재삭제하지 않고 확인한 revision을 사용한다", async () => {
+    setQuery({ items: [{ ...resource, canManage: true }], extractionAvailable: true });
+    mutateAsync.mockRejectedValueOnce(new ApiClientError({ status: 409, code: "REVISION_CONFLICT", message: "충돌" })).mockResolvedValue({ deleted: true });
+    refetch.mockResolvedValue({ data: { items: [{ ...resource, canManage: true, revision: RevisionSchema.make(2), places: [{ ...resource.places![0]!, name: "멤버가 바꾼 카페", summary: "토요일에 함께 가요" }] }] }, isError: false });
+    render(<TestPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "원본 자료 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "자료 삭제" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "삭제" }));
+    await dialog.findByText(/다른 멤버가 자료를 변경했어요/);
+    fireEvent.click(dialog.getByRole("button", { name: "삭제" }));
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(dialog.getByRole("button", { name: "삭제" })).toBeDisabled();
+    fireEvent.click(dialog.getByRole("button", { name: "최신 자료 확인" }));
+    const latest = within(await dialog.findByRole("region", { name: "최신 자료 내용" }));
+    expect(latest.getByText(resource.note)).toBeInTheDocument();
+    expect(latest.getByText("멤버가 바꾼 카페 · 맛집")).toBeInTheDocument();
+    expect(latest.getByText("토요일에 함께 가요")).toBeInTheDocument();
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(dialog.getByRole("button", { name: "삭제" })).toBeEnabled();
+    fireEvent.click(dialog.getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenLastCalledWith({ type: "delete", resourceId: resource.id, expectedRevision: 2 }));
+  });
+
+  it.each([
+    { result: { data: { items: [] }, isError: false }, message: "이 자료는 이미 삭제되었어요." },
+    { result: { data: { items: [{ ...resource, canManage: false }] }, isError: false }, message: "이 자료를 삭제할 권한이 없어요." },
+    { result: { data: { items: [{ ...resource, canManage: true }] }, isError: true }, message: "최신 자료를 불러오지 못했어요. 다시 확인해주세요." },
+  ])("삭제 충돌 복구 중 $message 재삭제를 차단한다", async ({ result, message }) => {
+    setQuery({ items: [{ ...resource, canManage: true }], extractionAvailable: true });
+    mutateAsync.mockRejectedValueOnce(new ApiClientError({ status: 409, code: "REVISION_CONFLICT", message: "충돌" }));
+    refetch.mockResolvedValue(result);
+    render(<TestPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "원본 자료 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "자료 삭제" }));
+    const dialog = within(await screen.findByRole("alertdialog"));
+    fireEvent.click(dialog.getByRole("button", { name: "삭제" }));
+    fireEvent.click(await dialog.findByRole("button", { name: "최신 자료 확인" }));
+    await dialog.findByText(message);
+    expect(dialog.getByRole("button", { name: "삭제" })).toBeDisabled();
+    expect(dialog.queryByRole("region", { name: "최신 자료 내용" })).not.toBeInTheDocument();
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("새로고침으로 공동 자료를 다시 조회해도 작성 중인 메모는 유지한다", async () => {
+    render(<TestPage />);
+    fireEvent.click(screen.getByRole("button", { name: "자료 추가" }));
+    fireEvent.change(screen.getByLabelText("메모"), { target: { value: "작성 중인 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("메모")).toHaveValue("작성 중인 메모");
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("일시적 조회 실패에는 입력을 보존하고 권한 실패에는 캐시 자료를 숨긴다", () => {
     const { rerender } = render(<TestPage />);
     fireEvent.click(screen.getByRole("button", { name: "자료 추가" }));

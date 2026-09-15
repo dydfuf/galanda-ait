@@ -147,7 +147,7 @@ describe("Trip resources HTTP boundary", () => {
   it("정리는 출처가 검증된 장소 카드를 원문 보존과 revision CAS를 거쳐 반환한다", async () => {
     const place = { name: "경복궁", category: "SIGHT", location: "", summary: "멤버가 방문을 제안했어요.", evidence: { source: "NOTE", text: "경복궁에 가자" } };
     const fetcher = vi.fn<typeof fetch>(async () => Response.json({
-      status: "completed", output: [{ content: [{ type: "output_text", text: JSON.stringify({ places: [place] }) }] }],
+      status: "completed", output: [{ content: [{ type: "output_text", text: JSON.stringify({ linkUsable: false, places: [place] }) }] }],
     }));
     vi.stubGlobal("fetch", fetcher);
     const updated = resourceRow();
@@ -165,6 +165,32 @@ describe("Trip resources HTTP boundary", () => {
     expect(update?.params.slice(-3)).toEqual(["trip-1", resourceId, 1]);
     expect(update?.text).not.toContain('"note" =');
     expect(update?.text).not.toContain('"url" =');
+  });
+
+  it.each([
+    { note: "", status: 422, body: { error: { code: "RESOURCE_EXTRACTION_FAILED" } }, writes: [] },
+    { note: "경복궁에 가자", status: 200, body: { note: "경복궁에 가자", linkStatus: "UNAVAILABLE", places: [{ evidence: { source: "NOTE" } }] }, writes: ["UNAVAILABLE"] },
+  ])("HTTP 200 로그인 페이지는 메모 '$note'에 따라 $status를 반환한다", async ({ note, status, body, writes }) => {
+    const url = "https://www.booking.com/hotel";
+    const places = note ? [{ name: "경복궁", category: "SIGHT", location: "", summary: "멤버가 방문을 제안했어요.", evidence: { source: "NOTE", text: note } }] : [];
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response("로그인이 필요합니다", { headers: { "content-type": "text/plain" } }))
+      .mockResolvedValueOnce(Response.json({ status: "completed", output: [{ content: [{ type: "output_text", text: JSON.stringify({ linkUsable: false, places }) }] }] }));
+    vi.stubGlobal("fetch", fetcher);
+    const updated = resourceRow(url, note);
+    updated[6] = 2;
+    updated[9] = places.map((place) => ({ ...place, edited: false }));
+    updated[10] = now;
+    updated[11] = "UNAVAILABLE";
+    const { app, calls } = makeApp([[roomRow()], [resourceRow(url, note)], [roomRow()], [updated]]);
+    const response = await app.fetch(request(`${resourcePath}/organize`, "POST", { expectedRevision: 1 }), configuredEnv);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject(body);
+    // Without a note, no write may turn places:null into a completed empty result.
+    const mutations = calls.filter((call) => /^(insert|update|delete)/.test(call.text));
+    expect(mutations.map((call) => call.params.find((param) => param === "UNAVAILABLE"))).toEqual(writes);
+    expect(mutations.some((call) => /"(note|url)" =/.test(call.text))).toBe(false);
   });
 
   it.each([

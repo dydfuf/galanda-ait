@@ -80,7 +80,9 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
   const [editConflict, setEditConflict] = useState(false);
   const [reviewedResource, setReviewedResource] = useState<TripResourceResponse>();
   const [deleteTarget, setDeleteTarget] = useState<TripResourceResponse>();
+  const [deleteReview, setDeleteReview] = useState<"required" | "review">();
   const disabled = mutation.isPending || !isOnline;
+  const deleteBlocked = disabled || query.isFetching || deleteReview === "required";
 
   const accessDenied = query.error instanceof ApiClientError && [401, 403, 404].includes(query.error.status);
   if (accessDenied || (!query.data && query.isError)) {
@@ -112,7 +114,7 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
   };
 
   const actOnResource = async (type: "organize" | "delete", resource: TripResourceResponse) => {
-    if (disabled) return;
+    if (disabled || (type === "delete" && deleteBlocked)) return;
     setActionError(undefined);
     setNotice("");
     try {
@@ -125,6 +127,7 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
         setNotice("자료와 연결된 장소 카드를 삭제했어요.");
       }
     } catch (error) {
+      if (type === "delete" && (isRevisionConflict(error) || (error instanceof ApiClientError && [401, 403, 404].includes(error.status)))) setDeleteReview("required");
       setActionError({
         resourceId: resource.id,
         type,
@@ -133,6 +136,26 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
           : toUserMessage(error, "처리하지 못했어요. 원본은 그대로 보관돼요. 다시 시도해주세요."),
       });
     }
+  };
+
+  const checkLatestDelete = async () => {
+    if (!deleteTarget || disabled || query.isFetching) return;
+    setDeleteReview("required");
+    const result = await query.refetch();
+    const resource = result.data?.items.find((item) => item.id === deleteTarget.id);
+    if (result.isError || !resource?.canManage) {
+      setActionError({
+        resourceId: deleteTarget.id,
+        type: "delete",
+        message: result.isError
+          ? "최신 자료를 불러오지 못했어요. 다시 확인해주세요."
+          : !resource ? "이 자료는 이미 삭제되었어요." : "이 자료를 삭제할 권한이 없어요.",
+      });
+      return;
+    }
+    setDeleteTarget(resource);
+    setActionError(undefined);
+    setDeleteReview("review");
   };
 
   const savePlace = async () => {
@@ -169,7 +192,9 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
 
   return (
     <PageBody>
-      <PageTitle title="함께 모은 여행 자료" description="링크와 메모를 모으고, 장소별로 정리해요." />
+      <PageTitle title="함께 모은 여행 자료" description="링크와 메모를 모으고, 장소별로 정리해요." action={
+        <Button type="button" variant="ghost" disabled={!isOnline || query.isFetching || mutation.isPending} onClick={() => void query.refetch()}>{query.isFetching ? "불러오는 중…" : "새로고침"}</Button>
+      } />
       <div className="flex min-w-0 flex-col gap-6 px-(--app-inline-padding)">
         {query.isError && <div role="alert" className="text-sm text-warning"><p>최신 자료를 확인하지 못했어요. 마지막으로 불러온 내용을 보고 있어요.</p><Button variant="ghost" onClick={() => void query.refetch()}>다시 불러오기</Button></div>}
         {!isOnline && <output className="text-sm text-foreground-muted">{OFFLINE_MUTATION_MESSAGE}</output>}
@@ -255,16 +280,28 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
               {actionError?.resourceId === resource.id && <div role="alert" className="mt-3 text-sm text-destructive-strong"><p>{actionError.message}</p><Button type="button" variant="ghost" disabled={!isOnline || query.isFetching} onClick={() => void query.refetch()}>최신 자료 확인</Button></div>}
               <div className="mt-3 flex flex-wrap gap-2">
                 {resource.places === null && <Button type="button" variant="outline" disabled={disabled || !extractionAvailable} onClick={() => void actOnResource("organize", resource)}>{mutation.isPending && mutation.variables?.type === "organize" && mutation.variables.resourceId === resource.id ? "정보 정리 중…" : actionError?.resourceId === resource.id && actionError.type === "organize" ? "정보 정리 다시 시도" : "정보 정리"}</Button>}
-                {resource.canManage && <Button type="button" variant="ghost" disabled={disabled} onClick={() => { setDeleteTarget(resource); setActionError(undefined); }}>자료 삭제</Button>}
+                {resource.canManage && <Button type="button" variant="ghost" disabled={disabled} onClick={() => { setDeleteTarget(resource); setDeleteReview(undefined); setActionError(undefined); }}>자료 삭제</Button>}
               </div>
             </li>)}</ul>}
           </TabsContent>
         </Tabs>
       </div>
-      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open && !mutation.isPending) setDeleteTarget(undefined); }}>
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open && !mutation.isPending && !query.isFetching) setDeleteTarget(undefined); }}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>이 자료를 삭제할까요?</AlertDialogTitle><AlertDialogDescription>원본과 연결된 장소 카드가 멤버 모두의 자료함에서 삭제돼요.</AlertDialogDescription></AlertDialogHeader>
           {deleteTarget && actionError?.resourceId === deleteTarget.id && <p role="alert" className="text-sm text-destructive-strong">{actionError.message}</p>}
-          <AlertDialogFooter><Button variant="outline" disabled={mutation.isPending} onClick={() => setDeleteTarget(undefined)}>취소</Button><Button variant="destructive" disabled={disabled} onClick={() => { if (deleteTarget) void actOnResource("delete", deleteTarget); }}>삭제</Button></AlertDialogFooter>
+          {deleteReview === "required" && <Button variant="outline" disabled={disabled || query.isFetching} onClick={() => void checkLatestDelete()}>최신 자료 확인</Button>}
+          {deleteTarget && deleteReview === "review" &&
+            <section aria-label="최신 자료 내용" className="max-h-60 overflow-y-auto rounded-lg bg-surface-subtle p-3 text-sm">
+              <h3 className="font-semibold">현재 저장된 자료</h3>
+              {deleteTarget.url && <SourceLink resource={deleteTarget} />}
+              {deleteTarget.note && <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{deleteTarget.note}</p>}
+              {deleteTarget.places?.length ? <ul className="mt-3 flex flex-col gap-3">{deleteTarget.places.map((place, index) => <li key={index}>
+                <p className="font-semibold [overflow-wrap:anywhere]">{place.name} · {PLACE_CATEGORY_LABELS[place.category]}</p>
+                <p className="[overflow-wrap:anywhere]">{place.location || "위치 확인 필요"}</p>
+                <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{place.summary || "설명 확인 필요"}</p>
+              </li>)}</ul> : <p className="mt-2">{deleteTarget.places === null ? "정리 전" : "장소 없음"}</p>}
+            </section>}
+          <AlertDialogFooter><Button variant="outline" disabled={mutation.isPending || query.isFetching} onClick={() => setDeleteTarget(undefined)}>취소</Button><Button variant="destructive" disabled={deleteBlocked} onClick={() => { if (deleteTarget) void actOnResource("delete", deleteTarget); }}>삭제</Button></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </PageBody>

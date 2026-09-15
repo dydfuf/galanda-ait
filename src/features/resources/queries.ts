@@ -16,6 +16,8 @@ export function useTripResourcesQuery(tripId: string) {
     queryKey: resourceKeys.list(tripId, session?.participantId),
     queryFn: ({ signal }) => getTripResources(TripIdSchema.make(tripId), signal),
     ...COLLABORATION_READ_FRESHNESS,
+    // ponytail: full payload on demand; split summary/detail if one refresh becomes too large.
+    refetchInterval: false,
     enabled: Boolean(tripId) && isSuccess && Boolean(session),
   });
 }
