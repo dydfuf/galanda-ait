@@ -450,6 +450,43 @@ describe("세션 기반 단일 권한 주체 Use Case 검증 (RAON-129)", (): vo
     confirmedPlanId: undefined,
   };
 
+  it.each(["create", "update", "delete", "opinion", "room"] as const)(
+    "%s mutation hides other members' private reasons without erasing stored opinions",
+    async (operation) => {
+      const target = { ...sampleRoom.plans[0], id: PlanIdSchema.make("plan-target") };
+      const privateRoom: TripRoom = {
+        ...sampleRoom,
+        plans: [{ ...sampleRoom.plans[0], memberOpinions: [
+          { userId: aliceUser.participantId, userName: aliceUser.name, reaction: "HARD", reason: "my-private-reason" },
+          { userId: bobUser.participantId, userName: bobUser.name, reaction: "HARD", reason: "other-private-reason" },
+        ] }, target],
+      };
+      const command = { roomId: privateRoom.id, expectedRevision: privateRoom.revision };
+      const mutation = operation === "create"
+        ? createPlan({ ...command, ...publishablePlanFields, title: "새 안", places: [] })
+        : operation === "update"
+          ? updatePlan({ ...command, plan: { ...target, title: "수정한 안" } })
+          : operation === "delete"
+            ? deletePlan({ ...command, planId: target.id })
+            : operation === "opinion"
+              ? submitOpinion({ ...command, planId: privateRoom.plans[0].id, opinion: { reaction: "HARD", reason: "my-private-reason" } })
+              : updateTripRoom({ ...command, params: { title: "새 여행 이름" } });
+      const { visible, stored } = await Effect.runPromise(Effect.gen(function* () {
+        const visible = yield* mutation;
+        const repo = yield* TripRoomRepository;
+        return { visible, stored: yield* repo.getRoom(privateRoom.id) };
+      }).pipe(Effect.provide(Layer.merge(
+        createInMemoryRepositoryLayer([privateRoom]),
+        createTestSessionLayer(aliceUser),
+      ))));
+      const visibleOpinions = visible.plans[0].memberOpinions!;
+      expect(visibleOpinions.find((opinion) => opinion.userId === aliceUser.participantId)?.reason).toBe("my-private-reason");
+      expect(visibleOpinions.find((opinion) => opinion.userId === bobUser.participantId)).not.toHaveProperty("reason");
+      expect(JSON.stringify(visible)).not.toContain("other-private-reason");
+      expect(stored.plans[0].memberOpinions?.find((opinion) => opinion.userId === bobUser.participantId)?.reason).toBe("other-private-reason");
+    },
+  );
+
   describe("1. createTripRoom", (): void => {
     it("첫 의견과 확정은 commit 후에만 집계하고 재저장·CAS 실패·원문을 제외한다", async () => {
       const events: string[] = [];

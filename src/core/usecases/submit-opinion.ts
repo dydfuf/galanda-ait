@@ -1,3 +1,4 @@
+import { toViewerRoom } from "../domain/room-visibility.ts";
 import { Effect } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
@@ -109,6 +110,6 @@ export const submitOpinion = Effect.fn("submitOpinion")(
       session.participantIds.includes(opinion.userId)))) {
       yield* logDecisionFunnelEvent("first_opinion_submitted", saved, session.participantIds);
     }
-    return saved;
+    return toViewerRoom(saved, session.participantIds);
   }
 );

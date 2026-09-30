@@ -289,7 +289,11 @@ describe("invite use cases", () => {
       )
     );
 
-    expect(result).toEqual(joinedRoom);
+    expect(result.members).toEqual(joinedRoom.members);
+    expect(result.plans[0].memberOpinions?.[0]).toEqual({
+      userId: memberId, userName: "Member", reaction: "HARD",
+    });
+    expect(joinedRoom.plans[0].memberOpinions?.[0].reason).toBe("비공개");
     expect(joined).toMatchObject({
       token,
       member: { id: guestId, name: "Member", role: "MEMBER" },

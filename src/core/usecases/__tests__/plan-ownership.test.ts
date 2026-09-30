@@ -1050,7 +1050,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
       const target = res.plans.find((p) => p.id === opinionsPlan.id);
       expect(target?.title).toBe("작성자가 수정한 제목");
-      expect(target?.memberOpinions).toEqual(opinionsPlan.memberOpinions);
+      expect(target?.memberOpinions).toEqual(opinionsPlan.memberOpinions?.map(({ userId, userName, reaction }) => ({ userId, userName, reaction })));
+      const stored = await readRoom(env, roomWithOpinions.id);
+      expect(stored.plans.find((p) => p.id === opinionsPlan.id)?.memberOpinions).toEqual(opinionsPlan.memberOpinions);
       expect(target?.voteCount).toBe(2);
     });
 
@@ -1487,7 +1489,9 @@ describe("RAON-138: 여행안 소유권 보호 (Plan Ownership Protection)", () 
 
         const target = res.plans.find((p) => p.id === opinionsPlan.id);
         expect(target?.title).toBe("로컬에서 의견을 지우려는 수정");
-        expect(target?.memberOpinions).toEqual(opinionsPlan.memberOpinions);
+        expect(target?.memberOpinions).toEqual(opinionsPlan.memberOpinions?.map(({ userId, userName, reaction }) => ({ userId, userName, reaction })));
+        const stored = await readRoom(localEnv, roomWithOpinions.id);
+        expect(stored.plans.find((p) => p.id === opinionsPlan.id)?.memberOpinions).toEqual(opinionsPlan.memberOpinions);
         expect(target?.voteCount).toBe(2);
       });
     });

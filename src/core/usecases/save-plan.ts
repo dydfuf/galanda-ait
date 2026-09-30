@@ -1,3 +1,4 @@
+import { toViewerRoom } from "../domain/room-visibility.ts";
 import { Clock, Effect, Result, Schema } from "effect";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
@@ -219,11 +220,12 @@ export const createPlan = Effect.fn("createPlan")(
       },
     };
 
-    return yield* repo.saveRoomWithActivity({
+    const saved = yield* repo.saveRoomWithActivity({
       room: { ...room, plans: [...room.plans, finalPlan] },
       expectedRevision: command.expectedRevision,
       activity,
     });
+    return toViewerRoom(saved, session.participantIds);
   }
 );
 
@@ -344,7 +346,7 @@ export const updatePlan = Effect.fn("updatePlan")(
       },
     };
 
-    return yield* repo.saveRoomWithActivity({
+    const saved = yield* repo.saveRoomWithActivity({
       room: {
         ...room,
         plans: room.plans.map((plan) =>
@@ -354,6 +356,7 @@ export const updatePlan = Effect.fn("updatePlan")(
       expectedRevision: input.expectedRevision,
       activity,
     });
+    return toViewerRoom(saved, session.participantIds);
   }
 );
 
@@ -416,12 +419,13 @@ export const deletePlan = Effect.fn("deletePlan")(
         itineraryRevision: null,
       },
     };
-    return yield* repo.deletePlanAndAutoUnlist({
+    const saved = yield* repo.deletePlanAndAutoUnlist({
       room: deletePlanFromRoom(room, plan),
       sourcePlanId: plan.id,
       expectedRevision: input.expectedRevision,
       unlistedAt,
       activity,
     });
+    return toViewerRoom(saved, session.participantIds);
   }
 );
