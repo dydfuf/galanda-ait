@@ -102,23 +102,48 @@ export const rankTripActionsDeterministically = (
     (left, right) => priority[left.actionId] - priority[right.actionId]
   );
 
+export type TripActionRankingValidationReason =
+  | "EMPTY_CANDIDATES"
+  | "UNKNOWN_ACTION"
+  | "PRIMARY_REPEATED"
+  | "DUPLICATE_ALTERNATIVE"
+  | "MISSING_ACTION"
+  | "REASON_MISMATCH";
+
+export const validateTripActionRanking = (
+  eligibleActions: ReadonlyArray<TripAction>,
+  ranking: TripActionRanking
+): TripActionRankingValidationReason | undefined => {
+  // When multiple rules fail, report the first failure in this order.
+  if (eligibleActions.length === 0) return "EMPTY_CANDIDATES";
+
+  const byId = new Map(eligibleActions.map((action) => [action.actionId, action]));
+  const actionIds = [ranking.primaryActionId, ...ranking.alternativeActionIds];
+  if (actionIds.some((actionId) => !byId.has(actionId))) return "UNKNOWN_ACTION";
+  if (ranking.alternativeActionIds.includes(ranking.primaryActionId)) {
+    return "PRIMARY_REPEATED";
+  }
+  if (new Set(ranking.alternativeActionIds).size !== ranking.alternativeActionIds.length) {
+    return "DUPLICATE_ALTERNATIVE";
+  }
+  if (actionIds.length !== eligibleActions.length) return "MISSING_ACTION";
+  if (byId.get(ranking.primaryActionId)?.reasonCode !== ranking.reasonCode) {
+    return "REASON_MISMATCH";
+  }
+
+  return undefined;
+};
+
 export const applyTripActionRanking = (
   eligibleActions: ReadonlyArray<TripAction>,
   ranking: TripActionRanking
 ): ReadonlyArray<TripAction> | undefined => {
+  if (validateTripActionRanking(eligibleActions, ranking) !== undefined) return undefined;
+
   const byId = new Map(eligibleActions.map((action) => [action.actionId, action]));
-  const actionIds = [ranking.primaryActionId, ...ranking.alternativeActionIds];
-  if (actionIds.length !== eligibleActions.length) return undefined;
-  if (new Set(actionIds).size !== actionIds.length) return undefined;
-
-  const ranked: TripAction[] = [];
-  for (const actionId of actionIds) {
-    const action = byId.get(actionId);
-    if (!action) return undefined;
-    ranked.push(action);
-  }
-
-  return ranked[0]?.reasonCode === ranking.reasonCode ? ranked : undefined;
+  return [ranking.primaryActionId, ...ranking.alternativeActionIds].map(
+    (actionId) => byId.get(actionId)!
+  );
 };
 
 export const isAiRankingNeeded = (

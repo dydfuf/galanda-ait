@@ -3,13 +3,31 @@ import {
   TripActionRankingSchema,
   type TripActionRanking,
 } from "../../../src/core/domain/trip-action.ts";
-import { applyTripActionRanking } from "../../../src/core/domain/trip-action-resolver.ts";
+import {
+  applyTripActionRanking,
+  validateTripActionRanking,
+  type TripActionRankingValidationReason,
+} from "../../../src/core/domain/trip-action-resolver.ts";
 import {
   TripActionRankingError,
   type TripActionRankerService,
   type TripActionRankingInput,
 } from "../../../src/core/ports/trip-action-ranker.ts";
-import { readOpenRouterCompletion, requestOpenRouter } from "./openrouter.ts";
+import {
+  OpenRouterCompletionError,
+  readOpenRouterCompletion,
+  requestOpenRouter,
+  type OpenRouterCompletionDiagnostics,
+  type OpenRouterCompletionFailure,
+} from "./openrouter.ts";
+
+const RANKING_REQUEST_VERSION = "openrouter-v3";
+
+export type TripActionRankingInvalidOutputReason =
+  | OpenRouterCompletionFailure
+  | "RANKING_JSON"
+  | "RANKING_SCHEMA"
+  | TripActionRankingValidationReason;
 
 export interface CloudflareAiGatewayRankerConfig {
   readonly gateway?: Pick<AiGateway, "run">;
@@ -19,19 +37,18 @@ export interface CloudflareAiGatewayRankerConfig {
   readonly onTelemetry?: (telemetry: CloudflareAiGatewayRankerTelemetry) => void;
 }
 
-export interface CloudflareAiGatewayRankerTelemetry {
+export interface CloudflareAiGatewayRankerTelemetry extends OpenRouterCompletionDiagnostics {
   readonly status: "COMPLETED" | "FAILED";
   readonly provider: "openrouter";
   readonly model: string;
   readonly policyVersion: string;
   readonly firstResponseLatencyMs: number;
+  readonly requestVersion: typeof RANKING_REQUEST_VERSION;
   readonly totalLatencyMs: number;
   readonly configuredTimeoutMs: number;
   readonly statusCode: number;
-  readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly totalTokens: number;
   readonly failure?: TripActionRankingError["reason"];
+  readonly invalidOutputReason?: TripActionRankingInvalidOutputReason;
 }
 
 const ACTIVE_RANKING_CACHE_TTL_SECONDS = 300;
@@ -46,11 +63,8 @@ const isTimeout = (error: unknown): boolean =>
 const decodeRanking = async (
   response: Response,
   eligibleActions: TripActionRankingInput["eligibleActions"],
-  onUsage: (usage: {
-    readonly inputTokens: number;
-    readonly outputTokens: number;
-    readonly totalTokens: number;
-  }) => void,
+  onDiagnostics: (diagnostics: OpenRouterCompletionDiagnostics) => void,
+  onInvalidOutput: (reason: TripActionRankingInvalidOutputReason) => void,
   signal: AbortSignal,
 ): Promise<{
   readonly ranking: TripActionRanking;
@@ -58,23 +72,35 @@ const decodeRanking = async (
   readonly outputTokens: number;
   readonly totalTokens: number;
 }> => {
+  const rejectOutput = (reason: TripActionRankingInvalidOutputReason): never => {
+    onInvalidOutput(reason);
+    throw invalidOutput();
+  };
+  const { content, ...usage } = await readOpenRouterCompletion(
+    response, signal, onDiagnostics,
+  ).catch((error: unknown) => {
+    if (error instanceof OpenRouterCompletionError) return rejectOutput(error.failure);
+    throw error;
+  });
+  let parsed: unknown;
   try {
-    const { content, ...usage } = await readOpenRouterCompletion(response, signal);
-    onUsage(usage);
-
-    const ranking = await Schema.decodeUnknownPromise(
+    parsed = JSON.parse(content);
+  } catch {
+    return rejectOutput("RANKING_JSON");
+  }
+  let ranking: TripActionRanking;
+  try {
+    ranking = await Schema.decodeUnknownPromise(
       TripActionRankingSchema,
       { onExcessProperty: "error" }
-    )(JSON.parse(content));
-    if (!applyTripActionRanking(eligibleActions, ranking)) throw invalidOutput();
-
-    return {
-      ranking,
-      ...usage,
-    };
-  } catch (error) {
-    throw error instanceof TripActionRankingError || isTimeout(error) ? error : invalidOutput();
+    )(parsed);
+  } catch {
+    return rejectOutput("RANKING_SCHEMA");
   }
+  const validationFailure = validateTripActionRanking(eligibleActions, ranking);
+  if (validationFailure) return rejectOutput(validationFailure);
+
+  return { ranking, ...usage };
 };
 
 export const makeCloudflareAiGatewayTripActionRanker = (
@@ -102,11 +128,14 @@ export const makeCloudflareAiGatewayTripActionRanker = (
 
   return {
     // Include the wire/prompt version and model in fingerprints and cache keys.
-    policyVersion: `${policyVersion}:openrouter-v2:${model}`,
-    rank: (input) => {
+    policyVersion: `${policyVersion}:${RANKING_REQUEST_VERSION}:${model}`,
+    rank: (input) => Effect.suspend(() => {
       const startedAt = Date.now();
-      if (!input.eligibleActions[0]) return Effect.fail(invalidOutput());
-      const attempt = {
+      const attempt: OpenRouterCompletionDiagnostics & {
+        firstResponseLatencyMs: number;
+        statusCode: number;
+        invalidOutputReason?: TripActionRankingInvalidOutputReason;
+      } = {
         firstResponseLatencyMs: 0,
         statusCode: 0,
         inputTokens: 0,
@@ -119,13 +148,23 @@ export const makeCloudflareAiGatewayTripActionRanker = (
       ];
       const request = Effect.tryPromise({
         try: async (parentSignal) => {
+          if (!input.eligibleActions[0]) {
+            attempt.invalidOutputReason = "EMPTY_CANDIDATES";
+            throw invalidOutput();
+          }
           const signal = AbortSignal.any([parentSignal, AbortSignal.timeout(config.timeoutMs)]);
           const response = await requestOpenRouter(config.gateway!, {
             model,
             maxTokens: 500,
             reasoning: { effort: "low" },
-            instructions:
-              "Rank only the supplied eligible trip actions. Never invent an action or reason code.",
+            instructions: [
+              "Rank all supplied eligible trip actions as a complete permutation.",
+              "Choose one primaryActionId and put every other eligible action ID in alternativeActionIds exactly once, in ranked order.",
+              `alternativeActionIds must contain exactly ${eligibleActionIds.length - 1} action IDs.`,
+              "Never repeat the primary action in alternatives, duplicate or omit an eligible action, or invent an action or reason code.",
+              "Copy reasonCode from the eligibleActions entry whose actionId equals primaryActionId.",
+              "Return only the JSON object required by the schema.",
+            ].join(" "),
             input: JSON.stringify({
               policyVersion,
               surface: input.surface,
@@ -139,12 +178,20 @@ export const makeCloudflareAiGatewayTripActionRanker = (
             schema: {
               type: "object",
               properties: {
-                primaryActionId: { type: "string", enum: eligibleActionIds },
+                primaryActionId: {
+                  type: "string", enum: eligibleActionIds,
+                  description: "The first action in the complete ranking of eligibleActions.",
+                },
                 alternativeActionIds: {
                   type: "array",
                   items: { type: "string", enum: eligibleActionIds },
+                  // Keep the portable schema subset; enforce cardinality locally.
+                  description: `Exactly ${eligibleActionIds.length - 1} action IDs: every eligible action except primaryActionId, exactly once, in ranked order. No duplicates.`,
                 },
-                reasonCode: { type: "string", enum: eligibleReasonCodes },
+                reasonCode: {
+                  type: "string", enum: eligibleReasonCodes,
+                  description: "Copy the reasonCode paired with primaryActionId in eligibleActions.",
+                },
               },
               required: [
                 "primaryActionId",
@@ -169,11 +216,8 @@ export const makeCloudflareAiGatewayTripActionRanker = (
             ...(await decodeRanking(
               response,
               input.eligibleActions,
-              ({ inputTokens, outputTokens, totalTokens }) => {
-                attempt.inputTokens = inputTokens;
-                attempt.outputTokens = outputTokens;
-                attempt.totalTokens = totalTokens;
-              },
+              (diagnostics) => { Object.assign(attempt, diagnostics); },
+              (reason) => { attempt.invalidOutputReason = reason; },
               signal,
             )),
             firstResponseLatencyMs,
@@ -198,6 +242,8 @@ export const makeCloudflareAiGatewayTripActionRanker = (
         }) => {
           const totalLatencyMs = Date.now() - startedAt;
           emitTelemetry({
+            ...attempt,
+            requestVersion: RANKING_REQUEST_VERSION,
             status: "COMPLETED",
             provider: "openrouter",
             model,
@@ -212,6 +258,8 @@ export const makeCloudflareAiGatewayTripActionRanker = (
           });
           return Effect.logInfo("nba_ai_ranker_completed").pipe(
             Effect.annotateLogs({
+              ...attempt,
+              requestVersion: RANKING_REQUEST_VERSION,
               provider: "openrouter",
               model,
               policyVersion,
@@ -229,6 +277,8 @@ export const makeCloudflareAiGatewayTripActionRanker = (
         Effect.tapError((error) => {
           const totalLatencyMs = Date.now() - startedAt;
           emitTelemetry({
+            ...attempt,
+            requestVersion: RANKING_REQUEST_VERSION,
             status: "FAILED",
             provider: "openrouter",
             model,
@@ -244,6 +294,8 @@ export const makeCloudflareAiGatewayTripActionRanker = (
           });
           return Effect.logWarning("nba_ai_ranker_failed").pipe(
             Effect.annotateLogs({
+              ...attempt,
+              requestVersion: RANKING_REQUEST_VERSION,
               provider: "openrouter",
               model,
               policyVersion,
@@ -258,7 +310,7 @@ export const makeCloudflareAiGatewayTripActionRanker = (
         }),
         Effect.map(({ ranking }) => ranking)
       );
-    },
+    }),
   };
 };
 

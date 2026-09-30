@@ -19,6 +19,10 @@ import {
 import type {
   TripActionRankingInput,
 } from "../../../src/core/ports/trip-action-ranker.ts";
+import type {
+  CloudflareAiGatewayRankerTelemetry,
+  TripActionRankingInvalidOutputReason,
+} from "./cloudflare-ai-gateway-trip-action-ranker.ts";
 
 export interface TripActionRankingGoldenCase {
   readonly id: string;
@@ -37,6 +41,9 @@ export interface TripActionRankingGoldenCase {
 export interface TripActionRankingEvalOutcome {
   readonly ranking?: TripActionRanking;
   readonly failure?: "TIMEOUT" | "PROVIDER_ERROR" | "INVALID_OUTPUT";
+  readonly diagnostics?: Pick<CloudflareAiGatewayRankerTelemetry,
+    "invalidOutputReason" | "finishReason" | "contentLength" | "refusal" | "choiceCount" | "requestVersion"
+  >;
   readonly firstResponseLatencyMs: number;
   readonly totalLatencyMs: number;
   readonly inputTokens: number;
@@ -391,6 +398,7 @@ export const runTripActionRankingEval = async (
         rationaleTag: goldenCase.rationaleTag,
         status: outcome.ranking ? "COMPLETED" as const : "FAILED" as const,
         failure: outcome.failure,
+        diagnostics: outcome.diagnostics,
         primaryActionId: outcome.ranking?.primaryActionId,
         eligibilityViolation,
         forbiddenAction,
@@ -417,6 +425,13 @@ export const runTripActionRankingEval = async (
         invokedCases: invoked.length,
         skippedCases: cases.length - invoked.length,
         completedCases: completed.length,
+        invalidOutputReasons: invoked.reduce((counts, item) => {
+          const reason = item.diagnostics?.invalidOutputReason;
+          if (item.failure === "INVALID_OUTPUT" && reason) {
+            counts[reason] = (counts[reason] ?? 0) + 1;
+          }
+          return counts;
+        }, {} as Partial<Record<TripActionRankingInvalidOutputReason, number>>),
         eligibilityViolationRate: rate(
           completed.filter(({ eligibilityViolation }) => eligibilityViolation).length,
           completed.length
