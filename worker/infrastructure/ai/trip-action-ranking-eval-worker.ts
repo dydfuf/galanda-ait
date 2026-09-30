@@ -30,19 +30,19 @@ export default {
     const policyVersion = env.AI_RECOMMENDATION_POLICY_VERSION;
     const timeoutMs = env.AI_RECOMMENDATION_TIMEOUT_MS;
     const candidates: ReadonlyArray<TripActionRankingEvalCandidate> = models.map((model) => {
-      let telemetry: CloudflareAiGatewayRankerTelemetry | undefined;
-      const ranker = makeCloudflareAiGatewayTripActionRanker({
-        gateway,
-        model,
-        policyVersion,
-        timeoutMs,
-        onTelemetry: (event) => {
-          telemetry = event;
-        },
-      });
       return {
         id: model,
         rank: async (input) => {
+          let telemetry: CloudflareAiGatewayRankerTelemetry | undefined;
+          const ranker = makeCloudflareAiGatewayTripActionRanker({
+            gateway,
+            model,
+            policyVersion,
+            timeoutMs,
+            onTelemetry: (event) => {
+              telemetry = event;
+            },
+          });
           let failure: TripActionRankingEvalOutcome["failure"];
           const ranking = await Effect.runPromise(
             ranker.rank(input).pipe(
@@ -58,6 +58,14 @@ export default {
           return {
             ranking,
             failure,
+            diagnostics: {
+              requestVersion: telemetry.requestVersion,
+              invalidOutputReason: telemetry.invalidOutputReason,
+              finishReason: telemetry.finishReason,
+              contentLength: telemetry.contentLength,
+              refusal: telemetry.refusal,
+              choiceCount: telemetry.choiceCount,
+            },
             firstResponseLatencyMs: telemetry.firstResponseLatencyMs,
             totalLatencyMs: telemetry.totalLatencyMs,
             inputTokens: telemetry.inputTokens,

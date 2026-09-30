@@ -33,10 +33,10 @@ OpenRouter API 키는 Gateway의 Provider Keys(BYOK)에 저장한다. Worker에�
 staging은 `shadow`, timeout 5초로 설정한다. 이 값은 관측용이며 active UX budget을
 승인한 값이 아니다. 자료함은 별도 `AI_RESOURCE_MODEL`과 전체 30초 제한을 사용한다.
 다음 행동 추천은 `reasoning: { "effort": "low" }`를 명시한다. 자료함의 추론 설정은
-모델 기본값을 사용한다. `openrouter-v2`는 이 추천 추론 설정을 포함한 요청 버전이다.
+모델 기본값을 사용한다. `openrouter-v3`는 이 추론 설정과 전체 후보 순열을 요구하는 prompt/schema 계약을 포함한 요청 버전이다.
 
 Model ID는 Worker vars로 관리한다. 실제 ranker policy와 cache identity는
-`<policy>:openrouter-v2:<model>`이므로 모델이 바뀌면 캐시도 분리된다.
+`<policy>:openrouter-v3:<model>`이므로 모델이 바뀌면 캐시도 분리된다.
 모델을 바꿀 때는 승인된 관측 구간도 분리하도록 `AI_RECOMMENDATION_POLICY_VERSION`을
 함께 변경하고 active 승인을 다시 평가한다. `active`는
 `AI_RECOMMENDATION_ACTIVE_APPROVED_POLICY_VERSION`이 현재 policy version과
@@ -80,3 +80,44 @@ Adapter는 payload 없이 provider, model, policy version, token 수, latency, H
 failure reason을 structured Worker log에 남긴다. Timeout, network/HTTP error, schema
 failure, action 누락을 포함한 eligible-set 위반은 recommendation use case에서 즉시
 deterministic `RULE` 결과로 fallback하며 provider retry chain은 실행하지 않는다.
+
+
+### INVALID_OUTPUT 세부 진단
+
+Public error는 기존 `TIMEOUT | PROVIDER_ERROR | INVALID_OUTPUT`을 유지한다.
+Worker log/adapter telemetry와 eval case의 `diagnostics`에는 다음 bounded reason을
+`invalidOutputReason`으로 추가한다. Eval summary의 `invalidOutputReasons`는 reason별
+실패 횟수이며, 기존 `schemaFailureRate`는 모든 INVALID_OUTPUT을 포함하는 지표로 유지한다.
+
+- `RESPONSE_READ`, `RESPONSE_TOO_LARGE`, `RESPONSE_JSON`: 본문 읽기, 150 KB 제한, envelope JSON 실패
+- `ENVELOPE_SCHEMA`: choices/message 구조 오류 또는 choice 수가 1이 아님
+- `FINISH_REASON`, `REFUSAL`, `EMPTY_CONTENT`: stop이 아닌 완료, refusal, 비어 있는 content
+- `RANKING_JSON`, `RANKING_SCHEMA`: content의 JSON 또는 ranking schema 오류
+- `EMPTY_CANDIDATES`, `UNKNOWN_ACTION`, `PRIMARY_REPEATED`, `DUPLICATE_ALTERNATIVE`,
+  `MISSING_ACTION`, `REASON_MISMATCH`: 후보 집합/primary reason 계약 위반
+
+검증은 위의 단계 순서로 진행한다. 예를 들어 finish_reason=length와 빈 content가 함께
+오면 `FINISH_REASON`, finishReason=length, contentLength=0으로 기록한다.
+JSON을 읽을 수 있으면 envelope가 거절되어도 유효한 usage token 수는 보존한다.
+기존 optional/null usage 구조 검증은 유지하므로 잘못된 usage 형식은 계속 거절한다.
+누락되거나 음수·소수·범위 밖인 token 수는 0이며, 이것이 비용이 0이라는 뜻은 아니다.
+
+추가 metadata는 요청 계약을 구분하는 `requestVersion`, allowlist로 정규화한
+`finishReason`, 숫자인 `choiceCount`와
+`contentLength`, boolean인 `refusal`이다. 임의 finish reason은 `OTHER`로 기록한다.
+원문, refusal 문구, JSON/schema 예외와 그 cause, 사용자 식별 정보는 추가하지 않는다.
+Gateway 본문 저장 설정은 기존 정책을 유지한다.
+
+요청은 모든 후보를 정확히 한 번 포함하고 primary를 alternatives에서 제외하며 primary와
+짝인 reasonCode를 복사하도록 명시한다. Schema는 후보 enum과 property description에
+이 계약과 정확한 alternatives 길이를
+명시한다. 배열 길이·중복 및 cross-field reason 대응은 로컬 검증으로 강제한다.
+OpenRouter는 endpoint별 schema 지원 차이를 명시하고, DeepSeek의 native strict tool
+schema는 minItems/maxItems를 지원하지 않으므로 새 validation keyword를 무조건
+추가하지 않는다. 이는 현재 OpenRouter 경로의 실패를 확인했다는 뜻은 아니다.
+
+- [OpenRouter structured output 호환성](https://openrouter.ai/docs/guides/features/structured-outputs)
+- [DeepSeek strict schema 배열 제약](https://api-docs.deepseek.com/guides/tool_calls/#array)
+
+모델·max_tokens=500·timeout·rollout 승인 설정은 변경하지 않는다. 이 진단만으로 실제 실패 원인이나 token 부족을 확정하지
+않으며, 새 버전의 live 응답/평가는 별도 관측이 필요하다.

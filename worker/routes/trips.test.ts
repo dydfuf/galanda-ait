@@ -990,7 +990,7 @@ describe("Trip API vertical slice", () => {
         { actionId: "GIVE_OPINION" },
       ],
       source: "AI",
-      policyVersion: "nba-ai-test-v1:openrouter-v2:test-model",
+      policyVersion: "nba-ai-test-v1:openrouter-v3:test-model",
       tripRevision: 3,
     });
     expect(providerFetch).toHaveBeenCalledOnce();
@@ -1126,11 +1126,15 @@ describe("Trip API vertical slice", () => {
     expect(promises).toHaveLength(0);
   });
 
-  it("shadow provider 실패가 recommendation 성공을 바꾸지 않는다", async () => {
+  it.each([
+    ["provider error", () => new Response(null, { status: 503 }), "PROVIDER_ERROR"],
+    ["truncated empty completion", () => Response.json({
+      choices: [{ finish_reason: "length", message: { content: "" } }],
+      usage: { prompt_tokens: 100, completion_tokens: 500, total_tokens: 600 },
+    }), "INVALID_OUTPUT"],
+  ] as const)("shadow %s가 recommendation 성공을 바꾸지 않는다", async (_name, providerResponse, failure) => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const providerFetch = providerRun.mockResolvedValue(
-      new Response(null, { status: 503 })
-    );
+    const providerFetch = providerRun.mockImplementation(async () => providerResponse());
     const { app } = makeApp([[rowValues(room)]]);
     const { executionCtx, promises } = makeExecutionContext();
 
@@ -1159,7 +1163,7 @@ describe("Trip API vertical slice", () => {
     await Promise.all(promises);
     expect(log).toHaveBeenCalledWith(expect.objectContaining({
       message: "nba_shadow_failed",
-      annotations: expect.objectContaining({ failure: "PROVIDER_ERROR" }),
+      annotations: expect.objectContaining({ failure }),
     }));
     providerFetch.mockRestore();
     log.mockRestore();
