@@ -1,0 +1,9 @@
+# Regenerated source binaries are delivered separately, never shipped in the app.
+output/
+models/
+renders/
+web/
+previews/
+*.blend
+*.blend1
+__pycache__/

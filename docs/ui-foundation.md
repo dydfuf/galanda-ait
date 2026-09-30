@@ -105,12 +105,15 @@ SVG 원본과 `icons/labels.json`이 source of truth입니다. 변경 후
 - `empty-search`: 탐색에서 적용된 필터로 조회한 빈 결과 안내입니다. 입력 중인
   `draftFilters`가 아니라 기존 `filters`/`hasFilters`를 따릅니다. 검색·초기화·URL·
   페이지네이션과 로딩/오류/캐시된 목록의 기존 분기를 유지합니다.
-- 모든 그림은 `public/assets/galanda/spots/`의 라이트·다크 SVG 쌍입니다.
-  총 16개이며 기존 PWA SVG precache 규칙으로 포함됩니다.
-  홈·빈 상태, 협업·확정, 탐색·검색의 8종 모두 원본에서 다크 팔레트를 조정한 입체형 SVG입니다.
-  추가 밝기 필터나 이름별 대비 보정 예외를 적용하지 않습니다.
-  원본 240×240, 표시 128×128, 테마별 도형 일치 및 파일당 4KB 미만 기준은
-  [일러스트 가이드](../public/assets/galanda/spots/README.md)를 따릅니다.
+- 모든 그림은 Blender의 실제 편집 가능한 모델을 렌더링한
+  `public/assets/galanda/spots-3d/`의 투명 WebP입니다. 8종, 원본 렌더 768×768,
+  배포 이미지 384×384, 화면 표시 128×128입니다. 라이트·다크에서 동일한 파일을 쓰며
+  추가 밝기 필터·바닥 그림자·후광·배경 판을 적용하지 않습니다.
+- PWA precache에는 WebP를 포함합니다. 앱에는 경량 WebP만 배포하고 Blender 생성 코드와
+  검증 도구는 `design/travel-assets/`에 보관합니다. `.blend`와 고해상도 PNG는 생성 스크립트로
+  재현할 수 있으며 제공되는 별도 원본 묶음에도 포함됩니다.
+- 각 상태 의미와 재생성 방법은 [3D 일러스트 가이드](../public/assets/galanda/spots-3d/README.md)를
+  따릅니다. 이전 SVG 원본은 `design/travel-assets/legacy-svg/`에만 보존하며 배포하지 않습니다.
 - `/dev#assets`에서 여덟 일러스트와 공통 아이콘을 검토할 수 있습니다.
 
 로고·앱 아이콘·공유 이미지는 이 에셋 세트와 별개입니다. 서비스 코드에 일러스트

@@ -1,0 +1,270 @@
+{
+  "validation": "Independent Blender saved-file reopen",
+  "application": "4.3.2",
+  "allPassed": true,
+  "modelCount": 8,
+  "models": [
+    {
+      "name": "empty-trips",
+      "savedFile": "models/empty-trips.blend",
+      "status": "PASS",
+      "meshes": 13,
+      "editableCurves": 2,
+      "baseVertices": 8996,
+      "basePolygons": 9258,
+      "editableModifiers": 14,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-light",
+        "Clay / ink",
+        "Clay / ivory",
+        "Clay / mint",
+        "Clay / slate"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 3.423905372619629,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/empty-trips.png"
+    },
+    {
+      "name": "create-trip",
+      "savedFile": "models/create-trip.blend",
+      "status": "PASS",
+      "meshes": 8,
+      "editableCurves": 1,
+      "baseVertices": 3424,
+      "basePolygons": 3306,
+      "editableModifiers": 12,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-light",
+        "Clay / blue-pale",
+        "Clay / ivory",
+        "Clay / mint"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 2.6739184856414795,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/create-trip.png"
+    },
+    {
+      "name": "empty-saved",
+      "savedFile": "models/empty-saved.blend",
+      "status": "PASS",
+      "meshes": 6,
+      "editableCurves": 0,
+      "baseVertices": 202,
+      "basePolygons": 113,
+      "editableModifiers": 12,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-light",
+        "Clay / blue-pale",
+        "Clay / ivory",
+        "Clay / mint"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 3.099881172180176,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/empty-saved.png"
+    },
+    {
+      "name": "invite-companions",
+      "savedFile": "models/invite-companions.blend",
+      "status": "PASS",
+      "meshes": 7,
+      "editableCurves": 0,
+      "baseVertices": 6136,
+      "basePolygons": 6238,
+      "editableModifiers": 6,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-pale",
+        "Clay / ivory",
+        "Clay / mint"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 2.979034423828125,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/invite-companions.png"
+    },
+    {
+      "name": "compare-plans",
+      "savedFile": "models/compare-plans.blend",
+      "status": "PASS",
+      "meshes": 12,
+      "editableCurves": 2,
+      "baseVertices": 6328,
+      "basePolygons": 6344,
+      "editableModifiers": 16,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-light",
+        "Clay / blue-pale",
+        "Clay / ivory",
+        "Clay / mint"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 2.8187031745910645,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/compare-plans.png"
+    },
+    {
+      "name": "confirm-plan",
+      "savedFile": "models/confirm-plan.blend",
+      "status": "PASS",
+      "meshes": 13,
+      "editableCurves": 3,
+      "baseVertices": 9148,
+      "basePolygons": 9334,
+      "editableModifiers": 14,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-pale",
+        "Clay / ivory"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 3.0096261501312256,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/confirm-plan.png"
+    },
+    {
+      "name": "empty-explore",
+      "savedFile": "models/empty-explore.blend",
+      "status": "PASS",
+      "meshes": 11,
+      "editableCurves": 0,
+      "baseVertices": 6462,
+      "basePolygons": 6342,
+      "editableModifiers": 16,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-light",
+        "Clay / blue-pale",
+        "Clay / ivory",
+        "Clay / mint"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 2.932081937789917,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/empty-explore.png"
+    },
+    {
+      "name": "empty-search",
+      "savedFile": "models/empty-search.blend",
+      "status": "PASS",
+      "meshes": 8,
+      "editableCurves": 2,
+      "baseVertices": 8440,
+      "basePolygons": 8542,
+      "editableModifiers": 6,
+      "materials": [
+        "Clay / blue",
+        "Clay / blue-light",
+        "Clay / blue-pale",
+        "Clay / ivory",
+        "Clay / mint"
+      ],
+      "cameraType": "ORTHO",
+      "cameraEuler": [
+        1.0745935440063477,
+        -3.202425702397704e-08,
+        0.4457123875617981
+      ],
+      "orthoScale": 2.985150098800659,
+      "areaLights": 3,
+      "samples": 512,
+      "resolution": [
+        768,
+        768
+      ],
+      "filmTransparent": true,
+      "externalImageTextures": false,
+      "renderPath": "//../renders/empty-search.png"
+    }
+  ]
+}

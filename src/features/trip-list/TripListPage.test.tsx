@@ -99,7 +99,7 @@ beforeEach(() => {
 describe("TripListPage", () => {
   it("shows empty art only for a successful empty list, not a failed cached empty list", () => {
     const view = renderPage();
-    expect(view.container.querySelector('img[src$="empty-trips-light.svg"]')).not.toBeNull();
+    expect(view.container.querySelector('img[src$="empty-trips.webp"]')).not.toBeNull();
 
     mockUseTripRoomsQuery.mockReturnValue(roomsQueryResult([], { isError: true }));
     view.rerender(<TestApp />);

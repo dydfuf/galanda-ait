@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "assets": 8,
+  "blenderSavedFilesIndependentlyReopened": 8,
+  "sourceRenders768": 8,
+  "staticAlphaWebPVariants": 24,
+  "runtime384TotalBytes": 88610,
+  "transparentTwoPixelBorders": true,
+  "clippingDetected": false,
+  "visualInspection": [
+    "128px light",
+    "128px dark",
+    "256px light",
+    "256px dark"
+  ],
+  "freshOutputNoRenderSmokeTest": "PASS",
+  "movedSavedModelRelativeRenderPathSmokeTest": "PASS",
+  "baseMeshVertices": 49136,
+  "baseMeshPolygons": 49477,
+  "editableMeshes": 78,
+  "editableCurves": 10,
+  "notes": "No model redesign after approved preview. No floor/backdrop, external image texture, external library or font dependency. Native GUI interaction not verified here; saved-model reopen and render verified in Blender background."
+}
