@@ -7,7 +7,8 @@ import type { PlatformAdapter } from "../../platform/types.ts";
 import type { copyToClipboard } from "../../platform/web/adapter.ts";
 import { InviteTokenSchema } from "../../core/domain/ids.ts";
 const fixtureToken = InviteTokenSchema.make("00000000-0000-4000-8000-000000000001");
-const mocks = vi.hoisted(() => ({ issue: vi.fn<typeof issueTripInvite>(), share: vi.fn<PlatformAdapter["share"]>(), copy: vi.fn<typeof copyToClipboard>() }));
+const mocks = vi.hoisted(() => ({ issue: vi.fn<typeof issueTripInvite>(), share: vi.fn<PlatformAdapter["share"]>(), copy: vi.fn<typeof copyToClipboard>(), session: { participantId: "host", accountType: "REGISTERED", isAuthenticated: true } as { participantId: string; accountType: string; isAuthenticated: boolean } | null }));
+vi.mock("../../hooks/useSession.ts", () => ({ useSessionQuery: () => ({ data: mocks.session }) }));
 vi.mock("../../app/api-client.ts", () => ({ issueTripInvite: mocks.issue }));
 vi.mock("../../platform/index.ts", () => ({ platform: { share: mocks.share } }));
 vi.mock("../../platform/web/adapter.ts", () => ({ copyToClipboard: mocks.copy }));
@@ -20,10 +21,34 @@ function Fixture() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.session = { participantId: "host", accountType: "REGISTERED", isAuthenticated: true };
   setInviteShareFallback(undefined);
   mocks.issue.mockResolvedValue({ token: fixtureToken, expiresAt: "2099-01-01T00:00:00Z" });
   mocks.share.mockResolvedValue("unsupported");
   mocks.copy.mockResolvedValue("unsupported");
+});
+
+it.each(["issue", "share"] as const)("discards pending %s after navigation, logout, or account change", async (phase) => {
+  for (const transition of ["navigate", "logout", "account"] as const) {
+    mocks.session = { participantId: "host", accountType: "REGISTERED", isAuthenticated: true };
+    let finish!: () => void;
+    if (phase === "issue") mocks.issue.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve({ token: fixtureToken, expiresAt: "2099-01-01T00:00:00Z" }); }));
+    else mocks.share.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve("unsupported"); }));
+    const view = render(<MemoryRouter><Fixture /></MemoryRouter>);
+    let pending!: ReturnType<typeof shareTripInvite>;
+    await act(async () => { pending = shareTripInvite("trip-1"); });
+    const shareCount = mocks.share.mock.calls.length;
+    if (transition === "navigate") fireEvent.click(screen.getByRole("button", { name: "이동" }));
+    else {
+      mocks.session = transition === "logout" ? null : { participantId: "other", accountType: "REGISTERED", isAuthenticated: true };
+      view.rerender(<MemoryRouter><Fixture /></MemoryRouter>);
+    }
+    await act(async () => { finish(); expect(await pending).toBe("cancelled"); });
+    expect(getInviteShareFallback()).toBeUndefined();
+    expect(screen.queryByLabelText("초대 링크")).not.toBeInTheDocument();
+    if (phase === "issue") expect(mocks.share).toHaveBeenCalledTimes(shareCount);
+    view.unmount();
+  }
 });
 it("keeps the issued link selectable and retries copying without issuing another invite", async () => {
   render(<MemoryRouter><Fixture /></MemoryRouter>);

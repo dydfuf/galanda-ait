@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -6,26 +6,27 @@ import {
   Drawer, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerTitle,
 } from "@/components/ui/drawer.tsx";
 import { copyToClipboard } from "@/platform/web/adapter.ts";
+import { useSessionQuery } from "@/hooks/useSession.ts";
 import {
-  getInviteShareFallback, setInviteShareFallback, subscribeInviteShareFallback,
+  getInviteShareFallback, invalidateInviteShare, subscribeInviteShareFallback,
 } from "./invite-share-fallback.ts";
 
 export function InviteShareFallback() {
   const url = useSyncExternalStore(subscribeInviteShareFallback, getInviteShareFallback);
   const location = useLocation();
+  const { data: session } = useSessionQuery();
   const inputRef = useRef<HTMLInputElement>(null);
   const [copyStatus, setCopyStatus] = useState<{ url: string; message: string }>();
   const message = copyStatus?.url === url ? copyStatus?.message : undefined;
-  useEffect(() => {
-    setInviteShareFallback(undefined);
+  useLayoutEffect(() => {
+    invalidateInviteShare();
     return () => {
-      setInviteShareFallback(undefined);
-      setCopyStatus(undefined);
+      invalidateInviteShare();
     };
-  }, [location.key]);
+  }, [location.key, session?.participantId, session?.accountType, session?.isAuthenticated]);
 
   function close() {
-    setInviteShareFallback(undefined);
+    invalidateInviteShare();
     setCopyStatus(undefined);
   }
 

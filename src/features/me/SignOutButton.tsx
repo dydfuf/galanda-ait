@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { sessionKeys } from "@/hooks/useSession.ts";
 import { getLoginPath } from "@/platform/auth.ts";
+import { invalidateInviteShare } from "../invite/invite-share-fallback.ts";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from "@/components/ui/alert-dialog.tsx";
 
 /** End the server session before discarding the current account's query cache. */
@@ -17,6 +18,7 @@ export function SignOutButton({ guest = false }: { guest?: boolean }) {
 
   const signOut = async () => {
     if (inFlight.current) return;
+    invalidateInviteShare();
     inFlight.current = true;
     setPending(true);
     setFailed(false);
