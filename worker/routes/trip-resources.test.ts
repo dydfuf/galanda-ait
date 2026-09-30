@@ -39,9 +39,9 @@ const makeApp = (responses: Array<unknown[][]>, actor: string | null = memberId)
   const db = drizzle(client as unknown as NodePgClient, { schema });
   const makeAuth = (() => ({
     handler: () => new Response(),
-    api: { getSession: async () => actor ? {
+    api: { getSession: async () => ({ headers: new Headers(), response: actor ? {
       user: { id: "auth-user-1", name: "세션 이름", email: "test@example.invalid" },
-    } : null },
+    } : null }) },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;
   return {
     calls,

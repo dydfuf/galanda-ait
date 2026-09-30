@@ -1280,17 +1280,17 @@ export const createJourneyHarness = (seed: HarnessSeed): JourneyHarness => {
     api: {
       getSession: async ({ headers }: { headers: Headers }) => {
         const id = headers.get(HEADER);
-        if (!id) return null;
+        if (!id) return { headers: new Headers(), response: null };
         const participant = participantsById.get(id);
-        if (!participant) return null;
-        return {
+        if (!participant) return { headers: new Headers(), response: null };
+        return { headers: new Headers(), response: {
           user: {
             id: participant.id,
             name: participant.name,
             email: `${participant.id}@example.com`,
             isAnonymous: participant.accountType === "GUEST",
           },
-        };
+        } };
       },
     },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;

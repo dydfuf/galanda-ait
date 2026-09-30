@@ -117,10 +117,10 @@ const makeApp = (options?: {
   const makeAuth = (() => ({
     handler: () => new Response(),
     api: {
-      getSession: async () =>
+      getSession: async () => ({ headers: new Headers(), response:
         user
           ? { user: { ...user, email: `${user.id}@example.com` } }
-          : null,
+          : null }),
     },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;
 

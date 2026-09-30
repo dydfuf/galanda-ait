@@ -199,9 +199,9 @@ const makeApp = (
     api: {
       getSession: async () => {
         if (user instanceof Error) throw user;
-        return user
+        return { headers: new Headers(), response: user
           ? { user: { ...user, email: `${user.id}@example.com` } }
-          : null;
+          : null };
       },
     },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;
