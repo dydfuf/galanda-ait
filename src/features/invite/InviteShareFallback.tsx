@@ -22,6 +22,7 @@ export function InviteShareFallback() {
     invalidateInviteShare();
     return () => {
       invalidateInviteShare();
+      setCopyStatus(undefined);
     };
   }, [location.key, session?.participantId, session?.accountType, session?.isAuthenticated]);
 
