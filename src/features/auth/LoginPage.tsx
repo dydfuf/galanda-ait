@@ -44,6 +44,13 @@ export function LoginPage() {
     setPending(true);
     setError(false);
     try {
+      // Apply expired-session cookie cleanup before issuing a new session,
+      // including when this page was opened directly without a route guard.
+      const session = await fetch("/api/auth/get-session", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!session.ok) throw new Error("세션을 확인하지 못했습니다.");
       await postAuthJson(`/api/auth/${signUp ? "sign-up" : "sign-in"}/email`, {
         email: email.trim(),
         password,

@@ -44,6 +44,23 @@ const inviteKeys = {
   detail: (token: string) => ["invite", token] as const,
 };
 
+const readNickname = (key: string): string => {
+  try {
+    return sessionStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+const persistNickname = (key: string, nickname?: string): void => {
+  try {
+    if (nickname === undefined) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, nickname);
+  } catch {
+    // Draft persistence is optional; blocked storage must not prevent joining.
+  }
+};
+
 export function InvitePage(): JSX.Element {
   const validated = decodeRouteParams(InviteParamsSchema, useParams());
   const inviteToken = Result.isSuccess(validated)
@@ -56,11 +73,7 @@ export function InvitePage(): JSX.Element {
   const submittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const storageKey = `galanda:invite-nickname:${inviteToken ?? "invalid"}`;
-  const [nickname, setNickname] = useState(() =>
-    typeof sessionStorage === "undefined"
-      ? ""
-      : (sessionStorage.getItem(storageKey) ?? "")
-  );
+  const [nickname, setNickname] = useState(() => readNickname(storageKey));
   const [errorMessage, setErrorMessage] = useState<string>();
 
   const inviteQuery = useQuery({
@@ -183,7 +196,7 @@ export function InvitePage(): JSX.Element {
         inviteToken,
         summary.alreadyJoined ? (session?.name ?? trimmedNickname) : trimmedNickname
       );
-      sessionStorage.removeItem(storageKey);
+      persistNickname(storageKey);
       await queryClient.invalidateQueries({ queryKey: tripRoomKeys.all });
       const target = !isRoomConfirmed(room) &&
         getRoomActor(room, session.participantIds).can("opinion:submit")
@@ -287,7 +300,7 @@ export function InvitePage(): JSX.Element {
                   value={nickname}
                   onChange={(event) => {
                     setNickname(event.target.value);
-                    sessionStorage.setItem(storageKey, event.target.value);
+                    persistNickname(storageKey, event.target.value);
                     setErrorMessage(undefined);
                   }}
                   aria-invalid={Boolean(errorMessage) || undefined}

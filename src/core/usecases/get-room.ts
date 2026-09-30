@@ -1,32 +1,12 @@
 import { Effect, Option } from "effect";
-import type { ParticipantId, TripId } from "../domain/ids.ts";
-import type { TripRoom } from "../domain/room.ts";
+import type { TripId } from "../domain/ids.ts";
+import { toViewerRoom } from "../domain/room-visibility.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { requireAuthSession } from "../ports/session.ts";
 import { mergeParticipantIdentityInRoom } from "../domain/room-transitions.ts";
 import { requireRoomMember } from "../domain/auth-guards.ts";
 import { NotFoundError } from "../domain/errors.ts";
 
-const toViewerRoom = (
-  room: TripRoom,
-  viewerIds: ReadonlyArray<ParticipantId> = []
-): TripRoom => ({
-  ...room,
-  plans: room.plans.map((plan) => ({
-    ...plan,
-    memberOpinions: plan.memberOpinions?.map((opinion) =>
-      viewerIds.includes(opinion.userId) &&
-      opinion.reaction === "HARD" &&
-      opinion.reason
-        ? opinion
-        : {
-            userId: opinion.userId,
-            userName: opinion.userName,
-            reaction: opinion.reaction,
-          }
-    ),
-  })),
-});
 
 export const getTripRoom = Effect.fn("getTripRoom")(function* (roomId: TripId) {
   const session = yield* requireAuthSession();

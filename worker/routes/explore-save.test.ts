@@ -118,8 +118,8 @@ const makeApp = (
   const makeAuth = (() => ({
     handler: () => new Response(),
     api: {
-      getSession: async () =>
-        user ? { user: { ...user, email: `${user.id}@example.com` } } : null,
+      getSession: async () => ({ headers: new Headers(), response:
+        user ? { user: { ...user, email: `${user.id}@example.com` } } : null }),
     },
   })) as unknown as NonNullable<AppDependencies["makeAuth"]>;
   const withDatabase: NonNullable<AppDependencies["withDatabase"]> = async (

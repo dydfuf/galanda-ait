@@ -11,6 +11,17 @@ const session = (accountType: UserSession["accountType"]): UserSession => ({
 });
 
 describe("safeReturnTo", () => {
+  it.each(["\t", "\r", "\n"])(
+    "rejects redirects that become external after browser whitespace normalization (%j)",
+    (whitespace) => {
+      const candidate = `/${whitespace}/evil.example`;
+      expect(new URL(candidate, "https://galanda.example").origin).toBe("https://evil.example");
+      const destination = safeReturnTo(candidate);
+      expect(destination).toBe("/trips");
+      expect(new URL(destination, "https://galanda.example").origin).toBe("https://galanda.example");
+    },
+  );
+
   it("keeps internal paths and rejects external redirects", () => {
     expect(safeReturnTo("/trips")).toBe("/trips");
     expect(safeReturnTo("/trips/trip-1/plans")).toBe("/trips/trip-1/plans");

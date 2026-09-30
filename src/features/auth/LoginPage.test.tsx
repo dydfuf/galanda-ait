@@ -71,6 +71,8 @@ describe("LoginPage entry flow", () => {
 
   it.each([false, true])("submits staging email credentials, prevents duplicates, and allows retry after failure (signUp=%s)", async (signUp) => {
     vi.mocked(fetch).mockResolvedValueOnce(Response.json({ emailAndPassword: true }));
+    const sessionCleanup = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(sessionCleanup.promise);
     const submission = deferred<Response>();
     vi.mocked(fetch).mockReturnValueOnce(submission.promise);
     renderPage();
@@ -84,6 +86,11 @@ describe("LoginPage entry flow", () => {
     fireEvent.submit(form);
     fireEvent.submit(form);
     expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenLastCalledWith("/api/auth/get-session", {
+      credentials: "same-origin", cache: "no-store",
+    });
+    await act(async () => sessionCleanup.resolve(Response.json(null)));
+    expect(fetch).toHaveBeenCalledTimes(3);
     expect(fetch).toHaveBeenLastCalledWith(`/api/auth/${signUp ? "sign-up" : "sign-in"}/email`, expect.objectContaining({
       method: "POST",
       credentials: "same-origin",
@@ -95,6 +102,20 @@ describe("LoginPage entry flow", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: signUp ? "계정 만들고 시작하기" : "이메일로 로그인" })).toBeEnabled();
     expect(screen.getByLabelText("이메일")).toHaveValue("agent@example.test");
+  });
+
+  it("does not submit credentials when session cleanup fails", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(Response.json({ emailAndPassword: true }))
+      .mockResolvedValueOnce(Response.json({}, { status: 503 }));
+    renderPage();
+    const form = await screen.findByRole("form", { name: "Staging 이메일 로그인" });
+    fireEvent.change(screen.getByLabelText("이메일"), { target: { value: "agent@example.test" } });
+    fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "test-password-123" } });
+    fireEvent.submit(form);
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: "이메일로 로그인" })).toBeEnabled();
   });
 
   it.each([

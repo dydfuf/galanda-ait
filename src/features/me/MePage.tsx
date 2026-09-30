@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SignOutButton } from "./SignOutButton.tsx";
 import { GalandaIcon } from "@/components/galanda/galanda-icon.tsx";
 
 import { useTheme } from "@/app/theme-provider.tsx";
@@ -126,6 +127,8 @@ export function MePage() {
           </MobileListItem>
         </MobileList>
       </nav>
+
+      <SignOutButton />
 
       <Drawer
         open={isThemeSheetOpen}

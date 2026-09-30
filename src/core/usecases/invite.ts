@@ -1,3 +1,4 @@
+import { toViewerRoom } from "../domain/room-visibility.ts";
 import { Clock, Effect, Option, Schema } from "effect";
 import { getRoomActor, requireRoomHost } from "../domain/auth-guards.ts";
 import { InvalidInviteError, ValidationError } from "../domain/errors.ts";
@@ -90,7 +91,7 @@ export const joinTripByInvite = Effect.fn("joinTripByInvite")(function* (
   });
   if (!room) return yield* invalidInvite();
   yield* logDecisionFunnelEvent("invite_joined", room, session.participantIds);
-  return room;
+  return toViewerRoom(room, session.participantIds);
 });
 
 export const getPublicInviteSummary = Effect.fn("getPublicInviteSummary")(

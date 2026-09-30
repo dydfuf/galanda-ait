@@ -79,6 +79,7 @@ const createTestApp = (authEnv: BetterAuthEnv = {}) => {
 
   return {
     app,
+    auth,
     getSessionLookups: () => sessionLookups,
     getAuthDatabaseHandles: () => authDatabaseHandles,
     databaseHandle,
@@ -98,6 +99,32 @@ const request = (
 };
 
 describe("Better Auth Worker integration", () => {
+  it("clears an expired browser cookie before the first re-login", async () => {
+    const stagingEnv = { ...env, APP_ENV: "staging" };
+    const { app, auth } = createTestApp(stagingEnv);
+    const credentials = { email: "expired@example.test", password: "test-password-123" };
+    const signUp = await app.fetch(request("/api/auth/sign-up/email", {
+      method: "POST", body: JSON.stringify({ ...credentials, name: "Expired Session" }),
+    }), stagingEnv);
+    const cookie = signUp.headers.get("set-cookie")!.split(";")[0];
+    const { token } = await signUp.json() as { token: string };
+    const context = await auth.$context;
+    await context.internalAdapter.updateSession(token, { expiresAt: new Date(0) });
+
+    const expired = await app.fetch(request("/api/session", {}, cookie), stagingEnv);
+    expect(await expired.json()).toBeNull();
+    expect(expired.headers.get("set-cookie")).toContain("Max-Age=0");
+
+    // The browser applies the expiry header before submitting credentials.
+    const signIn = await app.fetch(request("/api/auth/sign-in/email", {
+      method: "POST", body: JSON.stringify(credentials),
+    }), stagingEnv);
+    expect(signIn.status).toBe(200);
+    const newCookie = signIn.headers.get("set-cookie")!.split(";")[0];
+    expect(await (await app.fetch(request("/api/session", {}, newCookie), stagingEnv)).json())
+      .toMatchObject({ accountType: "REGISTERED", name: "Expired Session" });
+  });
+
   it.each([undefined, "production", "development", "staging"])(
     "exposes email login only for the staging server binding (%s), without opening a database",
     async (APP_ENV) => {

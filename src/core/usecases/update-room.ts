@@ -1,3 +1,4 @@
+import { toViewerRoom } from "../domain/room-visibility.ts";
 import { Effect } from "effect";
 import {
   TripRoomRepository,
@@ -56,7 +57,7 @@ export const updateTripRoom = Effect.fn("updateTripRoom")(
           : undefined,
     };
 
-    return yield* repo.saveRoom(
+    const saved = yield* repo.saveRoom(
       {
         ...currentRoom,
         title: sanitizedParams.title ?? currentRoom.title,
@@ -65,5 +66,6 @@ export const updateTripRoom = Effect.fn("updateTripRoom")(
       },
       input.expectedRevision
     );
+    return toViewerRoom(saved, session.participantIds);
   }
 );

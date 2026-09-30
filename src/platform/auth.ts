@@ -1,7 +1,9 @@
 import type { UserSession } from "@/core/domain/room.ts";
 
 export const safeReturnTo = (value: string | null): string =>
-  value?.startsWith("/") && !value.startsWith("//") && !value.includes("\\")
+  value?.startsWith("/") && !value.startsWith("//") && !value.includes("\\") &&
+  // Browsers strip these characters before parsing, turning `/\t/host` into `//host`.
+  !/[\t\r\n]/u.test(value)
     ? value
     : "/trips";
 

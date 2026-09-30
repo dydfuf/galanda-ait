@@ -32,10 +32,15 @@ export const createAuthSessionMiddleware = (
     }
 
     try {
-      const session = await createAuth(
+      const { response: session, headers } = await createAuth(
         c.var.database,
         c.env as BetterAuthEnv
-      ).api.getSession({ headers: c.req.raw.headers });
+      ).api.getSession({ headers: c.req.raw.headers, returnHeaders: true });
+      // Forward expiry/refresh cookies as well as the session value. Keeping an
+      // expired cookie can make the next sign-in clear its newly issued cookie.
+      for (const cookie of headers.getSetCookie()) {
+        c.header("Set-Cookie", cookie, { append: true });
+      }
       c.set(
         "authSession",
         session
