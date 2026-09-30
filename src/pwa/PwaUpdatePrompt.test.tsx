@@ -29,6 +29,9 @@ it("preserves the page after timeout and late activation, then reloads only on e
   const testWindow = Object.create(window) as Window
   Object.defineProperty(testWindow, "location", { value: { reload } })
   vi.stubGlobal("window", testWindow)
+  const testNavigator = Object.create(navigator) as Navigator
+  Object.defineProperty(testNavigator, "serviceWorker", { value: new EventTarget() })
+  vi.stubGlobal("navigator", testNavigator)
   const worker = Object.assign(new EventTarget(), { state: "installed" })
   const registration = { waiting: worker, update: vi.fn(async () => {}) }
   const view = render(<PwaUpdatePrompt />)
