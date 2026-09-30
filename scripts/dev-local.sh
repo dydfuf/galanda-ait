@@ -23,50 +23,31 @@ VITE_PORT="${GALANDA_DEV_VITE_PORT:-5173}"
 WORKER_PORT="${GALANDA_DEV_WORKER_PORT:-8787}"
 BROWSER_ORIGIN="http://localhost:${VITE_PORT}"
 
-# --------------------------------------------------------------- 사전 점검
-if [ ! -f .dev.vars ]; then
-  cat >&2 <<'MSG'
-❌ .dev.vars 가 없어요. 로컬 Worker는 여기서 secret/DB URL을 읽어요.
-   최소 필요한 키: BETTER_AUTH_SECRET, BETTER_AUTH_URL, DATABASE_URL
-   자세한 내용: docs/local-development.md
-MSG
+# An explicit fixture file keeps existing developer credentials untouched.
+ENV_FILE="${GALANDA_DEV_ENV_FILE:-.dev.vars}"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "❌ 로컬 환경 파일이 없어요. docs/local-development.md 를 확인해 주세요." >&2
   exit 1
 fi
-
-# 주석 처리되지 않은 DATABASE_URL 행만 확인해요. (값은 출력하지 않아요)
-DB_LINE="$(grep -E '^[[:space:]]*DATABASE_URL=' .dev.vars | tail -1 || true)"
-
-if [ -z "$DB_LINE" ]; then
-  cat >&2 <<'MSG'
-❌ .dev.vars 에 DATABASE_URL 이 없어요.
-   로컬 DB를 준비하려면: pnpm db:setup:local
-MSG
-  exit 1
-fi
-
-if printf '%s' "$DB_LINE" | grep -qE 'supabase\.(co|com)'; then
-  cat >&2 <<'MSG'
-⚠️  DATABASE_URL 이 원격 Supabase 를 가리켜요.
-   로컬 Worker가 staging 데이터에 직접 쓰게 되고, Direct endpoint는 IPv6 전용이라
-   대부분의 로컬 네트워크에서는 연결도 실패해요.
-   로컬 DB 사용을 권장해요: pnpm db:setup:local
-   staging에 붙어야 한다면: pnpm dev:staging
-MSG
-fi
-
-# 로컬 PostgreSQL 도달성 확인 (URL이 로컬을 가리킬 때만)
-if printf '%s' "$DB_LINE" | grep -qE '@(127\.0\.0\.1|localhost|\[::1\])'; then
-  DB_PORT="$(printf '%s' "$DB_LINE" | sed -nE 's#.*@[^:/]+:([0-9]+).*#\1#p')"
-  DB_PORT="${DB_PORT:-5432}"
-  if ! nc -z 127.0.0.1 "$DB_PORT" >/dev/null 2>&1; then
-    cat >&2 <<MSG
-❌ 127.0.0.1:${DB_PORT} 의 PostgreSQL에 연결할 수 없어요.
-   준비: pnpm db:setup:local
-   (이미 준비했다면: brew services start postgresql@15)
-MSG
-    exit 1
-  fi
-fi
+# Parse dotenv without sourcing shell code; never print configuration values.
+node --input-type=module - "$ENV_FILE" <<'JS'
+import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+const fail = (message) => { console.error(message); process.exit(1); };
+try {
+  const vars = parseEnv(readFileSync(process.argv[2], 'utf8'));
+  const db = new URL(vars.DATABASE_URL || '');
+  if (!['postgres:', 'postgresql:'].includes(db.protocol) ||
+      !['localhost', '127.0.0.1', '[::1]'].includes(db.hostname)) {
+    fail('❌ 로컬 개발은 loopback PostgreSQL만 사용해요. 원격 검증은 별도 운영 절차를 따라 주세요.');
+  }
+  if ((vars.BETTER_AUTH_SECRET || '').trim().length < 32) {
+    fail('❌ 로컬 BETTER_AUTH_SECRET은 32자 이상이어야 해요.');
+  }
+} catch {
+  fail('❌ 로컬 환경 파일의 DATABASE_URL 형식을 확인해 주세요. 값은 출력하지 않아요.');
+}
+JS
 
 # wrangler는 assets 디렉터리가 존재해야 실행돼요.
 # 이 모드에서는 브라우저가 Vite에서 SPA를 받으므로 dist 내용은 사용되지 않아요.
@@ -76,13 +57,20 @@ mkdir -p dist
 WORKER_PID=""
 VITE_PID=""
 
+stop_tree() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null || true); do stop_tree "$child"; done
+  kill "$1" 2>/dev/null || true
+}
+
 cleanup() {
   trap - EXIT INT TERM
-  [ -n "$VITE_PID" ] && kill "$VITE_PID" 2>/dev/null || true
-  [ -n "$WORKER_PID" ] && kill "$WORKER_PID" 2>/dev/null || true
+  [ -n "$VITE_PID" ] && stop_tree "$VITE_PID"
+  [ -n "$WORKER_PID" ] && stop_tree "$WORKER_PID"
   wait 2>/dev/null || true
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT TERM
 
 echo "▶ Worker API   http://localhost:${WORKER_PORT}  (/api/*)"
 echo "▶ Vite dev     ${BROWSER_ORIGIN}  ← 브라우저는 여기로 접속해요"
@@ -90,20 +78,29 @@ echo
 
 # Better Auth의 baseURL/redirect_uri는 브라우저가 보는 origin과 같아야 해요.
 # 이 모드에서는 브라우저가 Vite origin을 사용하므로 .dev.vars 값을 덮어써요.
-./node_modules/.bin/wrangler dev \
+./node_modules/.bin/wrangler dev --local \
+  --persist-to "${GALANDA_DEV_STATE_DIR:-.wrangler/state}" \
+  --ip 127.0.0.1 \
+  --env-file "$ENV_FILE" \
   --port "$WORKER_PORT" \
   --var "BETTER_AUTH_URL:${BROWSER_ORIGIN}" \
   --show-interactive-dev-session=false &
 WORKER_PID=$!
 
+READY=false
 for _ in $(seq 1 60); do
-  curl -sf -o /dev/null "http://127.0.0.1:${WORKER_PORT}/api/health" && break
+  if curl --max-time 2 -sf -o /dev/null "http://127.0.0.1:${WORKER_PORT}/api/health"; then READY=true; break; fi
   kill -0 "$WORKER_PID" 2>/dev/null || { echo "❌ Worker가 종료됐어요." >&2; exit 1; }
   sleep 1
 done
 
+if [ "$READY" != true ]; then
+  echo "❌ Worker 준비 시간 초과" >&2
+  exit 1
+fi
+
 GALANDA_DEV_API_TARGET="http://127.0.0.1:${WORKER_PORT}" \
-  ./node_modules/.bin/vite --port "$VITE_PORT" --strictPort "$@" &
+  ./node_modules/.bin/vite --host 127.0.0.1 --port "$VITE_PORT" --strictPort "$@" &
 VITE_PID=$!
 
 # 둘 중 하나라도 종료되면 전체를 정리해요. (macOS 기본 bash 3.2에는 `wait -n`이 없어요)

@@ -1,3 +1,4 @@
+import { logServerFailure } from "./safe-log.ts";
 import type { Context as HonoContext } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { Cause } from "effect";
@@ -228,9 +229,9 @@ export function mapErrorToResponse(
 
   const dieReason = cause.reasons.find(Cause.isDieReason);
   if (dieReason) {
-    console.error(`[Defect] requestId=${requestId}:`, dieReason.defect);
+    logServerFailure("effect_defect", requestId);
   } else {
-    console.error(`[Cause] requestId=${requestId}:`, cause);
+    logServerFailure("effect_interrupted", requestId);
   }
 
   return c.json(

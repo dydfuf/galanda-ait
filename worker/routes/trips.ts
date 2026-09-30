@@ -1,3 +1,4 @@
+import { logServerFailure } from "../http/safe-log.ts";
 import { Effect, Layer, Logger, Schema } from "effect";
 import { Hono, type Context as HonoContext } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -178,12 +179,8 @@ const makeActiveTripActionRanker = (
           (promise) => c.executionCtx.waitUntil(promise)
         )
       : ranker;
-  } catch (error) {
-    console.error(JSON.stringify({
-      message: "nba_active_configuration_invalid",
-      requestId: c.var.requestId,
-      error: error instanceof Error ? error.message : String(error),
-    }));
+  } catch {
+    logServerFailure("nba_active_configuration_invalid", c.var.requestId);
     return undefined;
   }
 };
@@ -408,12 +405,8 @@ tripsRoute.post(
             recommendation,
             Date.now() - startedAt
           );
-        } catch (error) {
-          console.error(JSON.stringify({
-            message: "nba_shadow_schedule_failed",
-            requestId: context.var.requestId,
-            error: error instanceof Error ? error.message : String(error),
-          }));
+        } catch {
+          logServerFailure("nba_shadow_schedule_failed", context.var.requestId);
         }
         return context.json(toRecommendNextActionResponse(recommendation));
       }

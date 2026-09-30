@@ -32,6 +32,11 @@ PORT="${GALANDA_LOCAL_PGPORT:-5432}"
 DB_NAME="${GALANDA_LOCAL_DB:-galanda_local}"
 SUPERUSER="${GALANDA_LOCAL_SUPERUSER:-${USER}}"
 
+case "$HOST" in
+  127.0.0.1|localhost|::1) ;;
+  *) echo "❌ 로컬 DB 준비는 loopback host만 허용해요." >&2; exit 1 ;;
+esac
+
 # migration이 `ALTER DEFAULT PRIVILEGES FOR ROLE postgres`를 사용하므로 admin role 이름은 고정이에요.
 ADMIN_ROLE="postgres"
 RUNTIME_ROLE="galanda_worker"
@@ -175,5 +180,5 @@ cat <<MSG
 
 이후 로컬 실행:
 
-  pnpm dev:local   # Worker API(8787) + Vite dev(5173) 동시 실행
+  pnpm dev   # Worker API(8787) + Vite dev(5173) 동시 실행
 MSG

@@ -270,3 +270,29 @@ Worker rollback은 database migration을 되돌리지 않는다. 이전 Worker�
 - [Cloudflare Hyperdrive connection pooling](https://developers.cloudflare.com/hyperdrive/concepts/connection-pooling/)
 - [Cloudflare Workers rollbacks](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)
 - [Supabase PostgreSQL connections](https://supabase.com/docs/guides/database/connecting-to-postgres)
+
+
+## 출시 설정 사전 점검과 운영 인계
+
+네트워크 호출 없이 명시한 환경 파일만 검사할 수 있다. `.dev.vars`를 자동으로
+읽지 않으며 secret 값은 출력하지 않는다. 실제 배포 대상의 secret 파일을 사용할
+때는 저장소 밖의 권한 제한 파일을 사용하고, 파일을 커밋하지 않는다.
+
+```bash
+node scripts/check-release-env.mjs staging /secure/path/release.env
+```
+
+검사는 APP_ENV, HTTPS canonical origin, auth secret 길이, Web 계정 접근에 필요한
+Kakao client ID, Hyperdrive binding과 URL 로그 비활성화를 확인한다. 통과는 원격
+secret 등록, Kakao callback/동의 설정, migration, 최소 DB 권한이나 실제 로그인
+성공을 증명하지 않는다. 이 항목들은 배포 권한이 준비된 운영 단계에서 확인한다.
+
+현재 `wrangler.jsonc`에는 staging만 선언되어 있다. production origin·Hyperdrive·
+OAuth 설정을 임의로 복제하거나 생성하지 않는다. 운영자가 production 대상을
+명시적으로 준비한 후 같은 명령의 첫 인자를 `production`으로 바꿔 검사하고,
+승인된 배포 후 실제 가입/로그인·초대·저장·재조회·로그아웃 smoke를 수행한다.
+기본 `pnpm deploy`는 AIT 배포이므로 Web production 배포 명령으로 사용하지 않는다.
+
+애플리케이션의 예외 로그는 고정 event 분류와 requestId만 남긴다. raw exception,
+SQL, 사용자 입력, 인증 진단 본문을 로그에 추가하지 않는다. 장애 진단은 requestId와
+HTTP route template/status로 상관 분석하며 원본 secret이나 사용자 데이터를 수집하지 않는다.
