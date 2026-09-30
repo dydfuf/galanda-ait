@@ -2,6 +2,34 @@
 
 Web/PWA 기본 타깃을 로컬에서 **로그인까지 동작하는 상태**로 실행하는 방법이에요.
 
+## 자격 증명 없이 첫 실행 / 출시 검증
+
+Node 24, Corepack pnpm 9.15.1, Docker가 준비되어 있어야 해요.
+의존성을 설치한 뒤 다음 명령을 사용하세요.
+
+```bash
+corepack pnpm install --frozen-lockfile
+bash scripts/dev-isolated.sh
+```
+
+공식 `docker.io/library/postgres:15-alpine` 이미지를 사용하며, 없으면 Docker가
+다운로드해요. PostgreSQL은 `127.0.0.1:55432`에만 바인딩하고 데이터는 tmpfs에
+보관해요. migration은 이 고정 주소에서만 실행하고 Worker는 최소 권한
+`galanda_worker`를 사용해요. 별도 임시 환경 파일을 만들어 기존 `.dev.vars`를
+읽거나 수정하지 않아요. 코드에 있는 로컬 합성용 secret/password는 원격 배포에
+사용하면 안 돼요.
+
+브라우저는 `http://localhost:5173`으로 접속해요. 로컬 Worker만 `APP_ENV=staging`으로
+실행하므로 이메일 가입·로그인을 사용할 수 있어요. 실제 이메일·OAuth·AI 서비스는
+사용하지 않아요. 합성 데이터만 입력하세요. Ctrl+C로 서버, 컨테이너, DB 데이터와
+임시 환경 파일을 정리해요. 강제 종료나 호스트 장애 시에는 남은
+`galanda-local-*` 컨테이너가 없는지 확인하세요. 이 경로는 수동 브라우저 검증용이며
+자동 브라우저 테스트 runner를 추가하지 않아요.
+
+기존 로컬 DB를 사용할 때는 아래 Homebrew 경로를 사용할 수 있어요.
+`pnpm dev`는 loopback DB만 허용하며, 다른 환경 파일은
+`GALANDA_DEV_ENV_FILE=/절대/경로/로컬.vars pnpm dev`로 명시해요.
+
 ## 왜 예전에는 로그인이 안 됐나요
 
 두 가지가 겹쳐 있었어요.
@@ -78,11 +106,12 @@ BETTER_AUTH_SECRET="<32자 이상 임의 문자열 — 로컬 전용>"
 BETTER_AUTH_URL="http://localhost:8787"
 DATABASE_URL="postgresql://galanda_worker@127.0.0.1:5432/galanda_local"
 MIGRATION_DATABASE_URL="postgresql://postgres@127.0.0.1:5432/galanda_local"
-KAKAO_CLIENT_ID="<Kakao REST API key>"
-KAKAO_CLIENT_SECRET="<Kakao client secret>"
+APP_ENV="staging"
+# OAuth를 직접 검증할 때만 KAKAO_CLIENT_ID / KAKAO_CLIENT_SECRET을 별도 설정해요.
 ```
 
 - `BETTER_AUTH_SECRET`이 없으면 `makeBetterAuth`가 throw해서 `/api/auth/*`가 500이 돼요.
+- `APP_ENV="staging"`은 로컬 합성 이메일 가입·로그인 검증용이에요. production에서 활성화하지 않아요.
 - `KAKAO_CLIENT_ID`가 없으면 social provider가 등록되지 않아 카카오 로그인만 실패해요
   (익명 로그인과 나머지 API는 정상 동작해요).
 - `BETTER_AUTH_URL`은 `pnpm dev:worker`용 값이에요. `pnpm dev`는 브라우저 origin이

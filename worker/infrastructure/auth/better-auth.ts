@@ -1,3 +1,4 @@
+import { safeAuthLogger } from "../../http/safe-log.ts";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth/minimal";
 import { anonymous } from "better-auth/plugins";
@@ -30,6 +31,7 @@ export const makeBetterAuth = (
   const kakaoClientId = env.KAKAO_CLIENT_ID?.trim();
 
   return betterAuth({
+    logger: safeAuthLogger,
     database: drizzleAdapter(db, {
       provider: "pg",
       schema,

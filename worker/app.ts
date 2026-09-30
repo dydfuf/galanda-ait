@@ -15,6 +15,7 @@ import {
 } from "./infrastructure/database/request-database.ts";
 import type { DatabaseHandle } from "../src/infrastructure/persistence/drizzle/database.ts";
 import type { UserSession } from "../src/core/domain/room.ts";
+import { logServerFailure } from "./http/safe-log.ts";
 import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
 import { invitesRoute, tripsRoute } from "./routes/trips.ts";
@@ -174,7 +175,7 @@ export function createApp(dependencies: AppDependencies = {}) {
       );
     }
 
-    console.error(`[UnhandledError] requestId=${requestId}:`, err);
+    logServerFailure("unhandled_error", requestId);
     return c.json(
       formatApiError({
         code: "INTERNAL_SERVER_ERROR",
