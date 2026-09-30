@@ -1,4 +1,4 @@
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Logger } from "effect";
 import { describe, expect, it, vi } from "vitest";
 import type { TripActionRankingInput } from "../../../src/core/ports/trip-action-ranker.ts";
 import {
@@ -140,6 +140,141 @@ describe("CloudflareAiGatewayTripActionRanker", () => {
     expect(telemetry[0]?.totalLatencyMs).toBeGreaterThanOrEqual(
       telemetry[0]?.firstResponseLatencyMs ?? 0
     );
+  });
+
+  it("request contract states a complete permutation and preserves the inference budget", async () => {
+    const run = vi.fn<AiGateway["run"]>(async () => responseWithOutput({
+      primaryActionId: "DEFINE_ROUTE",
+      alternativeActionIds: ["INVITE_MEMBER"],
+      reasonCode: "DEFINE_TRAVEL_ROUTE",
+    }));
+    const ranker = makeCloudflareAiGatewayTripActionRanker({ ...config, gateway: { run } });
+    await Effect.runPromise(ranker.rank(input));
+    expect(ranker.policyVersion).toBe("nba-ai-v1:openrouter-v3:test-model");
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      query: expect.objectContaining({
+        max_tokens: 500,
+        reasoning: { effort: "low" },
+        messages: expect.arrayContaining([expect.objectContaining({
+          role: "system",
+          content: expect.stringContaining("every other eligible action ID in alternativeActionIds exactly once"),
+        }), expect.objectContaining({
+          role: "system",
+          content: expect.stringContaining("whose actionId equals primaryActionId"),
+        })]),
+        response_format: {
+          type: "json_schema",
+          json_schema: expect.objectContaining({
+            strict: true,
+            schema: expect.objectContaining({
+              additionalProperties: false,
+              properties: expect.objectContaining({
+                primaryActionId: expect.objectContaining({ enum: ["DEFINE_ROUTE", "INVITE_MEMBER"] }),
+                alternativeActionIds: expect.objectContaining({
+                  description: expect.stringContaining("Exactly 1 action IDs"),
+                  items: { type: "string", enum: ["DEFINE_ROUTE", "INVITE_MEMBER"] },
+                }),
+              }),
+            }),
+          }),
+        },
+      }),
+    }), expect.anything());
+  });
+
+  it.each([
+    ["missing alternative", { primaryActionId: "DEFINE_ROUTE", alternativeActionIds: [], reasonCode: "DEFINE_TRAVEL_ROUTE" }, "MISSING_ACTION"],
+    ["duplicate alternative", { primaryActionId: "DEFINE_ROUTE", alternativeActionIds: ["INVITE_MEMBER", "INVITE_MEMBER"], reasonCode: "DEFINE_TRAVEL_ROUTE" }, "DUPLICATE_ALTERNATIVE"],
+    ["primary repeated", { primaryActionId: "DEFINE_ROUTE", alternativeActionIds: ["DEFINE_ROUTE"], reasonCode: "DEFINE_TRAVEL_ROUTE" }, "PRIMARY_REPEATED"],
+    ["unknown eligible ID", { primaryActionId: "VIEW_ITINERARY", alternativeActionIds: ["INVITE_MEMBER"], reasonCode: "TRIP_CONFIRMED" }, "UNKNOWN_ACTION"],
+    ["unknown action enum", { primaryActionId: "invented-private-value", alternativeActionIds: ["INVITE_MEMBER"], reasonCode: "DEFINE_TRAVEL_ROUTE" }, "RANKING_SCHEMA"],
+    ["reason mismatch", { primaryActionId: "DEFINE_ROUTE", alternativeActionIds: ["INVITE_MEMBER"], reasonCode: "INVITE_TRAVEL_COMPANION" }, "REASON_MISMATCH"],
+    ["extra property", { primaryActionId: "DEFINE_ROUTE", alternativeActionIds: ["INVITE_MEMBER"], reasonCode: "DEFINE_TRAVEL_ROUTE", privateText: "do-not-log" }, "RANKING_SCHEMA"],
+  ])("classifies %s without changing the public error", async (_name, output, invalidOutputReason) => {
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
+    const logs: string[] = [];
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, gateway: { run: async () => responseWithOutput(output) },
+      onTelemetry: (event) => telemetry.push(event),
+    });
+    const failure = await Effect.runPromise(ranker.rank(input).pipe(
+      Effect.flip,
+      Effect.provide(Logger.layer([Logger.formatJson.pipe(Logger.map((line) => { logs.push(line); }))])),
+    ));
+    expect(failure.toJSON()).toEqual({ _tag: "TripActionRankingError", reason: "INVALID_OUTPUT" });
+    expect(telemetry).toEqual([expect.objectContaining({
+      status: "FAILED", failure: "INVALID_OUTPUT", invalidOutputReason,
+      inputTokens: 12, outputTokens: 8, totalTokens: 20,
+      finishReason: "stop", choiceCount: 1,
+    })]);
+    expect(logs.join()).toContain(invalidOutputReason);
+    expect(JSON.stringify({ telemetry, logs, failure })).not.toMatch(/invented-private-value|do-not-log|primaryActionId|alternativeActionIds/);
+  });
+
+  it.each([
+    ["truncated empty content", { choices: [{ finish_reason: "length", message: { content: "" } }] }, "FINISH_REASON"],
+    ["empty stopped content", { choices: [{ finish_reason: "stop", message: { content: "" } }] }, "EMPTY_CONTENT"],
+    ["refusal", { choices: [{ finish_reason: "stop", message: { content: null, refusal: "private refusal text" } }] }, "REFUSAL"],
+    ["malformed ranking JSON", { choices: [{ finish_reason: "stop", message: { content: "{private content" } }] }, "RANKING_JSON"],
+    ["invalid envelope", { choices: [] }, "ENVELOPE_SCHEMA"],
+  ])("retains usage and safe diagnostics for %s", async (_name, body, invalidOutputReason) => {
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config,
+      gateway: { run: async () => Response.json({
+        ...body, usage: { prompt_tokens: 100, completion_tokens: 500, total_tokens: 600 },
+      }) },
+      onTelemetry: (event) => telemetry.push(event),
+    });
+    const exit = await Effect.runPromiseExit(ranker.rank(input));
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(telemetry).toEqual([expect.objectContaining({
+      status: "FAILED", failure: "INVALID_OUTPUT", invalidOutputReason,
+      statusCode: 200, inputTokens: 100, outputTokens: 500, totalTokens: 600,
+    })]);
+    expect(JSON.stringify({ telemetry, exit })).not.toContain("private");
+  });
+
+  it("classifies malformed response JSON without retaining its contents", async () => {
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, gateway: { run: async () => new Response("{private-provider-body") },
+      onTelemetry: (event) => telemetry.push(event),
+    });
+    const exit = await Effect.runPromiseExit(ranker.rank(input));
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(telemetry[0]).toMatchObject({ invalidOutputReason: "RESPONSE_JSON", totalTokens: 0 });
+    expect(JSON.stringify({ telemetry, exit })).not.toContain("private-provider-body");
+  });
+
+  it("rejects empty candidates without calling the provider and emits one diagnostic", async () => {
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
+    const run = vi.fn<AiGateway["run"]>();
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config, gateway: { run }, onTelemetry: (event) => telemetry.push(event),
+    });
+    const exit = await Effect.runPromiseExit(ranker.rank({ ...input, eligibleActions: [] }));
+    expect(Exit.isFailure(exit)).toBe(true);
+    expect(run).not.toHaveBeenCalled();
+    expect(telemetry).toEqual([expect.objectContaining({ invalidOutputReason: "EMPTY_CANDIDATES", statusCode: 0 })]);
+  });
+
+  it("keeps telemetry failures and repeated Effect execution isolated", async () => {
+    const telemetry: CloudflareAiGatewayRankerTelemetry[] = [];
+    let calls = 0;
+    const ranker = makeCloudflareAiGatewayTripActionRanker({
+      ...config,
+      gateway: { run: async () => ++calls === 1 ? responseWithOutput({}) : responseWithOutput({
+        primaryActionId: "DEFINE_ROUTE", alternativeActionIds: ["INVITE_MEMBER"], reasonCode: "DEFINE_TRAVEL_ROUTE",
+      }) },
+      onTelemetry: (event) => { telemetry.push(event); throw new Error("observer failed"); },
+    });
+    const program = ranker.rank(input);
+    expect(Exit.isFailure(await Effect.runPromiseExit(program))).toBe(true);
+    await expect(Effect.runPromise(program)).resolves.toMatchObject({ primaryActionId: "DEFINE_ROUTE" });
+    expect(telemetry[0]?.invalidOutputReason).toBe("RANKING_SCHEMA");
+    expect(telemetry[1]?.status).toBe("COMPLETED");
+    expect(telemetry[1]?.invalidOutputReason).toBeUndefined();
   });
 
   it("설정된 latency budget이 지나면 TIMEOUT을 반환한다", async () => {

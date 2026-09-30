@@ -162,7 +162,7 @@ describe("recommendNextTripAction", () => {
     expect(rank).not.toHaveBeenCalled();
   });
 
-  it("ranker 실패 시 deterministic RULE recommendation으로 fallback한다", async () => {
+  it.each(["TIMEOUT", "PROVIDER_ERROR", "INVALID_OUTPUT"] as const)("ranker %s 실패 시 deterministic RULE recommendation으로 fallback한다", async (reason) => {
     const result = await Effect.runPromise(
       recommendNextTripAction(planHomeCommand).pipe(
         Effect.provide(Layer.merge(
@@ -170,7 +170,7 @@ describe("recommendNextTripAction", () => {
           Layer.succeed(TripActionRanker, {
             policyVersion: "nba-ai-test-v1",
             rank: () => Effect.fail(
-              new TripActionRankingError({ reason: "TIMEOUT" })
+              new TripActionRankingError({ reason })
             ),
           })
         ))
