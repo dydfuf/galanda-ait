@@ -5,11 +5,14 @@ import { AppRouter } from "./app/router.tsx";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { PwaUpdatePrompt } from "@/pwa/PwaUpdatePrompt.tsx";
 
+import { InviteShareFallback } from "./features/invite/InviteShareFallback.tsx";
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppRouter />
+        <InviteShareFallback />
       </BrowserRouter>
       {/* 하단 고정 CTA(BottomAction)와 겹치지 않게 모바일 오프셋을 줘요. */}
       <Toaster

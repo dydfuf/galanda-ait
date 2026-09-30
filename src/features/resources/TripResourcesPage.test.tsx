@@ -8,6 +8,8 @@ import type { TripResourceResponse, TripResourcesResponse } from "../../contract
 import { TripResourcesPage } from "./TripResourcesPage.tsx";
 import { useTripResourceMutation, useTripResourcesQuery } from "./queries.ts";
 
+vi.mock("../../hooks/useSession.ts", () => ({ useSessionQuery: vi.fn<() => { data: { participantId: string } }>(() => ({ data: { participantId: "draft-actor" } })) }));
+
 vi.mock("./queries.ts", () => ({ useTripResourcesQuery: vi.fn<typeof useTripResourcesQuery>(), useTripResourceMutation: vi.fn<typeof useTripResourceMutation>() }));
 vi.mock("../../platform/index.ts", () => ({ platform: { openExternalUrl: vi.fn<(url: string) => Promise<void>>().mockResolvedValue(undefined) } }));
 
@@ -37,6 +39,7 @@ function TestPage() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   mutateAsync.mockResolvedValue(resource);
   refetch.mockResolvedValue({ data: { items: [resource], extractionAvailable: true }, isError: false });
@@ -91,11 +94,10 @@ describe("공동 여행 자료함", () => {
   it("AI를 사용할 수 없어도 메모만 저장할 수 있다", async () => {
     setQuery({ items: [{ ...resource, places: null }], extractionAvailable: false });
     render(<TestPage />);
-    expect(screen.getByText(/현재 AI 정보 정리를 사용할 수 없어요/)).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "원본 자료 1" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByText("정리 전")).not.toBeInTheDocument();
     expect(screen.getByText(resource.note)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "원본 자료 1" }));
-    expect(screen.getByRole("button", { name: "정보 정리" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "정보 정리" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "자료 추가" }));
     fireEvent.change(screen.getByLabelText("메모"), { target: { value: "제주 숲길을 걷고 싶어요" } });
     fireEvent.click(screen.getByRole("button", { name: "자료 저장" }));
@@ -110,12 +112,12 @@ describe("공동 여행 자료함", () => {
     expect(screen.getByRole("button", { name: "카드 수정" })).toBeEnabled();
   });
 
-  it("AI가 꺼진 빈 장소 탭에서 사용할 수 없는 정보 정리를 안내하지 않는다", () => {
+  it("AI가 꺼진 빈 자료함은 링크와 메모 저장에만 집중한다", () => {
     setQuery({ items: [], extractionAvailable: false });
     render(<TestPage />);
-    expect(screen.getByRole("tab", { name: "원본 자료 0" })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(screen.getByRole("tab", { name: "장소 카드 0" }));
-    expect(screen.getByText("원본 자료에서 함께 모은 링크와 메모를 볼 수 있어요.")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "여행 자료 추가" })).toBeInTheDocument();
+    expect(screen.getByText("함께 볼 자료를 모아보세요")).toBeInTheDocument();
     expect(screen.queryByText("링크나 메모를 저장한 뒤 정보 정리를 눌러보세요.")).not.toBeInTheDocument();
   });
 
@@ -283,5 +285,95 @@ describe("공동 여행 자료함", () => {
     expect(screen.getByRole("button", { name: "수정 저장" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(screen.getByRole("tab", { name: "원본 자료 0" })).not.toHaveAttribute("aria-disabled", "true");
+  });
+});
+
+describe("원본 자료 수정", () => {
+  const editable = { ...resource, places: null, canManage: true };
+  it("권한이 없는 멤버에게 원본 수정은 노출하지 않는다", () => {
+    setQuery({ items: [{ ...editable, canManage: false }], extractionAvailable: false });
+    render(<TestPage />);
+    expect(screen.queryByRole("button", { name: "원본 수정" })).not.toBeInTheDocument();
+  });
+  it("실패 시 입력 유지, 재시도 성공 시 편집기를 닫고 취소는 쓰지 않는다", async () => {
+    setQuery({ items: [editable], extractionAvailable: false });
+    mutateAsync.mockRejectedValueOnce(new Error("수정 실패"));
+    render(<TestPage />);
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정" }));
+    fireEvent.change(screen.getByLabelText("메모 수정"), { target: { value: "고친 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정 저장" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("수정 실패");
+    expect(screen.getByLabelText("메모 수정")).toHaveValue("고친 메모");
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정 저장" }));
+    await waitFor(() => expect(screen.queryByRole("form", { name: "원본 자료 수정" })).not.toBeInTheDocument());
+    expect(mutateAsync).toHaveBeenLastCalledWith({ type: "edit-source", resourceId: resource.id, input: { url: resource.url, note: "고친 메모", expectedRevision: 1 } });
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정" }));
+    fireEvent.click(screen.getByRole("button", { name: "수정 취소" }));
+    expect(mutateAsync).toHaveBeenCalledTimes(2);
+  });
+  it("충돌 후 최신 원본을 읽고 확인하기 전에는 재저장하지 않는다", async () => {
+    setQuery({ items: [editable], extractionAvailable: false });
+    mutateAsync.mockRejectedValueOnce(new ApiClientError({ status: 409, code: "REVISION_CONFLICT", message: "stale" }));
+    refetch.mockResolvedValue({ data: { items: [{ ...editable, revision: 2, note: "다른 수정" }], extractionAvailable: false }, isError: false });
+    render(<TestPage />);
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정" }));
+    fireEvent.change(screen.getByLabelText("메모 수정"), { target: { value: "내 수정" } });
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정 저장" }));
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "원본 수정 저장" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "최신 원본 확인" }));
+    await screen.findByRole("region", { name: "최신 원본 내용" });
+    fireEvent.click(screen.getByRole("button", { name: "최신 원본을 확인했어요" }));
+    expect(screen.getByLabelText("메모 수정")).toHaveValue("내 수정");
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정 저장" }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenLastCalledWith({ type: "edit-source", resourceId: resource.id, input: { url: resource.url, note: "내 수정", expectedRevision: 2 } }));
+  });
+  it("기존 장소 카드 원본은 변경하지 않고 복사한 입력만 제공한다", () => {
+    setQuery({ items: [{ ...resource, canManage: true }], extractionAvailable: false });
+    render(<TestPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "원본 자료 1" }));
+    expect(screen.queryByRole("button", { name: "원본 수정" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "새 자료로 복사" }));
+    expect(screen.getByLabelText("메모")).toHaveValue(resource.note);
+    expect(screen.getByLabelText("링크")).toHaveValue(resource.url);
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("자료함 로그인 복구", () => {
+  it("401은 자동 이동 없이 입력을 남기고 같은 계정 재진입에서 복원한다", async () => {
+    setQuery({ items: [], extractionAvailable: false });
+    mutateAsync.mockRejectedValue(new ApiClientError({ status: 401, message: "로그인 필요" }));
+    const view = render(<TestPage />);
+    fireEvent.change(screen.getByLabelText("메모"), { target: { value: "복구할 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: "자료 저장" }));
+    expect(await screen.findByRole("button", { name: "다시 로그인하고 이어하기" })).toBeInTheDocument();
+    expect(screen.getByLabelText("메모")).toHaveValue("복구할 메모");
+    expect(screen.getByText(/이 탭에 임시 저장했어요/)).toBeInTheDocument();
+    view.unmount(); render(<TestPage />);
+    expect(screen.getByLabelText("메모")).toHaveValue("복구할 메모");
+  });
+  it("원본 수정의 401도 원래 revision과 입력을 복원한다", async () => {
+    setQuery({ items: [{ ...resource, places: null, canManage: true }], extractionAvailable: false });
+    mutateAsync.mockRejectedValueOnce(new ApiClientError({ status: 401, message: "로그인 필요" }));
+    const view = render(<TestPage />);
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정" }));
+    fireEvent.change(screen.getByLabelText("메모 수정"), { target: { value: "복구할 수정" } });
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정 저장" }));
+    await screen.findByRole("button", { name: "다시 로그인하고 이어하기" });
+    view.unmount(); render(<TestPage />);
+    fireEvent.click(screen.getByRole("button", { name: "원본 수정" }));
+    expect(screen.getByLabelText("메모 수정")).toHaveValue("복구할 수정");
+  });
+  it("저장소 실패에는 저장 성공을 주장하지 않고 이동 전 복사를 안내한다", async () => {
+    const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    setQuery({ items: [], extractionAvailable: false });
+    mutateAsync.mockRejectedValueOnce(new ApiClientError({ status: 401, message: "로그인 필요" }));
+    render(<TestPage />);
+    fireEvent.change(screen.getByLabelText("메모"), { target: { value: "복사할 메모" } });
+    fireEvent.click(screen.getByRole("button", { name: "자료 저장" }));
+    expect(await screen.findByText(/로그인 전에 링크와 메모를 복사/)).toBeInTheDocument();
+    expect(screen.getByLabelText("메모")).toHaveValue("복사할 메모");
+    write.mockRestore();
   });
 });

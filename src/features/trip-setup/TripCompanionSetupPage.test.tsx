@@ -172,7 +172,7 @@ describe("TripCompanionSetupPage", () => {
     ).toBeEnabled();
     expect(
       screen.getByRole("button", {
-        name: "미정으로 두고 다음",
+        name: "초대는 나중에 하고 다음",
       }),
     ).toBeEnabled();
     expect(container).not.toHaveTextContent(/이메일 초대|권한 선택|AI 추천/);
@@ -208,7 +208,7 @@ describe("TripCompanionSetupPage", () => {
       screen.getByRole("button", { name: "초대 링크 준비 중..." }),
     ).toBeDisabled();
     const continueButton = screen.getByRole("button", {
-      name: "미정으로 두고 다음",
+      name: "초대는 나중에 하고 다음",
     });
     expect(continueButton).toBeDisabled();
     fireEvent.click(continueButton);
@@ -238,7 +238,7 @@ describe("TripCompanionSetupPage", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "미정으로 두고 다음",
+        name: "초대는 나중에 하고 다음",
       }),
     );
 
@@ -349,4 +349,14 @@ describe("TripCompanionSetupPage", () => {
     unmount();
     expect(removeInsetListener).toHaveBeenCalledTimes(1);
   });
+});
+
+it("일시적인 여행방 조회 실패는 삭제라고 안내하지 않고 같은 단계에서 재시도한다", () => {
+  const refetch = vi.fn();
+  mocks.useTripRoomRawQuery.mockReturnValue(roomQueryResult(undefined, { data: undefined, isError: true, error: new Error("network"), refetch }));
+  renderPage();
+  expect(screen.queryByText("요청한 여행방이 없거나 접근 권한이 없어요.")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+  expect(refetch).toHaveBeenCalledOnce();
+  expect(screen.getByTestId("location-path").textContent).toBe(setupPath);
 });

@@ -102,10 +102,7 @@ describe("MePage", () => {
     expect(within(profile).getByText("R")).toHaveAttribute("aria-hidden", "true");
 
     const menu = screen.getByRole("navigation", { name: "마이 메뉴" });
-    expect(within(menu).getByRole("link", { name: "저장한 여행 일정" })).toHaveAttribute(
-      "href",
-      "/me/saved",
-    );
+    expect(within(menu).queryByRole("link", { name: "저장한 여행 일정" })).not.toBeInTheDocument();
 
     const settingsMenu = within(menu).getByRole("button", { name: /화면 설정/ });
     expect(within(settingsMenu).getByText("시스템")).toBeInTheDocument();

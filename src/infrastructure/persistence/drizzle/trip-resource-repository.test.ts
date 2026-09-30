@@ -114,3 +114,18 @@ describe("DrizzleTripResourceRepository", () => {
     }
   });
 });
+
+describe("source edit CAS", () => {
+  it("updates only the scoped revision and invalidates empty extraction metadata", async () => {
+    const { repository, calls } = makeDb([[row(2)]]);
+    expect((await Effect.runPromise(repository.saveSource(tripId, id, revision, { url: "", note: "corrected" }))).revision).toBe(2);
+    expect(calls[0].text).toContain('"revision" = "trip_resources"."revision" + 1');
+    expect(calls[0].text).toContain('"places" =');
+    expect(calls[0].params).toEqual(["", "corrected", null, null, "NOT_READ", tripId, id, revision]);
+  });
+  it.each([true, false])("distinguishes stale edit from missing row: exists=%s", async (exists) => {
+    const { repository } = makeDb([[], exists ? [row(3)] : []]);
+    const error = await Effect.runPromise(Effect.flip(repository.saveSource(tripId, id, revision, { url: "", note: "corrected" })));
+    expect(error._tag).toBe(exists ? "RevisionConflictError" : "NotFoundError");
+  });
+});

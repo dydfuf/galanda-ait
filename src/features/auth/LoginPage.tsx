@@ -95,7 +95,7 @@ export function LoginPage() {
           />
         </div>
 
-        <ol aria-label="갈란다에서 여행을 결정하는 방법" className="mx-(--app-inline-padding) flex flex-col gap-3 rounded-2xl bg-muted p-5 text-base">
+        <ol aria-label="갈란다에서 여행을 결정하는 방법" className="mx-(--app-inline-padding) flex flex-col gap-3 rounded-2xl bg-muted p-5 text-base text-pretty break-keep">
           <li><strong>비교</strong> · 여행안의 일정과 비용을 나란히 살펴봐요.</li>
           <li><strong>의견</strong> · 친구들과 좋은 점, 어려운 점을 나눠요.</li>
           <li><strong>확정</strong> · 모인 의견으로 예약할 여행안을 정해요.</li>

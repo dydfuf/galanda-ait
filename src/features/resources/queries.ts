@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createTripResource, deleteTripResource, editTripResourcePlace, getTripResources, organizeTripResource } from "../../app/api-client.ts";
+import { createTripResource, deleteTripResource, editTripResourceSource, editTripResourcePlace, getTripResources, organizeTripResource } from "../../app/api-client.ts";
 import { COLLABORATION_READ_FRESHNESS } from "../../app/query-freshness.ts";
-import type { CreateResourceRequest, EditResourcePlaceRequest, TripResourcesResponse } from "../../contracts/trip-resource.ts";
+import type { CreateResourceRequest, EditResourceSourceRequest, EditResourcePlaceRequest, TripResourcesResponse } from "../../contracts/trip-resource.ts";
 import { RevisionSchema, TripIdSchema } from "../../core/domain/ids.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 
@@ -25,6 +25,7 @@ export function useTripResourcesQuery(tripId: string) {
 type ResourceMutation =
   | { type: "create"; input: CreateResourceRequest }
   | { type: "organize" | "delete"; resourceId: string; expectedRevision: number }
+  | { type: "edit-source"; resourceId: string; input: EditResourceSourceRequest }
   | { type: "edit"; resourceId: string; input: EditResourcePlaceRequest };
 
 export function useTripResourceMutation(tripId: string) {
@@ -36,6 +37,7 @@ export function useTripResourceMutation(tripId: string) {
       const id = TripIdSchema.make(tripId);
       switch (action.type) {
         case "create": return createTripResource(id, action.input);
+        case "edit-source": return editTripResourceSource(id, action.resourceId, action.input);
         case "edit": return editTripResourcePlace(id, action.resourceId, action.input);
         case "organize": return organizeTripResource(id, action.resourceId, RevisionSchema.make(action.expectedRevision));
         case "delete": return deleteTripResource(id, action.resourceId, RevisionSchema.make(action.expectedRevision));

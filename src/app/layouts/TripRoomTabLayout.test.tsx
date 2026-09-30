@@ -10,6 +10,7 @@ type MutablePlatformAdapter = Omit<PlatformAdapter, "navigation"> & {
 };
 
 const mocks = vi.hoisted(() => ({
+  role: "HOST",
   platform: {
     name: "web",
     signIn: vi.fn<PlatformAdapter["signIn"]>().mockResolvedValue(undefined),
@@ -22,6 +23,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../platform/index.ts", () => ({
   platform: mocks.platform,
+}));
+
+vi.mock("../../features/plan-detail/queries.ts", () => ({
+  useTripRoomRawQuery: () => ({ data: { members: [{ id: "actor", role: mocks.role }] } }),
+}));
+vi.mock("../../hooks/useSession.ts", () => ({
+  useSessionQuery: () => ({ data: { participantIds: ["actor"] } }),
 }));
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -122,8 +130,20 @@ function expectPlansTabSelected() {
 
 describe("TripRoomTabLayout platform shell ownership (RAON-229)", () => {
   beforeEach(() => {
+    mocks.role = "HOST";
     mocks.platform.navigation = undefined;
     vi.clearAllMocks();
+  });
+
+  it("does not offer host-only invite sharing to members on web or native shell", () => {
+    mocks.role = "MEMBER";
+    const { unmount } = renderLayout();
+    expect(screen.queryByRole("button", { name: "여행 초대 링크 공유" })).not.toBeInTheDocument();
+    unmount();
+    const { navigation } = createNativeNavigation();
+    mocks.platform.navigation = navigation;
+    renderLayout();
+    expect(navigation.addAccessoryButton).not.toHaveBeenCalled();
   });
 
   it("Web/PWA keeps header and mode tabs in one sticky navigation without a floating obstruction", () => {

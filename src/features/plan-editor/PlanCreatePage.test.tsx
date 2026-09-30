@@ -776,3 +776,12 @@ describe("PlanCreatePage", () => {
     expect(screen.getByText("완료 화면")).toBeVisible();
   });
 });
+
+it("첫 여행안 조회 장애는 같은 화면에서 재시도한다", () => {
+ const refetch = vi.fn();
+ mockUseTripRoomRawQuery.mockReturnValue({ ...queryResult(room, refetch), isError: true, error: new Error("network") } as ReturnType<typeof useTripRoomRawQuery>);
+ renderPage();
+ fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+ expect(refetch).toHaveBeenCalledOnce();
+ expect(screen.getByTestId("location-path").textContent).toBe(summaryPath);
+});

@@ -53,6 +53,7 @@ export function PlanHomePage() {
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
 
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
   const [isComparePickerOpen, setIsComparePickerOpen] = useState(false);
   const [selectedCompareIds, setSelectedCompareIds] = useState<ReadonlyArray<string>>([]);
   const [compareRecommendation, setCompareRecommendation] =
@@ -176,11 +177,14 @@ export function PlanHomePage() {
   const actor = getRoomActor(rawRoom, session?.participantIds);
   const canCreatePlan = actor.can("plan:create");
   const cta = resolvePlanHomeCta(rawRoom, actor);
-  const recommendation = !actor.isMember || plans.length === 0 || recommendationQuery.isError || recommendationQuery.data?.recommendationId ===
+  // A ready single plan has a concrete completion path. Optional recommendation
+  // results (or their loading state) must not replace that host action.
+  const canShowRecommendation = actor.isMember && plans.length > 0 && cta.primaryKind !== "review-confirm";
+  const recommendation = !canShowRecommendation || recommendationQuery.isError || recommendationQuery.data?.recommendationId ===
       dismissedRecommendationId
     ? undefined
     : recommendationQuery.data;
-  const isRecommendationPending = actor.isMember && plans.length > 0 && recommendationQuery.isPending;
+  const isRecommendationPending = canShowRecommendation && recommendationQuery.isPending;
   const hasRecommendationSurface = Boolean(recommendation) || isRecommendationPending;
 
   const runRecommendationAction = async (
@@ -212,6 +216,10 @@ export function PlanHomePage() {
       context.actionId === "COMPARE_PLANS" ||
       context.actionId === "CONFIRM_PLAN"
     ) {
+      if (context.actionId === "CONFIRM_PLAN" && plans.length === 1) {
+        navigate(`/trips/${tripId}/plans/${plans[0].id}`, { state: { nbaRecommendation: context } });
+        return;
+      }
       openComparePicker(context);
       return;
     }
@@ -224,6 +232,9 @@ export function PlanHomePage() {
   const runPrimaryCta = (): void => {
     if (!cta.primaryKind) return;
     switch (cta.primaryKind) {
+      case "review-confirm":
+        navigate(`/trips/${tripId}/plans/${plans[0].id}`);
+        return;
       case "view-itinerary":
         navigate(`/trips/${tripId}/itinerary`, { replace: true });
         return;
@@ -275,6 +286,7 @@ export function PlanHomePage() {
             destination={room.destination}
             period={room.period}
             memberCount={room.memberCount}
+            onMembersClick={actor.isGuest ? undefined : () => setIsMembersOpen(true)}
           />
           <DecisionSummarySection
             badgeText={room.decisionBadgeText}
@@ -454,6 +466,21 @@ export function PlanHomePage() {
               선택한 2개 비교하기
             </Button>
           </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+      <Drawer open={isMembersOpen} onOpenChange={setIsMembersOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>함께하는 멤버 {rawRoom.members.length}명</DrawerTitle>
+            <DrawerDescription>멤버 모두 여행 자료와 여행안을 함께 볼 수 있어요. 초대와 일정 확정은 방장이 진행해요.</DrawerDescription>
+          </DrawerHeader>
+          <ul aria-label="여행 멤버" className="flex max-h-[50dvh] flex-col gap-4 overflow-y-auto px-6 py-3">
+            {rawRoom.members.map((member) => <li key={member.id} className="flex min-w-0 items-center justify-between gap-3">
+              <span className="min-w-0 [overflow-wrap:anywhere]">{member.name}{session?.participantIds.includes(member.id) ? " (나)" : ""}</span>
+              <Badge variant="secondary">{member.role === "HOST" ? "방장" : "멤버"}</Badge>
+            </li>)}
+          </ul>
+          <DrawerFooter><Button type="button" variant="secondary" onClick={() => setIsMembersOpen(false)}>닫기</Button></DrawerFooter>
         </DrawerContent>
       </Drawer>
     </PageBody>

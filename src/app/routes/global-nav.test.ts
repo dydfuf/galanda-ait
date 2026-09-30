@@ -6,16 +6,14 @@ import {
 } from "./global-nav.ts";
 
 describe("resolveGlobalNavKey (RAON-249 route contract / Issue #96)", () => {
-  it("logical order로 4개 목적지를 노출한다", () => {
+  it("핵심 3개 목적지만 노출하고 탐색 직접 경로는 보존한다", () => {
     expect(GLOBAL_NAV_ITEMS.map((i) => i.key)).toEqual([
       "HOME",
-      "EXPLORE",
       "TRIPS",
       "ME",
     ]);
     expect(GLOBAL_NAV_ITEMS.map((i) => i.path)).toEqual([
       "/home",
-      "/explore",
       "/trips",
       "/me",
     ]);

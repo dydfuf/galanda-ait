@@ -38,6 +38,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../platform/index.ts", () => ({
   platform: mocks.platform,
 }));
+// Shell ownership is exercised as the host who owns this confirmed itinerary.
+vi.mock("../../hooks/useSession.ts", () => ({
+  useSessionQuery: () => ({ data: { participantIds: ["participant-host"] } }),
+}));
+vi.mock("../plan-detail/queries.ts", () => ({
+  useTripRoomRawQuery: () => ({
+    data: { members: [{ id: "participant-host", name: "방장", role: "HOST" }] },
+  }),
+}));
 vi.mock("./queries.ts", () => ({
   useItineraryQuery: vi.fn(),
 }));

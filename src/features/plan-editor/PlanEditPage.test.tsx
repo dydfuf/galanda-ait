@@ -429,3 +429,22 @@ describe("PlanEditPage", () => {
     );
   });
 });
+
+it("일시적인 편집 조회 실패는 삭제로 오인하지 않고 재시도할 수 있다", () => {
+  const refetch = vi.fn();
+  mockUseTripRoomRawQuery.mockReturnValue({ ...queryResult(room, refetch), isError: true, error: new Error("network") } as ReturnType<typeof useTripRoomRawQuery>);
+  renderPage();
+  expect(screen.queryByText("요청하신 여행 정보가 없거나 삭제되었습니다.")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+  expect(refetch).toHaveBeenCalledOnce();
+  expect(screen.getByTestId("location-path").textContent).toBe(editPath);
+});
+
+it("수정 저장 중 세션이 만료되어도 폼에 남아 명시적으로 다시 로그인할 수 있다", async () => {
+  mockUseUpdatePlanMutation.mockReturnValue(updateMutationResult(vi.fn().mockRejectedValue(new ApiClientError({ status: 401, message: "expired" }))));
+  renderPage();
+  fireEvent.click(screen.getByRole("button", { name: "수정안 반영하기" }));
+  expect(await screen.findByRole("button", { name: "다시 로그인하고 이어하기" })).toBeInTheDocument();
+  expect(screen.getByTestId("location-path").textContent).toBe(editPath);
+  expect(screen.getByRole("button", { name: "수정안 반영하기" })).toBeInTheDocument();
+});

@@ -1,3 +1,6 @@
+import { getRoomActor } from "../../core/domain/auth-guards.ts";
+import { useSessionQuery } from "../../hooks/useSession.ts";
+import { useTripRoomRawQuery } from "../../features/plan-detail/queries.ts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
 import { Bell } from "lucide-react";
@@ -38,6 +41,9 @@ export function TripRoomTabLayout() {
 
   const validated = decodeRouteParams(TripParamsSchema, params);
   const tripId = Result.isSuccess(validated) ? validated.success.tripId : "";
+  const { data: room } = useTripRoomRawQuery(tripId);
+  const { data: session } = useSessionQuery();
+  const canInvite = Boolean(room && getRoomActor(room, session?.participantIds).can("room:invite"));
   const selectedTab = getTripRoomSection(location.pathname);
 
   const { data: trips } = useTripRoomsQuery();
@@ -50,7 +56,7 @@ export function TripRoomTabLayout() {
   );
 
   useEffect(() => {
-    if (!platformNavigation || !tripId) return;
+    if (!platformNavigation || !tripId || !canInvite) return;
 
     const registrationId = ++accessoryRegistrationId.current;
     let isActive = true;
@@ -81,7 +87,7 @@ export function TripRoomTabLayout() {
 
       void registration.then(removeIfCurrent, removeIfCurrent);
     };
-  }, [isCurrentAccessoryRegistration, platformNavigation, tripId]);
+  }, [isCurrentAccessoryRegistration, platformNavigation, tripId, canInvite]);
 
   if (Result.isFailure(validated)) {
     return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
@@ -92,7 +98,7 @@ export function TripRoomTabLayout() {
   };
 
   const showWebNavigation = !platformNavigation;
-  const showShareAction = showWebNavigation || failedAccessoryTripId === tripId;
+  const showShareAction = canInvite && (showWebNavigation || failedAccessoryTripId === tripId);
 
   const headerActions = (
     <div className="flex items-center gap-0.5">

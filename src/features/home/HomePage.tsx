@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { GalandaIcon } from "@/components/galanda/galanda-icon.tsx";
 
 import { ActionIcon } from "@/components/galanda/action-icon.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
@@ -102,16 +101,9 @@ export function HomePage() {
             <ActionIcon name="create-trip" size={20} />
             새 여행 만들기
           </Link>
-          <Link
-            to="/explore"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "xl" }),
-              "no-underline!"
-            )}
-          >
-            <GalandaIcon name="explore" size={20} />
-            여행 탐색
-          </Link>
+          <p className="text-sm leading-relaxed text-pretty break-keep text-foreground-muted">
+            초대받았다면 전달받은 초대 링크를 열어 여행에 참여하세요.
+          </p>
         </div>
       </section>
     );

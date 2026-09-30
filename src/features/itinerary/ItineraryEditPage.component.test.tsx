@@ -13,6 +13,9 @@ import {
   TripIdSchema,
 } from "../../core/domain/ids.ts";
 
+const recoverySession = vi.hoisted(() => ({ participantId: "participant-host" }));
+vi.mock("../../hooks/useSession.ts", () => ({ useSessionQuery: () => ({ data: recoverySession }) }));
+
 vi.mock("./queries.ts", () => ({
   useItineraryQuery: vi.fn(),
 }));
@@ -148,6 +151,8 @@ function TestApp() {
 const renderPage = () => render(<TestApp />);
 
 beforeEach(() => {
+  sessionStorage.clear();
+  recoverySession.participantId = "participant-host";
   mockUseItineraryQuery.mockReset();
   mockUseReviseItineraryMutation.mockReset();
   mockUseItineraryQuery.mockReturnValue(queryResult());
@@ -187,7 +192,7 @@ describe("ItineraryEditPage shared form presentation", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "확정 일정 수정" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("수정 기준 v4 · 저장하면 새 revision이 생성됩니다.")).toBeInTheDocument();
+    expect(screen.getByText("일정 v4을 수정해요. 저장한 변경은 멤버가 일정에서 확인할 수 있어요.")).toBeInTheDocument();
 
     const stayGroup = screen.getByRole("group", { name: "숙소 일정 1" });
     const transportGroup = screen.getByRole("group", {
@@ -402,7 +407,7 @@ describe("ItineraryEditPage mutation state", () => {
       "내 변경을 최신 일정에 다시 적용했습니다.",
     );
     expect(refetch).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("수정 기준 v5 · 저장하면 새 revision이 생성됩니다.")).toBeInTheDocument();
+    expect(screen.getByText("일정 v5을 수정해요. 저장한 변경은 멤버가 일정에서 확인할 수 있어요.")).toBeInTheDocument();
 
     stayGroup = screen.getByRole("group", { name: "숙소 일정 1" });
     expect(within(stayGroup).getByLabelText("숙소")).toHaveValue(
@@ -437,4 +442,42 @@ describe("ItineraryEditPage mutation state", () => {
       ),
     );
   });
+});
+
+ it("세션 만료 입력을 같은 계정 재진입에서 복원하고 저장 전 검토를 안내한다", async () => {
+   mockUseReviseItineraryMutation.mockReturnValue(mutationResult(vi.fn().mockRejectedValue(new ApiClientError({ status: 401, message: "expired" }))));
+   const view = renderPage();
+   fireEvent.change(screen.getByLabelText("숙소"), { target: { value: "다시 로그인할 때 유지할 숙소" } });
+   fireEvent.click(screen.getByRole("button", { name: "변경 저장" }));
+   expect(await screen.findByRole("button", { name: "다시 로그인하고 이어하기" })).toBeInTheDocument();
+   expect(screen.getByLabelText("숙소")).toHaveValue("다시 로그인할 때 유지할 숙소");
+   fireEvent.change(screen.getByLabelText("숙소"), { target: { value: "로그인 직전 마지막 수정" } });
+   view.unmount();
+   renderPage();
+   expect(screen.getByLabelText("숙소")).toHaveValue("로그인 직전 마지막 수정");
+   expect(screen.getByText("다시 로그인하기 전 입력을 복원했어요. 내용을 확인한 뒤 저장해주세요.")).toBeInTheDocument();
+ });
+ it("브라우저 임시 저장 차단 시 입력을 유지하고 복사 보관을 안내한다", async () => {
+   const storage = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+   try {
+     mockUseReviseItineraryMutation.mockReturnValue(mutationResult(vi.fn().mockRejectedValue(new ApiClientError({ status: 401, message: "expired" }))));
+     renderPage();
+     fireEvent.change(screen.getByLabelText("숙소"), { target: { value: "보관할 숙소" } });
+     fireEvent.click(screen.getByRole("button", { name: "변경 저장" }));
+     expect(await screen.findByText("입력을 임시 보관하지 못했어요. 로그인 전에 변경 내용을 복사해 보관해주세요.")).toBeInTheDocument();
+     expect(screen.getByLabelText("숙소")).toHaveValue("보관할 숙소");
+   } finally { storage.mockRestore(); }
+ });
+
+it("다른 계정은 이전 계정의 로그인 복구 입력을 복원하지 않는다", async () => {
+  mockUseReviseItineraryMutation.mockReturnValue(mutationResult(vi.fn().mockRejectedValue(new ApiClientError({ status: 401, message: "expired" }))));
+  const view = renderPage();
+  fireEvent.change(screen.getByLabelText("숙소"), { target: { value: "이전 계정만 볼 입력" } });
+  fireEvent.click(screen.getByRole("button", { name: "변경 저장" }));
+  await screen.findByRole("button", { name: "다시 로그인하고 이어하기" });
+  recoverySession.participantId = "different-account";
+  view.rerender(<TestApp />);
+  expect(screen.getByLabelText("숙소")).not.toHaveValue("이전 계정만 볼 입력");
+  expect(sessionStorage.getItem(`galanda:itinerary-recovery:different-account:${TRIP_ID}:${itinerary.id}`)).toBeNull();
+  expect(screen.queryByText("다시 로그인하기 전 입력을 복원했어요. 내용을 확인한 뒤 저장해주세요.")).toBeNull();
 });

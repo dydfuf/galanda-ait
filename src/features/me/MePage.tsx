@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button.tsx";
+import { getLoginPath } from "@/platform/auth.ts";
 import { SignOutButton } from "./SignOutButton.tsx";
 import { GalandaIcon } from "@/components/galanda/galanda-icon.tsx";
 
@@ -92,21 +95,16 @@ export function MePage() {
         </section>
       )}
 
+      {session?.accountType === "GUEST" && (
+        <section className="mx-(--app-inline-padding) mt-4 rounded-2xl bg-surface-subtle p-4" aria-label="게스트 계정 안내">
+          <h2 className="font-semibold">여행을 계속 이어가려면 계정을 연결하세요</h2>
+          <p className="mt-2 text-sm text-foreground-muted">지금은 이 브라우저의 게스트로 참여 중이에요. 로그아웃하거나 브라우저 데이터를 지우면 같은 참여자로 돌아오지 못할 수 있어요.</p>
+          <Button className="mt-4 w-full" render={<Link to={getLoginPath("/me", true)} />}>계정 연결하기</Button>
+        </section>
+      )}
+
       <nav className="mt-5 px-(--app-inline-padding)" aria-label="마이 메뉴">
         <MobileList className="overflow-hidden border-y border-border">
-          <MobileListItem
-            to="/me/saved"
-            chevron
-            leading={
-              <span className="grid size-8 shrink-0 place-items-center text-muted-foreground">
-                <GalandaIcon name="bookmark" size={20} />
-              </span>
-            }
-          >
-            <ItemTitle className="text-base font-medium text-foreground">
-              저장한 여행 일정
-            </ItemTitle>
-          </MobileListItem>
           <MobileListItem
             chevron
             onClick={() => setIsThemeSheetOpen(true)}
@@ -128,7 +126,7 @@ export function MePage() {
         </MobileList>
       </nav>
 
-      <SignOutButton />
+      <SignOutButton guest={session?.accountType === "GUEST"} />
 
       <Drawer
         open={isThemeSheetOpen}

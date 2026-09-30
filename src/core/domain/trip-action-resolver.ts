@@ -213,7 +213,7 @@ export const resolveEligibleTripActions = (
   }
   if (
     actor.isHost &&
-    context.planCount >= 2 &&
+    context.planCount >= 1 &&
     context.confirmablePlanCount > 0
   ) {
     eligible.push(actions.CONFIRM_PLAN);

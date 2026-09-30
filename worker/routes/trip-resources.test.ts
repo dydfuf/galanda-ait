@@ -209,3 +209,32 @@ describe("Trip resources HTTP boundary", () => {
     expect(calls.some((call) => /^(insert|update|delete)/.test(call.text))).toBe(false);
   });
 });
+
+describe("source edit HTTP boundary", () => {
+  const input = { url: "", note: "corrected", expectedRevision: 1 };
+  it.each([memberId, "host-1"])("allows source author/host %s", async (actor) => {
+    const updated = resourceRow("", "corrected"); updated[6] = 2;
+    const { app, calls } = makeApp([[roomRow()], [resourceRow()], [updated]], actor);
+    const response = await app.fetch(request(`${resourcePath}/source`, "PATCH", input), env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ note: "corrected", revision: 2, canManage: true });
+    expect(calls.at(-1)?.params.slice(-3)).toEqual(["trip-1", resourceId, 1]);
+  });
+  it.each([
+    { ...input, note: "" }, { ...input, url: "javascript:alert(1)" },
+    { ...input, expectedRevision: 0 }, { ...input, createdBy: "host-1" },
+  ])("rejects invalid or identity-forged DTO before I/O", async (body) => {
+    const { app, calls } = makeApp([]);
+    expect((await app.fetch(request(`${resourcePath}/source`, "PATCH", body), env)).status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+  it("rejects non-owner members and conceals cross-trip sources", async () => {
+    const ownedByOther = resourceRow(); ownedByOther[2] = "host-1";
+    const forbidden = makeApp([[roomRow()], [ownedByOther]]);
+    expect((await forbidden.app.fetch(request(`${resourcePath}/source`, "PATCH", input), env)).status).toBe(403);
+    expect(forbidden.calls.some((call) => call.text.startsWith("update"))).toBe(false);
+    const missing = makeApp([[roomRow()], []]);
+    expect((await missing.app.fetch(request(`${resourcePath}/source`, "PATCH", input), env)).status).toBe(404);
+    expect(missing.calls[1].params).toEqual(["trip-1", resourceId, 1]);
+  });
+});

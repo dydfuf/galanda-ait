@@ -13,8 +13,8 @@ import {
  * Global 탐색 shell (RAON-248 / Goal 13 DISC).
  *
  * domain-independent 하단 navigation이다. 어떤 product query, session, platform
- * SDK도 참조하지 않고 오직 현재 pathname으로 active destination을 결정한다. 4개
- * 목적지(홈/탐색/내 여행/마이)를 logical order로 렌더링하며, 각 항목은 실제 route로
+ * SDK도 참조하지 않고 오직 현재 pathname으로 active destination을 결정한다. 3개
+ * 목적지(홈/내 여행/마이)를 logical order로 렌더링하며, 각 항목은 실제 route로
  * 이동하는 native link다(버튼으로 route를 흉내내지 않는다).
  *
  * a11y 계약:

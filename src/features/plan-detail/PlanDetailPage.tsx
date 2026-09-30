@@ -1,3 +1,6 @@
+import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
+import { buildConfirmPlanSummary } from "../plan-compare/plan-compare-view-model.ts";
+import { ConfirmPlanSummaryView } from "../plan-compare/components/ConfirmPlanSummaryView.tsx";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Result } from "effect";
@@ -69,6 +72,10 @@ export function PlanDetailPage(): JSX.Element {
   const { isError: isSessionError, error: sessionError } = useSessionQuery();
   const { data: room, isLoading, isError, error, refetch } = useTripRoomDetailQuery(tripId);
   const submitOpinionMutation = useSubmitOpinionMutation();
+  const confirmPlanMutation = useConfirmPlanMutation();
+  const confirmInFlight = useRef(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmError, setConfirmError] = useState<string>();
   const deletePlanMutation = useDeletePlanMutation();
   const isOnline = useOnlineStatus();
   const [isOpinionSheetOpen, setIsOpinionSheetOpen] = useState(false);
@@ -137,7 +144,7 @@ export function PlanDetailPage(): JSX.Element {
   const isConfirmed = plan.isConfirmed;
   const canChangeOpinion = room.canSubmitOpinion;
   const canManage = Boolean(plan.canManage);
-  const hasBottomAction = isConfirmed || canChangeOpinion;
+  const hasBottomAction = isConfirmed || canChangeOpinion || plan.canConfirm;
   const durationText =
     plan.days > 0 ? `${plan.nights}박 ${plan.days}일` : "기간 미정";
   const opinionCounts: Record<ReactionType, number> = {
@@ -225,6 +232,33 @@ export function PlanDetailPage(): JSX.Element {
         setOpinionError(toUserMessage(err, "의견을 등록하지 못했습니다."));
       }
     }
+  };
+
+  const handleConfirmPlan = async (): Promise<void> => {
+    if (!plan.canConfirm || confirmInFlight.current || confirmPlanMutation.isPending || isResolvingConflict) return;
+    if (!isOnline) { setConfirmError(OFFLINE_MUTATION_MESSAGE); return; }
+    confirmInFlight.current = true;
+    setConfirmError(undefined);
+    try {
+      await confirmPlanMutation.mutateAsync({ roomId: room.id, planId: plan.id, revision: room.revision });
+      if (recommendationAction?.actionId === "CONFIRM_PLAN") {
+        trackRecommendationEvent(tripId, recommendationAction.recommendation, recommendationAction.surface, "nba_action_completed", recommendationAction.actionId);
+      }
+      navigate(`/trips/${tripId}/itinerary`, { replace: true });
+    } catch (err: unknown) {
+      if (isRevisionConflict(err) || isStateConflict(err)) {
+        setIsResolvingConflict(true);
+        setIsConfirmOpen(false);
+        const refreshed = await refetch();
+        setConfirmError(refreshed.isError || !refreshed.data
+          ? "최신 여행 상태를 불러오지 못했어요. 다시 시도해주세요."
+          : isRevisionConflict(err) ? toRevisionConflictMessage(err)
+          : toUserMessage(err, "여행 상태가 바뀌었어요. 최신 내용을 확인해주세요."));
+        setIsResolvingConflict(false);
+      } else {
+        setConfirmError(toUserMessage(err, "일정을 확정하지 못했어요. 다시 시도해주세요."));
+      }
+    } finally { confirmInFlight.current = false; }
   };
 
   const handleConfirmDelete = async (): Promise<void> => {
@@ -457,6 +491,28 @@ export function PlanDetailPage(): JSX.Element {
         </>
       )}
 
+      {confirmError && !isConfirmOpen && <p role="alert" className="px-(--app-inline-padding) py-4 text-destructive-strong">{confirmError}</p>}
+      {plan.canConfirm && (
+        <Drawer open={isConfirmOpen} onOpenChange={(open) => {
+          if (!confirmInFlight.current && !isResolvingConflict) setIsConfirmOpen(open);
+        }} showSwipeHandle>
+          <DrawerContent className="lg:mx-auto lg:max-w-(--content-max-width)">
+            <DrawerHeader>
+              <DrawerTitle>이 여행안으로 확정할까요?</DrawerTitle>
+              <DrawerDescription className="break-keep">확정 후에는 다른 여행안으로 바꿀 수 없어요. 참여자 의견과 확인이 필요한 내용을 살펴보세요.</DrawerDescription>
+            </DrawerHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
+              <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(plan)} />
+              <p className="text-sm text-muted-foreground">의견을 남긴 참여자 {plan.memberOpinions.length}/{room.memberCount}명</p>
+              {confirmError && <p role="alert" className="text-destructive-strong">{confirmError}</p>}
+            </div>
+            <DrawerFooter className="flex-row *:min-w-0 *:flex-1">
+              <Button variant="secondary" disabled={confirmPlanMutation.isPending || isResolvingConflict} onClick={() => setIsConfirmOpen(false)}>다시 보기</Button>
+              <Button disabled={confirmPlanMutation.isPending || isResolvingConflict || !isOnline} onClick={() => void handleConfirmPlan()}>{confirmPlanMutation.isPending ? "확정 중..." : "확정하기"}</Button>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      )}
       {isConfirmed ? (
         <BottomAction>
           <Button
@@ -468,6 +524,10 @@ export function PlanDetailPage(): JSX.Element {
           >
             확정 일정 보기
           </Button>
+        </BottomAction>
+      ) : plan.canConfirm ? (
+        <BottomAction>
+          <Button size="xl" disabled={!isOnline || confirmPlanMutation.isPending || isResolvingConflict} onClick={() => { setConfirmError(undefined); setIsConfirmOpen(true); }}>이 여행안으로 확정하기</Button>
         </BottomAction>
       ) : canChangeOpinion ? (
         <BottomAction>

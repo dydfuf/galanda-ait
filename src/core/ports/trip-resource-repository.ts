@@ -17,6 +17,7 @@ export class TripResourceRepository extends Context.Service<TripResourceReposito
     readonly createdBy: ParticipantId;
     readonly createdByName: string;
   }) => RepositoryEffect<TripResource, NotFoundError | ValidationError>;
+  readonly saveSource: (tripId: TripId, id: string, expectedRevision: Revision, source: ResourceSource) => RepositoryEffect<TripResource, NotFoundError | RevisionConflictError>;
   readonly saveResult: (tripId: TripId, id: string, expectedRevision: Revision, result: ResourceResult) => RepositoryEffect<TripResource, NotFoundError | RevisionConflictError>;
   readonly remove: (tripId: TripId, id: string, expectedRevision: Revision) => RepositoryEffect<void, NotFoundError | RevisionConflictError>;
 }>()("galanda/ports/TripResourceRepository") {}

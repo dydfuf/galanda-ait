@@ -137,6 +137,11 @@ describe("deterministic Trip action resolver", () => {
     expect(actions[0]?.actionId).toBe(expected);
   });
 
+  it("host can confirm one viable plan without a dummy alternative", () => {
+    expect(actionIds(resolveEligibleTripActions(context({ planCount: 1, confirmablePlanCount: 1 }), host))).toContain("CONFIRM_PLAN");
+    expect(actionIds(resolveEligibleTripActions(context({ planCount: 1, confirmablePlanCount: 0 }), host))).not.toContain("CONFIRM_PLAN");
+  });
+
   it("route가 미완료면 숙소와 교통 action을 열지 않는다", () => {
     const actions = actionIds(resolveEligibleTripActions(
       context({

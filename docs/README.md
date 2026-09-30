@@ -40,6 +40,8 @@
 
 ## 검증 기록과 보류된 작업
 
+- [Lean 첫 출시 체크리스트](acceptance/lean-release-checklist.md): 현재 좁은 출시 범위, 화면별 유지/보류 결정, 로컬 검증과 운영 인계 경계.
+
 - [design-qa](../design-qa.md): 여행 중심 UI의 로컬 샘플 데이터 기반 시각 검증.
 - [MVP matrix](acceptance/2026-08-18-mvp-acceptance-test-matrix.md),
   [UI foundation acceptance](acceptance/ui-foundation-v2.md): 해당 변경의 검증 범위와 판정.

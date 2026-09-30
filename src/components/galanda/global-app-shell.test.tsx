@@ -16,29 +16,28 @@ const renderAt = (path: string) =>
   );
 
 describe("GlobalAppShell (RAON-248)", () => {
-  it("4개 목적지를 native link로 logical order로 렌더링하고 children을 보여준다", () => {
+  it("3개 목적지를 native link로 logical order로 렌더링하고 children을 보여준다", () => {
     renderAt("/home");
 
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
     const links = within(nav).getAllByRole("link");
     expect(links.map((a) => a.getAttribute("href"))).toEqual([
       "/home",
-      "/explore",
       "/trips",
       "/me",
     ]);
-    expect(links.map((a) => a.textContent)).toEqual(["홈", "탐색", "내 여행", "마이"]);
+    expect(links.map((a) => a.textContent)).toEqual(["홈", "내 여행", "마이"]);
     expect(screen.getByText("child content")).toBeVisible();
   });
 
   it("active 목적지를 semantic aria-current=page로 표시한다(색만으로 구분하지 않음)", () => {
-    renderAt("/explore");
+    renderAt("/trips");
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
     const current = within(nav)
       .getAllByRole("link")
       .filter((a) => a.getAttribute("aria-current") === "page");
     expect(current).toHaveLength(1);
-    expect(current[0]!.getAttribute("href")).toBe("/explore");
+    expect(current[0]!.getAttribute("href")).toBe("/trips");
   });
 
   it("/me/saved 에서는 '마이'가 active다", () => {
@@ -53,7 +52,6 @@ describe("GlobalAppShell (RAON-248)", () => {
 
   it.each([
     ["/home", "홈"],
-    ["/explore", "탐색"],
     ["/trips", "내 여행"],
     ["/me", "마이"],
     ["/me/saved", "마이"],
@@ -75,7 +73,7 @@ describe("GlobalAppShell (RAON-248)", () => {
     renderAt("/home");
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
 
-    for (const label of ["탐색", "내 여행", "마이", "홈"]) {
+    for (const label of ["내 여행", "마이", "홈"]) {
       const selected = within(nav).getByRole("link", { name: label });
       fireEvent.click(selected);
 
@@ -96,14 +94,14 @@ describe("GlobalAppShell (RAON-248)", () => {
     renderAt("/home");
     const nav = screen.getByRole("navigation", { name: "주요 화면" });
     const icons = nav.querySelectorAll("svg");
-    expect(icons).toHaveLength(4);
+    expect(icons).toHaveLength(3);
     for (const icon of icons) {
       expect(icon).toHaveAttribute("aria-hidden", "true");
       expect(icon).toHaveAttribute("focusable", "false");
       expect(icon).toHaveAttribute("viewBox", "0 0 24 24");
     }
     expect(within(nav).getByRole("link", { name: "홈" })).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "탐색" })).toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: "탐색" })).not.toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "내 여행" })).toBeInTheDocument();
     expect(within(nav).getByRole("link", { name: "마이" })).toBeInTheDocument();
   });

@@ -21,6 +21,8 @@ import type { TripRoom } from "../../core/domain/room.ts";
 import type { PlanDetailViewModel } from "./plan-detail-view-model.ts";
 import { toPlanDetailViewModel } from "./plan-detail-view-model.ts";
 
+vi.mock("../plan-home/mutations.ts", () => ({ useConfirmPlanMutation: vi.fn<typeof useConfirmPlanMutation>() }));
+
 vi.mock("./queries.ts", () => ({
   useTripRoomDetailQuery: vi.fn(),
 }));
@@ -37,6 +39,8 @@ vi.mock("sonner", () => ({
   toast: vi.fn(),
 }));
 
+import { ApiClientError } from "../../app/api-client.ts";
+import { useConfirmPlanMutation } from "../plan-home/mutations.ts";
 import { useSessionQuery } from "../../hooks/useSession.ts";
 import { useDeletePlanMutation } from "../plan-editor/mutations.ts";
 import { useSubmitOpinionMutation } from "./mutations.ts";
@@ -217,6 +221,7 @@ const renderPage = () => render(<TestApp />);
 
 beforeEach(() => {
   const viewModel = makeViewModel();
+  vi.mocked(useConfirmPlanMutation).mockReturnValue({ mutateAsync: vi.fn<() => Promise<void>>(), isPending: false } as unknown as ReturnType<typeof useConfirmPlanMutation>);
   mockUseSessionQuery.mockReset();
   mockUseDeletePlanMutation.mockReset();
   mockUseSubmitOpinionMutation.mockReset();
@@ -487,5 +492,51 @@ describe("PlanDetailPage permission and overlay contracts", () => {
       "입력한 이유는 실패 후에도 남아야 해요.",
     );
     expect(dialog).toBeInTheDocument();
+  });
+});
+
+
+describe("single plan confirmation", () => {
+  const publishedRoom: TripRoom = { ...baseRoom, plans: [{ ...baseRoom.plans[0], status: "VOTING", revision: RevisionSchema.make(1), routes: [{ city: "도쿄", arrivalDate: "2026-09-01", departureDate: "2026-09-03" }], transports: [...baseRoom.plans[0].transports!, { ...baseRoom.plans[0].transports![0], id: "transport-2", fromCity: "도쿄", toCity: "인천" }] }] };
+  it("host reviews a single viable plan and submits once with room revision", async () => {
+    const vm = toPlanDetailViewModel(publishedRoom, hostId);
+    expect(vm.plans[0].canConfirm).toBe(true);
+    mockUseTripRoomDetailQuery.mockReturnValue(queryResult(vm));
+    const pending = deferred<void>();
+    const mutateAsync = vi.fn<() => Promise<void>>().mockReturnValue(pending.promise);
+    vi.mocked(useConfirmPlanMutation).mockReturnValue({ mutateAsync, isPending: false } as unknown as ReturnType<typeof useConfirmPlanMutation>);
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "이 여행안으로 확정하기" }));
+    const submit = await screen.findByRole("button", { name: "확정하기" });
+    expect(screen.getByText(/확정 후에는 다른 여행안으로/)).toBeTruthy();
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    expect(mutateAsync).toHaveBeenCalledWith({ roomId: "trip-1", planId: "plan-1", revision: 7 });
+    await act(async () => pending.resolve());
+    expect(await screen.findByText("다른 화면")).toBeTruthy();
+  });
+  it.each([memberId, guestId])("does not expose confirmation to non-host %s", (viewerId) => {
+    mockUseTripRoomDetailQuery.mockReturnValue(queryResult(toPlanDetailViewModel(publishedRoom, viewerId)));
+    renderPage();
+    expect(screen.queryByRole("button", { name: "이 여행안으로 확정하기" })).toBeNull();
+  });
+  it("keeps unpublished and incomplete plans unconfirmable", () => {
+    expect(makeViewModel().plans[0].canConfirm).toBe(false);
+    const incomplete = { ...publishedRoom, plans: [{ ...publishedRoom.plans[0], routes: [] }] };
+    expect(toPlanDetailViewModel(incomplete, hostId).plans[0].canConfirm).toBe(false);
+    expect(makeViewModel({ confirmed: true }).plans[0].canConfirm).toBe(false);
+  });
+  it("refreshes after conflict and requires reviewing again before retry", async () => {
+    const vm = toPlanDetailViewModel(publishedRoom, hostId);
+    const refetch = vi.fn<() => Promise<{ data: PlanDetailViewModel; isError: boolean }>>().mockResolvedValue({ data: vm, isError: false });
+    mockUseTripRoomDetailQuery.mockReturnValue(queryResult(vm, refetch));
+    const mutateAsync = vi.fn<() => Promise<void>>().mockRejectedValue(new ApiClientError({ status: 409, code: "REVISION_CONFLICT", message: "다른 참여자가 수정했어요" }));
+    vi.mocked(useConfirmPlanMutation).mockReturnValue({ mutateAsync, isPending: false } as unknown as ReturnType<typeof useConfirmPlanMutation>);
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "이 여행안으로 확정하기" }));
+    fireEvent.click(await screen.findByRole("button", { name: "확정하기" }));
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
   });
 });

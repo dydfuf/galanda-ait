@@ -957,6 +957,8 @@ describe("Trip API vertical slice", () => {
   });
 
   it("active mode는 ambiguous Trip Room action에만 AI ranking을 적용한다", async () => {
+    // A single published plan now permits confirmation. Provider rankings must
+    // still enumerate every eligible action exactly once; omissions fall back to RULE.
     const providerFetch = providerRun.mockResolvedValue(
       Response.json({
         choices: [{ finish_reason: "stop", message: {
@@ -965,6 +967,7 @@ describe("Trip API vertical slice", () => {
               alternativeActionIds: [
                 "PROPOSE_ALTERNATIVE",
                 "GIVE_OPINION",
+                "CONFIRM_PLAN",
               ],
               reasonCode: "INVITE_TRAVEL_COMPANION",
             }),
@@ -988,6 +991,7 @@ describe("Trip API vertical slice", () => {
       alternatives: [
         { actionId: "PROPOSE_ALTERNATIVE" },
         { actionId: "GIVE_OPINION" },
+        { actionId: "CONFIRM_PLAN" },
       ],
       source: "AI",
       policyVersion: "nba-ai-test-v1:openrouter-v3:test-model",
