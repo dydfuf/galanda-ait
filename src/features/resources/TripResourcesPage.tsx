@@ -71,7 +71,7 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [section, setSection] = useState("places");
+  const [section, setSection] = useState<string>();
   const [createError, setCreateError] = useState<string>();
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState<{ resourceId: string; type: "organize" | "delete"; message: string }>();
@@ -107,7 +107,9 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
       setNote("");
       setIsAdding(false);
       setSection("sources");
-      setNotice("자료를 저장했어요. 원본 자료에서 정보를 정리할 수 있어요.");
+      setNotice(extractionAvailable
+        ? "자료를 저장했어요. 원본 자료에서 정보를 정리할 수 있어요."
+        : "자료를 저장했어요. 여행 멤버와 함께 볼 수 있어요.");
     } catch (error) {
       setCreateError(toUserMessage(error, "자료를 저장하지 못했어요. 입력 내용은 유지돼요."));
     }
@@ -220,13 +222,13 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
         </form> : <Button type="button" variant="outline" size="lg" disabled={mutation.isPending || Boolean(editing)} onClick={() => setIsAdding(true)}>자료 추가</Button>}
         {!extractionAvailable && <p className="text-sm text-foreground-muted">현재 AI 정보 정리를 사용할 수 없어요. 링크와 메모는 계속 모아둘 수 있어요.</p>}
         {notice && <output className="text-sm text-primary">{notice}</output>}
-        <Tabs value={section} onValueChange={(value) => { if (!editing) setSection(String(value)); }}>
+        <Tabs value={section ?? (editing || placeCount > 0 ? "places" : "sources")} onValueChange={(value) => { if (!editing) setSection(String(value)); }}>
           <TabsList className="w-full" aria-label="자료 보기">
             <TabsTrigger value="places">장소 카드 {placeCount}</TabsTrigger>
             <TabsTrigger value="sources" disabled={Boolean(editing)}>원본 자료 {items.length}</TabsTrigger>
           </TabsList>
           <TabsContent value="places" className="mt-3">
-            {placeCount === 0 && !editing ? <PageState status="empty" title="아직 정리된 장소가 없어요" description={unprocessedCount ? `원본 자료 ${unprocessedCount}개가 정리를 기다려요.` : "링크나 메모를 저장한 뒤 정보 정리를 눌러보세요."} actionText={items.length ? "원본 자료 보기" : undefined} onAction={items.length ? () => setSection("sources") : undefined} /> : (
+            {placeCount === 0 && !editing ? <PageState status="empty" title="아직 정리된 장소가 없어요" description={!extractionAvailable ? "원본 자료에서 함께 모은 링크와 메모를 볼 수 있어요." : unprocessedCount ? `원본 자료 ${unprocessedCount}개가 정리를 기다려요.` : "링크나 메모를 저장한 뒤 정보 정리를 눌러보세요."} actionText={items.length ? "원본 자료 보기" : undefined} onAction={items.length ? () => setSection("sources") : undefined} /> : (
               <div className="flex flex-col gap-4">
                 <p className="text-sm text-foreground-muted">AI가 원문에서 정리한 정보예요. 가격·운영 정보는 출처에서 다시 확인해주세요.</p>
                 {cardResources.flatMap((resource) => (resource.places ?? []).map((place, index) => {

@@ -92,12 +92,31 @@ describe("공동 여행 자료함", () => {
     setQuery({ items: [{ ...resource, places: null }], extractionAvailable: false });
     render(<TestPage />);
     expect(screen.getByText(/현재 AI 정보 정리를 사용할 수 없어요/)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "원본 자료 1" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(resource.note)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "원본 자료 1" }));
     expect(screen.getByRole("button", { name: "정보 정리" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "자료 추가" }));
     fireEvent.change(screen.getByLabelText("메모"), { target: { value: "제주 숲길을 걷고 싶어요" } });
     fireEvent.click(screen.getByRole("button", { name: "자료 저장" }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({ type: "create", input: { url: "", note: "제주 숲길을 걷고 싶어요" } }));
+    expect(await screen.findByText("자료를 저장했어요. 여행 멤버와 함께 볼 수 있어요.")).toBeInTheDocument();
+  });
+
+  it("AI가 꺼져도 기존 장소 카드는 유지하고 함께 수정할 수 있다", () => {
+    setQuery({ items: [resource], extractionAvailable: false });
+    render(<TestPage />);
+    expect(screen.getByRole("article", { name: "서울 카페" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "카드 수정" })).toBeEnabled();
+  });
+
+  it("AI가 꺼진 빈 장소 탭에서 사용할 수 없는 정보 정리를 안내하지 않는다", () => {
+    setQuery({ items: [], extractionAvailable: false });
+    render(<TestPage />);
+    expect(screen.getByRole("tab", { name: "원본 자료 0" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "장소 카드 0" }));
+    expect(screen.getByText("원본 자료에서 함께 모은 링크와 메모를 볼 수 있어요.")).toBeInTheDocument();
+    expect(screen.queryByText("링크나 메모를 저장한 뒤 정보 정리를 눌러보세요.")).not.toBeInTheDocument();
   });
 
   it("카드 편집 실패에 입력을 유지하고 취소하면 저장 요청 없이 원래 카드를 보여준다", async () => {
