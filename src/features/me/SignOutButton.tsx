@@ -24,7 +24,11 @@ export function SignOutButton() {
         headers: { "content-type": "application/json" },
         body: "{}",
       });
-      if (!response.ok) throw new Error("Sign out failed");
+      const result: unknown = await response.json();
+      if (!response.ok || !result || typeof result !== "object" ||
+          !("success" in result) || result.success !== true) {
+        throw new Error("Sign out failed");
+      }
       await queryClient.cancelQueries();
       queryClient.clear();
       queryClient.setQueryData(sessionKeys.current(), null);
