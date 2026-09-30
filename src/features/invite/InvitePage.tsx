@@ -229,8 +229,8 @@ export function InvitePage(): JSX.Element {
 
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
-      <main className="flex flex-1 flex-col">
-        <PageBody safeTop withBottomAction className="flex flex-col">
+      <main className="flex flex-1 flex-col lg:flex-none">
+        <PageBody safeTop withBottomAction className="flex flex-col lg:min-h-0 lg:flex-none lg:pb-6!">
           <PageTitle
             title={`${summary.title}에 초대받았어요`}
             description={`${summary.inviterName}님이 함께 여행하자고 초대했어요.`}
@@ -309,7 +309,7 @@ export function InvitePage(): JSX.Element {
                 {errorMessage ? (
                   <FieldError>{errorMessage}</FieldError>
                 ) : (
-                  <FieldDescription>
+                  <FieldDescription className="text-pretty break-keep">
                     계정 없이 이 여행에서 사용할 이름만 입력하면 돼요.
                     참여하면 여행안을 보고 바로 의견을 남길 수 있어요.
                   </FieldDescription>
@@ -357,6 +357,7 @@ export function InvitePage(): JSX.Element {
       </main>
 
       <BottomAction
+        className="lg:static lg:mx-auto lg:w-full lg:max-w-(--content-max-width) lg:shadow-none!"
         accessory={
           completionCondition ? (
             <p

@@ -67,6 +67,17 @@ export const makeDrizzleTripResourceRepository = (db: DatabaseHandle): typeof Tr
       if (result._tag === "Limit") return yield* Effect.fail(new ValidationError({ message: `한 여행에는 자료를 ${RESOURCE_LIMIT}개까지 저장할 수 있어요.` }));
       return result.resource;
     }),
+    saveSource: (tripId, id, expectedRevision, source) => Effect.gen(function* () {
+      const resource = yield* databaseEffect("tripResources.saveSource", async () => {
+        const [row] = await db.update(tripResources).set({
+          url: source.url, note: source.note,
+          places: null, processedAt: null, linkStatus: "NOT_READ",
+          updatedAt: sql`now()`, revision: sql`${tripResources.revision} + 1`,
+        }).where(and(scope(tripId, id), eq(tripResources.revision, expectedRevision))).returning();
+        return row ? decode(row) : undefined;
+      });
+      return resource ?? (yield* conflict(tripId, id, expectedRevision));
+    }),
     saveResult: (tripId, id, expectedRevision, result) => Effect.gen(function* () {
       const resource = yield* databaseEffect("tripResources.saveResult", async () => {
         const [row] = await db.update(tripResources).set({

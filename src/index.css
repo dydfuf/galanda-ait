@@ -40,6 +40,9 @@
   --popover: #ffffff;
   --popover-foreground: #191f28;
   --primary: #3182f6;
+  /* Filled actions need readable white labels at normal text sizes. */
+  --primary-action: #1b64da;
+  --primary-action-hover: color-mix(in oklch, var(--primary-action), var(--foreground) 10%);
   --primary-foreground: #ffffff;
   --secondary: #f2f4f6;
   --secondary-foreground: #333d4b;
@@ -119,6 +122,8 @@
   --popover: #171d24;
   --popover-foreground: #f2f4f6;
   --primary: #7aa7ff;
+  --primary-action: var(--primary);
+  --primary-action-hover: color-mix(in oklch, var(--primary-action), var(--foreground) 10%);
   --primary-foreground: #0b1420;
   --secondary: #242b33;
   --secondary-foreground: #e5e8eb;
@@ -365,6 +370,8 @@ select {
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-action: var(--primary-action);
+  --color-primary-action-hover: var(--primary-action-hover);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);

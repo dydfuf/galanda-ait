@@ -6,13 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { sessionKeys } from "@/hooks/useSession.ts";
 import { SignOutButton } from "./SignOutButton.tsx";
 
-function setup() {
+function setup(guest = false) {
   const client = new QueryClient();
   client.setQueryData(["private-trip"], { name: "Private trip" });
   client.setQueryData(sessionKeys.current(), { participantId: "host" });
   render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/me"]}>
     <Routes>
-      <Route path="/me" element={<SignOutButton />} />
+      <Route path="/me" element={<SignOutButton guest={guest} />} />
       <Route path="/login" element={<h1>로그인 화면</h1>} />
     </Routes>
   </MemoryRouter></QueryClientProvider>);
@@ -37,6 +37,19 @@ describe("SignOutButton", () => {
     expect(client.getQueryData(["private-trip"])).toBeUndefined();
     expect(client.getQueryData(sessionKeys.current())).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith("/api/auth/sign-out", expect.objectContaining({ method: "POST", credentials: "same-origin" }));
+  });
+
+  it("warns guests before discarding access and offers account linking", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ success: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    setup(true);
+    fireEvent.click(screen.getByRole("button", { name: "로그아웃" }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText(/수정 권한을 잃을 수 있어요/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "계정 연결하기" }));
+    await screen.findByRole("heading", { name: "로그인 화면" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it.each(["server", "network", "invalid response"])("preserves session and supports retry after %s failure", async (failure) => {

@@ -16,8 +16,8 @@ import { Database } from "../../src/infrastructure/persistence/drizzle/database.
 import { TripRoomRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-room-repository.ts";
 import { DrizzleTripResourceRepositoryLive } from "../../src/infrastructure/persistence/drizzle/trip-resource-repository.ts";
 import { makeTripResourceExtractor } from "../infrastructure/ai/trip-resource-extractor.ts";
-import { CreateResourceRequestSchema, EditResourcePlaceRequestSchema, ResourceParamsSchema, ResourceRevisionRequestSchema } from "../../src/contracts/trip-resource.ts";
-import { createTripResource, deleteTripResource, editTripResourcePlace, listTripResources, organizeTripResource } from "../../src/core/usecases/trip-resources.ts";
+import { CreateResourceRequestSchema, EditResourceSourceRequestSchema, EditResourcePlaceRequestSchema, ResourceParamsSchema, ResourceRevisionRequestSchema } from "../../src/contracts/trip-resource.ts";
+import { createTripResource, deleteTripResource, editTripResourceSource, editTripResourcePlace, listTripResources, organizeTripResource } from "../../src/core/usecases/trip-resources.ts";
 
 type Requirements = RequestScopeService | SessionService | TripRoomRepository | TripResourceRepository | TripResourceExtractor;
 
@@ -55,6 +55,11 @@ tripResourcesRoute.post("/:tripId/resources/:resourceId/organize", resourceParam
   const { tripId, resourceId } = c.req.valid("param");
   return runResourceEffect(c, organizeTripResource(tripId, resourceId, c.req.valid("json").expectedRevision));
 });
+tripResourcesRoute.patch("/:tripId/resources/:resourceId/source", resourceParams,
+  effectValidator("json", EditResourceSourceRequestSchema, strictInput), (c) => {
+    const { tripId, resourceId } = c.req.valid("param");
+    return runResourceEffect(c, editTripResourceSource(tripId, resourceId, c.req.valid("json")));
+  });
 tripResourcesRoute.patch("/:tripId/resources/:resourceId/places", resourceParams,
   effectValidator("json", EditResourcePlaceRequestSchema, strictInput), (c) => {
     const { tripId, resourceId } = c.req.valid("param");

@@ -461,7 +461,7 @@ export function ItineraryPage(): JSX.Element {
         }}
         showSwipeHandle
       >
-        <DrawerContent>
+        <DrawerContent className="lg:mx-auto lg:max-w-(--content-max-width)">
           <DrawerHeader>
             <DrawerTitle className="min-w-0 text-left text-lg font-bold leading-snug [overflow-wrap:anywhere]">
               변경된 일정 확인

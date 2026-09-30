@@ -1,3 +1,5 @@
+import { SessionRecoveryAction } from "../auth/SessionRecoveryAction.tsx";
+import { ApiClientError } from "../../app/api-client.ts";
 import { useRef, useState, useMemo } from "react";
 import { css } from "@emotion/react";
 import {
@@ -105,6 +107,7 @@ export function PlanCreatePage(): JSX.Element {
     data: room,
     isLoading,
     isError,
+    error: roomError,
     refetch,
   } = useTripRoomRawQuery(tripId, { editing: true });
   const {
@@ -112,10 +115,12 @@ export function PlanCreatePage(): JSX.Element {
     isLoading: isSessionLoading,
     isError: isSessionError,
     error: sessionError,
+    refetch: refetchSession,
   } = useSessionQuery();
   const createPlanMutation = useCreatePlanMutation();
   const isSubmittingRef = useRef(false);
   const isOnline = useOnlineStatus();
+  const [mutationError, setMutationError] = useState<unknown>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeRecommendation, setActiveRecommendation] = useState<
@@ -402,6 +407,7 @@ export function PlanCreatePage(): JSX.Element {
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setErrorMsg(null);
+    setMutationError(undefined);
     try {
       const command = {
         title: editor.title.trim(),
@@ -438,6 +444,7 @@ export function PlanCreatePage(): JSX.Element {
         navigate(`/trips/${tripId}/plans/${createdPlan.id}`, { replace: true });
       }
     } catch (err: unknown) {
+      setMutationError(err);
       if (isRevisionConflict(err) || isStateConflict(err)) {
         const refreshed = await refetch();
         if (refreshed.isError || !refreshed.data) {
@@ -490,6 +497,15 @@ export function PlanCreatePage(): JSX.Element {
   }
 
   // Guard: Error
+  if (isSessionError) {
+    return <RouteErrorFallback title="로그인 정보를 확인할 수 없습니다" message={toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")} actionText="다시 시도" onAction={() => void refetchSession()} />;
+  }
+
+  const roomAccessDenied = roomError instanceof ApiClientError && [401, 403, 404].includes(roomError.status);
+  if (isError && !roomAccessDenied) {
+    return <RouteErrorFallback title="여행 정보를 불러오지 못했어요" message={toUserMessage(roomError, "잠시 후 다시 시도해주세요. 작성 중인 내용은 유지돼요.")} actionText="다시 시도" onAction={() => void refetch()} />;
+  }
+
   if (isError || !room) {
     return (
       <RouteErrorFallback
@@ -500,15 +516,11 @@ export function PlanCreatePage(): JSX.Element {
   }
 
   // Guard: Session Error
-  if (isSessionError || !session) {
+  if (!session) {
     return (
       <RouteErrorFallback
         title="로그인 정보를 확인할 수 없습니다"
-        message={
-          isSessionError
-            ? toUserMessage(sessionError, "잠시 후 다시 시도해주세요.")
-            : "여행안을 작성하려면 로그인이 필요합니다."
-        }
+        message="여행안을 작성하려면 로그인이 필요합니다."
       />
     );
   }
@@ -686,6 +698,7 @@ export function PlanCreatePage(): JSX.Element {
                       {errorMsg}
                     </span>
                   )}
+                  <SessionRecoveryAction error={mutationError} returnTo={`${location.pathname}${location.search}${location.hash}`} description={editor.draftSaveStatus === "SAVED" ? "이 기기에 임시 저장했어요. 같은 계정으로 로그인하면 이어서 작성할 수 있어요." : "임시 저장 상태를 확인해주세요. 저장되지 않은 내용은 로그인 전에 복사해 보관해주세요."} />
                 </>
               ) : undefined
             }

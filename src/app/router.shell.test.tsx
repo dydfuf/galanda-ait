@@ -168,8 +168,8 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
       { path: "/home", testId: "route-home", activeHref: "/home" },
       { path: "/home/", testId: "route-home", activeHref: "/home" },
       { path: "/HOME", testId: "route-home", activeHref: "/home" },
-      { path: "/explore?query=제주", testId: "route-explore", activeHref: "/explore" },
-      { path: "/EXPLORE?query=제주", testId: "route-explore", activeHref: "/explore" },
+      { path: "/explore?query=제주", testId: "route-explore", activeHref: undefined },
+      { path: "/EXPLORE?query=제주", testId: "route-explore", activeHref: undefined },
       { path: "/trips", testId: "route-trips", activeHref: "/trips" },
       { path: "/TRIPS", testId: "route-trips", activeHref: "/trips" },
       { path: "/me", testId: "route-me", activeHref: "/me" },
@@ -187,12 +187,12 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
 
       const nav = screen.getByRole("navigation", { name: "주요 화면" });
       const links = within(nav).getAllByRole("link");
-      expect(links).toHaveLength(4);
+      expect(links).toHaveLength(3);
 
       const activeLinks = links.filter(
         (link) => link.getAttribute("aria-current") === "page",
       );
-      expect(activeLinks).toHaveLength(1);
+      expect(activeLinks).toHaveLength(activeHref ? 1 : 0);
       expect(activeLinks[0]?.getAttribute("href")).toBe(activeHref);
     });
   });
@@ -349,10 +349,7 @@ describe("AppRouter shell layout topology (Issue #96)", () => {
       expect(await screen.findByTestId("route-home")).toBeInTheDocument();
       const nav = screen.getByRole("navigation", { name: "주요 화면" });
 
-      const exploreLink = within(nav).getByRole("link", { name: "탐색" });
-      fireEvent.click(exploreLink);
-      expect(await screen.findByTestId("route-explore")).toBeInTheDocument();
-      expect(exploreLink).toHaveAttribute("aria-current", "page");
+      expect(within(nav).queryByRole("link", { name: "탐색" })).not.toBeInTheDocument();
 
       const tripsLink = within(nav).getByRole("link", { name: "내 여행" });
       fireEvent.click(tripsLink);

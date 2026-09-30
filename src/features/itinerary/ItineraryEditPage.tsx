@@ -1,6 +1,10 @@
-import { useRef, useState } from "react";
-import { Result } from "effect";
-import { useNavigate, useParams } from "react-router-dom";
+import { useSessionQuery } from "../../hooks/useSession.ts";
+import { SessionRecoveryAction } from "../auth/SessionRecoveryAction.tsx";
+import { ItineraryItemPatchSchema } from "../../core/domain/confirmed-itinerary.ts";
+import { RevisionSchema } from "../../core/domain/ids.ts";
+import { useEffect, useRef, useState } from "react";
+import { Result, Schema } from "effect";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiClientError } from "../../app/api-client.ts";
 import { BottomAction } from "@/components/galanda/bottom-action.tsx";
 import { PageBody } from "@/components/galanda/page-body.tsx";
@@ -70,6 +74,20 @@ const toItineraryPatches = (
         },
   );
 
+const RecoveryDraftSchema = Schema.Struct({
+  revision: RevisionSchema,
+  base: Schema.Array(ItineraryItemPatchSchema),
+  patches: Schema.Array(ItineraryItemPatchSchema),
+});
+
+function readRecoveryDraft(key: string | undefined) {
+  if (!key) return undefined;
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? Schema.decodeUnknownSync(RecoveryDraftSchema)(JSON.parse(raw)) : undefined;
+  } catch { return undefined; }
+}
+
 function ItineraryEditor({
   tripId,
   itinerary,
@@ -82,20 +100,35 @@ function ItineraryEditor({
   readonly refreshFailed: boolean;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { data: session } = useSessionQuery();
+  const recoveryKey = session?.participantId ? `galanda:itinerary-recovery:${session.participantId}:${tripId}:${itinerary.id}` : undefined;
+  const [recovered] = useState(() => readRecoveryDraft(recoveryKey));
+  const [recoverySaved, setRecoverySaved] = useState(false);
+  const [mutationError, setMutationError] = useState<unknown>();
   const mutation = useReviseItineraryMutation();
   const isOnline = useOnlineStatus();
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expectedRevision, setExpectedRevision] = useState(
-    itinerary.currentRevision,
+    recovered?.revision ?? itinerary.currentRevision,
   );
   const [basePatches, setBasePatches] = useState(() =>
-    toItineraryPatches(itinerary),
+    recovered ? [...recovered.base] : toItineraryPatches(itinerary),
   );
-  const [patches, setPatches] = useState(() => toItineraryPatches(itinerary));
+  const [patches, setPatches] = useState(() => recovered ? [...recovered.patches] : toItineraryPatches(itinerary));
   const [conflictNotice, setConflictNotice] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
   const [isResolvingConflict, setIsResolvingConflict] = useState(false);
+
+  useEffect(() => {
+    if (!(mutationError instanceof ApiClientError) || mutationError.status !== 401) return;
+    try {
+      if (!recoveryKey) throw new Error("No draft owner");
+      sessionStorage.setItem(recoveryKey, JSON.stringify({ revision: expectedRevision, base: basePatches, patches }));
+      setRecoverySaved(true);
+    } catch { setRecoverySaved(false); }
+  }, [mutationError, recoveryKey, expectedRevision, basePatches, patches]);
 
   const update = (index: number, patch: ItineraryItemPatch) =>
     setPatches((current) => [
@@ -136,6 +169,7 @@ function ItineraryEditor({
     setIsSubmitting(true);
     setConflictNotice(undefined);
     setSaveError(undefined);
+    setMutationError(undefined);
 
     try {
       await mutation.mutateAsync({
@@ -143,8 +177,10 @@ function ItineraryEditor({
         patches: changedPatches,
         expectedRevision,
       });
+      try { if (recoveryKey) sessionStorage.removeItem(recoveryKey); } catch { /* Browser storage is optional. */ }
       navigate(`/trips/${tripId}/itinerary`, { replace: true });
     } catch (error: unknown) {
+      setMutationError(error);
       if (isRevisionConflict(error) || isStateConflict(error)) {
         setIsResolvingConflict(true);
         let latest: ConfirmedItinerary | undefined;
@@ -217,8 +253,9 @@ function ItineraryEditor({
     >
       <PageTitle
         title="확정 일정 수정"
-        description={`수정 기준 v${expectedRevision} · 저장하면 새 revision이 생성됩니다.`}
+        description={`일정 v${expectedRevision}을 수정해요. 저장한 변경은 멤버가 일정에서 확인할 수 있어요.`}
       />
+      {recovered && <p role="status" className="px-(--app-inline-padding) text-sm">다시 로그인하기 전 입력을 복원했어요. 내용을 확인한 뒤 저장해주세요.</p>}
       {refreshFailed && (
         <p role="alert" className="px-(--app-inline-padding) text-destructive-strong">
           최신 일정을 확인하지 못했어요. 작성 중인 입력은 유지했어요. 연결을 확인한 뒤 저장해주세요.
@@ -421,6 +458,7 @@ function ItineraryEditor({
                   {saveError}
                 </p>
               )}
+              <SessionRecoveryAction error={mutationError} returnTo={`${location.pathname}${location.search}${location.hash}`} description={recoverySaved ? "이 탭에 입력을 임시 보관했어요. 같은 계정으로 다시 로그인하면 이어서 수정할 수 있어요." : "입력을 임시 보관하지 못했어요. 로그인 전에 변경 내용을 복사해 보관해주세요."} />
               {completionCondition && (
                 <p
                   id={ITINERARY_VALIDATION_ID}
@@ -450,6 +488,7 @@ function ItineraryEditor({
 }
 
 export function ItineraryEditPage(): JSX.Element {
+  const { data: session } = useSessionQuery();
   const params = useParams();
   const navigate = useNavigate();
   const validated = decodeRouteParams(TripParamsSchema, params);
@@ -495,6 +534,7 @@ export function ItineraryEditPage(): JSX.Element {
   }
   return (
     <ItineraryEditor
+      key={`${session?.participantId ?? "anonymous"}:${tripId}:${query.data.itinerary.id}`}
       tripId={tripId}
       itinerary={query.data.itinerary}
       refreshFailed={transientRefreshFailure}

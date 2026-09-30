@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Effect, Schema } from "effect";
-import { ForbiddenError, NotFoundError, RevisionConflictError, UnauthorizedError } from "../domain/errors.ts";
+import { ForbiddenError, NotFoundError, RevisionConflictError, UnauthorizedError, ValidationError } from "../domain/errors.ts";
 import { ParticipantIdSchema, RevisionSchema, TripIdSchema } from "../domain/ids.ts";
 import { ResourceExtractionError, ResourceSourceSchema, type TripResource } from "../domain/trip-resource.ts";
 import type { TripRoom } from "../domain/room.ts";
@@ -8,7 +8,7 @@ import { SessionService } from "../ports/session.ts";
 import { TripRoomRepository } from "../ports/trip-room-repository.ts";
 import { TripResourceRepository } from "../ports/trip-resource-repository.ts";
 import { TripResourceExtractor } from "../ports/trip-resource-extractor.ts";
-import { createTripResource, deleteTripResource, editTripResourcePlace, listTripResources, organizeTripResource } from "./trip-resources.ts";
+import { createTripResource, deleteTripResource, editTripResourceSource, editTripResourcePlace, listTripResources, organizeTripResource } from "./trip-resources.ts";
 
 const tripId = TripIdSchema.make("trip-resource-test");
 const author = ParticipantIdSchema.make("author");
@@ -34,6 +34,11 @@ function harness(actor: typeof author | null = member, initial = source) {
     get: vi.fn<typeof TripResourceRepository.Service.get>((requestedTrip) => requestedTrip === tripId ? Effect.succeed(current) : Effect.fail(new NotFoundError({ entity: "TripResource", id: current.id }))),
     list: vi.fn<typeof TripResourceRepository.Service.list>(() => Effect.succeed([current])),
     create: vi.fn<typeof TripResourceRepository.Service.create>((input) => Effect.succeed({ ...source, ...input })),
+    saveSource: vi.fn<typeof TripResourceRepository.Service.saveSource>((_trip, _id, expectedRevision, input) => {
+      if (current.revision !== expectedRevision) return Effect.fail(new RevisionConflictError({ message: "stale", expectedRevision, actualRevision: current.revision }));
+      current = { ...current, ...input, places: null, processedAt: null, linkStatus: "NOT_READ", revision: RevisionSchema.make(current.revision + 1) };
+      return Effect.succeed(current);
+    }),
     saveResult: vi.fn<typeof TripResourceRepository.Service.saveResult>((_trip, _id, expectedRevision, result) => {
       if (current.revision !== expectedRevision) return Effect.fail(new RevisionConflictError({ message: "stale", expectedRevision, actualRevision: current.revision }));
       current = { ...current, ...result, revision: RevisionSchema.make(current.revision + 1) };
@@ -131,5 +136,29 @@ describe("shared trip resources", () => {
       { url: "", note: "  " }, { url: "javascript:alert(1)", note: "" },
       { url: "https://user:password@example.com", note: "" }, { url: "", note: "a".repeat(20_001) },
     ]) expect(valid(input)).toBe(false);
+  });
+});
+
+describe("resource source editing", () => {
+  const input = { url: "", note: "  corrected note  ", expectedRevision: source.revision };
+  it.each([author, host])("allows author or host %s to correct original data", async (actor) => {
+    const h = harness(actor, { ...source, places: [], processedAt: source.createdAt });
+    expect(await h.run(editTripResourceSource(tripId, source.id, input))).toMatchObject({ note: "corrected note", revision: 2, places: null, processedAt: null, linkStatus: "NOT_READ", canManage: true });
+  });
+  it.each([member, ParticipantIdSchema.make("outsider"), null])("denies actor %s before writes", async (actor) => {
+    const h = harness(actor);
+    await expect(h.run(editTripResourceSource(tripId, source.id, input))).rejects.toBeInstanceOf(actor === null ? UnauthorizedError : actor === member ? ForbiddenError : NotFoundError);
+    expect(h.repo.saveSource).not.toHaveBeenCalled();
+  });
+  it("rejects cross-trip ids and stale revisions without writing", async () => {
+    const h = harness(author);
+    await expect(h.run(editTripResourceSource(TripIdSchema.make("other-trip"), source.id, input))).rejects.toBeInstanceOf(NotFoundError);
+    await expect(h.run(editTripResourceSource(tripId, source.id, { ...input, expectedRevision: RevisionSchema.make(2) }))).rejects.toBeInstanceOf(RevisionConflictError);
+    expect(h.repo.saveSource).not.toHaveBeenCalled();
+  });
+  it("preserves existing cards and evidence rather than clearing them", async () => {
+    const h = harness(author, { ...source, places: [{ ...place, edited: true }] });
+    await expect(h.run(editTripResourceSource(tripId, source.id, input))).rejects.toBeInstanceOf(ValidationError);
+    expect(h.repo.saveSource).not.toHaveBeenCalled();
   });
 });

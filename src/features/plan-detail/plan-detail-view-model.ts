@@ -1,3 +1,4 @@
+import { isPlanConfirmable } from "../../core/domain/confirmed-itinerary.ts";
 import {
   getConfirmedPlan,
   getPlanDateRange,
@@ -35,6 +36,7 @@ export interface PlanMemberOpinionViewModel {
 }
 
 export interface DetailedPlanViewModel extends PlanSummaryData {
+  readonly canConfirm: boolean;
   readonly route: ReadonlyArray<{ readonly city: string; readonly nights: number }>;
   readonly costSummary: PlanCostSummary;
   readonly groupCostText: string;
@@ -379,6 +381,7 @@ export const toPlanDetailViewModel = (
         myOpinionReason:
           myOpinion?.reaction === "HARD" ? myOpinion.reason : undefined,
         isConfirmed: isPlanConfirmed,
+        canConfirm: viewer.isHost && !roomConfirmed && isPlanConfirmable(room, p),
         bookingRisks,
         timelineItems,
         memberOpinions,

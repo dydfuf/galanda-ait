@@ -725,3 +725,45 @@ describe("PlanHomePage draft resume ('이어서 작성하기')", () => {
     expect(screen.queryByRole("button", { name: "이어서 작성하기" })).not.toBeInTheDocument();
   });
 });
+
+ it("멤버 목록에서 이름과 역할 및 내 계정을 확인한다", () => {
+    mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+    mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(baseRoom));
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "참여 1명 보기" }));
+    expect(screen.getByRole("list", { name: "여행 멤버" }).textContent).toContain("나 (나)");
+    expect(screen.getByRole("list", { name: "여행 멤버" }).textContent).toContain("방장");
+ });
+
+
+it.each(["absent", "pending", "loaded"] as const)("single viable plan keeps host confirmation and optional proposal with recommendation %s", (recommendationState) => {
+  const room: TripRoom = {
+    ...baseRoom,
+    plans: [{
+      ...planFixture("plan-1"), status: "VOTING", revision: RevisionSchema.make(1), baseHeadcount: 2,
+      routes: [{ city: "서울", arrivalDate: "2026-10-01", departureDate: "2026-10-02" }],
+      accommodations: [{ id: "stay", city: "서울", period: "2026-10-01 ~ 2026-10-02", nights: 1, hotelName: "숙소", bookingStatus: "AVAILABLE" }],
+      transports: [
+        { id: "out", fromCity: "부산", toCity: "서울", mode: "기차", hasTransfer: false, durationText: "2시간", bookingStatus: "AVAILABLE" },
+        { id: "back", fromCity: "서울", toCity: "부산", mode: "기차", hasTransfer: false, durationText: "2시간", bookingStatus: "AVAILABLE" },
+      ],
+    }],
+  };
+  mockUseSessionQuery.mockReturnValue(toQueryResult(memberSession));
+  mockUseTripRoomRawQuery.mockReturnValue(toQueryResult(room));
+  if (recommendationState === "pending") {
+    mockUseRecommendation.mockReturnValue({ data: undefined, isPending: true, isError: false } as ReturnType<typeof useNextTripActionRecommendation>);
+  } else if (recommendationState === "loaded") {
+    mockUseRecommendation.mockReturnValue(toQueryResult({
+      recommendationId: RecommendationIdSchema.make("single-plan-recommendation"),
+      primary: { actionId: "PROPOSE_ALTERNATIVE", reasonCode: "ADD_PLAN_ALTERNATIVE" },
+      alternatives: [{ actionId: "CONFIRM_PLAN" }], source: "RULE", policyVersion: "nba-rule-v1",
+      tripRevision: room.revision, contextFingerprint: "fingerprint",
+    }));
+  }
+  renderPage();
+  expect(screen.getByRole("button", { name: "새 여행안 제안하기" })).toBeInTheDocument();
+  expect(screen.queryByText("여행 상태에 맞는 다음 행동을 확인하고 있어요.")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "여행안 확인하고 확정하기" }));
+  expect(screen.getByTestId("location-path")).toHaveTextContent("/trips/trip-1/plans/plan-1");
+});

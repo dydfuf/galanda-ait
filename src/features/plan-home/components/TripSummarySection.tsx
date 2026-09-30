@@ -1,8 +1,10 @@
+import { Button } from "@/components/ui/button.tsx";
 interface TripSummarySectionProps {
   readonly title: string;
   readonly destination: string;
   readonly period: string;
   readonly memberCount: number;
+  readonly onMembersClick?: () => void;
 }
 
 /** 여행 제목과 서버 aggregate의 요약 값을 하나의 정보 그룹으로 표시한다. */
@@ -11,6 +13,7 @@ export function TripSummarySection({
   destination,
   period,
   memberCount,
+  onMembersClick,
 }: TripSummarySectionProps) {
   return (
     <section
@@ -21,7 +24,8 @@ export function TripSummarySection({
         {title}
       </h1>
       <p className="mt-4 min-w-0 text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
-        {destination} · {period} · 참여 {memberCount}명
+        {destination} · {period}
+        {onMembersClick ? <Button type="button" variant="ghost" className="ml-1" onClick={onMembersClick}>참여 {memberCount}명 보기</Button> : <> · 참여 {memberCount}명</>}
       </p>
     </section>
   );

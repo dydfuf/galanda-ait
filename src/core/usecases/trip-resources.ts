@@ -42,6 +42,23 @@ export const createTripResource = Effect.fn("createTripResource")(
   },
 );
 
+export const editTripResourceSource = Effect.fn("editTripResourceSource")(
+  function* (tripId: TripId, id: string, input: ResourceSource & { readonly expectedRevision: Revision }) {
+    const { repository, canManage, present } = yield* resourceAccess(tripId);
+    const resource = yield* repository.get(tripId, id);
+    if (!canManage(resource)) {
+      return yield* Effect.fail(new ForbiddenError({ reason: "자료를 올린 멤버나 방장만 원본을 수정할 수 있어요." }));
+    }
+    yield* requireRevision(resource, input.expectedRevision);
+    if (resource.places?.length) {
+      return yield* Effect.fail(new ValidationError({ message: "장소 카드의 원문 근거를 보존하려면 새 자료로 복사해서 저장해주세요." }));
+    }
+    const source = { url: input.url.trim(), note: input.note.trim() };
+    if (!source.url && !source.note) return yield* Effect.fail(new ValidationError({ message: "링크나 메모를 입력해주세요." }));
+    return present(yield* repository.saveSource(tripId, id, input.expectedRevision, source));
+  },
+);
+
 export const organizeTripResource = Effect.fn("organizeTripResource")(
   function* (tripId: TripId, id: string, expectedRevision: Revision) {
     const { repository } = yield* resourceAccess(tripId);

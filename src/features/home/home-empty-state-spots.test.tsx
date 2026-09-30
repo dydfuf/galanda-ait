@@ -55,13 +55,12 @@ beforeEach(() => {
 });
 
 describe("Home and saved empty-state illustration integration", () => {
-  it("uses the first-trip illustration without changing creation/explore destinations", () => {
+  it("keeps the first-trip illustration and creation entry without deferred exploration", () => {
     const { container } = renderHome();
     expect(spot(container)).toHaveAttribute("data-spot", "empty-trips");
     expect(screen.getByRole("link", { name: "새 여행 만들기" })).toHaveAttribute("href", "/trips/new");
-    const explore = screen.getByRole("link", { name: "여행 탐색" });
-    expect(explore).toHaveAttribute("href", "/explore");
-    expect(explore.querySelector("svg")).toHaveAttribute("data-icon", "explore");
+    expect(screen.queryByRole("link", { name: "여행 탐색" })).not.toBeInTheDocument();
+    expect(screen.getByText("초대받았다면 전달받은 초대 링크를 열어 여행에 참여하세요.")).toBeVisible();
   });
 
   it("distinguishes past-only trips from a first trip and preserves both actions", () => {

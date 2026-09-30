@@ -1,6 +1,10 @@
+import { useSessionQuery } from "../../hooks/useSession.ts";
+import { SessionRecoveryAction } from "../auth/SessionRecoveryAction.tsx";
+import { resourceDraftKey, useResourceDraft } from "./resource-draft.ts";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Result } from "effect";
+import { RevisionSchema } from "../../core/domain/ids.ts";
 import { ApiClientError } from "../../app/api-client.ts";
 import { OFFLINE_MUTATION_MESSAGE } from "../../app/offline-mutation.ts";
 import { decodeRouteParams, TripParamsSchema } from "../../app/routes/route-params.ts";
@@ -57,24 +61,86 @@ function SourceLink({ resource }: { resource: TripResourceResponse }) {
   );
 }
 
-export function TripResourcesPage() {
-  const params = useParams();
-  const validated = decodeRouteParams(TripParamsSchema, params);
-  if (Result.isFailure(validated)) return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
-  return <TripResourcesContent key={validated.success.tripId} tripId={validated.success.tripId} />;
+function SourceEditor({ resource, disabled, onSave, onRefresh, onCancel, draftKey, returnTo }: {
+  draftKey: string | undefined;
+  returnTo: string;
+  resource: TripResourceResponse;
+  disabled: boolean;
+  onSave: (input: { url: string; note: string; expectedRevision: TripResourceResponse["revision"] }) => Promise<unknown>;
+  onRefresh: () => Promise<TripResourceResponse | undefined>;
+  onCancel: () => void;
+}) {
+  const draft = useResourceDraft(draftKey, { url: resource.url, note: resource.note, revision: resource.revision });
+  const { url, note } = draft.draft;
+  const setUrl = (url: string) => draft.update({ ...draft.draft, url });
+  const setNote = (note: string) => draft.update({ ...draft.draft, note });
+  const revision = RevisionSchema.make(draft.draft.revision ?? resource.revision);
+  const setRevision = (revision: number) => draft.update({ ...draft.draft, revision });
+  const [sessionError, setSessionError] = useState<unknown>();
+  const [error, setError] = useState<string>();
+  const [conflict, setConflict] = useState(false);
+  const [latest, setLatest] = useState<TripResourceResponse>();
+  const [checking, setChecking] = useState(false);
+  const save = async () => {
+    if (disabled || checking || conflict) return;
+    setError(undefined);
+    try { await onSave({ url: url.trim(), note: note.trim(), expectedRevision: revision }); draft.clear(); }
+    catch (error) {
+      setSessionError(error);
+      draft.update(draft.draft);
+      setConflict(isRevisionConflict(error));
+      setError(isRevisionConflict(error) ? "다른 멤버가 자료를 변경했어요. 입력은 유지돼요. 최신 원본을 확인해주세요." : toUserMessage(error, "원본을 수정하지 못했어요. 입력은 유지돼요."));
+    }
+  };
+  const refresh = async () => {
+    setChecking(true);
+    setLatest(undefined);
+    try {
+      const current = await onRefresh();
+      if (!current) setError("자료가 삭제되었어요. 입력 내용을 복사해서 보관해주세요.");
+      else if (!current.canManage) setError("이 원본을 수정할 권한이 없어요. 입력 내용을 복사해서 보관해주세요.");
+      else if (current.places?.length) setError("장소 카드가 추가되어 원본을 바꿀 수 없어요. 입력 내용을 새 자료로 저장해주세요.");
+      else setLatest(current);
+    } catch { setError("최신 원본을 불러오지 못했어요. 입력은 유지돼요. 다시 확인해주세요."); }
+    finally { setChecking(false); }
+  };
+  return <form aria-label="원본 자료 수정" className="mt-3 flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+    <Field><FieldLabel htmlFor="source-edit-url">링크 수정</FieldLabel><Input id="source-edit-url" type="url" maxLength={2048} value={url} disabled={disabled} onChange={(event) => setUrl(event.target.value)} /></Field>
+    <Field><FieldLabel htmlFor="source-edit-note">메모 수정</FieldLabel><Textarea id="source-edit-note" maxLength={RESOURCE_NOTE_LIMIT} value={note} disabled={disabled} onChange={(event) => setNote(event.target.value)} /></Field>
+    {error && <p role="alert" className="text-sm text-destructive-strong">{error}</p>}
+    <SessionRecoveryAction error={sessionError} returnTo={returnTo} description={draft.saved ? "이 탭에 임시 저장했어요. 같은 계정으로 로그인한 뒤 이 자료의 원본 수정을 누르면 이어서 작성할 수 있어요." : "임시 저장하지 못했어요. 로그인 전에 링크와 메모를 복사해 보관해주세요."} />
+    {conflict && <Button type="button" variant="outline" disabled={disabled || checking} onClick={() => void refresh()}>최신 원본 확인</Button>}
+    {latest && <section aria-label="최신 원본 내용" className="rounded-lg bg-background p-3 text-sm">
+      <SourceLink resource={latest} /><p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{latest.note}</p>
+      <Button type="button" variant="outline" onClick={() => { setRevision(latest.revision); setConflict(false); setLatest(undefined); setError(undefined); }}>최신 원본을 확인했어요</Button>
+    </section>}
+    <div className="flex gap-2"><Button type="button" variant="outline" disabled={disabled || checking} onClick={() => { draft.clear(); onCancel(); }}>수정 취소</Button><Button type="submit" disabled={disabled || checking || conflict || (!url.trim() && !note.trim())}>원본 수정 저장</Button></div>
+  </form>;
 }
 
-function TripResourcesContent({ tripId }: { tripId: string }) {
+export function TripResourcesPage() {
+  const params = useParams();
+  const { data: session } = useSessionQuery();
+  const validated = decodeRouteParams(TripParamsSchema, params);
+  if (Result.isFailure(validated)) return <RouteErrorFallback message="유효하지 않은 여행방 식별자입니다." />;
+  return <TripResourcesContent key={`${session?.participantId ?? "unknown"}:${validated.success.tripId}`} tripId={validated.success.tripId} actorId={session?.participantId} />;
+}
+
+function TripResourcesContent({ tripId, actorId }: { tripId: string; actorId?: string }) {
   const query = useTripResourcesQuery(tripId);
   const mutation = useTripResourceMutation(tripId);
   const isOnline = useOnlineStatus();
-  const [url, setUrl] = useState("");
-  const [note, setNote] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
+  const draft = useResourceDraft(resourceDraftKey(actorId, tripId), { url: "", note: "" });
+  const { url, note } = draft.draft;
+  const setUrl = (url: string) => draft.update({ ...draft.draft, url });
+  const setNote = (note: string) => draft.update({ ...draft.draft, note });
+  const [createSessionError, setCreateSessionError] = useState<unknown>();
+  const [isAdding, setIsAdding] = useState(Boolean(url || note));
   const [section, setSection] = useState<string>();
   const [createError, setCreateError] = useState<string>();
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState<{ resourceId: string; type: "organize" | "delete"; message: string }>();
+  const [sourceEditing, setSourceEditing] = useState<TripResourceResponse>();
   const [editing, setEditing] = useState<EditingPlace>();
   const [editError, setEditError] = useState<string>();
   const [editConflict, setEditConflict] = useState(false);
@@ -93,24 +159,29 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
   const { items, extractionAvailable } = query.data;
   const showAddForm = isAdding || items.length === 0;
   const placeCount = items.reduce((count, resource) => count + (resource.places?.length ?? 0), 0);
+  const showPlaceCards = extractionAvailable || placeCount > 0 || Boolean(editing);
   const unprocessedCount = items.filter((resource) => resource.places === null).length;
   const editingResourceDeleted = Boolean(editing && !items.some((resource) => resource.id === editing.resourceId));
+  const sourceResources = sourceEditing && !items.some((item) => item.id === sourceEditing.id) ? [...items, sourceEditing] : items;
   const cardResources = editingResourceDeleted && editing ? [...items, editing.source] : items;
 
   const saveResource = async () => {
-    if (disabled || editing) return;
+    if (disabled || editing || sourceEditing) return;
     setCreateError(undefined);
     setNotice("");
     try {
       await mutation.mutateAsync({ type: "create", input: { url: url.trim(), note: note.trim() } });
-      setUrl("");
-      setNote("");
+      draft.update({ url: "", note: "" });
+      draft.clear();
+      setCreateSessionError(undefined);
       setIsAdding(false);
       setSection("sources");
       setNotice(extractionAvailable
         ? "자료를 저장했어요. 원본 자료에서 정보를 정리할 수 있어요."
         : "자료를 저장했어요. 여행 멤버와 함께 볼 수 있어요.");
     } catch (error) {
+      setCreateSessionError(error);
+      draft.update(draft.draft);
       setCreateError(toUserMessage(error, "자료를 저장하지 못했어요. 입력 내용은 유지돼요."));
     }
   };
@@ -194,7 +265,7 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
 
   return (
     <PageBody>
-      <PageTitle title="함께 모은 여행 자료" description="링크와 메모를 모으고, 장소별로 정리해요." action={
+      <PageTitle title="함께 모은 여행 자료" description={extractionAvailable ? "링크와 메모를 모으고, 장소별로 정리해요." : "여행 멤버와 함께 링크와 메모를 모아봐요."} action={
         <Button type="button" variant="ghost" disabled={!isOnline || query.isFetching || mutation.isPending} onClick={() => void query.refetch()}>{query.isFetching ? "불러오는 중…" : "새로고침"}</Button>
       } />
       <div className="flex min-w-0 flex-col gap-6 px-(--app-inline-padding)">
@@ -207,26 +278,26 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
           </div>
           <Field>
             <FieldLabel htmlFor="resource-url">링크</FieldLabel>
-            <Input id="resource-url" type="url" inputMode="url" autoComplete="off" placeholder="https://" maxLength={2048} value={url} onChange={(event) => { setUrl(event.target.value); setIsAdding(true); }} disabled={mutation.isPending || Boolean(editing)} />
+            <Input id="resource-url" type="url" inputMode="url" autoComplete="off" placeholder="https://" maxLength={2048} value={url} onChange={(event) => { setUrl(event.target.value); setIsAdding(true); }} disabled={mutation.isPending || Boolean(editing) || Boolean(sourceEditing)} />
           </Field>
           <Field>
             <FieldLabel htmlFor="resource-note">메모</FieldLabel>
-            <Textarea id="resource-note" placeholder="장소 정보나 함께 보고 싶은 내용을 적어주세요." rows={3} maxLength={RESOURCE_NOTE_LIMIT} value={note} onChange={(event) => { setNote(event.target.value); setIsAdding(true); }} disabled={mutation.isPending || Boolean(editing)} />
+            <Textarea id="resource-note" placeholder="장소 정보나 함께 보고 싶은 내용을 적어주세요." rows={3} maxLength={RESOURCE_NOTE_LIMIT} value={note} onChange={(event) => { setNote(event.target.value); setIsAdding(true); }} disabled={mutation.isPending || Boolean(editing) || Boolean(sourceEditing)} />
           </Field>
           <p className="text-sm text-foreground-muted">링크나 메모 중 하나만 있어도 저장할 수 있어요. 여행 멤버 모두에게 보여요.</p>
           {createError && <p role="alert" className="text-sm text-destructive-strong">{createError}</p>}
+          <SessionRecoveryAction error={createSessionError} returnTo={`/trips/${tripId}/resources`} description={draft.saved ? "이 탭에 임시 저장했어요. 같은 계정으로 로그인하면 이어서 작성할 수 있어요." : "임시 저장하지 못했어요. 로그인 전에 링크와 메모를 복사해 보관해주세요."} />
           {items.length >= RESOURCE_LIMIT && <p className="text-sm text-foreground-muted">자료는 여행마다 {RESOURCE_LIMIT}개까지 보관할 수 있어요.</p>}
-          <Button type="submit" size="lg" disabled={disabled || Boolean(editing) || (!url.trim() && !note.trim()) || items.length >= RESOURCE_LIMIT}>
+          <Button type="submit" size="lg" disabled={disabled || Boolean(editing) || Boolean(sourceEditing) || (!url.trim() && !note.trim()) || items.length >= RESOURCE_LIMIT}>
             {mutation.isPending && mutation.variables?.type === "create" ? "저장 중…" : "자료 저장"}
           </Button>
-        </form> : <Button type="button" variant="outline" size="lg" disabled={mutation.isPending || Boolean(editing)} onClick={() => setIsAdding(true)}>자료 추가</Button>}
-        {!extractionAvailable && <p className="text-sm text-foreground-muted">현재 AI 정보 정리를 사용할 수 없어요. 링크와 메모는 계속 모아둘 수 있어요.</p>}
+        </form> : <Button type="button" variant="outline" size="lg" disabled={mutation.isPending || Boolean(editing) || Boolean(sourceEditing)} onClick={() => setIsAdding(true)}>자료 추가</Button>}
         {notice && <output className="text-sm text-primary">{notice}</output>}
-        <Tabs value={section ?? (editing || placeCount > 0 ? "places" : "sources")} onValueChange={(value) => { if (!editing) setSection(String(value)); }}>
-          <TabsList className="w-full" aria-label="자료 보기">
-            <TabsTrigger value="places">장소 카드 {placeCount}</TabsTrigger>
+        <Tabs value={showPlaceCards ? section ?? (editing || placeCount > 0 ? "places" : "sources") : "sources"} onValueChange={(value) => { if (!editing && !sourceEditing) setSection(String(value)); }}>
+          {showPlaceCards && <TabsList className="w-full" aria-label="자료 보기">
+            <TabsTrigger value="places" disabled={Boolean(sourceEditing)}>장소 카드 {placeCount}</TabsTrigger>
             <TabsTrigger value="sources" disabled={Boolean(editing)}>원본 자료 {items.length}</TabsTrigger>
-          </TabsList>
+          </TabsList>}
           <TabsContent value="places" className="mt-3">
             {placeCount === 0 && !editing ? <PageState status="empty" title="아직 정리된 장소가 없어요" description={!extractionAvailable ? "원본 자료에서 함께 모은 링크와 메모를 볼 수 있어요." : unprocessedCount ? `원본 자료 ${unprocessedCount}개가 정리를 기다려요.` : "링크나 메모를 저장한 뒤 정보 정리를 눌러보세요."} actionText={items.length ? "원본 자료 보기" : undefined} onAction={items.length ? () => setSection("sources") : undefined} /> : (
               <div className="flex flex-col gap-4">
@@ -273,16 +344,21 @@ function TripResourcesContent({ tripId }: { tripId: string }) {
             )}
           </TabsContent>
           <TabsContent value="sources" className="mt-3">
-            {items.length === 0 ? <PageState status="empty" title="함께 볼 자료를 모아보세요" description="숙소, 여행지, 액티비티 링크나 메모를 남기면 멤버들과 함께 볼 수 있어요." /> : <ul className="flex flex-col gap-4">{items.map((resource) => <li key={resource.id} className="min-w-0 rounded-2xl bg-surface-subtle p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{resource.createdByName}</p><Badge variant="secondary">{resource.places === null ? "정리 전" : resource.places.length ? `장소 ${resource.places.length}개` : "장소 없음"}</Badge></div>
+            {sourceResources.length === 0 ? <PageState status="empty" title="함께 볼 자료를 모아보세요" description="숙소, 여행지, 액티비티 링크나 메모를 남기면 멤버들과 함께 볼 수 있어요." /> : <ul className="flex flex-col gap-4">{sourceResources.map((resource) => <li key={resource.id} className="min-w-0 rounded-2xl bg-surface-subtle p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold">{resource.createdByName}</p>{(extractionAvailable || resource.places !== null) && <Badge variant="secondary">{resource.places === null ? "정리 전" : resource.places.length ? `장소 ${resource.places.length}개` : "장소 없음"}</Badge>}</div>
+              {sourceEditing?.id === resource.id && <SourceEditor draftKey={resourceDraftKey(actorId, tripId, resource.id)} returnTo={`/trips/${tripId}/resources`} resource={sourceEditing} disabled={disabled} onCancel={() => setSourceEditing(undefined)}
+                onSave={async (input) => { await mutation.mutateAsync({ type: "edit-source", resourceId: resource.id, input }); setSourceEditing(undefined); setNotice("원본 자료를 수정했어요. 여행 멤버와 함께 볼 수 있어요."); }}
+                onRefresh={async () => { const result = await query.refetch(); if (result.isError) throw new Error("refresh failed"); return result.data?.items.find((item) => item.id === resource.id); }} />}
               {resource.url && <SourceLink resource={resource} />}
               {resource.note && <p className="mt-2 whitespace-pre-wrap leading-relaxed [overflow-wrap:anywhere]">{resource.note}</p>}
               {resource.linkStatus === "UNAVAILABLE" && <p className="mt-3 text-sm text-warning">링크를 읽지 못해 메모만으로 정리했어요.</p>}
               {resource.places?.length === 0 && <p className="mt-3 text-sm text-foreground-muted">이 자료에서 장소를 찾지 못했어요. 원본은 그대로 보관돼요.</p>}
               {actionError?.resourceId === resource.id && <div role="alert" className="mt-3 text-sm text-destructive-strong"><p>{actionError.message}</p><Button type="button" variant="ghost" disabled={!isOnline || query.isFetching} onClick={() => void query.refetch()}>최신 자료 확인</Button></div>}
               <div className="mt-3 flex flex-wrap gap-2">
-                {resource.places === null && <Button type="button" variant="outline" disabled={disabled || !extractionAvailable} onClick={() => void actOnResource("organize", resource)}>{mutation.isPending && mutation.variables?.type === "organize" && mutation.variables.resourceId === resource.id ? "정보 정리 중…" : actionError?.resourceId === resource.id && actionError.type === "organize" ? "정보 정리 다시 시도" : "정보 정리"}</Button>}
-                {resource.canManage && <Button type="button" variant="ghost" disabled={disabled} onClick={() => { setDeleteTarget(resource); setDeleteReview(undefined); setActionError(undefined); }}>자료 삭제</Button>}
+                {extractionAvailable && resource.places === null && <Button type="button" variant="outline" disabled={disabled || Boolean(sourceEditing)} onClick={() => void actOnResource("organize", resource)}>{mutation.isPending && mutation.variables?.type === "organize" && mutation.variables.resourceId === resource.id ? "정보 정리 중…" : actionError?.resourceId === resource.id && actionError.type === "organize" ? "정보 정리 다시 시도" : "정보 정리"}</Button>}
+                {resource.canManage && !resource.places?.length && <Button type="button" variant="outline" disabled={disabled || Boolean(sourceEditing)} onClick={() => { setSourceEditing(resource); setNotice(""); }}>원본 수정</Button>}
+                {resource.canManage && Boolean(resource.places?.length) && <Button type="button" variant="outline" disabled={disabled || Boolean(sourceEditing) || isAdding || Boolean(url || note) || items.length >= RESOURCE_LIMIT} onClick={() => { draft.update({ url: resource.url, note: resource.note }); setIsAdding(true); setNotice("장소 카드의 원문 근거를 보존하려면 수정한 내용을 새 자료로 저장해주세요."); }}>새 자료로 복사</Button>}
+                {resource.canManage && <Button type="button" variant="ghost" disabled={disabled || Boolean(sourceEditing)} onClick={() => { setDeleteTarget(resource); setDeleteReview(undefined); setActionError(undefined); }}>자료 삭제</Button>}
               </div>
             </li>)}</ul>}
           </TabsContent>

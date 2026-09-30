@@ -16,12 +16,11 @@ export interface GlobalNavItem {
 }
 
 /**
- * Global 탐색 목적지. logical order(홈 → 탐색 → 내 여행 → 마이)로 고정한다.
+ * Global 탐색 목적지. 첫 릴리스는 홈 → 내 여행 → 마이로 노출한다. 탐색 직접 경로는 보존한다.
  * label/icon은 UI(GlobalAppShell)가 소유하고, 여기서는 label/path 계약만 둔다.
  */
 export const GLOBAL_NAV_ITEMS: ReadonlyArray<GlobalNavItem> = [
   { key: "HOME", label: "홈", path: "/home" },
-  { key: "EXPLORE", label: "탐색", path: "/explore" },
   { key: "TRIPS", label: "내 여행", path: "/trips" },
   { key: "ME", label: "마이", path: "/me" },
 ];

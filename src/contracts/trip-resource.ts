@@ -10,6 +10,13 @@ export const ResourceParamsSchema = Schema.Struct({
 export const CreateResourceRequestSchema = ResourceSourceSchema;
 export type CreateResourceRequest = typeof CreateResourceRequestSchema.Type;
 const ResourceRevisionSchema = RevisionSchema.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1));
+export const EditResourceSourceRequestSchema = Schema.Struct({
+  ...ResourceSourceSchema.fields,
+  expectedRevision: ResourceRevisionSchema,
+}).check(Schema.makeFilter(({ url, note }) => Boolean(url.trim() || note.trim()), {
+  message: "링크나 메모를 입력해주세요.",
+}));
+export type EditResourceSourceRequest = typeof EditResourceSourceRequestSchema.Type;
 export const ResourceRevisionRequestSchema = Schema.Struct({ expectedRevision: ResourceRevisionSchema });
 export const EditResourcePlaceRequestSchema = Schema.Struct({
   ...PlaceCardFieldsSchema.fields,

@@ -291,7 +291,7 @@ describe("trip creation navigation history", () => {
     );
     expect(mocks.createTrip).toHaveBeenCalledWith({ title: "제주 여행" });
     fireEvent.click(
-      screen.getByRole("button", { name: "미정으로 두고 다음" }),
+      screen.getByRole("button", { name: "초대는 나중에 하고 다음" }),
     );
 
     await waitFor(() =>

@@ -41,6 +41,7 @@ RAON-181 이후 Galanda의 UI implementation layer 기준입니다. 화면 문�
 | 화면/텍스트 기본 | `--background`, `--foreground` |
 | 보조 텍스트/배경 | `--muted`, `--muted-foreground` |
 | 브랜드/주요 행동 | `--primary`, `--primary-foreground` |
+| 채워진 CTA / hover | `--primary-action`, `--primary-action-hover` |
 | 경계선/입력 | `--border`, `--input`, `--ring` |
 | 위험/삭제 | `--destructive`, `--destructive-strong`, `--destructive-muted`, `--destructive-border` |
 | 상태 배지 | `--success(-muted)`, `--warning(-muted/-border)`, `--info(-muted)` |
@@ -48,6 +49,11 @@ RAON-181 이후 Galanda의 UI implementation layer 기준입니다. 화면 문�
 | 경계 단계 | `--border-strong`, `--border-stronger` |
 | primary tint | `--primary-muted`, `--primary-border`, `--primary-border-weak` |
 | 모서리 | `--radius` |
+
+채워진 버튼은 브랜드 강조색과 분리된 `--primary-action`을 사용합니다. 밝은 테마의
+기존 브랜드 파랑은 흰 일반 크기 글자 대비가 약 3.71:1이므로, CTA에는 더 진한
+파랑을 사용합니다. hover는 불투명도를 낮추지 않고 전경색 방향으로 섞어 대비를
+유지합니다. 어두운 테마는 기존 밝은 파랑과 어두운 글자 조합을 유지합니다.
 
 모든 토큰은 `@theme inline`에도 등록돼 있어 Tailwind utility(`text-foreground-subtle`,
 `bg-surface-subtle` 등)로도 쓸 수 있어요.

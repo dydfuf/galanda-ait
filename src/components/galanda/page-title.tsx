@@ -26,7 +26,7 @@ export function PageTitle({ title, description, action, className }: PageTitlePr
           {title}
         </h1>
         {hasDescription && (
-          <p className="min-w-0 text-base leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+          <p className="min-w-0 text-base leading-relaxed text-pretty break-keep text-muted-foreground [overflow-wrap:anywhere]">
             {description}
           </p>
         )}

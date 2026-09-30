@@ -1,3 +1,5 @@
+import { ApiClientError } from "../../app/api-client.ts";
+import { toUserMessage } from "../common/error-message.ts";
 import { useEffect, useRef, useState } from "react";
 import { Result } from "effect";
 import { useNavigate, useParams } from "react-router-dom";
@@ -34,7 +36,7 @@ const SHARE_RESULT_MESSAGE: Record<SetupShareResult, string> = {
   copied: "초대 링크를 복사했어요.",
   cancelled: "공유를 취소했어요. 원할 때 다시 시도할 수 있어요.",
   unsupported:
-    "이 환경에서는 링크를 공유할 수 없어요. 여행방에서 다시 시도해주세요.",
+    "초대 링크를 직접 복사해 동행에게 보내주세요.",
   failed: "초대 링크를 만들지 못했어요. 다시 시도해주세요.",
 };
 
@@ -49,11 +51,15 @@ export function TripCompanionSetupPage() {
     data: room,
     isLoading: isRoomLoading,
     isError: isRoomError,
+    error: roomError,
+    refetch: refetchRoom,
   } = useTripRoomRawQuery(tripId);
   const {
     data: session,
     isLoading: isSessionLoading,
     isError: isSessionError,
+    error: sessionError,
+    refetch: refetchSession,
   } = useSessionQuery();
 
   const isSharingRef = useRef(false);
@@ -83,6 +89,8 @@ export function TripCompanionSetupPage() {
   const isLoading = isRoomLoading || isSessionLoading;
   const hasLoadError =
     isRoomError || isSessionError || (!isLoading && (!room || !session));
+  const loadError = isSessionError ? sessionError : roomError;
+  const accessDenied = loadError instanceof ApiClientError && [401, 403, 404].includes(loadError.status);
   const planCreatePath = `/trips/${tripId}/plans/new/basic`;
   const hasShared = shareResult === "shared" || shareResult === "copied";
 
@@ -138,9 +146,9 @@ export function TripCompanionSetupPage() {
             <PageState
               status="error"
               title="여행방을 확인할 수 없어요"
-              description="요청한 여행방이 없거나 접근 권한이 없어요."
-              actionText="내 여행으로 이동"
-              onAction={() => navigate("/trips", { replace: true })}
+              description={accessDenied ? "요청한 여행방이 없거나 접근 권한이 없어요." : toUserMessage(loadError, "잠시 후 다시 시도해주세요. 만든 여행방은 유지돼요.")}
+              actionText={accessDenied ? "내 여행으로 이동" : "다시 시도"}
+              onAction={() => { if (accessDenied) navigate("/trips", { replace: true }); else if (isSessionError) void refetchSession(); else void refetchRoom(); }}
             />
           ) : !isFirstPlanSetup ? (
             <PageState
@@ -194,7 +202,7 @@ export function TripCompanionSetupPage() {
                     >
                       초대 링크 공유
                     </h2>
-                    <p className="mt-1 text-base leading-relaxed text-foreground-muted [overflow-wrap:anywhere]">
+                    <p className="mt-1 text-base leading-relaxed text-pretty break-keep text-foreground-muted [overflow-wrap:anywhere]">
                       링크로 참여한 사람은 이 여행의 멤버로 추가돼요.
                     </p>
                   </div>
@@ -202,7 +210,7 @@ export function TripCompanionSetupPage() {
 
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="lg"
                   aria-busy={isSharing || undefined}
                   disabled={isSharing}
@@ -238,6 +246,7 @@ export function TripCompanionSetupPage() {
           <Button
             type="button"
             size="xl"
+            variant={hasShared ? "default" : "secondary"}
             disabled={isSharing}
             onClick={() =>
               navigate(planCreatePath, {
@@ -249,7 +258,7 @@ export function TripCompanionSetupPage() {
               })
             }
           >
-            {hasShared ? "다음: 기본 정보" : "미정으로 두고 다음"}
+            {hasShared ? "다음: 기본 정보" : "초대는 나중에 하고 다음"}
           </Button>
         </BottomAction>
       )}

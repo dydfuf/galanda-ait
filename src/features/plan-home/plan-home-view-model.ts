@@ -1,3 +1,4 @@
+import { isPlanConfirmable } from "../../core/domain/confirmed-itinerary.ts";
 import { getConfirmedPlan, getPlanDateRange, getPlanNightCount, getPlanPublishCompletion, getStayNightCount, getTripRoomDisplayDate, type BookingStatus, type TripRoom } from "../../core/domain/room.ts";
 import {
   hasResolvablePlanAuthor,
@@ -308,7 +309,7 @@ export const getTripListStatusText = (
  *
  * primary는 상태별로 0개 또는 1개만 존재한다.
  * - 후보 0개: 첫 여행안 만들기
- * - 후보 1개: 새 여행안 제안하기 (비교 CTA 없음)
+ * - 후보 1개: 방장은 유효한 안을 확인·확정, 그 외 새 여행안 제안하기
  * - 후보 2개 이상: 여행안 비교하기 (fast compare / selector는 기존 계약 유지)
  * - 확정: 확정 일정 보기 (mutation 진입 없음)
  *
@@ -320,6 +321,7 @@ export const getTripListStatusText = (
  * bottom sticky에서 primary끼리 경쟁하지 않게 한다.
  */
 export type PlanHomePrimaryCtaKind =
+  | "review-confirm"
   | "create-first"
   | "propose-new"
   | "compare"
@@ -343,6 +345,9 @@ export const resolvePlanHomeCta = (
   room: TripRoom,
   actor: RoomActor,
 ): PlanHomeCtaContract => {
+  if (actor.isHost && !isDomainRoomConfirmed(room) && room.plans.length === 1 && isPlanConfirmable(room, room.plans[0])) {
+    return { primaryKind: "review-confirm", primaryLabel: "여행안 확인하고 확정하기", showNewProposalEntry: actor.can("plan:create") };
+  }
   const actionId = resolveEligibleTripActions(
     toTripRoomDecisionContext(room, actor),
     actor,

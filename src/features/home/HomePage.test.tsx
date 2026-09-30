@@ -226,7 +226,7 @@ describe("HomePage dashboard", () => {
     expect(mockSaved).not.toHaveBeenCalled();
   });
 
-  it("진행 중인 여행이 없으면 가짜 카드를 만들지 않고 실제 생성/탐색 route를 안내한다", () => {
+  it("진행 중인 여행이 없으면 가짜 카드를 만들지 않고 여행 생성과 초대 참여를 안내한다", () => {
     mockRooms.mockReturnValue(roomsResult({ data: [] }));
     mockSaved.mockReturnValue(
       savedResult({ data: { pages: [{ items: [] }], pageParams: [undefined] } }),
@@ -238,10 +238,8 @@ describe("HomePage dashboard", () => {
       "href",
       "/trips/new",
     );
-    expect(screen.getByRole("link", { name: /여행 탐색/ })).toHaveAttribute(
-      "href",
-      "/explore",
-    );
+    expect(screen.queryByRole("link", { name: /여행 탐색/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/전달받은 초대 링크/)).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 

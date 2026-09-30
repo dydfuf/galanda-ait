@@ -58,6 +58,7 @@ export function HomeNextAction({ trip, stale = false }: { readonly trip: TripOve
         if (target) path = `/trips/${trip.id}/plans/${target.id}`;
       } else if (context.actionId === "COMPARE_PLANS" || context.actionId === "CONFIRM_PLAN") {
         const [left, right] = room.plans.filter((plan) => plan.status !== "DRAFT");
+        if (context.actionId === "CONFIRM_PLAN" && left && !right) path = `/trips/${trip.id}/plans/${left.id}`;
         if (left && right) path = `/trips/${trip.id}/plans/compare?left=${left.id}&right=${right.id}`;
       }
       navigate(path, { state: { nbaRecommendation: context } });

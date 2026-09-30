@@ -5,6 +5,7 @@ import {
   TripResourcesResponseSchema,
   type CreateResourceRequest,
   type EditResourcePlaceRequest,
+  type EditResourceSourceRequest,
 } from "../contracts/trip-resource.ts";
 import type {
   ExploreListingId,
@@ -210,6 +211,11 @@ export const createTripResource = (tripId: TripId, input: CreateResourceRequest)
 export const organizeTripResource = (tripId: TripId, resourceId: string, expectedRevision: Revision) =>
   requestJson(`${tripPath(tripId)}/resources/${encodeURIComponent(resourceId)}/organize`, TripResourceResponseSchema, {
     method: "POST", body: JSON.stringify({ expectedRevision }),
+  });
+
+export const editTripResourceSource = (tripId: TripId, resourceId: string, input: EditResourceSourceRequest) =>
+  requestJson(`${tripPath(tripId)}/resources/${encodeURIComponent(resourceId)}/source`, TripResourceResponseSchema, {
+    method: "PATCH", body: JSON.stringify(input),
   });
 
 export const editTripResourcePlace = (tripId: TripId, resourceId: string, input: EditResourcePlaceRequest) =>
