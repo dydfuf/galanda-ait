@@ -138,11 +138,30 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   sessionStorage.clear();
 });
 
 describe("InvitePage entry flow", () => {
+  it.each(["getItem", "setItem", "removeItem"] as const)(
+    "sessionStorage %s 실패에도 닉네임으로 참여하고 성공한 여행방에 진입한다",
+    async (method) => {
+      vi.spyOn(Storage.prototype, method).mockImplementation(() => {
+        throw new DOMException("Storage unavailable", "SecurityError");
+      });
+      renderPage();
+      fireEvent.change(await screen.findByRole("textbox"), { target: { value: "라온" } });
+      fireEvent.click(screen.getByRole("button", { name: "이 이름으로 참여하고 의견 남기기" }));
+
+      expect(await screen.findByText("여행방 진입 완료")).toBeInTheDocument();
+      const joins = requests.filter(({ path }) => path.endsWith("/join"));
+      expect(joins).toHaveLength(1);
+      expect(JSON.parse(joins[0]?.init?.body as string)).toEqual({ nickname: "라온" });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    },
+  );
+
   it.each([
     ["첫 미응답 후보", false, false, "second"],
     ["모든 후보 응답", true, false, undefined],

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,11 +16,13 @@ const mockSession = vi.mocked(useSessionQuery);
 
 const renderPage = () =>
   render(
+    <QueryClientProvider client={new QueryClient()}>
     <ThemeProvider>
       <MemoryRouter>
         <MePage />
       </MemoryRouter>
-    </ThemeProvider>,
+    </ThemeProvider>
+    </QueryClientProvider>,
   );
 
 beforeEach(() => {
