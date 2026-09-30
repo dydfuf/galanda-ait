@@ -792,7 +792,7 @@ function AssetsSection() {
     [ArrowLeftRight, "비교"], [CalendarCheck, "확정 일정"], [Bookmark, "저장"],
   ] as const;
   return (
-    <DevSection id="assets" title="여행 중심 아이콘·에셋" description="정보에는 작은 선형 아이콘, 상태 안내에는 하나의 일러스트를 사용해요. 확정 그림은 실제 일정 확정 후에만 표시해요.">
+    <DevSection id="assets" title="여행 중심 아이콘·에셋" description="정보에는 작은 선형 아이콘, 상태 안내에는 Blender로 만든 3D 일러스트를 사용해요. 투명 배경의 같은 이미지를 라이트·다크에서 표시하며, 확정 그림은 실제 일정 확정 후에만 표시해요.">
       <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3">
         {spots.map(([name, label]) => (
           <figure key={name} className="flex flex-col items-center gap-3">

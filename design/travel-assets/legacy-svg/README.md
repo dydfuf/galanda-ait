@@ -1,3 +1,5 @@
+> 보관용: 이전 SVG 원본입니다. 현재 앱에는 배포되지 않으며 최신 안내는 `public/assets/galanda/spots-3d/README.md`를 따릅니다. 아래 내용은 SVG 제작 당시의 기록입니다.
+
 # Galanda spot illustrations
 
 `GalandaSpot`이 기존 이름과 경로로 렌더링하는 장식용 SVG입니다. 기능 아이콘(16–24px)과 별개이며 화면의 제목·설명·버튼이 의미를 소유합니다.

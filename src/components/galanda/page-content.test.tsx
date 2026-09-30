@@ -16,7 +16,7 @@ describe("PageState", () => {
     const { container, rerender } = render(
       <PageState status="empty" title="저장한 여행 일정이 없어요" illustration={<GalandaSpot name="empty-saved" />} />,
     );
-    expect(container.querySelectorAll("img")).toHaveLength(2);
+    expect(container.querySelectorAll("img")).toHaveLength(1);
     expect(container.querySelector("img")?.closest('[aria-hidden="true"]')).not.toBeNull();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("저장한 여행 일정이 없어요");

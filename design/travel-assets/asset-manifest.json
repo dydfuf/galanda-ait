@@ -1,0 +1,957 @@
+{
+  "version": 1,
+  "assetSet": "galanda-travel-spots-3d",
+  "sourceApplication": "Blender 4.3.2",
+  "renderer": "Cycles CPU",
+  "samples": 512,
+  "denoising": false,
+  "viewTransform": "AgX / Medium High Contrast",
+  "externalDependencies": [],
+  "themeVariants": "One neutral palette; validated on #FFFFFF and #101116",
+  "runtimeContract": {
+    "displaySize": 128,
+    "recommendedSourceSize": 384,
+    "sizes": [
+      256,
+      384,
+      512
+    ],
+    "format": "static alpha WebP",
+    "background": "transparent",
+    "cssFilter": "none",
+    "cssShadow": "none",
+    "imageFit": "contain",
+    "decorative": true,
+    "alt": "",
+    "ariaHidden": true
+  },
+  "runtime384TotalBytes": 88610,
+  "contactSheets": [
+    "previews/contact-sheet-128-light.png",
+    "previews/contact-sheet-128-dark.png",
+    "previews/contact-sheet-256-light.png",
+    "previews/contact-sheet-256-dark.png"
+  ],
+  "assets": [
+    {
+      "name": "empty-trips",
+      "meaning": "Successful empty trip query; rounded suitcase",
+      "source": {
+        "path": "renders/empty-trips.png",
+        "bytes": 439974,
+        "sha256": "a5c8ec2b2769107cf5ac13c0e028e6ee833532860e3e3daed4f6c54f5f5c44a4",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          195,
+          81,
+          573,
+          687
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.6972,
+        "fullyOpaqueFraction": 0.2947,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/empty-trips.blend",
+        "bytes": 188024,
+        "sha256": "27fb42e175e760c7563c1fdb5b032dc37224b18e18c297643bd7896672ccd9eb",
+        "objects": 15,
+        "meshes": 13,
+        "curves": 2,
+        "orthoScale": 3.423905372619629,
+        "projectedBounds": [
+          [
+            -0.8462775945663452,
+            -1.2106757164001465,
+            -0.9483857750892639
+          ],
+          [
+            0.8242018222808838,
+            1.4770900011062622,
+            1.093074083328247
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/empty-trips-256.webp",
+          "bytes": 6774,
+          "sha256": "838565ecefc191c11b63cae8e4581c4dd1627473f59d1cc099ae3cceaa6f3935",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            63,
+            25,
+            193,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6843,
+          "fullyOpaqueFraction": 0.2827,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-trips-384.webp",
+          "bytes": 10462,
+          "sha256": "ba5d5ae5c6f36713297ee972d8342df2e0f6bfe980eeec4c0b4bd55e84dedf78",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            96,
+            39,
+            288,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6902,
+          "fullyOpaqueFraction": 0.2872,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-trips-512.webp",
+          "bytes": 15856,
+          "sha256": "2eb9d702716e8bf8aaa1d937d7ade06f5225b15a36789f70a7bce23626799eff",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            128,
+            52,
+            384,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6914,
+          "fullyOpaqueFraction": 0.2897,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "create-trip",
+      "meaning": "Start the first candidate plan; folded map and destination pin",
+      "source": {
+        "path": "renders/create-trip.png",
+        "bytes": 485452,
+        "sha256": "f728321bd112391f59db9af4692950ed3f7b68b058b0114b4c2c1fa9e773f0a3",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          82,
+          82,
+          686,
+          686
+        ],
+        "longestDimensionOccupancy": 0.7865,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.5378,
+        "fullyOpaqueFraction": 0.4543,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/create-trip.blend",
+        "bytes": 163640,
+        "sha256": "279a906adea4f02d640a2db3177d9cc1f2c31aa1517118f5666fea057ce51ca0",
+        "objects": 9,
+        "meshes": 8,
+        "curves": 1,
+        "orthoScale": 2.6739184856414795,
+        "projectedBounds": [
+          [
+            -1.0680938959121704,
+            -1.0730186700820923,
+            -0.9024577140808105
+          ],
+          [
+            1.021060824394226,
+            1.0260074138641357,
+            1.1613943576812744
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/create-trip-256.webp",
+          "bytes": 5846,
+          "sha256": "67367086fea23f55184bd264f7497cd39aaef76e77a9f03cbe6b43ae78f91538",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            25,
+            25,
+            231,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.5228,
+          "fullyOpaqueFraction": 0.4396,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/create-trip-384.webp",
+          "bytes": 9066,
+          "sha256": "4d3780389bea0e484fd2b34e7577c92e5760b60804a3dfdeffa42639c9b3f264",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            39,
+            39,
+            345,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.5289,
+          "fullyOpaqueFraction": 0.4456,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/create-trip-512.webp",
+          "bytes": 12170,
+          "sha256": "ff0574375e3467b0a270162ef93ae3056fcfd43e3f6e467baf3d9c635b85d041",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            53,
+            52,
+            459,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.532,
+          "fullyOpaqueFraction": 0.4486,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "empty-saved",
+      "meaning": "Successful empty saved-plan query; cards and bookmark",
+      "source": {
+        "path": "renders/empty-saved.png",
+        "bytes": 445276,
+        "sha256": "da7e94ddd3615e7a26a91c1c4536b40459f08907ef7229f9bf8c6343957941be",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          151,
+          81,
+          618,
+          687
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5007,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.6147,
+        "fullyOpaqueFraction": 0.3782,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/empty-saved.blend",
+        "bytes": 98949,
+        "sha256": "5ab7084a81b8194c9638310bdbb9a452f71f5b1ea30fc811cb559ebae8a74b5f",
+        "objects": 6,
+        "meshes": 6,
+        "curves": 0,
+        "orthoScale": 3.099881172180176,
+        "projectedBounds": [
+          [
+            -1.0111165046691895,
+            -1.230160117149353,
+            -1.020952582359314
+          ],
+          [
+            0.8619226813316345,
+            1.2032465934753418,
+            1.0554921627044678
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/empty-saved-256.webp",
+          "bytes": 5966,
+          "sha256": "ecc09f18bf98a8bed70b42966194578372225b8b886c8cd324fdb4d546ae35bf",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            48,
+            25,
+            208,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6021,
+          "fullyOpaqueFraction": 0.3669,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-saved-384.webp",
+          "bytes": 8686,
+          "sha256": "cce91c82906a78c01074179241ab8cd51f68517621faa008a422c33bb87f0ccd",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            73,
+            39,
+            311,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6069,
+          "fullyOpaqueFraction": 0.3707,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-saved-512.webp",
+          "bytes": 12250,
+          "sha256": "d1111083107d595546d815f04db309295bae6ec1adb551afc22a911ceece62a3",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            98,
+            52,
+            414,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6093,
+          "fullyOpaqueFraction": 0.3736,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "invite-companions",
+      "meaning": "Invite travel companions; two abstract people and plus",
+      "source": {
+        "path": "renders/invite-companions.png",
+        "bytes": 454043,
+        "sha256": "3db567a7d062c7b2d6b765024e048e7f01f798a10abd84cb7593364ec70c0523",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          108,
+          81,
+          660,
+          687
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.6342,
+        "fullyOpaqueFraction": 0.3568,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/invite-companions.blend",
+        "bytes": 169142,
+        "sha256": "37bf5c613e101635e6add32420feea0ddc2412bacf1a63cbfa03287b65d285a2",
+        "objects": 7,
+        "meshes": 7,
+        "curves": 0,
+        "orthoScale": 2.979034423828125,
+        "projectedBounds": [
+          [
+            -1.0675363540649414,
+            -1.163197636604309,
+            -1.0236207246780396
+          ],
+          [
+            1.0640504360198975,
+            1.175344467163086,
+            1.329665184020996
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/invite-companions-256.webp",
+          "bytes": 8670,
+          "sha256": "92bd834c3f165f4c2d81a37f113c13b1c3042fdfa6c6e002910d30f7b9b6d96a",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            34,
+            25,
+            222,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6198,
+          "fullyOpaqueFraction": 0.3426,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/invite-companions-384.webp",
+          "bytes": 13480,
+          "sha256": "86dd5f06b5309e81f26b21f953ae54fe8de820ad42f38f31dbc31958a2dfb99d",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            52,
+            39,
+            332,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6258,
+          "fullyOpaqueFraction": 0.3485,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/invite-companions-512.webp",
+          "bytes": 18038,
+          "sha256": "c7f2e7b1638c365f063fe22220a97a8e9ce6d8e4ed2405f81804105163901f16",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            70,
+            52,
+            442,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6287,
+          "fullyOpaqueFraction": 0.3514,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "compare-plans",
+      "meaning": "Two equal unselected candidates; no winning or confirmed state",
+      "source": {
+        "path": "renders/compare-plans.png",
+        "bytes": 485111,
+        "sha256": "3539bc3aa39f574b33b7605633db3dfb4aa82e285396c8d41278af1d77e6c34b",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          81,
+          97,
+          687,
+          671
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.5707,
+        "fullyOpaqueFraction": 0.4179,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/compare-plans.blend",
+        "bytes": 177403,
+        "sha256": "80bfc54ee0ac17ad336b22a99b0b035b24c2f78e7573702e8843b12b84c77a20",
+        "objects": 14,
+        "meshes": 12,
+        "curves": 2,
+        "orthoScale": 2.8187031745910645,
+        "projectedBounds": [
+          [
+            -1.106341004371643,
+            -1.050469994544983,
+            -0.9203903675079346
+          ],
+          [
+            1.106341004371643,
+            1.050516128540039,
+            0.9203882813453674
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/compare-plans-256.webp",
+          "bytes": 6512,
+          "sha256": "a8c3fec8bc6c6da2eeaf322ca0b0a7a3d3f5165e4b169d0ceaf2d77690d4f5d9",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            25,
+            30,
+            231,
+            226
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.5529,
+          "fullyOpaqueFraction": 0.4025,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/compare-plans-384.webp",
+          "bytes": 9774,
+          "sha256": "3d663728a7d6ff9510b0ec74e3c6a768781ac99e7cf1ebc8bb882c009951efeb",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            39,
+            46,
+            345,
+            338
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.5618,
+          "fullyOpaqueFraction": 0.4081,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/compare-plans-512.webp",
+          "bytes": 13622,
+          "sha256": "a4be4c941c1022af35ead5ff5a37f7514df74ad2ecb097d9b2983298b648e453",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            52,
+            62,
+            460,
+            450
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.5642,
+          "fullyOpaqueFraction": 0.4112,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "confirm-plan",
+      "meaning": "Server-confirmed itinerary; calendar and check, not a booking confirmation",
+      "source": {
+        "path": "renders/confirm-plan.png",
+        "bytes": 477932,
+        "sha256": "3a210ed56c9c86a56c3a115c66a39c3412e85f9a8d33f0c0ee4b7849462b4dce",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          152,
+          81,
+          616,
+          687
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.6223,
+        "fullyOpaqueFraction": 0.3695,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/confirm-plan.blend",
+        "bytes": 188798,
+        "sha256": "9aea63f89600e73ce0766ec85c9fc67550c44c25b00f74f5a6780573fe06d6c2",
+        "objects": 16,
+        "meshes": 13,
+        "curves": 3,
+        "orthoScale": 3.0096261501312256,
+        "projectedBounds": [
+          [
+            -0.9029925465583801,
+            -1.1734076738357544,
+            -0.875187337398529
+          ],
+          [
+            0.9029925465583801,
+            1.1891487836837769,
+            0.9894174933433533
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/confirm-plan-256.webp",
+          "bytes": 6804,
+          "sha256": "580d46ee45a8f938947a1f20dda13954d6f26f96c14a2d86bd296cb4e6515ee4",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            49,
+            25,
+            207,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.616,
+          "fullyOpaqueFraction": 0.3572,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/confirm-plan-384.webp",
+          "bytes": 10380,
+          "sha256": "a9fb7b9a5e095c4331d899a29c9422994ec45428280ceb0e78b402ee42de0ffe",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            74,
+            39,
+            310,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6151,
+          "fullyOpaqueFraction": 0.364,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/confirm-plan-512.webp",
+          "bytes": 13936,
+          "sha256": "060e1fb2a9b5cb8deeac51feb3276eb7ca0c43de6106a4e47a8202ca63a53660",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            100,
+            52,
+            412,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6186,
+          "fullyOpaqueFraction": 0.3655,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "empty-explore",
+      "meaning": "Successful empty exploration with no applied filters; compass",
+      "source": {
+        "path": "renders/empty-explore.png",
+        "bytes": 475172,
+        "sha256": "846cf988e0e6bcb624dd8630da173b5e9488bc4909200e411e22f9adf16f62ca",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          120,
+          81,
+          648,
+          687
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.623,
+        "fullyOpaqueFraction": 0.3694,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/empty-explore.blend",
+        "bytes": 226862,
+        "sha256": "cf434ec27986112298d07444f611bd7917e8f10811e23c65aefbc397cbdc6c58",
+        "objects": 11,
+        "meshes": 11,
+        "curves": 0,
+        "orthoScale": 2.932081937789917,
+        "projectedBounds": [
+          [
+            -1.0441803932189941,
+            -1.0441031455993652,
+            -0.7190684080123901
+          ],
+          [
+            0.9628497362136841,
+            1.2575812339782715,
+            0.8231457471847534
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/empty-explore-256.webp",
+          "bytes": 9486,
+          "sha256": "2c541149038ba7568f9967b0578137535dc02b8e2827053648d5be90a95ac1e1",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            38,
+            25,
+            218,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6108,
+          "fullyOpaqueFraction": 0.3573,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-explore-384.webp",
+          "bytes": 14902,
+          "sha256": "1612bf027c59dac67a9f2eb88d81b3b0c1c08a1bd458cc585eedbb810aa7878d",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            58,
+            39,
+            326,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.616,
+          "fullyOpaqueFraction": 0.3624,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-explore-512.webp",
+          "bytes": 20046,
+          "sha256": "1e09615d2bf1538bdcac47e1eb2dc30d4a1ce764b0b392e406276549e8ec5915",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            78,
+            52,
+            434,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6184,
+          "fullyOpaqueFraction": 0.3648,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    },
+    {
+      "name": "empty-search",
+      "meaning": "Successful empty result with applied filters; route card and magnifier",
+      "source": {
+        "path": "renders/empty-search.png",
+        "bytes": 451637,
+        "sha256": "323b6ee144b328ba17071563c9f3a2bd52b9a2e9e2bce3c8209c716dc5556af5",
+        "mode": "RGBA",
+        "width": 768,
+        "height": 768,
+        "alphaBounds": [
+          126,
+          81,
+          642,
+          687
+        ],
+        "longestDimensionOccupancy": 0.7891,
+        "alphaCenter": [
+          0.5,
+          0.5
+        ],
+        "fullyTransparentFraction": 0.6792,
+        "fullyOpaqueFraction": 0.3133,
+        "outerTwoPixelBorderTransparent": true
+      },
+      "model": {
+        "path": "models/empty-search.blend",
+        "bytes": 243540,
+        "sha256": "15b30e49a65e7d7df9f6f9543f655d9a14e103ad81eb3f45380b5d26efbe9fde",
+        "objects": 10,
+        "meshes": 8,
+        "curves": 2,
+        "orthoScale": 2.985150098800659,
+        "projectedBounds": [
+          [
+            -1.0071009397506714,
+            -1.2901004552841187,
+            -0.9471908807754517
+          ],
+          [
+            0.9913973808288574,
+            1.0532424449920654,
+            1.012768268585205
+          ]
+        ]
+      },
+      "variants": [
+        {
+          "path": "web/empty-search-256.webp",
+          "bytes": 7834,
+          "sha256": "65809e6af14742182dbb663463acf4db06cd775f0fcebf59ff49a519a63c6374",
+          "mode": "RGBA",
+          "width": 256,
+          "height": 256,
+          "alphaBounds": [
+            40,
+            25,
+            216,
+            231
+          ],
+          "longestDimensionOccupancy": 0.8047,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6664,
+          "fullyOpaqueFraction": 0.3009,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-search-384.webp",
+          "bytes": 11860,
+          "sha256": "576f2de58b0afacfc8ff79de07ec3d257661df132b8b09f8b7be4e37e5d02549",
+          "mode": "RGBA",
+          "width": 384,
+          "height": 384,
+          "alphaBounds": [
+            61,
+            39,
+            323,
+            345
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6715,
+          "fullyOpaqueFraction": 0.3059,
+          "outerTwoPixelBorderTransparent": true
+        },
+        {
+          "path": "web/empty-search-512.webp",
+          "bytes": 16454,
+          "sha256": "8b61d202a7daec15aaa60d94905f634917691b90521e4da7874a36db2998a0a8",
+          "mode": "RGBA",
+          "width": 512,
+          "height": 512,
+          "alphaBounds": [
+            82,
+            52,
+            430,
+            460
+          ],
+          "longestDimensionOccupancy": 0.7969,
+          "alphaCenter": [
+            0.5,
+            0.5
+          ],
+          "fullyTransparentFraction": 0.6742,
+          "fullyOpaqueFraction": 0.3086,
+          "outerTwoPixelBorderTransparent": true
+        }
+      ]
+    }
+  ]
+}

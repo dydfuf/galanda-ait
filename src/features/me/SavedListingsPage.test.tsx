@@ -92,7 +92,7 @@ describe("SavedListingsPage (RAON-254 DISC-6)", () => {
     );
     const { container } = renderPage();
     expect(screen.getByText("아직 저장한 여행 일정이 없어요")).toBeInTheDocument();
-    expect(container.querySelector('img[src$="empty-saved-light.svg"]')).not.toBeNull();
+    expect(container.querySelector('img[src$="empty-saved.webp"]')).not.toBeNull();
   });
 
   it("저장한 LISTED 항목만 카드로 노출한다(read-through)", () => {
