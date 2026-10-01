@@ -50,6 +50,9 @@ export interface DetailedPlanViewModel extends PlanSummaryData {
   readonly memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel>;
   /** memberOpinions가 없는 legacy voteCount처럼 stable participant에 귀속할 수 없는 수예요. */
   readonly unattributedOpinionCount: number;
+  /** 현재 참여자가 아닌 사람의 과거 의견도 삭제하지 않고 구분해서 표시해요. */
+  readonly departedOpinionText?: string;
+  readonly departedHardOpinionCount: number;
 }
 
 export interface PlanDetailViewModel {
@@ -108,6 +111,7 @@ export const toPlanDetailViewModel = (
 ): PlanDetailViewModel => {
   const confirmed = getConfirmedPlan(room);
   const roomConfirmed = isRoomConfirmed(room);
+  const currentParticipantIds = new Set(room.members.map(({ id }) => id));
   const viewer = getRoomActor(room, currentUserIds);
 
   let decisionStatusText = "여행안을 고르고 있어요";
@@ -317,6 +321,15 @@ export const toPlanDetailViewModel = (
       }
 
       const privateOpinions = p.memberOpinions ?? [];
+      const departedOpinions = privateOpinions.filter(
+        ({ userId }) => !currentParticipantIds.has(userId),
+      );
+      const departedOpinionText = departedOpinions.length > 0
+        ? `이전 참여자의 과거 의견 ${departedOpinions.length}개가 포함돼요. 현재 참여 인원에는 포함하지 않아요.`
+        : undefined;
+      const departedHardOpinionCount = departedOpinions.filter(
+        ({ reaction }) => reaction === "HARD",
+      ).length;
       const unattributedOpinionCount =
         p.memberOpinions === undefined ? p.voteCount : 0;
       const memberOpinions: ReadonlyArray<PlanMemberOpinionViewModel> =
@@ -386,6 +399,8 @@ export const toPlanDetailViewModel = (
         timelineItems,
         memberOpinions,
         unattributedOpinionCount,
+        departedOpinionText,
+        departedHardOpinionCount,
       };
     },
   );

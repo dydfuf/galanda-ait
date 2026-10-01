@@ -476,6 +476,12 @@ export function PlanDetailPage(): JSX.Element {
         </MobileListItem>
       </MobileList>
 
+      {plan.departedOpinionText && (
+        <p className="px-(--app-inline-padding) py-3 text-sm text-muted-foreground">
+          {plan.departedOpinionText}
+        </p>
+      )}
+
       {room.canCreatePlan && (
         <>
           <SectionHeader title="다른 행동" />

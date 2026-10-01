@@ -566,6 +566,30 @@ describe("single plan confirmation", () => {
       expect(within(dialog).getByText("어려워요 의견이 없어요.")).toBeInTheDocument();
     }
   });
+  it.each([false, true])("떠난 참여자의 HARD 기록을 현재 참여와 구분한다 (현재 HARD: %s)", async (hasCurrentHard) => {
+    const memberOpinions: NonNullable<TripRoom["plans"][number]["memberOpinions"]> = [
+      { userId: guestId, userName: "이전 참여자", reaction: "HARD", reason: "비공개 사유" },
+      ...(hasCurrentHard ? [{ userId: hostId, userName: "방장", reaction: "HARD" as const }] : []),
+    ];
+    const room: TripRoom = {
+      ...publishedRoom,
+      plans: [{ ...publishedRoom.plans[0], memberOpinions }],
+    };
+    const vm = toPlanDetailViewModel(room, hostId);
+    expect(vm.plans[0].memberOpinions).toHaveLength(hasCurrentHard ? 2 : 1);
+    mockUseTripRoomDetailQuery.mockReturnValue(queryResult(vm));
+    renderPage();
+
+    const historicalText = "이전 참여자의 과거 의견 1개가 포함돼요. 현재 참여 인원에는 포함하지 않아요.";
+    expect(screen.getByText(historicalText)).toBeInTheDocument();
+    expect(screen.queryByText("비공개 사유")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "이 여행안으로 확정하기" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 여행안으로 확정할까요?" });
+    expect(within(dialog).getByText(`의견을 남긴 참여자 ${hasCurrentHard ? 1 : 0}/2명`)).toBeInTheDocument();
+    expect(within(dialog).getByText(historicalText)).toBeInTheDocument();
+    expect(within(dialog).getByText(`어려워요 의견 ${hasCurrentHard ? 2 : 1}개 중 이전 참여자의 과거 의견 1개가 포함돼요.`)).toBeInTheDocument();
+    expect(within(dialog).queryByText("어려워요 의견이 없어요.")).not.toBeInTheDocument();
+  });
   it("host reviews a single viable plan and submits once with room revision", async () => {
     const vm = toPlanDetailViewModel(publishedRoom, hostId);
     expect(vm.plans[0].canConfirm).toBe(true);
