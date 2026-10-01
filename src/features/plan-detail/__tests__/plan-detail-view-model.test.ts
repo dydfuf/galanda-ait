@@ -62,6 +62,23 @@ describe("toPlanDetailViewModel 세션 신원 처리 (RAON-149)", (): void => {
     expect("reason" in (plan.memberOpinions[1] ?? {})).toBe(false);
   });
 
+  it.each(["LIKE", "OKAY", "HARD"] as const)("이전 참여자의 %s 의견을 보존하고 과거 기록으로 구분한다", (reaction) => {
+    const departedRoom: TripRoom = {
+      ...room,
+      plans: [{
+        ...room.plans[0],
+        memberOpinions: [{ userId: UserIdSchema.make("departed"), userName: "이전 참여자", reaction, reason: "비공개 사유" }],
+      }],
+    };
+    const plan = toPlanDetailViewModel(departedRoom).plans[0];
+    expect(plan.departedOpinionText).toBe("이전 참여자의 과거 의견 1개가 포함돼요. 현재 참여 인원에는 포함하지 않아요.");
+    expect(plan.departedHardOpinionCount).toBe(reaction === "HARD" ? 1 : 0);
+    expect(plan.memberOpinions).toEqual([{ userId: "departed", userName: "이전 참여자", reaction }]);
+    expect(plan.opinions.likeCount + plan.opinions.okayCount + plan.opinions.hardCount).toBe(1);
+    expect(toPlanDetailViewModel(room).plans[0].departedOpinionText).toBeUndefined();
+    expect(toPlanDetailViewModel(room).plans[0].departedHardOpinionCount).toBe(0);
+  });
+
   it("세션 사용자가 없으면 '내 의견'이 존재하지 않는다 (user-local-me 폴백 금지)", (): void => {
     const vm = toPlanDetailViewModel(room, undefined);
     const plan = vm.plans[0];

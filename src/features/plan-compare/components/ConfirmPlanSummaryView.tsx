@@ -147,6 +147,10 @@ export function ConfirmPlanSummaryView({ summary }: ConfirmPlanSummaryViewProps)
         <p css={rowValueStyle}>{summary.hardOpinionText}</p>
       </div>
 
+      {summary.departedOpinionText && (
+        <p css={rowValueStyle}>{summary.departedOpinionText}</p>
+      )}
+
       {summary.needCheckMessages.length > 0 && (
         <div css={needCheckBoxStyle}>
           <p css={needCheckTitleStyle}>
