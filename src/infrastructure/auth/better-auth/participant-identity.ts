@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   ParticipantIdSchema,
   type ParticipantId,
@@ -130,9 +130,20 @@ export const linkAnonymousParticipant = async (
         });
     }
 
-    await tx
+    // A concurrent login may already have moved this Guest to another account.
+    // Recheck ownership in the write itself so stale requests cannot take it over.
+    const [linked] = await tx
       .update(participants)
       .set({ authUserId: registeredAuthUserId })
-      .where(eq(participants.id, anonymousParticipant.id));
+      .where(and(
+        eq(participants.id, anonymousParticipant.id),
+        eq(participants.authUserId, anonymousAuthUserId)
+      ))
+      .returning({ id: participants.id });
+
+    if (!linked) {
+      // Roll back registered aliases/detachment too; Toss removes its new session.
+      throw new Error("Anonymous participant mapping changed during linking");
+    }
   });
 };

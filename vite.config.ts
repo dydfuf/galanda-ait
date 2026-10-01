@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { buildIdentityPlugin } from './scripts/build-identity.ts'
 
 import aitDevtools from "@apps-in-toss/devtools/unplugin";
 
@@ -38,6 +39,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
+      buildIdentityPlugin(import.meta.dirname),
       ...(isAitTarget
         ? [aitDevtools.vite()]
         : [

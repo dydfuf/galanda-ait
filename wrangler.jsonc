@@ -4,6 +4,7 @@
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-22",
   "compatibility_flags": ["nodejs_compat"],
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "observability": {
     "enabled": true,
     "logs": {
@@ -24,6 +25,7 @@
   "env": {
     "staging": {
       "workers_dev": true,
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
       "observability": {
         "enabled": true,
         "logs": {
