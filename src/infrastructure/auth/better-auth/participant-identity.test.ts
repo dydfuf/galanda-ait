@@ -43,7 +43,7 @@ describe("Participant identity mapping", () => {
       [],
       [],
       [],
-      [],
+      [["participant-guest"]],
       [],
     ]);
 
@@ -66,5 +66,20 @@ describe("Participant identity mapping", () => {
       "participant-guest",
     ]);
     expect(calls[6]?.params).toContain("auth-registered");
+    expect(calls[6]?.params.at(-1)).toBe("auth-guest");
+    expect(calls[6]?.text).toContain('"participant"."auth_user_id" =');
+    expect(calls[6]?.text).toContain('returning "id"');
+  });
+
+  it("rolls back when a concurrent link has changed the Guest owner", async () => {
+    const { db, calls } = makeDatabase([
+      [], [["participant-guest"]], [["participant-registered"]], [], [], [], [], [],
+    ]);
+
+    await expect(linkAnonymousParticipant(db, "auth-guest", "auth-registered"))
+      .rejects.toThrow("Anonymous participant mapping changed during linking");
+
+    expect(calls.at(-1)?.text).toBe("rollback");
+    expect(calls.some(({ text }) => text === "commit")).toBe(false);
   });
 });

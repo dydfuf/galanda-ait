@@ -33,3 +33,34 @@ jobs:
         run: bash scripts/check-drizzle-drift.sh
       - run: pnpm build
       - run: pnpm build:ait
+
+  auth-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: galanda_auth_test
+          POSTGRES_PASSWORD: synthetic-postgres-test-only
+        ports:
+          - 127.0.0.1:55432:5432
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U postgres -d galanda_auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:postgres
+        env:
+          GALANDA_TEST_PG_PORT: 55432
