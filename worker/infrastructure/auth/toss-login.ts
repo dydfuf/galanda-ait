@@ -150,13 +150,6 @@ export const tossLogin = ({ db, fetcher }: TossLoginOptions): BetterAuthPlugin =
         }
         await setSessionCookie(ctx, { session, user: registeredUser });
 
-        if (
-          previousSession?.user.isAnonymous &&
-          previousSession.user.id !== registeredUser.id
-        ) {
-          await ctx.context.internalAdapter.deleteUser(previousSession.user.id);
-        }
-
         return ctx.json({ success: true, user: { id: registeredUser.id } });
       }
     ),
