@@ -95,7 +95,7 @@ function fixture() {
     await ensureParticipantIdentity(db, user.id);
     await seedAliases(user.id, [`${suffix}-older`]);
     const ctx = await auth.$context;
-    // Real dependent rows let cleanup exercise ON DELETE CASCADE, not just mocks.
+    // Real dependent rows verify production Guest cleanup, not just adapter calls.
     await ctx.internalAdapter.createSession(user.id);
     await ctx.internalAdapter.createAccount({ issuer: "synthetic-guest", accountId: user.id, providerId: "synthetic-guest", userId: user.id });
     await db.insert(schema.tripRooms).values({ id: suffix, title: "Synthetic trip", destination: "Synthetic" });
@@ -168,6 +168,20 @@ describe("production Better Auth on PostgreSQL 15 with galanda_worker privileges
     await expect(runtime.query('CREATE TABLE forbidden_runtime_table (id text)')).rejects.toMatchObject({ code: "42501" });
   });
 
+  it("applies auth SET NULL/cascades and participant alias/domain FK cascades", async () => {
+    const f = fixture();
+    const guest = await f.guest();
+    // Direct DML distinguishes real FK actions from Better Auth's explicit cleanup.
+    await db.delete(schema.user).where(eq(schema.user.id, guest.id));
+    await expectGuestCleaned(guest.id, guest.trip);
+    expect(await db.select({ user: schema.participants.authUserId }).from(schema.participants).where(eq(schema.participants.id, guest.id))).toEqual([{ user: null }]);
+    expect(await db.select().from(schema.participantAliases)).toHaveLength(1);
+    await db.delete(schema.participants).where(eq(schema.participants.id, guest.older));
+    expect(await db.select().from(schema.participantAliases)).toHaveLength(0);
+    await db.delete(schema.participants).where(eq(schema.participants.id, guest.id));
+    expect(await db.select().from(schema.tripInvites)).toHaveLength(0);
+  });
+
   it.each([false, true])("preserves stable identities and domain FKs while removing Guest auth rows (existing=%s)", async (existing) => {
     const f = fixture();
     const registered = existing ? await f.existingToss() : undefined;
@@ -208,13 +222,17 @@ describe("production Better Auth on PostgreSQL 15 with galanda_worker privileges
     await expectGuestCleaned(guest.id, guest.trip);
   });
 
-  it("does not let simultaneous links transfer the same Guest to two different accounts", async () => {
+  it.each([false, true])("does not transfer one Guest to two concurrent accounts (existing=%s)", async (existing) => {
     const f = fixture();
-    const first = await f.existingToss("1234");
-    const second = await f.existingToss("5678");
+    const first = existing ? await f.existingToss("1234") : undefined;
+    const second = existing ? await f.existingToss("5678") : undefined;
     const guest = await f.guest();
-    const accounts = [first, second];
     const responses = await overlapLinks(guest.id, () => [f.toss(guest.cookie, "1234"), f.toss(guest.cookie, "5678")]);
+    const users = await db.select().from(schema.user);
+    const accounts = [first, second].map((registered, index) => registered ?? {
+      id: users.find((user) => user.email === `toss-${["1234", "5678"][index]}@auth.galanda.invalid`)!.id,
+      participant: users.find((user) => user.email === `toss-${["1234", "5678"][index]}@auth.galanda.invalid`)!.id,
+    });
     expect(responses.filter((r) => r.status === 200)).toHaveLength(1);
     const winner = responses.findIndex((r) => r.status === 200);
     const loser = 1 - winner;
@@ -222,9 +240,9 @@ describe("production Better Auth on PostgreSQL 15 with galanda_worker privileges
     expect(responses[loser]!.headers.get("set-cookie")).toBeNull();
     const winnerIdentity = await ensureParticipantIdentity(db, accounts[winner]!.id);
     expect(winnerIdentity.participantId).toBe(guest.id);
-    expect(new Set(winnerIdentity.participantIds)).toEqual(new Set([guest.id, guest.older, accounts[winner]!.participant, accounts[winner]!.older]));
-    expect(await ensureParticipantIdentity(db, accounts[loser]!.id)).toEqual({ participantId: accounts[loser]!.participant, participantIds: [accounts[loser]!.participant, accounts[loser]!.older] });
-    expect(await db.select().from(schema.session).where(eq(schema.session.userId, accounts[loser]!.id))).toHaveLength(1);
+    expect(new Set(winnerIdentity.participantIds)).toEqual(new Set([guest.id, guest.older, ...(existing ? [accounts[winner]!.participant, `registered-${["1234", "5678"][winner]}-older`] : [])]));
+    expect(await ensureParticipantIdentity(db, accounts[loser]!.id)).toEqual({ participantId: accounts[loser]!.participant, participantIds: [accounts[loser]!.participant, ...(existing ? [`registered-${["1234", "5678"][loser]}-older`] : [])] });
+    expect(await db.select().from(schema.session).where(eq(schema.session.userId, accounts[loser]!.id))).toHaveLength(existing ? 1 : 0);
     await expectGuestCleaned(guest.id, guest.trip);
   });
 

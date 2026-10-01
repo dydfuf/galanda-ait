@@ -415,7 +415,9 @@ export const buildConfirmPlanSummary = (
   hardOpinionText:
     plan.opinions.hardCount > 0
       ? `어려워요 의견 ${plan.opinions.hardCount}개가 있어요.`
-      : "어려워요 의견이 없어요.",
+      : plan.unattributedOpinionCount > 0
+        ? "과거 의견의 반응을 확인할 수 없어 어려워요 의견 여부를 알 수 없어요."
+        : "어려워요 의견이 없어요.",
   needCheckMessages: plan.bookingRisks.map((risk) => risk.message),
 });
 
