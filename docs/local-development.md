@@ -236,3 +236,42 @@ dig +short A    db.<project-ref>.supabase.co   # 비어 있음
 
 staging DB로 개발해야 한다면 `DATABASE_URL`을 돌려 놓지 말고 `pnpm dev:staging`을 사용해요.
 자격증명이 Cloudflare에 남고 Hyperdrive 경계가 유지돼요.
+
+## Guest → Toss PostgreSQL 통합 검증
+
+`pnpm test:postgres`는 production `makeBetterAuth`와 실제 Drizzle/pg adapter를
+PostgreSQL 15에 연결한다. 기본 `pnpm test`의 memory/SQL fixture 검증과 별개이며,
+CI의 `auth-postgres` job은 커밋된 migration 전체를 빈 DB에 적용한 뒤
+`galanda_worker` 최소 권한으로 실행한다. 실제 Toss 요청은 mock이며 외부 fetch는
+실패하도록 막는다. 기존 `verify` gate와 `pnpm check`는 그대로 유지한다.
+
+로컬에서는 **새 disposable container**에만 실행한다. 일반 개발 DB나 원격 DB는
+사용하지 않는다. 데이터는 tmpfs에 있고 컨테이너 종료와 함께 사라진다.
+아래 비밀번호는 이 임시 서비스에만 쓰는 공개 synthetic fixture다.
+
+```bash
+docker run --rm --name galanda-auth-postgres \
+  --tmpfs /var/lib/postgresql/data \
+  -p 127.0.0.1:55432:5432 \
+  -e POSTGRES_DB=galanda_auth_test \
+  -e POSTGRES_PASSWORD=synthetic-postgres-test-only \
+  postgres:15-alpine
+# 다른 터미널에서 서버 준비 후:
+GALANDA_TEST_PG_PORT=55432 pnpm test:postgres
+# 완료 후 첫 터미널에서 Ctrl+C
+```
+
+suite는 포트만 입력받으며 loopback host, DB 이름과 synthetic credential은 고정한다.
+`.dev.vars`, `DATABASE_URL`, `MIGRATION_DATABASE_URL`을 읽지 않는다.
+포트 누락, DB 연결 실패, PostgreSQL major version 불일치, 이미 테이블이 있는 DB는
+skip 없이 실패한다. 다시 실행할 때는 새 컨테이너를 띄운다.
+
+검증 범위는 실제 unique/FK/check 제약, Guest auth/session/account 삭제와 domain FK
+보존, participant transaction rollback과 재시도, 같은 Guest의 동시 연결이다.
+동시성 검증은 PostgreSQL row lock으로 두 요청의 겹침을 확인한다.
+Hyperdrive, 실계정 OAuth, AIT 기기 검증을 대신하지 않는다.
+
+동시 연결은 participant ID와 원래 Guest auth user ID를 함께 조건으로 UPDATE한다.
+먼저 성공한 요청 뒤에 소유권이 달라졌다면 전체 연결 transaction을 rollback하고,
+실패 요청의 새 session을 삭제하여 성공 cookie를 발급하지 않는다. 다시 로그인해도
+다른 계정에 이미 연결된 Guest의 권한을 가져오지 않는다.

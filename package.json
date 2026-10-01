@@ -31,7 +31,8 @@
     "check": "pnpm lint && pnpm test && pnpm check:db && pnpm build && pnpm build:ait",
     "preview": "vite preview",
     "deploy": "ait deploy",
-    "deploy:staging": "pnpm build:web && wrangler deploy --env staging"
+    "deploy:staging": "pnpm build:web && wrangler deploy --env staging",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "3.0.3",
