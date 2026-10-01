@@ -270,3 +270,8 @@ skip 없이 실패한다. 다시 실행할 때는 새 컨테이너를 띄운다.
 보존, participant transaction rollback과 재시도, 같은 Guest의 동시 연결이다.
 동시성 검증은 PostgreSQL row lock으로 두 요청의 겹침을 확인한다.
 Hyperdrive, 실계정 OAuth, AIT 기기 검증을 대신하지 않는다.
+
+동시 연결은 participant ID와 원래 Guest auth user ID를 함께 조건으로 UPDATE한다.
+먼저 성공한 요청 뒤에 소유권이 달라졌다면 전체 연결 transaction을 rollback하고,
+실패 요청의 새 session을 삭제하여 성공 cookie를 발급하지 않는다. 다시 로그인해도
+다른 계정에 이미 연결된 Guest의 권한을 가져오지 않는다.

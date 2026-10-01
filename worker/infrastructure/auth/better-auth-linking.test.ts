@@ -42,7 +42,11 @@ function participantDatabase() {
           failUpdate = false;
           throw new Error("synthetic participant write failure");
         }
-        participants.set(values.at(-1)!, values[0]!);
+        const returning = sql.includes('returning "id"');
+        const id = values.at(returning ? -2 : -1)!;
+        if (returning && participants.get(id) !== values.at(-1)) return { rows: [] };
+        participants.set(id, values[0]!);
+        if (returning) return { rows: [[id]] };
       } else if (sql.startsWith('update "participant_alias"')) {
         for (const [id, canonical] of aliases) if (canonical === values[1]) aliases.set(id, values[0]!);
       } else if (sql.startsWith('insert into "participant_alias"')) {

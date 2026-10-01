@@ -244,6 +244,10 @@ describe("production Better Auth on PostgreSQL 15 with galanda_worker privileges
     expect(await ensureParticipantIdentity(db, accounts[loser]!.id)).toEqual({ participantId: accounts[loser]!.participant, participantIds: [accounts[loser]!.participant, ...(existing ? [`registered-${["1234", "5678"][loser]}-older`] : [])] });
     expect(await db.select().from(schema.session).where(eq(schema.session.userId, accounts[loser]!.id))).toHaveLength(existing ? 1 : 0);
     await expectGuestCleaned(guest.id, guest.trip);
+    const retry = await f.toss(guest.cookie, ["1234", "5678"][loser]);
+    expect(retry.status).toBe(200);
+    expect(await ensureParticipantIdentity(db, accounts[winner]!.id)).toEqual(winnerIdentity);
+    expect((await ensureParticipantIdentity(db, accounts[loser]!.id)).participantId).toBe(accounts[loser]!.participant);
   });
 
   it("keeps simultaneous same-account requests safe and permits a subsequent login retry", async () => {
