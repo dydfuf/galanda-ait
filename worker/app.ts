@@ -18,6 +18,7 @@ import type { UserSession } from "../src/core/domain/room.ts";
 import { logServerFailure } from "./http/safe-log.ts";
 import { formatApiError } from "./http/api-error.ts";
 import { healthRoute } from "./routes/health.ts";
+import { versionRoute } from "./routes/version.ts";
 import { invitesRoute, tripsRoute } from "./routes/trips.ts";
 import { exploreRoute, explorePlanListingRoute, meRoute } from "./routes/explore.ts";
 import { tripResourcesRoute } from "./routes/trip-resources.ts";
@@ -116,6 +117,8 @@ export function createApp(dependencies: AppDependencies = {}) {
     return c.json({ emailAndPassword: c.env.APP_ENV === "staging" });
   });
 
+  // Build identity stays available without a database or authenticated session.
+  app.route("/api/version", versionRoute);
   app.use("/api/*", databaseMiddleware);
   app.all("/api/auth/*", (c) => {
     if (!c.var.database) {
