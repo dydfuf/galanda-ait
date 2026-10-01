@@ -137,6 +137,48 @@ describe("확정 요청 중복 방지 (RAON-143)", (): void => {
 });
 
 describe("확정 전 재확인 요약 (RAON-143)", (): void => {
+  it.each<{
+    name: string;
+    memberOpinions: TripRoom["plans"][number]["memberOpinions"];
+    voteCount: number;
+    hardOpinionText: string;
+  }>([
+    {
+      name: "legacy 양수의 반응은 알 수 없음",
+      memberOpinions: undefined,
+      voteCount: 5,
+      hardOpinionText: "과거 의견의 반응을 확인할 수 없어 어려워요 의견 여부를 알 수 없어요.",
+    },
+    {
+      name: "명시적 빈 의견은 과거 voteCount보다 우선함",
+      memberOpinions: [],
+      voteCount: 5,
+      hardOpinionText: "어려워요 의견이 없어요.",
+    },
+    {
+      name: "legacy 0은 알려진 의견 없음",
+      memberOpinions: undefined,
+      voteCount: 0,
+      hardOpinionText: "어려워요 의견이 없어요.",
+    },
+    {
+      name: "확인된 어려워요 의견은 개수 표시",
+      memberOpinions: [
+        { userId: MEMBER_ID, userName: "참여자", reaction: "HARD" },
+      ],
+      voteCount: 0,
+      hardOpinionText: "어려워요 의견 1개가 있어요.",
+    },
+  ])("$name", ({ memberOpinions, voteCount, hardOpinionText }): void => {
+    const room = makeRoom();
+    const plan = toPlanDetailViewModel({
+      ...room,
+      plans: [{ ...room.plans[0], memberOpinions, voteCount }],
+    }, HOST_ID).plans[0];
+
+    expect(buildConfirmPlanSummary(plan).hardOpinionText).toBe(hardOpinionText);
+  });
+
   it("날짜·경로·총액과 확인이 필요한 예약 항목을 모아 보여준다", (): void => {
     const vm = toPlanDetailViewModel(makeRoom(), HOST_ID);
     const plan = vm.plans.find((p) => p.id === "plan-basic");
