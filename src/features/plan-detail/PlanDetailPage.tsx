@@ -161,6 +161,15 @@ export function PlanDetailPage(): JSX.Element {
     : canChangeOpinion
       ? "아직 내 의견이 없어요"
       : "의견을 열람할 수 있어요";
+  const currentParticipantIds = new Set(room.memberParticipants.map(({ id }) => id));
+  const opinionParticipantCount = new Set(
+    plan.memberOpinions
+      .map(({ userId }) => userId)
+      .filter((id) => currentParticipantIds.has(id)),
+  ).size;
+  const confirmationParticipationText = plan.unattributedOpinionCount > 0
+    ? `회원과 연결되지 않은 과거 의견 ${plan.unattributedOpinionCount}개가 있어요. 의견을 남긴 참여자 수와 반응은 확인할 수 없어요.`
+    : `의견을 남긴 참여자 ${opinionParticipantCount}/${currentParticipantIds.size}명`;
 
   const openOpinionSheet = (): void => {
     if (
@@ -503,7 +512,7 @@ export function PlanDetailPage(): JSX.Element {
             </DrawerHeader>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-2">
               <ConfirmPlanSummaryView summary={buildConfirmPlanSummary(plan)} />
-              <p className="text-sm text-muted-foreground">의견을 남긴 참여자 {plan.memberOpinions.length}/{room.memberCount}명</p>
+              <p className="text-sm text-muted-foreground">{confirmationParticipationText}</p>
               {confirmError && <p role="alert" className="text-destructive-strong">{confirmError}</p>}
             </div>
             <DrawerFooter className="flex-row *:min-w-0 *:flex-1">

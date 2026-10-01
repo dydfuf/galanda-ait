@@ -498,6 +498,74 @@ describe("PlanDetailPage permission and overlay contracts", () => {
 
 describe("single plan confirmation", () => {
   const publishedRoom: TripRoom = { ...baseRoom, plans: [{ ...baseRoom.plans[0], status: "VOTING", revision: RevisionSchema.make(1), routes: [{ city: "도쿄", arrivalDate: "2026-09-01", departureDate: "2026-09-03" }], transports: [...baseRoom.plans[0].transports!, { ...baseRoom.plans[0].transports![0], id: "transport-2", fromCity: "도쿄", toCity: "인천" }] }] };
+  it.each<{
+    name: string;
+    memberOpinions: TripRoom["plans"][number]["memberOpinions"];
+    voteCount: number;
+    participationText: string;
+  }>([
+    {
+      name: "legacy 양수는 참여 인원과 반응을 알 수 없는 과거 기록으로 표시한다",
+      memberOpinions: undefined,
+      voteCount: 5,
+      participationText: "회원과 연결되지 않은 과거 의견 5개가 있어요. 의견을 남긴 참여자 수와 반응은 확인할 수 없어요.",
+    },
+    {
+      name: "명시적인 빈 의견 목록에서는 voteCount를 참여 인원으로 쓰지 않는다",
+      memberOpinions: [],
+      voteCount: 5,
+      participationText: "의견을 남긴 참여자 0/2명",
+    },
+    {
+      name: "legacy 0은 알려진 응답 0명으로 표시한다",
+      memberOpinions: undefined,
+      voteCount: 0,
+      participationText: "의견을 남긴 참여자 0/2명",
+    },
+    {
+      name: "현재 참여자 의견만 인원에 포함하고 떠난 참여자는 제외한다",
+      memberOpinions: [
+        { userId: hostId, userName: "방장", reaction: "OKAY" },
+        { userId: guestId, userName: "이전 참여자", reaction: "LIKE" },
+      ],
+      voteCount: 1,
+      participationText: "의견을 남긴 참여자 1/2명",
+    },
+    {
+      name: "중복된 의견 기록이 있어도 현재 참여자 ID를 한 번씩만 센다",
+      memberOpinions: [
+        { userId: hostId, userName: "방장", reaction: "LIKE" },
+        { userId: hostId, userName: "방장", reaction: "LIKE" },
+        { userId: memberId, userName: "참여자", reaction: "OKAY" },
+      ],
+      voteCount: 2,
+      participationText: "의견을 남긴 참여자 2/2명",
+    },
+  ])("$name", async ({ memberOpinions, voteCount, participationText }) => {
+    const room: TripRoom = {
+      ...publishedRoom,
+      plans: [{ ...publishedRoom.plans[0], memberOpinions, voteCount }],
+    };
+    mockUseTripRoomDetailQuery.mockReturnValue(
+      queryResult(toPlanDetailViewModel(room, hostId)),
+    );
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "이 여행안으로 확정하기" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "이 여행안으로 확정할까요?",
+    });
+
+    expect(within(dialog).getByText(participationText)).toBeInTheDocument();
+    if (memberOpinions === undefined && voteCount > 0) {
+      expect(within(dialog).queryByText(/의견을 남긴 참여자 \d+\/\d+명/)).not.toBeInTheDocument();
+      expect(within(dialog).queryByText("어려워요 의견이 없어요.")).not.toBeInTheDocument();
+      expect(within(dialog).getByText("과거 의견의 반응을 확인할 수 없어 어려워요 의견 여부를 알 수 없어요.")).toBeInTheDocument();
+    } else {
+      expect(within(dialog).queryByText(/회원과 연결되지 않은 과거 의견/)).not.toBeInTheDocument();
+      expect(within(dialog).getByText("어려워요 의견이 없어요.")).toBeInTheDocument();
+    }
+  });
   it("host reviews a single viable plan and submits once with room revision", async () => {
     const vm = toPlanDetailViewModel(publishedRoom, hostId);
     expect(vm.plans[0].canConfirm).toBe(true);
