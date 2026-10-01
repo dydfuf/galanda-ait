@@ -61,12 +61,16 @@ export const makeBetterAuth = (
       : {}),
     plugins: [
       anonymous({
-        onLinkAccount: ({ anonymousUser, newUser }) =>
-          linkAnonymousParticipant(
+        onLinkAccount: ({ anonymousUser, newUser, ctx }) => {
+          // Toss links before issuing its cookie so a failed link can roll back
+          // the new session. The anonymous plugin still owns Guest cleanup.
+          if (ctx.path === "/sign-in/toss") return;
+          return linkAnonymousParticipant(
             db,
             anonymousUser.user.id,
             newUser.user.id
-          ),
+          );
+        },
       }),
       tossLogin({ db, fetcher: env.TOSS_MTLS }),
     ],
